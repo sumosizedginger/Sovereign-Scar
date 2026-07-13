@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Voxel Engine Kit — top-down 8-way example</title>
+    <link rel="icon" href="data:,">
+    <style>
+        html, body { margin: 0; height: 100%; background: #0a0514; overflow: hidden; font-family: ui-monospace, monospace; }
+        #hud {
+            position: fixed; top: 12px; left: 12px; z-index: 10;
+            color: #cfe8ff; background: rgba(8,6,20,0.72); border: 1px solid #2a2a44;
+            padding: 12px 14px; border-radius: 8px; font-size: 13px; line-height: 1.55;
+            max-width: 360px; white-space: pre-wrap;
+        }
+        #hud b { color: #7fe0ff; }
+        #nav { position: fixed; top: 12px; right: 12px; z-index: 10; }
+        #nav a { color: #7fe0ff; font-family: ui-monospace, monospace; font-size: 12px; text-decoration: none; }
+    </style>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "../lib/three/three.module.min.js",
+            "three/addons/": "../lib/three/addons/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div id="hud">loading…</div>
+    <div id="nav"><a href="../index.html">&larr; kit home</a> &nbsp;|&nbsp; <a href="./voxel-showcase.html">showcase &rarr;</a></div>
+    <script type="module">
+        import * as THREE from 'three';
+        import { scene, camera, renderer, composer, onResize } from '../src/engine/renderer.js';
+        import { initLights } from '../src/engine/lights.js';
+        import { CollisionWorld } from '../src/engine/collision.js';
+        import { makeFacing } from '../src/combat/facing.js';
+        import { hitboxCheck } from '../src/combat/hitbox.js';
+        import { buildTorso, buildHead, buildArm, buildLeg } from '../src/characters/builders.js';
+        import { buildVoxelGeo } from '../src/voxel/core.js';
+        import { SUMO_PALETTE, S } from '../src/voxel/palette.js';
+
+        // ── Camera: replace the belt-scroller's locked side view with an
+        // angled top-down follow. This is the "swap the camera block" porting
+        // note from the README made real. ──
+        initLights();
+        camera.position.set(0, 22, 14);
+        camera.lookAt(0, 0, 0);
+        window.addEventListener('resize', onResize);
+
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(60, 60),
+            new THREE.MeshStandardMaterial({ color: 0x161226, roughness: 1 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // ── A voxel hero assembled from the kit's character-part builders ──
+        function buildFigure(parts, scale) {
+            const group = new THREE.Group();
+            for (const [m, offset] of parts) {
+                const mesh = new THREE.Mesh(buildVoxelGeo(m),
+                    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 }));
+                mesh.scale.setScalar(scale);
+                mesh.position.set(offset[0] * scale, offset[1] * scale, offset[2] * scale);
+                mesh.castShadow = true;
+                group.add(mesh);
+            }
+            return group;
+        }
+        const heroParts = [
+            [buildTorso(SUMO_PALETTE), [0, 0, 0]],
+            [buildHead(SUMO_PALETTE), [0, 24, 0]],
+            [buildArm(SUMO_PALETTE, 1), [12, 15, 0]],
+            [buildArm(SUMO_PALETTE, -1), [-12, 15, 0]],
+            [buildLeg(SUMO_PALETTE, 1), [5, 0, 0]],
+            [buildLeg(SUMO_PALETTE, -1), [-5, 0, 0]]
+        ];
+        const heroRig = buildFigure(heroParts, S * 3.2);
+        heroRig.position.y = 1.0;
+        scene.add(heroRig);
+        const hero = { root: heroRig.position, state: makeFacing(1) };
+
+        // ── Walls (CollisionWorld) the hero slides along ──
+        const cw = new CollisionWorld();
+        const wallDefs = [
+            { minX: -14, maxX: -12, minZ: -10, maxZ: 10 },
+            { minX: 6, maxX: 14, minZ: 4, maxZ: 6 }
+        ];
+        for (const w of wallDefs) {
+            cw.addSolid(w);
+            const wm = new THREE.Mesh(
+                new THREE.BoxGeometry(w.maxX - w.minX, 2, w.maxZ - w.minZ),
+                new THREE.MeshStandardMaterial({ color: 0x2a3050 })
+            );
+            wm.position.set((w.minX + w.maxX) / 2, 1, (w.minZ + w.maxZ) / 2);
+            wm.castShadow = wm.receiveShadow = true;
+            scene.add(wm);
+        }
+
+        // ── Dummy targets for the melee arc ──
+        const MOVE = { range: 2.6, depthTolerance: 1.6, vertical: 2.0 };
+        const targets = [-6, 0, 7].map((tx, i) => {
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(0.6, 12, 12),
+                new THREE.MeshStandardMaterial({ color: 0x555577, emissive: 0x000000 })
+            );
+            mesh.position.set(tx, 1, -6 + i * 2);
+            mesh.castShadow = true;
+            scene.add(mesh);
+            return { root: mesh.position, hitRadius: 0.6, state: { current: 'IDLE' }, mesh };
+        });
+
+        // ── Input: WASD (or arrows) drives 8-way facing + movement; Space attacks ──
+        const keys = new Set();
+        window.addEventListener('keydown', (e) => { keys.add(e.code); if (e.code === 'Space') attack(); });
+        window.addEventListener('keyup', (e) => keys.delete(e.code));
+
+        let lastHit = 'none yet';
+        function attack() {
+            let hitAny = false;
+            for (const t of targets) {
+                if (hitboxCheck(hero, t, MOVE)) {
+                    hitAny = true;
+                    t.mesh.material.emissive.setHex(0xff4040);
+                    setTimeout(() => t.mesh.material.emissive.setHex(0x000000), 150);
+                }
+            }
+            lastHit = hitAny ? 'HIT' : 'miss';
+        }
+
+        window.__engineKit = { renderer, composer, scene };
+
+        const hud = document.getElementById('hud');
+        const clock = new THREE.Clock();
+
+        function frame() {
+            const dt = Math.min(0.05, clock.getDelta());
+            let dx = 0, dz = 0;
+            if (keys.has('KeyW') || keys.has('ArrowUp')) dz -= 1;
+            if (keys.has('KeyS') || keys.has('ArrowDown')) dz += 1;
+            if (keys.has('KeyA') || keys.has('ArrowLeft')) dx -= 1;
+            if (keys.has('KeyD') || keys.has('ArrowRight')) dx += 1;
+
+            if (dx || dz) {
+                hero.state.setFacing(dx, dz);
+                const speed = 5;
+                const next = cw.resolveMove(
+                    heroRig.position.x, heroRig.position.z,
+                    heroRig.position.x + dx * speed * dt, heroRig.position.z + dz * speed * dt,
+                    0.5
+                );
+                heroRig.position.x = next.x;
+                heroRig.position.z = next.z;
+                heroRig.rotation.y = Math.atan2(hero.state.facingVec.x, hero.state.facingVec.z);
+            }
+
+            camera.position.set(heroRig.position.x, heroRig.position.y + 22, heroRig.position.z + 14);
+            camera.lookAt(heroRig.position.x, heroRig.position.y, heroRig.position.z);
+
+            composer.render();
+
+            const fv = hero.state.facingVec;
+            hud.innerHTML =
+                '<b>topdown-8way example</b>\n' +
+                'WASD move (8-way) · Space attack\n\n' +
+                'facing → (' + fv.x.toFixed(2) + ', ' + fv.z.toFixed(2) + ')\n' +
+                'last attack: ' + lastHit + '\n\n' +
+                '<b>this proves:</b> setFacing8-style aiming + hitboxCheck turn\n' +
+                'with the player, and CollisionWorld walls work unchanged from\n' +
+                'the belt-scroller case — only the camera block was replaced.';
+            requestAnimationFrame(frame);
+        }
+        frame();
+    </script>
+</body>
+</html>

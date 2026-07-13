@@ -117,6 +117,22 @@ each axis so one fast step can't jump through a thin wall.
 5. Give each attacker a facing (`makeFacing`) and use `hitboxCheck` for melee, or
    grow your own projectile system for a shmup.
 
+## Examples
+
+Two tiny, self-contained pages (kit APIs only, no bundler — open them straight
+off `npm run serve`) that prove the "genre-neutral" claim above isn't just talk:
+
+- **[examples/topdown-8way.html](examples/topdown-8way.html)** — the camera
+  block replaced for a top-down follow, a voxel hero built from
+  `characters/builders.js`, WASD 8-way movement via `setFacing`, a melee arc
+  via `hitboxCheck` against three dummy targets, and `CollisionWorld` walls the
+  hero slides along. The Zelda-like porting note, made real.
+- **[examples/voxel-showcase.html](examples/voxel-showcase.html)** — a rotating
+  gallery of six bespoke voxel builds (ship, crystal, mushroom, robot head,
+  tree, turret) authored purely with `fillBox` / `fillEllipsoid` / `paint`,
+  bloom picking out the glowing bits, quality tiers live-switchable on
+  <kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd>. The shmup porting note's proof.
+
 ## Porting notes (from the honest assessment)
 
 - **R-Type-style shmup**: keep the renderer, voxel pipeline, FX, audio, UI, and

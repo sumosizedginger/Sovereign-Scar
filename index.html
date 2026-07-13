@@ -16,6 +16,8 @@
         #hud b { color: #7fe0ff; }
         #hud .ok { color: #7CFFB0; }
         #hud .no { color: #ff7a90; }
+        #nav { position: fixed; top: 12px; right: 12px; z-index: 10; }
+        #nav a { color: #7fe0ff; font-family: ui-monospace, monospace; font-size: 12px; text-decoration: none; }
     </style>
     <!-- three r185, vendored locally (offline). Same import map the game uses. -->
     <script type="importmap">
@@ -29,6 +31,7 @@
 </head>
 <body>
     <div id="hud">loading…</div>
+    <div id="nav"><a href="./examples/topdown-8way.html">top-down example &rarr;</a> &nbsp;|&nbsp; <a href="./examples/voxel-showcase.html">showcase &rarr;</a></div>
     <script type="module">
         import * as THREE from 'three';
         import { scene, camera, renderer, composer, onResize } from './src/engine/renderer.js';

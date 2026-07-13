@@ -19,9 +19,17 @@ jobs:
 
       - run: npm ci
 
-      # The harness (tests/harness.mjs findChrome) honors CHROME_PATH; the
-      # ubuntu runner ships Chrome stable preinstalled at this path.
+      # Pin a Chrome build explicitly rather than guessing where the runner
+      # image preinstalled one (that path drifts across image updates and
+      # broke this workflow once already). The harness (tests/harness.mjs
+      # findChrome) honors CHROME_PATH.
+      - name: Set up Chrome
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
       - name: Run full suite (unit specs + browser smoke test)
         run: npm test
         env:
-          CHROME_PATH: /usr/bin/google-chrome
+          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}

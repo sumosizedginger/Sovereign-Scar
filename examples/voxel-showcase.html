@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Voxel Engine Kit — voxel showcase example</title>
+    <link rel="icon" href="data:,">
+    <style>
+        html, body { margin: 0; height: 100%; background: #0a0514; overflow: hidden; font-family: ui-monospace, monospace; }
+        #hud {
+            position: fixed; top: 12px; left: 12px; z-index: 10;
+            color: #cfe8ff; background: rgba(8,6,20,0.72); border: 1px solid #2a2a44;
+            padding: 12px 14px; border-radius: 8px; font-size: 13px; line-height: 1.55;
+            max-width: 360px; white-space: pre-wrap;
+        }
+        #hud b { color: #7fe0ff; }
+        #nav { position: fixed; top: 12px; right: 12px; z-index: 10; }
+        #nav a { color: #7fe0ff; font-family: ui-monospace, monospace; font-size: 12px; text-decoration: none; }
+    </style>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "../lib/three/three.module.min.js",
+            "three/addons/": "../lib/three/addons/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div id="hud">loading…</div>
+    <div id="nav"><a href="./topdown-8way.html">&larr; top-down</a> &nbsp;|&nbsp; <a href="../index.html">kit home &rarr;</a></div>
+    <script type="module">
+        import * as THREE from 'three';
+        import { scene, camera, renderer, composer, onResize } from '../src/engine/renderer.js';
+        import { initLights } from '../src/engine/lights.js';
+        import { fillBox, fillEllipsoid, paint } from '../src/voxel/helpers.js';
+        import { buildVoxelGeo } from '../src/voxel/core.js';
+        import { initQuality, setQuality, getQuality } from '../src/engine/quality.js';
+
+        initLights();
+        camera.position.set(0, 10, 26);
+        camera.lookAt(0, 4, 0);
+        window.addEventListener('resize', onResize);
+        initQuality(); // bloom + shadow tier from URL/localStorage, default 'high'
+
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(80, 80),
+            new THREE.MeshStandardMaterial({ color: 0x120e20, roughness: 1 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        function toMesh(map) {
+            const mesh = new THREE.Mesh(buildVoxelGeo(map),
+                new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 }));
+            mesh.castShadow = mesh.receiveShadow = true;
+            return mesh;
+        }
+
+        // ── Six bespoke voxel builds, each proving a different helper ──
+        function buildShip() {
+            const m = new Map();
+            fillBox(m, -2, 2, 0, 2, -6, 4, 0x3a4a6e);
+            fillEllipsoid(m, 0, 1, -6, 2.4, 1.6, 3, 0x5a7bd6);
+            fillBox(m, -6, -3, 0, 1, -1, 2, 0xd63b3b); // wings
+            fillBox(m, 3, 6, 0, 1, -1, 2, 0xd63b3b);
+            paint(m, (x, y, z) => (z <= -5 ? 0xffe27a : null)); // engine glow (bloom bait)
+            return m;
+        }
+        function buildCrystal() {
+            const m = new Map();
+            fillEllipsoid(m, 0, 6, 0, 2.2, 6, 2.2, 0x8a4ce0);
+            fillEllipsoid(m, 0, 2, 0, 3.2, 3, 3.2, 0x6a2cc0);
+            paint(m, (x, y, z) => (y >= 9 ? 0xd8b8ff : null));
+            return m;
+        }
+        function buildMushroom() {
+            const m = new Map();
+            for (let y = 0; y <= 5; y++) fillEllipsoid(m, 0, y, 0, 1.1, 1.5, 1.1, 0xefe6d0);
+            fillEllipsoid(m, 0, 7, 0, 4, 2.4, 4, 0xd63b6a);
+            paint(m, (x, y, z) => (y >= 6 && ((x + z) % 3 === 0) ? 0xf5f0e8 : null)); // spots
+            return m;
+        }
+        function buildRobotHead() {
+            const m = new Map();
+            fillBox(m, -3, 3, 0, 5, -3, 3, 0x3a3a4a);
+            fillBox(m, -2, -1, 3, 4, 4, 4, 0x40ffe0); // eyes (bloom bait)
+            fillBox(m, 1, 2, 3, 4, 4, 4, 0x40ffe0);
+            fillBox(m, -4, 4, 6, 6, -2, 2, 0x24243a); // antenna base
+            fillBox(m, -1, 1, 6, 9, -1, 1, 0x24243a);
+            return m;
+        }
+        function buildTree() {
+            const m = new Map();
+            fillBox(m, -1, 1, 0, 4, -1, 1, 0x5a3a20);
+            fillEllipsoid(m, 0, 8, 0, 5, 4.4, 5, 0x2fa84a);
+            paint(m, (x, y, z) => (Math.abs(x) + Math.abs(z) <= 1 && y >= 9 ? 0x4fd86a : null));
+            return m;
+        }
+        function buildTurret() {
+            const m = new Map();
+            fillEllipsoid(m, 0, 2, 0, 3, 2, 3, 0x555560);
+            fillBox(m, -1, 1, 1, 3, 0, 8, 0x9a1c1c);
+            paint(m, (x, y, z) => (z >= 7 ? 0xff6a3a : null)); // muzzle glow
+            return m;
+        }
+
+        const BUILDS = [buildShip, buildCrystal, buildMushroom, buildRobotHead, buildTree, buildTurret];
+        const gallery = BUILDS.map((fn, i) => {
+            const mesh = toMesh(fn());
+            mesh.scale.setScalar(0.7);
+            const angle = (i / BUILDS.length) * Math.PI * 2;
+            const radius = 11;
+            mesh.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+            scene.add(mesh);
+            return mesh;
+        });
+
+        // ── Quality tiers: 1/2/3 switch low/med/high live ──
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Digit1') setQuality('low');
+            if (e.code === 'Digit2') setQuality('med');
+            if (e.code === 'Digit3') setQuality('high');
+        });
+
+        window.__engineKit = { renderer, composer, scene };
+
+        const hud = document.getElementById('hud');
+        const clock = new THREE.Clock();
+        let orbit = 0;
+
+        function frame() {
+            const dt = Math.min(0.05, clock.getDelta());
+            orbit += dt * 0.15;
+            camera.position.x = Math.sin(orbit) * 26;
+            camera.position.z = Math.cos(orbit) * 26;
+            camera.lookAt(0, 4, 0);
+            for (const mesh of gallery) mesh.rotation.y += dt * 0.6;
+
+            composer.render();
+
+            hud.innerHTML =
+                '<b>voxel-showcase example</b>\n' +
+                'six builds from fillBox / fillEllipsoid / paint, one material\n' +
+                'each (baked AO + vertex colors), bloom on the glow bits.\n\n' +
+                'keys 1 / 2 / 3 — quality tier (current: <b>' + getQuality() + '</b>)';
+            requestAnimationFrame(frame);
+        }
+        frame();
+    </script>
+</body>
+</html>
