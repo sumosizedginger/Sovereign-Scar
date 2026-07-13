@@ -2,11 +2,17 @@
   "name": "voxel-engine-kit",
   "version": "0.1.0",
   "type": "module",
-  "description": "Genre-neutral voxel/three.js engine layer extracted from the voxel beat-em-up: renderer + bloom pipeline, voxel meshing, character builders, particles, smears, audio synth, settings, quality tiers, skybox/environment, AABB collision, and a vectorized (8-way) hitbox. A starting platform for a new game, not a game.",
+  "description": "Zero-build, offline-first three.js voxel engine kit: renderer + HDR bloom pipeline, voxel meshing with baked AO, character builders, particles/smears, WebAudio synth, settings persistence, quality tiers, skybox/environment, AABB collision, and a vectorized (8-way) hitbox. A copy-and-hack starting point, not a framework.",
   "scripts": {
     "serve": "node scripts/serve.mjs 8799"
   },
   "//": "three is vendored under lib/three (offline). Install it only if you want editor/tooling type resolution.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sumosizedginger/My-Engine.git"
+  },
+  "author": "sumosizedginger",
+  "license": "MIT",
   "devDependencies": {
     "three": "^0.185.0"
   }
