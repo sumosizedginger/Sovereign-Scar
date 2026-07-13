@@ -27,7 +27,9 @@ async function checkPage(browser, base, entry, t) {
 
     try {
         await page.setViewport({ width: 1280, height: 720 });
-        await page.goto(base + entry.path, { waitUntil: 'networkidle0', timeout: 30000 });
+        // SwiftShader (software WebGL, needed on GPU-less CI runners) is much
+        // slower than hardware rendering — give the first frame room to land.
+        await page.goto(base + entry.path, { waitUntil: 'networkidle0', timeout: 60000 });
         await sleep(500); // let a few frames render
 
         t.ok(entry.path + ': zero console errors', errors.length === 0, errors.join(' | '));
@@ -68,10 +70,20 @@ export async function run(t) {
     const server = await startServer(PORT);
     let browser;
     try {
+        // GPU-less CI runners report GL_VENDOR/GL_RENDERER "Disabled" and
+        // refuse WebGL under --use-gl=angle (no real GPU to back it) — use
+        // SwiftShader software rendering there (Chromium's own CI does the
+        // same on Linux; --enable-unsafe-swiftshader is required on modern
+        // Chrome to actually allow the fallback). Local dev machines have a
+        // real GPU, so keep the faster hardware path there — SwiftShader was
+        // flaky across a second WebGL context on at least one Windows setup.
+        const glArgs = process.env.CI
+            ? ['--use-gl=swiftshader', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']
+            : ['--use-gl=angle'];
         browser = await puppeteer.launch({
             executablePath: exe,
             headless: 'new',
-            args: ['--use-gl=angle', '--ignore-gpu-blocklist', '--no-sandbox', '--disable-dev-shm-usage']
+            args: [...glArgs, '--ignore-gpu-blocklist', '--no-sandbox', '--disable-dev-shm-usage']
         });
     } catch (e) {
         t.ok('Chrome launches (executablePath=' + exe + ')', false, String(e && e.message || e));
