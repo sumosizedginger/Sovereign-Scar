@@ -4,6 +4,7 @@
 
 import { createDungeon, doorCells } from '../world/room-graph.js';
 import { getOverworldState, patchOverworld, markScreenVisited } from '../world/keys.js';
+import { loadSovereignProgress } from '../kernel/progress.js';
 import { CRUST_COLORS, ABYSS_COLORS } from '../assets/palettes.js';
 import { fillBox } from '../../voxel/helpers.js';
 import { sfx } from '../../audio/synth.js';
@@ -17,7 +18,10 @@ export const SCREEN_HALF = 23; // 47×47 cells ≈ the plan's 48-unit screens
  *   screens: { 'r0c0': {
  *     grid: [sx, sy],
  *     edges: [{ to, side, at?, width? }],   // open border gaps
- *     build(map, h),                        // terrain, LOCAL coords
+ *     build(map, h),                        // shared terrain, LOCAL coords
+ *     crust: { build(map, h) },             // W5: crust-only layout
+ *     abyss: { build(map, h) },             // W5: abyss-only layout
+ *     monolith: { x, z },                   // W5: mirror-travel site
  *     entrances: [{ x, z, to, label }],     // dungeon doors (E to enter)
  *     spawn: { x, z },
  *   } }
@@ -53,10 +57,38 @@ export function createOverworld(ctx, screensDef, opts = {}) {
                     fillBox(map, en.x + 2, en.x + 2, 1, 4, en.z, en.z, CRUST_COLORS.goldLeaf);
                     fillBox(map, en.x - 2, en.x + 2, 4, 4, en.z, en.z, CRUST_COLORS.goldLeaf);
                 }
+                // W5: monolith — mirror-travel obelisk (violet shaft, gold cap)
+                if (s.monolith) {
+                    const m = s.monolith;
+                    fillBox(map, m.x, m.x, 1, 5, m.z, m.z, ABYSS_COLORS.violet);
+                    fillBox(map, m.x, m.x, 6, 6, m.z, m.z, ABYSS_COLORS.goldVein);
+                }
                 if (s.build) s.build(map, h);
+                // W5: state-specific layout on top of the shared terrain
+                const variant = mood === 'abyss' ? s.abyss : s.crust;
+                if (variant?.build) variant.build(map, h);
             },
             enemies: s.enemies || [],
         };
+    }
+
+    // W5: begin a mirror swap — persist the other state + exact position,
+    // ramp the mood, and reload the overworld once the ramp lands.
+    function startSwap(game, level) {
+        const sid = level.currentRoomId();
+        const room = rooms[sid];
+        const p = game.player.root.position;
+        const other = mood === 'crust' ? 'abyss' : 'crust';
+        patchOverworld({
+            state: other,
+            pos: { screen: sid, x: p.x - room.grid[0] * 64, z: p.z - room.grid[1] * 64 },
+        });
+        game.mood?.startRamp?.(other, 1.5);
+        game.hud?.toast?.(other === 'abyss'
+            ? 'The world folds into the Abyss…'
+            : 'The Crust reasserts itself…', 1800);
+        sfx.phase?.();
+        level._swapTimer = 1.5;
     }
 
     const def = {
@@ -67,13 +99,35 @@ export function createOverworld(ctx, screensDef, opts = {}) {
         banner: screensDef.banner || 'The Scarred Crust — find the wounds',
         rooms,
         onUpdate(dt, game, level) {
-            // Dungeon entrances: stand in the arch + interact
+            // W5: pending mirror swap — reload after the mood ramp lands
+            if (level._swapTimer != null) {
+                level._swapTimer -= dt;
+                if (level._swapTimer <= 0) {
+                    level._swapTimer = null;
+                    game.loadLevel?.('overworld');
+                }
+                return;
+            }
             const sid = level.currentRoomId();
             const s = screensDef.screens[sid];
-            if (!s || !s.entrances || level.isTransitioning()) return;
+            if (!s || level.isTransitioning()) return;
             const room = rooms[sid];
             const ox = room.grid[0] * 64, oz = room.grid[1] * 64;
             const p = game.player.root.position;
+
+            // W5: mirror travel — monolith interact (free-swap holders can
+            // trigger it anywhere outdoors via level.onMoodToggle, wired in
+            // index.js)
+            if (s.monolith) {
+                const md = Math.hypot(p.x - (ox + s.monolith.x), p.z - (oz + s.monolith.z));
+                if (md < 2.2 && game.input?.consumeInteract?.()) {
+                    startSwap(game, level);
+                    return;
+                }
+            }
+
+            // Dungeon entrances: stand in the arch + interact
+            if (!s.entrances) return;
             for (const en of s.entrances) {
                 const d = Math.hypot(p.x - (ox + en.x), p.z - (oz + en.z));
                 if (d < 1.6) {
@@ -106,6 +160,41 @@ export function createOverworld(ctx, screensDef, opts = {}) {
             z: room.grid[1] * 64 + saved.pos.z,
         };
     }
+
+    // W5: never trap the player — if the (possibly state-swapped) layout put
+    // a solid where they stand, nudge to the nearest free cell (ring search).
+    {
+        const blocked = (x, z) => level.getVoxelAt(x, 1.5, z);
+        if (blocked(level.spawn.x, level.spawn.z)) {
+            outer:
+            for (let r = 1; r <= 8; r++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    for (let dz = -r; dz <= r; dz++) {
+                        if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+                        const nx = level.spawn.x + dx, nz = level.spawn.z + dz;
+                        if (!blocked(nx, nz) && level.getVoxelAt(nx, 0.5, nz)) {
+                            level.spawn = { x: nx, y: 1.95, z: nz };
+                            break outer;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // W5: mirror-free holders (Proxy defeated) can swap anywhere outdoors —
+    // index.js routes the M/mood toggle here first.
+    level.onMoodToggle = (game) => {
+        if (level._swapTimer != null || level.isTransitioning()) return true;
+        const freeSwap = game.player.inventory?.getFlag?.('mirror_free')
+            || (loadSovereignProgress().bossesDefeated || []).includes('proxy');
+        if (!freeSwap) {
+            game.hud?.toast?.('The mirror resists — find a monolith', 1500);
+            return true;
+        }
+        startSwap(game, level);
+        return true;
+    };
 
     // Save position on every screen transition (natural checkpoint) and
     // track visited screens for the map (W6).

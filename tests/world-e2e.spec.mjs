@@ -254,6 +254,67 @@ export async function run(t) {
         t.ok('reload restores overworld screen', restored.screen === 'r0c1', restored.screen);
         t.ok('reload restores position on that screen', restored.onEastScreen);
 
+        // ── W5: mirror travel — monolith swap, divergent layouts, no traps ──
+        const mirror = await page.evaluate(async () => {
+            const s = window.__sovereignScar;
+            const out = {};
+            const tick = (n) => { for (let i = 0; i < n; i++) s.game.level.update(0.05, s.game); };
+            s.game.paused = true;
+            // Walk back to r0c0 (monolith screen) via the W edge
+            s.player.rig.position.set(168.7, 1.95, 128);
+            tick(1); tick(10);
+            out.screen = s.game.level.currentRoomId();
+            out.moodBefore = s.game.level.mood;
+            // Crust-only rock present at local (-13, 1) → world (115, 129)
+            out.rockInCrust = s.game.level.getVoxelAt(115, 1.5, 129);
+            out.reefInCrust = s.game.level.getVoxelAt(143, 1.5, 119);
+
+            // Swap at the monolith (local 12,12 → world 140,140)
+            s.player.rig.position.set(140.8, 1.95, 141.2);
+            s.game.input._interactPressed = true;
+            tick(1);
+            out.swapStarted = s.game.level._swapTimer != null;
+            tick(35); // > 1.5 s of def.onUpdate → reload fires
+            await new Promise((r) => setTimeout(r, 200));
+            out.moodAfter = s.game.level.mood;
+            out.rockInAbyss = s.game.level.getVoxelAt(115, 1.5, 129);
+            out.reefInAbyss = s.game.level.getVoxelAt(143, 1.5, 119);
+            return out;
+        });
+        t.ok('monolith screen reached', mirror.screen === 'r0c0', mirror.screen);
+        t.ok('starts in crust', mirror.moodBefore === 'crust', mirror.moodBefore);
+        t.ok('crust rock present in crust', mirror.rockInCrust === true);
+        t.ok('abyss reef absent in crust', mirror.reefInCrust === false);
+        t.ok('monolith interact starts swap', mirror.swapStarted === true);
+        t.ok('swap lands in abyss', mirror.moodAfter === 'abyss', mirror.moodAfter);
+        t.ok('crust rock absent in abyss', mirror.rockInAbyss === false);
+        t.ok('abyss reef present in abyss', mirror.reefInAbyss === true);
+
+        // Swapping while standing where a wall will appear must not trap
+        const trap = await page.evaluate(async () => {
+            const s = window.__sovereignScar;
+            const tick = (n) => { for (let i = 0; i < n; i++) s.game.level.update(0.05, s.game); };
+            // Start the swap back to crust from the monolith…
+            s.player.rig.position.set(140.8, 1.95, 141.2);
+            s.game.input._interactPressed = true;
+            tick(1);
+            // …then force the saved return-position INTO the crust rock spot
+            const raw = JSON.parse(window.localStorage.getItem('vsbeu.progress') || '{}');
+            raw.sovereignProgress.overworld.pos = { screen: 'r0c0', x: -13, z: 1 };
+            window.localStorage.setItem('vsbeu.progress', JSON.stringify(raw));
+            tick(35);
+            await new Promise((r) => setTimeout(r, 200));
+            const p = s.player.root.position;
+            return {
+                mood: s.game.level.mood,
+                standingInsideWall: s.game.level.getVoxelAt(p.x, 1.5, p.z),
+                onFloor: s.game.level.getVoxelAt(p.x, 0.5, p.z),
+            };
+        });
+        t.ok('swap-back lands in crust', trap.mood === 'crust', trap.mood);
+        t.ok('trapped spawn nudged to a free cell', trap.standingInsideWall === false);
+        t.ok('nudged spot still has floor', trap.onFloor === true);
+
         t.ok('no fatal pageerrors', errors.filter((e) => !/AudioContext|favicon/i.test(e)).length === 0,
             errors.slice(0, 5).join(' | '));
     } finally {

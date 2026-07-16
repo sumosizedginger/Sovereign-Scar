@@ -581,8 +581,11 @@ function frame() {
         loadLevel(pid); // always allow backtracking
     }
     if (input.consumeMoodToggle()) {
+        // W5: the overworld can claim the toggle (mirror travel); otherwise
         // D7: mood flip is a dev tool, not a player verb
-        if (dev.enabled) {
+        if (game.level?.onMoodToggle?.(game)) {
+            // handled by the level
+        } else if (dev.enabled) {
             mood.toggle();
             hud.toast(`Mood: ${mood.mood}`);
         }

@@ -18,8 +18,21 @@ export const TEST_SCREENS = {
             entrances: [
                 { x: -8, z: -14, to: 'w-test-dungeon', label: 'Test Crypt' },
             ],
+            monolith: { x: 12, z: 12 },
             build(map, h) {
                 h.fillBox(map, 5, 8, 1, 2, -5, -3, CRUST_COLORS.slateDark);
+            },
+            // W5: divergent layouts — a rock blocks (−14..−12, 0..2) only in
+            // crust; the abyss grows a gold reef elsewhere instead.
+            crust: {
+                build(map, h) {
+                    h.fillBox(map, -14, -12, 1, 2, 0, 2, CRUST_COLORS.iron);
+                },
+            },
+            abyss: {
+                build(map, h) {
+                    h.fillBox(map, 14, 16, 1, 2, -10, -8, h.ABYSS_COLORS.goldVein);
+                },
             },
             enemies: [{ x: 6, z: 8, kind: 'sentinel', hp: 2 }],
         },
