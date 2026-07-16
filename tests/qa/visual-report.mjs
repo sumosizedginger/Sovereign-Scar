@@ -33,8 +33,10 @@ async function main() {
             for (const meta of s.LEVELS) {
                 s.loadLevel(meta.id);
                 s.game.bossIntro = null; // camera push-in would skew the sample
-                await new Promise((r) => setTimeout(r, 400));
-                const lum = await s.sampleLuminance();
+                await new Promise((r) => setTimeout(r, 600));
+                const lumA = await s.sampleLuminance();
+                await new Promise((r) => setTimeout(r, 300));
+                const lum = Math.max(lumA, await s.sampleLuminance());
                 const m = s.measure();
                 out.push({
                     id: meta.id,

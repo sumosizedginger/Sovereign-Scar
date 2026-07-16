@@ -24,6 +24,7 @@ import { run as runJuice } from './game/juice.spec.mjs';
 import { run as runMenu } from './game/menu.spec.mjs';
 import { run as runGamepad } from './game/gamepad.spec.mjs';
 import { run as runUpgrades } from './game/upgrades.spec.mjs';
+import { run as runWorldGraph } from './game/world-graph.spec.mjs';
 
 const unitOnly = process.argv.includes('--unit-only');
 
@@ -62,6 +63,7 @@ async function main() {
     runNamed('menu', runMenu);
     runNamed('gamepad', runGamepad);
     runNamed('upgrades', runUpgrades);
+    runNamed('world-graph', runWorldGraph);
 
     if (!unitOnly) {
         const { run: runSmoke } = await import('./smoke.spec.mjs');
@@ -88,6 +90,11 @@ async function main() {
         const campaignE2E = createSink('campaign-e2e');
         await runCampaignE2E(campaignE2E);
         sinks.push(campaignE2E);
+
+        const { run: runWorldE2E } = await import('./world-e2e.spec.mjs');
+        const worldE2E = createSink('world-e2e');
+        await runWorldE2E(worldE2E);
+        sinks.push(worldE2E);
     }
 
     writeStepSummary(sinks);

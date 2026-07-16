@@ -15,6 +15,7 @@ import { loadBeat11 } from './beat-11-mire.js';
 import { loadBeat12 } from './beat-12-pyre.js';
 import { loadBeat13 } from './beat-13-gumoi.js';
 import { loadBeat14 } from './beat-14-leviathan.js';
+import { loadTestDungeon } from './dev-test-dungeon.js';
 
 export const LEVELS = [
     { id: 'sandbox-combat', name: 'Combat Sandbox', load: loadSandboxCombat, mood: 'crust', bossId: null },
@@ -34,8 +35,16 @@ export const LEVELS = [
     { id: 'beat-14-leviathan', name: '14 Leviathan Core', load: loadBeat14, mood: 'abyss', bossId: 'leviathan' },
 ];
 
+// Dev-only levels: reachable via loadLevel/dev-panel teleport, but never in
+// the player-facing LEVELS list (menus, beat cycling, e2e level sweeps).
+export const DEV_LEVELS = [
+    { id: 'w-test-dungeon', name: 'W Test Dungeon (dev)', load: loadTestDungeon, mood: 'crust', bossId: null },
+];
+
 export function getLevel(id) {
-    return LEVELS.find((l) => l.id === id) || LEVELS[0];
+    return LEVELS.find((l) => l.id === id)
+        || DEV_LEVELS.find((l) => l.id === id)
+        || LEVELS[0];
 }
 
 export function levelIndex(id) {

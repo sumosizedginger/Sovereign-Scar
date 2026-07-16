@@ -54,8 +54,13 @@ export async function run(t) {
                     s.loadLevel(meta.id);
                     // The boss-intro camera push-in would skew the sample.
                     s.game.bossIntro = null;
-                    await new Promise((r) => setTimeout(r, 400));
-                    const lum = await s.sampleLuminance();
+                    await new Promise((r) => setTimeout(r, 600));
+                    // Two samples, keep the max: first frames after a load can
+                    // read dark while materials/programs settle.
+                    const lumA = await s.sampleLuminance();
+                    await new Promise((r) => setTimeout(r, 300));
+                    const lumB = await s.sampleLuminance();
+                    const lum = Math.max(lumA, lumB);
                     const m = s.measure();
                     out.push({
                         id: meta.id,

@@ -21,7 +21,7 @@ import { HUD } from './ui/hud.js';
 import { MoodController } from './fx/mood-controller.js';
 import { createFlickerPass, updateFlickerPass } from './fx/flicker-shader-pass.js';
 import { createWrapPass, updateWrapPass } from './render/wrap-shader-pass.js';
-import { LEVELS, getLevel, nextLevelId, prevLevelId } from './levels/registry.js';
+import { LEVELS, DEV_LEVELS, getLevel, nextLevelId, prevLevelId } from './levels/registry.js';
 import { loadSovereignProgress, saveSovereignProgress, unlockBeat, recordBossDefeat, resetSovereignProgress } from './kernel/progress.js';
 import { MenuOverlay } from './ui/menu.js';
 import { EndingSequence } from './ui/credits.js';
@@ -166,7 +166,7 @@ world.player = player;
 world.collision = collisionWorld;
 
 // Dev mode (Phase D): gate + badge + god mode; inert unless enabled
-dev.init(game, { loadLevel, LEVELS, applyUpgradeStats, input });
+dev.init(game, { loadLevel, LEVELS, DEV_LEVELS, applyUpgradeStats, input });
 
 // ── Level lifecycle ───────────────────────────────────────────────────────
 function unloadLevel() {
@@ -643,6 +643,7 @@ function frame() {
 
         if (particles.update) particles.update(sdt);
         updateSmears(sdt);
+        camRig.setBounds(game.level?.cameraBounds || null); // W2 room-lock
         camRig.update(sdt, player.root.position);
 
         // Soul motes home to the player and pay out shards (A5)

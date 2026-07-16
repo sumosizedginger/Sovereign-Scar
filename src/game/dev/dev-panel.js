@@ -126,7 +126,7 @@ export class DevPanel {
         Object.assign(sep.style, { color: '#9aa8bc', margin: '8px 0 4px' });
         this.el.appendChild(sep);
 
-        for (const meta of hooks.LEVELS || []) {
+        for (const meta of [...(hooks.LEVELS || []), ...(hooks.DEV_LEVELS || [])]) {
             this.el.appendChild(this._row(meta.name || meta.id, () => {
                 hooks.loadLevel?.(meta.id);
                 this.close(game);

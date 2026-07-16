@@ -369,14 +369,14 @@ export class ProxyBoss extends BossBase {
 export class ObsidianArachnid extends BossBase {
     constructor(scene, position = { x: 0, z: -2 }) {
         const body = new THREE.Group();
-        const abdomen = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 12), mat(0x1a1020, 0x6020a0, 0.9));
+        const abdomen = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 12), mat(0x3a2850, 0x6020a0, 1.1));
         abdomen.scale.set(1.3, 0.9, 1.5);
-        const head = new THREE.Mesh(new THREE.SphereGeometry(0.55, 10, 10), mat(0x2a1830, 0xff2040, 1.4));
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.55, 10, 10), mat(0x462a52, 0xff2040, 1.4));
         head.position.set(0, 0.2, 1.2);
         body.add(abdomen, head);
         const legs = [];
         for (let i = 0; i < 8; i++) {
-            const leg = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 1.8), mat(0x2a2030, 0x401060, 0.5));
+            const leg = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 1.8), mat(0x3a2f44, 0x401060, 0.7));
             const side = i < 4 ? -1 : 1;
             const idx = i % 4;
             leg.position.set(side * 0.9, -0.3, -0.6 + idx * 0.5);

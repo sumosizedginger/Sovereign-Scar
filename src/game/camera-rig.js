@@ -12,17 +12,48 @@ export class CameraRig {
         this.lookY = opts.lookY != null ? opts.lookY : 0.5;
         this.lerp = opts.lerp != null ? opts.lerp : 8;
         this._pos = { x: 0, y: this.height, z: this.back };
+        this._look = { x: 0, y: this.lookY, z: 0 };
         this._focus = null; // { t, dur, toH, toB, target } — boss-intro push-in
+        this._bounds = null; // W2: room-lock rect for the look-at target
+    }
+
+    /**
+     * W2: lock the look-at target inside a world rect (room bounds). The
+     * clamp keeps the visible floor area inside the rect; rooms smaller than
+     * the view resolve to their midpoint. Pass null to clear.
+     */
+    setBounds(bounds) {
+        this._bounds = bounds || null;
+    }
+
+    _clampToBounds(x, z, effH, effB) {
+        const b = this._bounds;
+        if (!b) return { x, z };
+        // Visible half-extents on the floor plane from fov/aspect/distance
+        // (approximate: distance from camera to look-at point).
+        const dist = Math.hypot(effH, effB);
+        const halfV = Math.tan(((camera.fov || 65) * Math.PI / 180) / 2) * dist;
+        const fx = Math.max(0, halfV * (camera.aspect || 1.6) * 0.8);
+        const fz = Math.max(0, halfV * 0.6);
+        x = (b.minX + fx > b.maxX - fx)
+            ? (b.minX + b.maxX) / 2
+            : Math.min(Math.max(x, b.minX + fx), b.maxX - fx);
+        z = (b.minZ + fz > b.maxZ - fz)
+            ? (b.minZ + b.maxZ) / 2
+            : Math.min(Math.max(z, b.minZ + fz), b.maxZ - fz);
+        return { x, z };
     }
 
     /** Snap immediately over target. */
     snapTo(target) {
         const x = target.x, y = target.y || 0, z = target.z;
-        this._pos.x = x;
+        const c = this._clampToBounds(x, z, this.height, this.back);
+        this._pos.x = c.x;
         this._pos.y = y + this.height;
-        this._pos.z = z + this.back;
+        this._pos.z = c.z + this.back;
+        this._look = { x: c.x, y: y + this.lookY, z: c.z };
         camera.position.set(this._pos.x, this._pos.y, this._pos.z);
-        camera.lookAt(x, y + this.lookY, z);
+        camera.lookAt(this._look.x, this._look.y, this._look.z);
     }
 
     /**
@@ -43,27 +74,32 @@ export class CameraRig {
             const f = this._focus;
             f.t += dt;
             const u = Math.min(1, f.t / f.dur);
-            const k = Math.sin(Math.PI * u); // 0 → 1 → 0 dip
-            effH = this.height + (f.toH - this.height) * k;
-            effB = this.back + (f.toB - this.back) * k;
+            const fk = Math.sin(Math.PI * u); // 0 → 1 → 0 dip
+            effH = this.height + (f.toH - this.height) * fk;
+            effB = this.back + (f.toB - this.back) * fk;
             if (f.target) {
-                x += (f.target.x - x) * k * 0.8;
-                y += ((f.target.y || 0) - y) * k * 0.8;
-                z += (f.target.z - z) * k * 0.8;
+                x += (f.target.x - x) * fk * 0.8;
+                y += ((f.target.y || 0) - y) * fk * 0.8;
+                z += (f.target.z - z) * fk * 0.8;
             }
             if (u >= 1) this._focus = null;
         }
 
-        const tx = x;
+        const c = this._clampToBounds(x, z, effH, effB);
+        const tx = c.x;
         const ty = y + effH;
-        const tz = z + effB;
+        const tz = c.z + effB;
         const k = 1 - Math.exp(-this.lerp * dt);
         this._pos.x += (tx - this._pos.x) * k;
         this._pos.y += (ty - this._pos.y) * k;
         this._pos.z += (tz - this._pos.z) * k;
+        // Look-at is lerped too so room transitions pan instead of snapping.
+        this._look.x += (c.x - this._look.x) * k;
+        this._look.y += (y + this.lookY - this._look.y) * k;
+        this._look.z += (c.z - this._look.z) * k;
 
         const s = juice.shakeOffset();
         camera.position.set(this._pos.x + s.x, this._pos.y + s.y, this._pos.z + s.z);
-        camera.lookAt(x, y + this.lookY, z);
+        camera.lookAt(this._look.x, this._look.y, this._look.z);
     }
 }
