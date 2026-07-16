@@ -1,0 +1,343 @@
+{
+  "boot": {
+    "id": "beat-01-crypt",
+    "y": 1.951,
+    "g": true,
+    "solid": true,
+    "hp": 6,
+    "levels": 15
+  },
+  "rows": [
+    {
+      "id": "sandbox-combat",
+      "y": 1.951,
+      "g": true,
+      "vy": 0,
+      "solid": true,
+      "feet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 5,
+      "managed": [],
+      "err": 0,
+      "errSample": []
+    },
+    {
+      "id": "beat-01-crypt",
+      "y": 1.951,
+      "g": true,
+      "vy": 0,
+      "solid": true,
+      "feet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 2,
+      "managed": [],
+      "err": 0,
+      "errSample": []
+    },
+    {
+      "id": "beat-02-spindle",
+      "y": 1.951,
+      "g": true,
+      "vy": 0,
+      "solid": true,
+      "feet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 3,
+      "managed": [
+        "bossish",
+        "bossish",
+        "bossish"
+      ],
+      "err": 0,
+      "errSample": []
+    },
+    {
+      "id": "beat-03-sink",
+      "y": 1.951,
+      "g": true,
+      "vy": 0,
+      "solid": true,
+      "feet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 1,
+      "managed": [
+        "bossish"
+      ],
+      "err": 0,
+      "errSample": []
+    },
+    {
+      "id": "beat-04-sky",
+      "y": 2.951,
+      "g": true,
+      "vy": 0,
+      "solid": true,
+      "feet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 1,
+      "managed": [
+        "bossish"
+      ],
+      "err": 0,
+      "errSample": []
+    },
+    {
+      "id": "beat-05-citadel",
+      "y": 1.951,
+      "g": true,
+      "vy": 0,
+      "solid": true,
+      "feet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 2,
+      "managed": [],
+      "err": 0,
+      "errSample": []
+    },
+    {
+      "id": "beat-06-quarry",
+      "y": 1.951,
+      "g": true,
+      "vy": 0,
+      "solid": true,
+      "feet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 2,
+      "managed": [],
+      "err": 0,
+      "errSample": []
+    },
+    {
+      "id": "beat-07-sluice",
+      "y": 1.951,
+      "g": true,
+      "vy": 0,
+      "solid": true,
+      "feet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 2,
+      "managed": [],
+      "err": 0,
+      "errSample": []
+    },
+    {
+      "id": "beat-08-bone",
+      "y": 1.951,
+      "g": true,
+      "vy": 0,
+      "solid": true,
+      "feet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 3,
+      "managed": [],
+      "err": 0,
+      "errSample": []
+    },
+    {
+      "id": "beat-09-town",
+      "y": 1.951,
+      "g": true,
+      "vy": 0,
+      "solid": true,
+      "feet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 2,
+      "managed": [
+        "bossish"
+      ],
+      "err": 0,
+      "errSample": []
+    },
+    {
+      "id": "beat-10-cryo",
+      "y": 1.951,
+      "g": true,
+      "vy": 0,
+      "solid": true,
+      "feet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 2,
+      "managed": [],
+      "err": 0,
+      "errSample": []
+    },
+    {
+      "id": "beat-11-mire",
+      "y": 1.951,
+      "g": true,
+      "vy": 0,
+      "solid": true,
+      "feet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 2,
+      "managed": [],
+      "err": 0,
+      "errSample": []
+    },
+    {
+      "id": "beat-12-pyre",
+      "y": 1.951,
+      "g": true,
+      "vy": 0,
+      "solid": true,
+      "feet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 2,
+      "managed": [],
+      "err": 0,
+      "errSample": []
+    },
+    {
+      "id": "beat-13-gumoi",
+      "y": 1.951,
+      "g": true,
+      "vy": 0,
+      "solid": true,
+      "feet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 4,
+      "managed": [],
+      "err": 0,
+      "errSample": []
+    },
+    {
+      "id": "beat-14-leviathan",
+      "y": 1.951,
+      "g": true,
+      "vy": 0,
+      "solid": true,
+      "feet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 3,
+      "managed": [
+        "bossish"
+      ],
+      "err": 0,
+      "errSample": []
+    }
+  ],
+  "p9meta": {
+    "managed": true,
+    "canHit0": true,
+    "enemyCount": 2
+  },
+  "phaseSamples": [
+    {
+      "canHit": true,
+      "hitR": 0.7,
+      "y": 1.579,
+      "g": true,
+      "py": 1.951
+    },
+    {
+      "canHit": true,
+      "hitR": 0.7,
+      "y": 1.618,
+      "g": true,
+      "py": 1.951
+    },
+    {
+      "canHit": true,
+      "hitR": 0.7,
+      "y": 1.656,
+      "g": true,
+      "py": 1.951
+    },
+    {
+      "canHit": true,
+      "hitR": 0.7,
+      "y": 1.692,
+      "g": true,
+      "py": 1.951
+    },
+    {
+      "canHit": true,
+      "hitR": 0.7,
+      "y": 1.726,
+      "g": true,
+      "py": 1.951
+    },
+    {
+      "canHit": true,
+      "hitR": 0.7,
+      "y": 1.758,
+      "g": true,
+      "py": 1.951
+    },
+    {
+      "canHit": true,
+      "hitR": 0.7,
+      "y": 1.787,
+      "g": true,
+      "py": 1.951
+    },
+    {
+      "canHit": true,
+      "hitR": 0.7,
+      "y": 1.813,
+      "g": true,
+      "py": 1.951
+    },
+    {
+      "canHit": true,
+      "hitR": 0.7,
+      "y": 1.837,
+      "g": true,
+      "py": 1.951
+    },
+    {
+      "canHit": true,
+      "hitR": 0.7,
+      "y": 1.856,
+      "g": true,
+      "py": 1.951
+    },
+    {
+      "canHit": true,
+      "hitR": 0.7,
+      "y": 1.873,
+      "g": true,
+      "py": 1.951
+    },
+    {
+      "canHit": true,
+      "hitR": 0.7,
+      "y": 1.885,
+      "g": true,
+      "py": 1.951
+    }
+  ],
+  "combat": {
+    "ok": true,
+    "hp0": 4,
+    "hp1": 3,
+    "y": 1.9509999999999998,
+    "g": true
+  },
+  "combat2": {
+    "hp0": 3,
+    "hp1": 2,
+    "cd": 0.10000000000000002
+  },
+  "resp": {
+    "dead": true,
+    "hp": 0,
+    "g": true,
+    "y": 1.951
+  }
+}

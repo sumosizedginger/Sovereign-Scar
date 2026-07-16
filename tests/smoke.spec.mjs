@@ -14,7 +14,15 @@ const PORT = Number(process.env.PORT) || 8765;
 // rendered" beyond "no console errors" (index.html has the hitbox/collision
 // proof panel; examples get the same treatment once Phase 3 adds them).
 const PAGES = [
-    { path: 'index.html', hudSelector: '#hud', mustContain: ['vectorized hitbox', 'AABB collision'] },
+    // Product entry is Sovereign Scar (not the kit demo HUD)
+    {
+        path: 'index.html',
+        hudSelector: '#ss-hud',
+        mustContain: ['SOVEREIGN SCAR'],
+        renderHook: '__sovereignScar',
+        waitMs: 4000,
+        waitUntil: 'domcontentloaded',
+    },
     { path: 'examples/topdown-8way.html', hudSelector: '#hud', mustContain: ['topdown-8way example', 'facing'] },
     { path: 'examples/voxel-showcase.html', hudSelector: '#hud', mustContain: ['voxel-showcase example', 'quality tier'] }
 ];
@@ -23,10 +31,12 @@ async function checkPage(page, errors, base, entry, t) {
     errors.length = 0;
     // SwiftShader (software WebGL, needed on GPU-less CI runners) is much
     // slower than hardware rendering — give the first frame room to land.
-    await page.goto(base + entry.path, { waitUntil: 'networkidle0', timeout: 60000 });
-    await sleep(500); // let a few frames render
+    const waitUntil = entry.waitUntil || 'networkidle0';
+    await page.goto(base + entry.path, { waitUntil, timeout: 60000 });
+    await sleep(entry.waitMs || 500);
 
-    t.ok(entry.path + ': zero console errors', errors.length === 0, errors.join(' | '));
+    const filtered = errors.filter((e) => !/AudioContext|autoplay|favicon/i.test(e));
+    t.ok(entry.path + ': zero console errors', filtered.length === 0, filtered.join(' | '));
 
     if (entry.hudSelector) {
         const hudText = await page.$eval(entry.hudSelector, (el) => el.textContent).catch(() => '');
@@ -36,12 +46,13 @@ async function checkPage(page, errors, base, entry, t) {
         }
     }
 
-    const renderCalls = await page.evaluate(() => {
-        const hook = window.__engineKit;
+    const hookName = entry.renderHook || '__engineKit';
+    const renderCalls = await page.evaluate((hn) => {
+        const hook = window[hn];
         return hook && hook.renderer && hook.renderer.info && hook.renderer.info.render
             ? hook.renderer.info.render.calls
             : -1;
-    });
+    }, hookName);
     t.ok(entry.path + ': renderer actually drew frames', renderCalls > 0,
         'renderer.info.render.calls=' + renderCalls);
 

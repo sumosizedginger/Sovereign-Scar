@@ -3,23 +3,48 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Voxel Engine Kit — smoke test</title>
+    <title>Sovereign Scar — The Wound That Remembers</title>
     <link rel="icon" href="data:,">
     <style>
-        html, body { margin: 0; height: 100%; background: #0a0514; overflow: hidden; font-family: ui-monospace, monospace; }
-        #hud {
-            position: fixed; top: 12px; left: 12px; z-index: 10;
-            color: #cfe8ff; background: rgba(8,6,20,0.72); border: 1px solid #2a2a44;
-            padding: 12px 14px; border-radius: 8px; font-size: 13px; line-height: 1.55;
-            max-width: 340px; white-space: pre-wrap;
+        html, body {
+            margin: 0;
+            height: 100%;
+            background: #0a0c12;
+            overflow: hidden;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         }
-        #hud b { color: #7fe0ff; }
-        #hud .ok { color: #7CFFB0; }
-        #hud .no { color: #ff7a90; }
-        #nav { position: fixed; top: 12px; right: 12px; z-index: 10; }
-        #nav a { color: #7fe0ff; font-family: ui-monospace, monospace; font-size: 12px; text-decoration: none; }
+        #boot {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: #cfe0f0;
+            z-index: 5;
+            pointer-events: none;
+            background: radial-gradient(ellipse at center, #1a1c28 0%, #0a0c12 70%);
+            transition: opacity 0.6s ease;
+        }
+        #boot h1 {
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            font-size: 1.4rem;
+            color: #7fe0ff;
+            margin: 0 0 0.4rem;
+        }
+        #boot p {
+            margin: 0;
+            color: #8a96a8;
+            font-size: 0.85rem;
+        }
+        #boot .sigil {
+            color: #d4a84b;
+            margin-top: 0.75rem;
+            font-size: 0.75rem;
+            letter-spacing: 0.2em;
+        }
     </style>
-    <!-- three r185, vendored locally (offline). Same import map the game uses. -->
     <script type="importmap">
     {
         "imports": {
@@ -30,99 +55,22 @@
     </script>
 </head>
 <body>
-    <div id="hud">loading…</div>
-    <div id="nav"><a href="./examples/topdown-8way.html">top-down example &rarr;</a> &nbsp;|&nbsp; <a href="./examples/voxel-showcase.html">showcase &rarr;</a></div>
+    <div id="boot">
+        <h1>SOVEREIGN SCAR</h1>
+        <p>The Wound That Remembers</p>
+        <p class="sigil">√π ⊗ ∞ ⊗ τ²</p>
+        <p style="margin-top:1.2rem;opacity:0.7">Click or press any key · loading…</p>
+    </div>
     <script type="module">
-        import * as THREE from 'three';
-        import { scene, camera, renderer, composer, onResize } from './src/engine/renderer.js';
-        import { initLights } from './src/engine/lights.js';
-        import { ParticleSystem } from './src/engine/particles.js';
-        import { fillBox, fillEllipsoid } from './src/voxel/helpers.js';
-        import { buildVoxelGeo } from './src/voxel/core.js';
-        import { CollisionWorld } from './src/engine/collision.js';
-        import { makeFacing } from './src/combat/facing.js';
-        import { hitboxCheck } from './src/combat/hitbox.js';
-
-        // ── Scene setup ────────────────────────────────────────────────────
-        initLights();
-        // Reframe the (belt-scroller) camera for a simple turntable view.
-        camera.position.set(0, 6, 12);
-        camera.lookAt(0, 1.6, 0);
-        window.addEventListener('resize', onResize);
-
-        // A ground plane so shadows land somewhere.
-        const ground = new THREE.Mesh(
-            new THREE.PlaneGeometry(60, 60),
-            new THREE.MeshStandardMaterial({ color: 0x161226, roughness: 1 })
-        );
-        ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
-        scene.add(ground);
-
-        // ── A voxel figure straight from the kit's voxel pipeline ───────────
-        const vox = new Map();
-        fillBox(vox, -3, 3, 0, 9, -2, 2, 0x3f6fe0);           // torso
-        fillEllipsoid(vox, 0, 13, 0, 3.2, 3.2, 3.2, 0xf0c090); // head
-        fillBox(vox, -3, 3, 10, 16, -1, 1, 0x2a3050);          // neck/collar
-        const mesh = new THREE.Mesh(
-            buildVoxelGeo(vox),
-            new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })
-        );
-        mesh.castShadow = true;
-        mesh.scale.setScalar(0.12);
-        const rig = new THREE.Group();
-        rig.add(mesh);
-        scene.add(rig);
-
-        const particles = new ParticleSystem(scene);
-
-        // ── Live proof: the vectorized hitbox + collision primitives ────────
-        // An attacker at the origin, a target parked off to +X+Z. As the
-        // attacker's facing sweeps around, hitboxCheck flips on only when the
-        // cone actually points at the target — that's the 8-way facing at work.
-        const attacker = { root: { position: { x: 0, y: 0, z: 0 } }, state: makeFacing(1) };
-        const target = { root: { position: { x: 1.4, y: 0, z: 0.9 } }, hitRadius: 0.4, state: { current: 'IDLE' } };
-        const MOVE = { range: 1.6, depthTolerance: 0.9, vertical: 1.2 };
-
-        // A collision world with one wall, to show blocking + slide.
-        const cw = new CollisionWorld();
-        cw.addSolid({ minX: 2, maxX: 3, minZ: -6, maxZ: 6 });
-        const blocked = cw.resolveMove(0, 0, 5, 0, 0.4);     // walks into the wall
-        const slid = cw.resolveMove(0, 0, 1.5, 4, 0.4);      // slides alongside it
-
-        const hud = document.getElementById('hud');
-        const clock = new THREE.Clock();
-        let angle = 0;
-
-        // Test hook: the smoke spec reads renderer.info to confirm frames are
-        // actually drawing (not just that the page loaded without errors).
-        window.__engineKit = { renderer, composer, scene };
-
-        function frame() {
-            const dt = Math.min(0.05, clock.getDelta());
-            angle += dt * 1.2;
-            // Sweep the attacker's facing vector around the compass.
-            attacker.state.setFacing(Math.cos(angle), Math.sin(angle));
-            const hit = hitboxCheck(attacker, target, MOVE);
-
-            rig.rotation.y += dt * 0.6;
-            if (particles.update) particles.update(dt);
-            composer.render();
-
-            const fv = attacker.state.facingVec;
-            hud.innerHTML =
-                '<b>voxel engine kit</b> — smoke test\n' +
-                'renderer + bloom: <span class="ok">up</span>\n' +
-                'voxel figure: <span class="ok">built</span>\n\n' +
-                '<b>vectorized hitbox</b>\n' +
-                'facing → (' + fv.x.toFixed(2) + ', ' + fv.z.toFixed(2) + ')\n' +
-                'cone on target: ' + (hit ? '<span class="ok">HIT</span>' : '<span class="no">miss</span>') + '\n\n' +
-                '<b>AABB collision</b>\n' +
-                'into wall x=5 → stopped at x=' + blocked.x.toFixed(2) + '\n' +
-                'slide past → (' + slid.x.toFixed(2) + ', ' + slid.z.toFixed(2) + ')';
-            requestAnimationFrame(frame);
-        }
-        frame();
+        import './src/game/index.js';
+        // Fade boot overlay once first frame likely painted
+        const boot = document.getElementById('boot');
+        setTimeout(() => {
+            if (boot) {
+                boot.style.opacity = '0';
+                setTimeout(() => boot.remove(), 700);
+            }
+        }, 900);
     </script>
 </body>
 </html>

@@ -1,0 +1,250 @@
+{
+  "town": {
+    "id": "beat-09-town",
+    "y": 1.951,
+    "grounded": true,
+    "solidSpawn": true,
+    "enemyCount": 2,
+    "phantasm": {
+      "canHit": false,
+      "hitRadius": 0,
+      "hp": 6,
+      "samples": [
+        {
+          "canHit": true,
+          "hitRadius": 0.7,
+          "y": 1.8637189707302726
+        },
+        {
+          "canHit": true,
+          "hitRadius": 0.7,
+          "y": 1.4766503426289679
+        },
+        {
+          "canHit": true,
+          "hitRadius": 0.7,
+          "y": 1.1193591704441936
+        },
+        {
+          "canHit": false,
+          "hitRadius": 0,
+          "y": 1.2474933448510717
+        },
+        {
+          "canHit": false,
+          "hitRadius": 0,
+          "y": 1.6976453404554435
+        }
+      ]
+    },
+    "tris": 63855
+  },
+  "levelRows": [
+    {
+      "id": "sandbox-combat",
+      "y": 1.951,
+      "grounded": true,
+      "vy": 0,
+      "solidSpawn": true,
+      "solidFeet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 5,
+      "errorCount": 0,
+      "errors": []
+    },
+    {
+      "id": "beat-01-crypt",
+      "y": 1.951,
+      "grounded": true,
+      "vy": 0,
+      "solidSpawn": true,
+      "solidFeet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 2,
+      "errorCount": 0,
+      "errors": []
+    },
+    {
+      "id": "beat-02-spindle",
+      "y": 1.951,
+      "grounded": true,
+      "vy": 0,
+      "solidSpawn": true,
+      "solidFeet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 3,
+      "errorCount": 0,
+      "errors": []
+    },
+    {
+      "id": "beat-03-sink",
+      "y": 1.951,
+      "grounded": true,
+      "vy": 0,
+      "solidSpawn": true,
+      "solidFeet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 1,
+      "errorCount": 0,
+      "errors": []
+    },
+    {
+      "id": "beat-04-sky",
+      "y": 3.17,
+      "grounded": false,
+      "vy": -3.3,
+      "solidSpawn": true,
+      "solidFeet": false,
+      "hp": 6,
+      "dead": false,
+      "enemies": 1,
+      "errorCount": 0,
+      "errors": []
+    },
+    {
+      "id": "beat-05-citadel",
+      "y": 1.951,
+      "grounded": true,
+      "vy": 0,
+      "solidSpawn": true,
+      "solidFeet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 2,
+      "errorCount": 0,
+      "errors": []
+    },
+    {
+      "id": "beat-06-quarry",
+      "y": 1.951,
+      "grounded": true,
+      "vy": 0,
+      "solidSpawn": true,
+      "solidFeet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 2,
+      "errorCount": 0,
+      "errors": []
+    },
+    {
+      "id": "beat-07-sluice",
+      "y": 1.951,
+      "grounded": true,
+      "vy": 0,
+      "solidSpawn": true,
+      "solidFeet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 2,
+      "errorCount": 0,
+      "errors": []
+    },
+    {
+      "id": "beat-08-bone",
+      "y": 1.951,
+      "grounded": true,
+      "vy": 0,
+      "solidSpawn": true,
+      "solidFeet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 3,
+      "errorCount": 0,
+      "errors": []
+    },
+    {
+      "id": "beat-09-town",
+      "y": 1.951,
+      "grounded": true,
+      "vy": 0,
+      "solidSpawn": true,
+      "solidFeet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 2,
+      "errorCount": 0,
+      "errors": []
+    },
+    {
+      "id": "beat-10-cryo",
+      "y": 1.951,
+      "grounded": true,
+      "vy": 0,
+      "solidSpawn": true,
+      "solidFeet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 2,
+      "errorCount": 0,
+      "errors": []
+    },
+    {
+      "id": "beat-11-mire",
+      "y": 1.951,
+      "grounded": true,
+      "vy": 0,
+      "solidSpawn": true,
+      "solidFeet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 2,
+      "errorCount": 0,
+      "errors": []
+    },
+    {
+      "id": "beat-12-pyre",
+      "y": 1.951,
+      "grounded": true,
+      "vy": 0,
+      "solidSpawn": true,
+      "solidFeet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 2,
+      "errorCount": 0,
+      "errors": []
+    },
+    {
+      "id": "beat-13-gumoi",
+      "y": 1.951,
+      "grounded": true,
+      "vy": 0,
+      "solidSpawn": true,
+      "solidFeet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 4,
+      "errorCount": 0,
+      "errors": []
+    },
+    {
+      "id": "beat-14-leviathan",
+      "y": 1.951,
+      "grounded": true,
+      "vy": 0,
+      "solidSpawn": true,
+      "solidFeet": true,
+      "hp": 6,
+      "dead": false,
+      "enemies": 3,
+      "errorCount": 0,
+      "errors": []
+    }
+  ],
+  "combat": {
+    "ok": true,
+    "hp0": 4,
+    "hp1": 3
+  },
+  "resp": {
+    "dead": true,
+    "hp": 0,
+    "y": 1.951,
+    "g": true
+  }
+}

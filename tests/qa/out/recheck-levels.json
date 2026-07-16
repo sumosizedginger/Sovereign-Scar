@@ -1,0 +1,487 @@
+[
+  {
+    "id": "sandbox-combat",
+    "name": "Combat Sandbox",
+    "spawn": {
+      "x": 0,
+      "y": 1.5,
+      "z": 10
+    },
+    "pos": {
+      "x": 0,
+      "y": 1.451,
+      "z": 10
+    },
+    "grounded": true,
+    "vy": 0,
+    "solidAtSpawnY01": true,
+    "solidAtFeet": true,
+    "solidBelowFeet": true,
+    "hp": 6,
+    "dead": false,
+    "enemies": 5,
+    "dest": 0,
+    "solidBounds": {
+      "minX": -14,
+      "maxX": 15,
+      "minZ": -14,
+      "maxZ": 15,
+      "n": 151
+    },
+    "triangles": 115459,
+    "errors": []
+  },
+  {
+    "id": "beat-01-crypt",
+    "name": "01 Crypt Breach",
+    "spawn": {
+      "x": 0,
+      "y": 1.2,
+      "z": 7
+    },
+    "pos": {
+      "x": 0,
+      "y": 1.451,
+      "z": 7
+    },
+    "grounded": true,
+    "vy": 0,
+    "solidAtSpawnY01": true,
+    "solidAtFeet": true,
+    "solidBelowFeet": true,
+    "hp": 6,
+    "dead": false,
+    "enemies": 2,
+    "dest": 0,
+    "solidBounds": {
+      "minX": -10,
+      "maxX": 11,
+      "minZ": -10,
+      "maxZ": 11,
+      "n": 143
+    },
+    "triangles": 87491,
+    "errors": []
+  },
+  {
+    "id": "beat-02-spindle",
+    "name": "02 Eastern Spindle",
+    "spawn": {
+      "x": 0,
+      "y": 1.5,
+      "z": 8
+    },
+    "pos": {
+      "x": 0,
+      "y": 1.451,
+      "z": 8
+    },
+    "grounded": true,
+    "vy": 0,
+    "solidAtSpawnY01": true,
+    "solidAtFeet": true,
+    "solidBelowFeet": true,
+    "hp": 6,
+    "dead": false,
+    "enemies": 3,
+    "dest": 0,
+    "solidBounds": {
+      "minX": -12,
+      "maxX": 13,
+      "minZ": -12,
+      "maxZ": 13,
+      "n": 140
+    },
+    "triangles": 43119,
+    "errors": []
+  },
+  {
+    "id": "beat-03-sink",
+    "name": "03 Duval Sink",
+    "spawn": {
+      "x": 0,
+      "y": 1.5,
+      "z": 9
+    },
+    "pos": {
+      "x": 0,
+      "y": 1.451,
+      "z": 9
+    },
+    "grounded": true,
+    "vy": 0,
+    "solidAtSpawnY01": true,
+    "solidAtFeet": true,
+    "solidBelowFeet": true,
+    "hp": 6,
+    "dead": false,
+    "enemies": 1,
+    "dest": 0,
+    "solidBounds": {
+      "minX": -13,
+      "maxX": 14,
+      "minZ": -13,
+      "maxZ": 14,
+      "n": 172
+    },
+    "triangles": 42683,
+    "errors": []
+  },
+  {
+    "id": "beat-04-sky",
+    "name": "04 Sky Monument",
+    "spawn": {
+      "x": 0,
+      "y": 3.5,
+      "z": 8
+    },
+    "pos": {
+      "x": 0,
+      "y": 3.335,
+      "z": 8
+    },
+    "grounded": false,
+    "vy": -2.2,
+    "solidAtSpawnY01": true,
+    "solidAtFeet": false,
+    "solidBelowFeet": false,
+    "hp": 6,
+    "dead": false,
+    "enemies": 1,
+    "dest": 0,
+    "solidBounds": {
+      "minX": -11,
+      "maxX": 12,
+      "minZ": -11,
+      "maxZ": 12,
+      "n": 192
+    },
+    "triangles": 42155,
+    "errors": []
+  },
+  {
+    "id": "beat-05-citadel",
+    "name": "05 Citadel of the Proxy",
+    "spawn": {
+      "x": 0,
+      "y": 1.5,
+      "z": 8
+    },
+    "pos": {
+      "x": 0,
+      "y": 1.451,
+      "z": 8
+    },
+    "grounded": true,
+    "vy": 0,
+    "solidAtSpawnY01": true,
+    "solidAtFeet": true,
+    "solidBelowFeet": true,
+    "hp": 6,
+    "dead": false,
+    "enemies": 2,
+    "dest": 0,
+    "solidBounds": {
+      "minX": -12,
+      "maxX": 13,
+      "minZ": -12,
+      "maxZ": 13,
+      "n": 157
+    },
+    "triangles": 89699,
+    "errors": []
+  },
+  {
+    "id": "beat-06-quarry",
+    "name": "06 Bleeding Quarry",
+    "spawn": {
+      "x": 0,
+      "y": 1.5,
+      "z": 8
+    },
+    "pos": {
+      "x": 0,
+      "y": 1.451,
+      "z": 8
+    },
+    "grounded": true,
+    "vy": 0,
+    "solidAtSpawnY01": true,
+    "solidAtFeet": true,
+    "solidBelowFeet": true,
+    "hp": 6,
+    "dead": false,
+    "enemies": 2,
+    "dest": 5,
+    "solidBounds": {
+      "minX": -12,
+      "maxX": 13,
+      "minZ": -12,
+      "maxZ": 13,
+      "n": 183
+    },
+    "triangles": 89763,
+    "errors": []
+  },
+  {
+    "id": "beat-07-sluice",
+    "name": "07 Sluice of Tears",
+    "spawn": {
+      "x": 0,
+      "y": 1.5,
+      "z": 8
+    },
+    "pos": {
+      "x": 0,
+      "y": 1.451,
+      "z": 8
+    },
+    "grounded": true,
+    "vy": 0,
+    "solidAtSpawnY01": true,
+    "solidAtFeet": true,
+    "solidBelowFeet": true,
+    "hp": 6,
+    "dead": false,
+    "enemies": 2,
+    "dest": 0,
+    "solidBounds": {
+      "minX": -12,
+      "maxX": 13,
+      "minZ": -12,
+      "maxZ": 13,
+      "n": 96
+    },
+    "triangles": 65515,
+    "errors": []
+  },
+  {
+    "id": "beat-08-bone",
+    "name": "08 Bone Forest",
+    "spawn": {
+      "x": 0,
+      "y": 1.2,
+      "z": 10
+    },
+    "pos": {
+      "x": 0,
+      "y": 1.451,
+      "z": 10
+    },
+    "grounded": true,
+    "vy": 0,
+    "solidAtSpawnY01": true,
+    "solidAtFeet": true,
+    "solidBelowFeet": true,
+    "hp": 6,
+    "dead": false,
+    "enemies": 3,
+    "dest": 1,
+    "solidBounds": {
+      "minX": -13,
+      "maxX": 14,
+      "minZ": -13,
+      "maxZ": 14,
+      "n": 195
+    },
+    "triangles": 110995,
+    "errors": []
+  },
+  {
+    "id": "beat-09-town",
+    "name": "09 Ruined Town",
+    "spawn": {
+      "x": 0,
+      "y": 1.5,
+      "z": 10
+    },
+    "pos": {
+      "x": 0,
+      "y": 1.951,
+      "z": 10
+    },
+    "grounded": true,
+    "vy": 0,
+    "solidAtSpawnY01": true,
+    "solidAtFeet": true,
+    "solidBelowFeet": true,
+    "hp": 6,
+    "dead": false,
+    "enemies": 2,
+    "dest": 0,
+    "solidBounds": {
+      "minX": -15,
+      "maxX": 15,
+      "minZ": -15,
+      "maxZ": 15,
+      "n": 9
+    },
+    "triangles": 0,
+    "errors": [
+      "TypeError: Cannot set property canHit of #<Object> which has only a getter",
+      "TypeError: Cannot set property canHit of #<Object> which has only a getter",
+      "TypeError: Cannot set property canHit of #<Object> which has only a getter",
+      "TypeError: Cannot set property canHit of #<Object> which has only a getter"
+    ]
+  },
+  {
+    "id": "beat-10-cryo",
+    "name": "10 Cryo Vault",
+    "spawn": {
+      "x": 0,
+      "y": 1.5,
+      "z": 8
+    },
+    "pos": {
+      "x": 0,
+      "y": 1.451,
+      "z": 8
+    },
+    "grounded": true,
+    "vy": 0,
+    "solidAtSpawnY01": true,
+    "solidAtFeet": true,
+    "solidBelowFeet": true,
+    "hp": 6,
+    "dead": false,
+    "enemies": 2,
+    "dest": 1,
+    "solidBounds": {
+      "minX": -12,
+      "maxX": 13,
+      "minZ": -12,
+      "maxZ": 13,
+      "n": 144
+    },
+    "triangles": 89147,
+    "errors": []
+  },
+  {
+    "id": "beat-11-mire",
+    "name": "11 Rot Mire",
+    "spawn": {
+      "x": 0,
+      "y": 1.5,
+      "z": 9
+    },
+    "pos": {
+      "x": 0.004,
+      "y": 1.451,
+      "z": 9.001
+    },
+    "grounded": true,
+    "vy": 0,
+    "solidAtSpawnY01": true,
+    "solidAtFeet": true,
+    "solidBelowFeet": true,
+    "hp": 6,
+    "dead": false,
+    "enemies": 2,
+    "dest": 0,
+    "solidBounds": {
+      "minX": -13,
+      "maxX": 14,
+      "minZ": -13,
+      "maxZ": 14,
+      "n": 189
+    },
+    "triangles": 89779,
+    "errors": []
+  },
+  {
+    "id": "beat-12-pyre",
+    "name": "12 Pyre Peak",
+    "spawn": {
+      "x": 0,
+      "y": 1.5,
+      "z": 8
+    },
+    "pos": {
+      "x": 0,
+      "y": 1.451,
+      "z": 8
+    },
+    "grounded": true,
+    "vy": 0,
+    "solidAtSpawnY01": true,
+    "solidAtFeet": true,
+    "solidBelowFeet": true,
+    "hp": 6,
+    "dead": false,
+    "enemies": 2,
+    "dest": 0,
+    "solidBounds": {
+      "minX": -12,
+      "maxX": 13,
+      "minZ": -12,
+      "maxZ": 13,
+      "n": 186
+    },
+    "triangles": 88587,
+    "errors": []
+  },
+  {
+    "id": "beat-13-gumoi",
+    "name": "13 GUMOI Tower",
+    "spawn": {
+      "x": 0,
+      "y": 1.2,
+      "z": 7
+    },
+    "pos": {
+      "x": 0,
+      "y": 1.451,
+      "z": 7
+    },
+    "grounded": true,
+    "vy": 0,
+    "solidAtSpawnY01": true,
+    "solidAtFeet": true,
+    "solidBelowFeet": true,
+    "hp": 6,
+    "dead": false,
+    "enemies": 4,
+    "dest": 0,
+    "solidBounds": {
+      "minX": -10,
+      "maxX": 11,
+      "minZ": -10,
+      "maxZ": 11,
+      "n": 196
+    },
+    "triangles": 132768,
+    "errors": []
+  },
+  {
+    "id": "beat-14-leviathan",
+    "name": "14 Leviathan Core",
+    "spawn": {
+      "x": 0,
+      "y": 1.5,
+      "z": 10
+    },
+    "pos": {
+      "x": 0.014,
+      "y": 1.451,
+      "z": 10
+    },
+    "grounded": true,
+    "vy": 0,
+    "solidAtSpawnY01": true,
+    "solidAtFeet": true,
+    "solidBelowFeet": true,
+    "hp": 6,
+    "dead": false,
+    "enemies": 3,
+    "dest": 0,
+    "solidBounds": {
+      "minX": -14,
+      "maxX": 15,
+      "minZ": -14,
+      "maxZ": 15,
+      "n": 193
+    },
+    "triangles": 91468,
+    "errors": []
+  }
+]
