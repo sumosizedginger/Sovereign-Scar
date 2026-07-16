@@ -3,6 +3,7 @@ import { fillBox } from '../../voxel/helpers.js';
 import { buildScatteredPredecessor, buildDeadConsole, stampMap } from '../assets/props.js';
 import { sfx } from '../../audio/synth.js';
 import { CryptWarden, attachBoss } from '../bosses/index.js';
+import { addAltar } from '../world/altar.js';
 
 export function loadBeat01(ctx) {
     const level = createLevelShell(ctx, {
@@ -32,6 +33,9 @@ export function loadBeat01(ctx) {
 
     level.addEnemy({ x: -3, y: 1, z: -1 }, { kind: 'sentinel', hp: 2 });
     level.addEnemy({ x: 3, y: 1, z: 2 }, { kind: 'scarab', hp: 2, ai: 'charge' });
+
+    // C3: Act I Reconstitution Altar, beside the spawn
+    addAltar(level, ctx, { x: 5, z: 7 });
 
     const warden = new CryptWarden(ctx.scene, { x: 0, y: 1.2, z: -5 });
     attachBoss(level, warden, {

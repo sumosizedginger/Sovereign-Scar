@@ -5,6 +5,7 @@ import { buildBoulder, stampMap } from '../assets/props.js';
 import { fillBox } from '../../voxel/helpers.js';
 import { abyssTint } from '../world/level-builder.js';
 import { ObsidianArachnid, attachBoss } from '../bosses/index.js';
+import { addAltar } from '../world/altar.js';
 
 export function loadBeat06(ctx) {
     const level = createLevelShell(ctx, {
@@ -26,6 +27,9 @@ export function loadBeat06(ctx) {
         { speaker: 'PREDECESSOR', text: 'The quarry bleeds gold. Something larger molts in the dark.' },
         { speaker: 'SYSTEM', text: 'Armor fails only during leaps. Time your swings.' },
     ];
+
+    // C3: Act II Reconstitution Altar, near the south spawn
+    addAltar(level, ctx, { x: -5, z: 8 });
 
     for (const [ox, oz] of [[-4, -3], [0, -5], [3, 3], [-2, 4]]) {
         const m = buildBoulder(0, 0, 0, 2, CRUST_COLORS.slate);

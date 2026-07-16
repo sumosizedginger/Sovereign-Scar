@@ -1,6 +1,7 @@
 import { createLevelShell, ABYSS_COLORS, CRUST_COLORS } from './_common.js';
 import { fillBox } from '../../voxel/helpers.js';
 import { GumoiWitness, attachBoss } from '../bosses/index.js';
+import { addAltar } from '../world/altar.js';
 
 export function loadBeat13(ctx) {
     const level = createLevelShell(ctx, {
@@ -27,6 +28,9 @@ export function loadBeat13(ctx) {
         { speaker: 'GUMOI', text: 'I am the index of every wrong turn you took.' },
         { speaker: 'PREDECESSOR', text: 'Climb. When flicker spikes, dash. The Witness falls to persistence.' },
     ];
+
+    // C3: Act III Reconstitution Altar — last stop before the Leviathan
+    addAltar(level, ctx, { x: -5, z: 7 });
 
     level.addEnemy({ x: 0, y: 1.5, z: 4 }, { kind: 'sentinel', hp: 3 });
     level.addEnemy({ x: -4, y: 3.5, z: 0 }, { kind: 'scarab', hp: 4, ai: 'charge' });

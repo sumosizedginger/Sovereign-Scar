@@ -27,6 +27,7 @@ import { MenuOverlay } from './ui/menu.js';
 import { EndingSequence } from './ui/credits.js';
 import { Inventory } from './kernel/inventory.js';
 import { bossHeartMax } from './kernel/health.js';
+import { tryPurchase, damageMult, dashIframeBonus, grappleRange, UPGRADES } from './kernel/upgrades.js';
 import { getWeapon } from './combat/weapons.js';
 
 // ── Boot ──────────────────────────────────────────────────────────────────
@@ -107,6 +108,15 @@ juice.onKill = (defender) => {
     const p = defender?.root?.position;
     if (p) soulMotes.burst(p);
 };
+
+// C3: apply purchased upgrades to the player's derived stats
+function applyUpgradeStats() {
+    const ups = loadSovereignProgress().upgrades || {};
+    player.damageMult = damageMult(ups);
+    player.dashIframeBonus = dashIframeBonus(ups);
+    player.grappleRange = grappleRange(ups);
+}
+applyUpgradeStats();
 
 // Shared game context
 const game = {
@@ -269,6 +279,8 @@ const menu = new MenuOverlay({
                 || (p.playTime || 0) > 60
                 || (p.deaths || 0) > 0;
         },
+        shards: () => player.inventory.scarShards,
+        upgrades: () => loadSovereignProgress().upgrades || {},
         settings: () => ({
             masterVol: volState.master,
             musicVol: volState.music,
@@ -343,9 +355,30 @@ const menu = new MenuOverlay({
             case 'quitTitle':
                 goToTitle();
                 break;
+            case 'buy': {
+                const ups = { ...(loadSovereignProgress().upgrades || {}) };
+                const res = tryPurchase(player.inventory, ups, ev.arg);
+                if (res.ok) {
+                    saveSovereignProgress({
+                        upgrades: ups,
+                        inventory: player.inventory.toJSON(),
+                    });
+                    applyUpgradeStats();
+                    sfx.pickup?.();
+                    hud.toast(`${UPGRADES[ev.arg].name} tier ${res.level} — ${res.cost} shards`, 2600);
+                } else if (res.reason === 'shards') {
+                    hud.toast('Not enough Scar Shards', 1600);
+                }
+                break;
+            }
         }
     },
 });
+
+game.openAltar = () => {
+    game.paused = true;
+    menu.openAltar();
+};
 
 // ── Ending sequence (B4) ──────────────────────────────────────────────────
 const ending = new EndingSequence({
@@ -543,14 +576,16 @@ function frame() {
         // consume grapple before the global facing pull.
         if (game.level) game.level.update(sdt, game);
 
-        // Global grapple fallback (levels without anchors)
+        // Global grapple fallback (levels without anchors); range scales with
+        // the Long-arm upgrade (C3)
         if (input.consumeGrapple() && player.inventory.hasItem('magnetic_grapple')) {
             if (!player.grapple.active) {
                 const fv = player.state.facingVec;
+                const reach = player.grappleRange || 8;
                 const target = {
-                    x: player.root.position.x + fv.x * 8,
+                    x: player.root.position.x + fv.x * reach,
                     y: player.root.position.y,
-                    z: player.root.position.z + fv.z * 8,
+                    z: player.root.position.z + fv.z * reach,
                 };
                 player.grapple.start(player.root.position, target, 10);
                 sfx.whoosh();

@@ -200,7 +200,8 @@ export class Player {
         this.physics.applyImpulse(fv.x * power, 0, fv.z * power);
         this.dashTimer = dur;
         this.dashCd = ownsBoot ? boot.cooldown : boot.cooldown * 1.2;
-        this.health.iFrames = Math.max(this.health.iFrames, dur + 0.05);
+        // C3: Ghost-step upgrade extends dash i-frames
+        this.health.iFrames = Math.max(this.health.iFrames, dur + 0.05 + (this.dashIframeBonus || 0));
         sfx.dash();
         this.arcSmear.spawn({
             position: this.rig.position,

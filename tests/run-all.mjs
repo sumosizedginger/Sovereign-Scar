@@ -23,6 +23,7 @@ import { run as runStory } from './game/story.spec.mjs';
 import { run as runJuice } from './game/juice.spec.mjs';
 import { run as runMenu } from './game/menu.spec.mjs';
 import { run as runGamepad } from './game/gamepad.spec.mjs';
+import { run as runUpgrades } from './game/upgrades.spec.mjs';
 
 const unitOnly = process.argv.includes('--unit-only');
 
@@ -60,6 +61,7 @@ async function main() {
     runNamed('juice', runJuice);
     runNamed('menu', runMenu);
     runNamed('gamepad', runGamepad);
+    runNamed('upgrades', runUpgrades);
 
     if (!unitOnly) {
         const { run: runSmoke } = await import('./smoke.spec.mjs');

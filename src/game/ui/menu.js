@@ -3,6 +3,7 @@
 // and receives {type:'set'|'action', ...} events via onEvent.
 
 import { MenuState } from './menu-state.js';
+import { UPGRADES, nextCost } from '../kernel/upgrades.js';
 
 const PANEL_BG = 'rgba(8,10,18,0.92)';
 const BORDER = '1px solid #3a4058';
@@ -103,6 +104,30 @@ export function buildScreens() {
         settings: (ctx) => ({ title: 'SETTINGS', items: settingsItems(ctx) }),
         beats: (ctx) => ({ title: 'BEAT SELECT', items: beatItems(ctx) }),
         controls: () => ({ title: 'CONTROLS', items: controlsItems() }),
+        altar: (ctx) => {
+            const shards = ctx.shards ? ctx.shards() : 0;
+            const ups = ctx.upgrades ? ctx.upgrades() : {};
+            const rows = Object.entries(UPGRADES).map(([id, u]) => {
+                const lvl = ups[id] || 0;
+                const cost = nextCost(id, lvl);
+                return {
+                    type: 'action',
+                    id: 'buy',
+                    arg: id,
+                    label: `${u.name}  ${'■'.repeat(lvl)}${'□'.repeat(u.costs.length - lvl)}`,
+                    note: cost == null ? 'MAXED' : `${u.desc} — ${cost} shards`,
+                    disabled: cost == null || shards < cost,
+                };
+            });
+            return {
+                title: 'RECONSTITUTION ALTAR',
+                items: [
+                    { type: 'text', label: `Scar Shards: ${shards}` },
+                    ...rows,
+                    { type: 'action', id: 'back', label: 'Leave' },
+                ],
+            };
+        },
         confirmNew: () => ({
             title: 'NEW GAME',
             items: [
@@ -181,6 +206,13 @@ export class MenuOverlay {
     openTitle() {
         this.mode = 'title';
         this.state.open('title');
+        this.render();
+        this.el.style.display = 'flex';
+    }
+
+    openAltar() {
+        this.mode = 'pause';
+        this.state.open('altar');
         this.render();
         this.el.style.display = 'flex';
     }

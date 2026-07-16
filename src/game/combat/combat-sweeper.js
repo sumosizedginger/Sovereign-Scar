@@ -33,7 +33,8 @@ export function applyHit(defender, move, attacker) {
         if (defender.onBlocked) defender.onBlocked(attacker, move);
         return { killed: false, damage: 0, blocked: true };
     }
-    const dmg = move.damage != null ? move.damage : 1;
+    // C3: Edge upgrade — attacker-side damage multiplier
+    const dmg = (move.damage != null ? move.damage : 1) * ((attacker && attacker.damageMult) || 1);
     if (defender.hp == null) defender.hp = 1;
     // Notify before HP mutation so handlers can still cancel via shielded re-check
     if (defender.onHit) defender.onHit(dmg, attacker, move);
