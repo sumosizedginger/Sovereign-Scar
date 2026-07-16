@@ -99,6 +99,20 @@ export class BossBase {
         return this.maxHp > 0 ? Math.max(0, this.hp / this.maxHp) : 0;
     }
 
+    /**
+     * S6 (P1-5): uniform visual-presence scale — grows the mesh and the
+     * combat radii together so gameplay matches the silhouette. Call once
+     * at the end of a subclass constructor. Bosses that re-assign
+     * hitRadius at runtime must use this.baseHitRadius for the reset value.
+     */
+    presenceScale(k) {
+        if (!this.root || !k || k === 1) return;
+        this.root.scale.multiplyScalar(k);
+        this.hitRadius *= k;
+        this.contactRadius *= k;
+        this.baseHitRadius = this.hitRadius;
+    }
+
     _checkPhase() {
         if (this.state.current === 'DEAD') return;
         const frac = this.hpFrac;

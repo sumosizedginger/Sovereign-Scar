@@ -99,7 +99,7 @@ export class HUD {
         this.helpEl.textContent =
             'WASD move · Mouse aim · LMB/Space attack\n' +
             'Shift dash · Q/R weapon · E interact · G grapple\n' +
-            'M mood · N mute · [ ] change beat · P pause · Enter skip story';
+            'N mute · P pause · Enter advance story';
         document.body.appendChild(this.helpEl);
 
         // Boss intro name card (A6)
@@ -151,6 +151,16 @@ export class HUD {
         this.story = new StoryPanel();
     }
 
+    /** D5: hide every HUD element for chrome-free capture (dev H key). */
+    setHidden(v) {
+        this._devHidden = !!v;
+        const vis = v ? 'hidden' : 'visible';
+        for (const el of [this.el, this.bossEl, this.toastEl, this.helpEl, this.cardEl]) {
+            el.style.visibility = vis;
+        }
+        if (this.story?.el) this.story.el.style.visibility = vis;
+    }
+
     /** Boss intro card: fade in 0.2s, hold, fade out. */
     bossCard(name, subtitle = '', hold = 1.6) {
         this._cardName.textContent = (name || '').toUpperCase();
@@ -199,7 +209,7 @@ export class HUD {
             this.helpEl.textContent =
                 'WASD move · Mouse aim · LMB/Space attack\n' +
                 'Shift dash · Q/R weapon · E interact · G grapple\n' +
-                'M mood · N mute · [ ] change beat · P pause · Enter skip story';
+                'N mute · P pause · Enter advance story';
         }
         const hp = state.hp ?? 0;
         const max = state.maxHp ?? 6;
@@ -211,7 +221,7 @@ export class HUD {
         this.el.innerHTML =
             `<b style="color:#7fe0ff">SOVEREIGN SCAR</b>\n` +
             `Beat: <span style="color:#ffd060">${state.beatName || state.beatId || '?'}</span>\n` +
-            `HP ${hearts} (${Number(hp).toFixed(1)}/${max})\n` +
+            `HP ${hearts} (${Number.isInteger(Number(hp)) ? hp : Number(hp).toFixed(1)}/${max})\n` +
             `Weapon: ${state.weapon || '—'}\n` +
             `Keys: ${keys}/3 · Shards: ${state.scarShards || 0} · Mood: ${state.mood || 'crust'}` +
             (bosses != null ? ` · Bosses: ${bosses}/14` : '') +

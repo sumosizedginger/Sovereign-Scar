@@ -78,6 +78,16 @@ async function main() {
         const bossE2E = createSink('boss-e2e');
         await runBossE2E(bossE2E);
         sinks.push(bossE2E);
+
+        const { run: runVisualSanity } = await import('./visual-sanity.spec.mjs');
+        const visualSanity = createSink('visual-sanity');
+        await runVisualSanity(visualSanity);
+        sinks.push(visualSanity);
+
+        const { run: runCampaignE2E } = await import('./campaign-e2e.spec.mjs');
+        const campaignE2E = createSink('campaign-e2e');
+        await runCampaignE2E(campaignE2E);
+        sinks.push(campaignE2E);
     }
 
     writeStepSummary(sinks);

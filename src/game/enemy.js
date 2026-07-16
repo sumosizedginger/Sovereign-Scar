@@ -41,15 +41,26 @@ export class Enemy {
             [buildLeg(pal, 1), [5, 0, 0]],
             [buildLeg(pal, -1), [-5, 0, 0]],
         ];
-        const scale = S * (opts.meshScale || 2.6);
-        this.rig = buildFigure(parts, scale);
-        this.rig.position.set(position.x, position.y != null ? position.y : 1.0, position.z);
+        const scale = S * (opts.meshScale || 0.33);
+        this.rig = new THREE.Group();
+        const inner = buildFigure(parts, scale);
         try {
             const eyes = buildGlowEyes(pal);
             eyes.left.scale.setScalar(scale);
             eyes.right.scale.setScalar(scale);
-            this.rig.add(eyes.left, eyes.right);
+            // buildGlowEyes bakes unscaled part-unit positions — re-place at
+            // head height (head part offset is [0,24,0] × scale).
+            eyes.left.position.set(-2.5 * scale, (6 + 24) * scale, 5.5 * scale);
+            eyes.right.position.set(2.5 * scale, (6 + 24) * scale, 5.5 * scale);
+            inner.add(eyes.left, eyes.right);
         } catch (_) {}
+        // Ground the mesh: enemy rig origin sits on the floor (rig.y = 1.0 =
+        // floor top), so shift the mesh up until its local minY is 0.
+        const bbox = new THREE.Box3().setFromObject(inner);
+        inner.position.y = -bbox.min.y;
+        this.rig.add(inner);
+        this._inner = inner;
+        this.rig.position.set(position.x, position.y != null ? position.y : 1.0, position.z);
         scene.add(this.rig);
         this.scene = scene;
 

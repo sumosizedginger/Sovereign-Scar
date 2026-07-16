@@ -121,7 +121,7 @@ export async function run(t) {
         t.ok('boot: help controls visible', /WASD/i.test(boot.helpText || ''), boot.helpText);
         t.ok('boot: drawing frames', boot.calls > 0 || boot.triangles > 0, JSON.stringify({ c: boot.calls, t: boot.triangles }));
         t.ok('boot: scene has content', boot.sceneChildren > 0, `children=${boot.sceneChildren}`);
-        t.ok('boot: default weapon', boot.weapon === 'anchor_link', `weapon=${boot.weapon}`);
+        t.ok('boot: default weapon', boot.weapon === 'bare_strike', `weapon=${boot.weapon}`);
 
         // Screenshot boot
         const shotBoot = path.join(OUT_DIR, 'boot.png');

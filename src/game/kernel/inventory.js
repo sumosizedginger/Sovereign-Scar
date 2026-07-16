@@ -1,8 +1,8 @@
 // Key items, weapons, memory keys, flags.
 
 const DEFAULT_STATE = () => ({
-    weapons: ['anchor_link'],
-    activeWeapon: 'anchor_link',
+    weapons: ['bare_strike'],
+    activeWeapon: 'bare_strike',
     items: {
         phase_boot: false,
         tectonic_glove: false,

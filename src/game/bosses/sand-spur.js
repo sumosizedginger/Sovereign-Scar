@@ -14,9 +14,9 @@ export class SandSpur extends BossBase {
             id: 'sand_spur',
             name: 'Sand Spur',
             hp: opts.hp || 14,
-            hitRadius: 0.75,
+            hitRadius: 1.5,
             contactDamage: 1,
-            contactRadius: 1.25,
+            contactRadius: 2.0,
             position: path[0] || { x: 0, z: 0 },
             mesh: body,
             phaseThresholds: [0.55, 0.3],
@@ -37,6 +37,8 @@ export class SandSpur extends BossBase {
                     emissiveIntensity: 0.4,
                 })
             );
+            // S6 (P1-5): emerged silhouette must clear the mob bar (~2.1+)
+            mesh.scale.setScalar(3.1);
             mesh.position.set(this.path[0].x, 0.6, this.path[0].z);
             mesh.castShadow = true;
             scene.add(mesh);
@@ -93,7 +95,9 @@ export class SandSpur extends BossBase {
             const a = this.path[i0], b = this.path[i1];
             this.segments[i].position.x = a.x + (b.x - a.x) * f;
             this.segments[i].position.z = a.z + (b.z - a.z) * f;
-            const yBase = this.submerged ? -0.4 : 0.55;
+            // Segments are ~2.2 tall (0.7 × 3.1 scale): emerged center rides just
+            // above the floor top (y=1.0); submerged hides below it.
+            const yBase = this.submerged ? -0.4 : 1.9;
             this.segments[i].position.y = yBase + Math.sin(this._pathU * 4 + i) * 0.15;
             this.segments[i].visible = !this.submerged || i === 0;
             this.segments[i].material.transparent = true;

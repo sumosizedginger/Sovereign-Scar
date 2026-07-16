@@ -15,6 +15,12 @@ export class MoodController {
         this._noiseAcc = 0;
         this._ramp = null; // { from, to, t, dur }
         this.musicProfile = 'crust';
+        this._lights = null;
+    }
+
+    /** S4: bind engine light objects so presets can drive ambient/key. */
+    bindLights({ keySun, fillNeon, rimWarm, ambient } = {}) {
+        this._lights = { keySun, fillNeon, rimWarm, ambient };
     }
 
     get current() {
@@ -37,6 +43,18 @@ export class MoodController {
         }
         if (vignettePass?.uniforms?.offset) {
             vignettePass.uniforms.offset.value = preset.vignette;
+        }
+
+        if (this._lights) {
+            const L = this._lights;
+            if (L.ambient && preset.ambient != null) {
+                L.ambient.color.setHex(preset.ambient);
+                L.ambient.intensity = preset.ambientIntensity ?? 0.5;
+            }
+            if (L.keySun && preset.key != null) {
+                L.keySun.color.setHex(preset.key);
+                L.keySun.intensity = preset.keyIntensity ?? 1.35;
+            }
         }
 
         if (audio && !getSetting('reduceHorrorAudio')) {
@@ -83,6 +101,19 @@ export class MoodController {
             if (scene.fog) {
                 scene.fog.color.copy(bg);
                 scene.fog.density = a.fogDensity + (b.fogDensity - a.fogDensity) * u;
+            }
+            if (this._lights) {
+                const L = this._lights;
+                if (L.ambient && a.ambient != null && b.ambient != null) {
+                    L.ambient.color.copy(new THREE.Color(a.ambient).lerp(new THREE.Color(b.ambient), u));
+                    const ai = a.ambientIntensity ?? 0.5, bi = b.ambientIntensity ?? 0.5;
+                    L.ambient.intensity = ai + (bi - ai) * u;
+                }
+                if (L.keySun && a.key != null && b.key != null) {
+                    L.keySun.color.copy(new THREE.Color(a.key).lerp(new THREE.Color(b.key), u));
+                    const ak = a.keyIntensity ?? 1.35, bk = b.keyIntensity ?? 1.35;
+                    L.keySun.intensity = ak + (bk - ak) * u;
+                }
             }
             if (u >= 1) {
                 this.apply(this._ramp.toName, { audio: true, music: 'abyss' });

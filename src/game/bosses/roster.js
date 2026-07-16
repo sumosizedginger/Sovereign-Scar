@@ -99,10 +99,11 @@ export class TriCompiler {
                 mat(opts.color || CRUST_COLORS.slate, opts.emissive || 0x40c0ff, 1.4)
             );
             mesh.position.set(c.x, c.y != null ? c.y : 1.4, c.z);
+            mesh.scale.setScalar(1.35); // S6 (P1-5): silhouette ≥ 2.4 units
             mesh.castShadow = true;
             scene.add(mesh);
             const core = {
-                root: mesh, mesh, hitRadius: 0.85,
+                root: mesh, mesh, hitRadius: 1.15,
                 hp: opts.hpPerCore || 4, maxHp: opts.hpPerCore || 4,
                 state: { current: 'IDLE' },
                 managedBySystem: true,
@@ -243,6 +244,7 @@ export class ProxyBoss extends BossBase {
         this.clones = [];
         this.castCd = 2.0;
         this._realIndex = 0;
+        this.presenceScale(1.15);
     }
     onPhaseChange(phase) {
         this.castCd = Math.max(0.9, 2.2 - phase * 0.4);
@@ -271,7 +273,7 @@ export class ProxyBoss extends BossBase {
     /** True body is always combat root; decoys are visual only. Brightness marks the real one. */
     _markRealBody() {
         this.canHit = true;
-        this.hitRadius = 1.3;
+        this.hitRadius = this.baseHitRadius || 1.3;
         if (this.core) {
             this.core.material.transparent = true;
             this.core.material.opacity = 1;
@@ -391,6 +393,7 @@ export class ObsidianArachnid extends BossBase {
         this.leapCd = 3;
         this._leapT = 0;
         this.shielded = true; // armor; underside weak when leaping
+        this.presenceScale(1.3);
     }
     tickAI(dt, player) {
         for (let i = 0; i < this.legs.length; i++) {
@@ -452,6 +455,7 @@ export class HydroidCloud extends BossBase {
         });
         this.orbs = orbs;
         this.pulseCd = 2.5;
+        this.presenceScale(1.35);
     }
     tickAI(dt, player) {
         const spread = 1.2 + this.phase * 0.5 + Math.sin(this.t) * 0.3;
@@ -518,6 +522,7 @@ export class SkeletalMantis extends BossBase {
         this.scytheR = scytheR;
         this.sliceCd = 2.2;
         this._sliceT = 0;
+        this.presenceScale(1.1);
     }
     tickAI(dt, player) {
         this.sliceCd -= dt;
@@ -578,13 +583,14 @@ export class PhantasmBoss extends BossBase {
         this.manifested = true;
         this.phaseTimer = 0;
         this.mirrorCd = 3;
+        this.presenceScale(1.25);
     }
     tickAI(dt, player) {
         this.phaseTimer += dt;
         const cycle = this.phase >= 2 ? 1.8 : 2.5;
         this.manifested = Math.floor(this.phaseTimer / cycle) % 2 === 0;
         this.canHit = this.manifested;
-        this.hitRadius = this.manifested ? 0.9 : 0;
+        this.hitRadius = this.manifested ? (this.baseHitRadius || 0.9) : 0;
         this.mesh.material.opacity = this.manifested ? 0.92 : 0.12;
         this.root.position.y = (1.5) + Math.sin(this.t * 2) * 0.45;
         this.root.rotation.y += dt * (this.manifested ? 1 : 2.5);
@@ -637,6 +643,7 @@ export class FrostAndFuel extends BossBase {
         this.mode = 'frost'; // alternates
         this.modeTimer = 0;
         this.castCd = 2.0;
+        this.presenceScale(1.35);
     }
     tickAI(dt, player) {
         this.modeTimer += dt;
@@ -784,6 +791,9 @@ export class MagmaWyrm extends BossBase {
                 new THREE.SphereGeometry(0.75 - i * 0.06, 10, 10),
                 mat(i === 0 ? 0xff6020 : 0xa03010, 0xff4010, 1.2 - i * 0.1)
             );
+            // S6 (P1-5): per-segment scale — root scaling would distort the
+            // chain math in tickAI (locals are world-derived offsets).
+            s.scale.setScalar(1.65);
             body.add(s);
             segs.push(s);
         }
@@ -820,8 +830,8 @@ export class MagmaWyrm extends BossBase {
                 );
             }
         }
-        // Align hit to head world pos
-        this.hitRadius = 1.0;
+        // Align hit to head world pos (radii track the 1.65 presence scale)
+        this.hitRadius = 1.65;
         this.fireCd -= dt;
         // Fire trail
         this.trails = this.trails.filter((tr) => {
@@ -859,8 +869,8 @@ export class MagmaWyrm extends BossBase {
             this.telegraphAt(this.root.position.x, this.root.position.z, 1.5, 0.3, 0xff8040);
         }
         if (player) {
-            // Contact via head
-            this.contactRadius = 1.6;
+            // Contact via head (tracks the 1.65 presence scale)
+            this.contactRadius = 2.4;
         }
     }
     dispose() {
@@ -886,6 +896,7 @@ export class GumoiWitness extends BossBase {
         });
         this.castCd = 2.0;
         this.flickerBoost = 0;
+        this.presenceScale(1.15);
     }
     onPhaseChange(phase) {
         this.castCd = Math.max(0.8, 2.2 - phase * 0.4);

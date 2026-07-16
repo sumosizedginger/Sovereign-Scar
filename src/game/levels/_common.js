@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { meshAndCollide, buildRoomFloor, buildPerimeter, VS } from '../world/level-builder.js';
 import { stampMap } from '../assets/props.js';
-import { CRUST_COLORS, ABYSS_COLORS } from '../assets/palettes.js';
+import { CRUST_COLORS, ABYSS_COLORS, MOOD_PRESETS } from '../assets/palettes.js';
 import { Enemy, DummyTarget } from '../enemy.js';
 
 /**
@@ -43,6 +43,24 @@ export function createLevelShell(ctx, opts = {}) {
         }),
     });
     disposers.push(() => built.dispose());
+
+    // S5: void dressing — a huge fog-colored ground plane below the floor so
+    // outside-the-arena reads as fog floor instead of black void.
+    {
+        const moodPreset = MOOD_PRESETS[opts.mood] || MOOD_PRESETS.crust;
+        const voidPlane = new THREE.Mesh(
+            new THREE.CircleGeometry(200, 24),
+            new THREE.MeshBasicMaterial({ color: moodPreset.background })
+        );
+        voidPlane.rotation.x = -Math.PI / 2;
+        voidPlane.position.y = -0.5;
+        scene.add(voidPlane);
+        disposers.push(() => {
+            if (voidPlane.parent) voidPlane.parent.remove(voidPlane);
+            voidPlane.geometry.dispose();
+            voidPlane.material.dispose();
+        });
+    }
 
     // Spawn on the floor interior (cell coords == world units at VOXEL_SCALE=1)
     const spawn = opts.spawn || { x: 0, y: 1.5, z: Math.max(2, half - 4) };
@@ -140,6 +158,7 @@ export function createLevelShell(ctx, opts = {}) {
         addPickup,
         addSystem,
         banner: opts.banner || '',
+        halfSize: half,
         friction: opts.friction || 'default',
         mood: opts.mood || 'crust',
         onEnter: opts.onEnter || null,

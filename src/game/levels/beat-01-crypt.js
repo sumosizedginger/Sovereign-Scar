@@ -42,14 +42,16 @@ export function loadBeat01(ctx) {
         nextBeat: 'beat-02-spindle',
         toast: 'Crypt Warden fallen — Eastern Spindle unlocked',
         onDefeat(game) {
+            // grantItem alone only sets a flag for this id — add the weapon
             game.player.inventory.grantItem?.('anchor_link');
+            game.player.inventory.addWeapon?.('anchor_link');
+            game.hud?.toast?.('Anchor Link salvaged — equipped');
             sfx.pickup();
         },
     });
 
     level.onEnter = (game) => {
-        game.hud.toast('Predecessor online… Anchor Link drive online.');
-        sfx.pickup();
+        game.hud.toast('Construct online. Objective: the Anchor Link.');
     };
 
     // Exit still works after boss

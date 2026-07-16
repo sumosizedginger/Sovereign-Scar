@@ -29,9 +29,12 @@ import { Inventory } from './kernel/inventory.js';
 import { bossHeartMax } from './kernel/health.js';
 import { tryPurchase, damageMult, dashIframeBonus, grappleRange, UPGRADES } from './kernel/upgrades.js';
 import { getWeapon } from './combat/weapons.js';
+import { dev } from './dev/dev-mode.js';
 
 // ── Boot ──────────────────────────────────────────────────────────────────
-initLights();
+// S4: capture the engine lights so MoodController can drive ambient/key.
+const gameLights = initLights();
+const ambientLight = scene.children.find((c) => c.isAmbientLight);
 try { initQuality(); } catch (_) { /* quality may reference missing env maps */ }
 
 // Hide ambient petals — fight Crust mood (buildplan risk mitigation)
@@ -42,7 +45,13 @@ const collisionWorld = new CollisionWorld();
 const input = new Input(window);
 const hud = new HUD();
 const mood = new MoodController();
-const camRig = new CameraRig({ height: 18, back: 12 });
+mood.bindLights({
+    keySun: gameLights?.keySun,
+    fillNeon: gameLights?.fillNeon,
+    rimWarm: gameLights?.rimWarm,
+    ambient: ambientLight,
+});
+const camRig = new CameraRig({ height: 12, back: 8 });
 
 // Custom passes before OutputPass
 const flickerPass = createFlickerPass();
@@ -156,6 +165,9 @@ world.game = game;
 world.player = player;
 world.collision = collisionWorld;
 
+// Dev mode (Phase D): gate + badge + god mode; inert unless enabled
+dev.init(game, { loadLevel, LEVELS, applyUpgradeStats, input });
+
 // ── Level lifecycle ───────────────────────────────────────────────────────
 function unloadLevel() {
     if (game.level) {
@@ -188,6 +200,9 @@ function loadLevel(id) {
 
     const sp = level.spawn || { x: 0, y: 1.2, z: 0 };
     player.setSpawn(sp.x, sp.y != null ? sp.y : 1.2, sp.z);
+    // S5: fit the camera to the room size
+    camRig.height = 8 + (level.halfSize || 12) * 0.35;
+    camRig.back = camRig.height * 0.66;
     camRig.snapTo(player.root.position);
 
     const moodName = level.mood || meta.mood || 'crust';
@@ -405,6 +420,14 @@ game.startEnding = () => {
 // Restore progress
 const progress = loadSovereignProgress();
 if (progress.inventory) {
+    // S-extra migration: pre-Bare-Strike saves with zero progress started
+    // holding the Anchor Link (the Beat 01 objective) — reset to new default.
+    if ((progress.bossesDefeated || []).length === 0
+        && progress.inventory.weapons?.length === 1
+        && progress.inventory.weapons[0] === 'anchor_link') {
+        progress.inventory.weapons = ['bare_strike'];
+        progress.inventory.activeWeapon = 'bare_strike';
+    }
     player.inventory = Inventory.fromJSON(progress.inventory);
 }
 if (progress.maxHp) player.health.setMax(progress.maxHp);
@@ -435,6 +458,10 @@ function unlockAudio() {
 window.addEventListener('pointerdown', unlockAudio);
 window.addEventListener('keydown', unlockAudio);
 window.addEventListener('resize', onResize);
+// S3 (P0-3): the engine sized itself once at import; the window may have
+// changed since (or reported 0×0 in a background tab).
+onResize();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) onResize(); });
 
 // ── Main loop ─────────────────────────────────────────────────────────────
 const clock = new THREE.Clock();
@@ -447,6 +474,13 @@ function frame() {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, clock.getDelta());
     renderer.info.reset();
+
+    // S3: continuous size guard — hidden-tab boot can leave the canvas at
+    // 0×0 with no resize event ever firing (cheap integer compare per frame).
+    if (window.innerWidth > 0) {
+        const want = Math.floor(window.innerWidth * renderer.getPixelRatio());
+        if (renderer.domElement.width !== want) onResize();
+    }
 
     // Juice ticks on RAW dt so hitstop can end itself and flashes restore
     juice.update(dt);
@@ -501,7 +535,16 @@ function frame() {
         input.consumeLevelNext();
         input.consumeLevelPrev();
         input.consumeAnyKey();
+        input.consumeDevKey();
     }
+
+    // Dev mode (Phase D): one gate — when disabled every dev key is a no-op
+    if (input.consumeDevToggle()) dev.toggle(game);
+    {
+        const dk = input.consumeDevKey();
+        if (dk && dev.enabled) dev.handleKey(dk, game);
+    }
+    if (dev.enabled) dev.update(dt, game);
 
     // Title attract: slow orbit around the player while the world is frozen
     if (game.atTitle) {
@@ -522,14 +565,13 @@ function frame() {
         if (unlocked.has(nid) || nid === 'sandbox-combat' || prog.currentBeat === nid) {
             loadLevel(nid);
         } else {
-            // Soft gate: still allow skip with toast so playtests aren't bricked,
-            // but require either unlock OR holding Shift (dev bypass).
-            if (input.keys.has('ShiftLeft') || input.keys.has('ShiftRight')) {
+            // D7: force-skip requires dev mode — no Shift bypass in normal play
+            if (dev.enabled) {
                 loadLevel(nid);
                 hud.toast(`Dev skip → ${nid}`);
             } else {
                 // Progressive unlock is real; offer unlock toast
-                hud.toast(`Locked: defeat prior boss or Shift+] to force`);
+                hud.toast(`Locked: defeat the prior boss first`);
             }
         }
     }
@@ -538,8 +580,11 @@ function frame() {
         loadLevel(pid); // always allow backtracking
     }
     if (input.consumeMoodToggle()) {
-        mood.toggle();
-        hud.toast(`Mood: ${mood.mood}`);
+        // D7: mood flip is a dev tool, not a player verb
+        if (dev.enabled) {
+            mood.toggle();
+            hud.toast(`Mood: ${mood.mood}`);
+        }
     }
     if (input.consumeStoryAdvance()) {
         if (ending.isActive) ending.advance();
@@ -562,7 +607,7 @@ function frame() {
                 const b = game.bossIntro.boss;
                 if (b && !b.defeated) {
                     hud.bossCard(b.bossName, bossSubtitle(b.bossId));
-                    camRig.focus({ height: 10, back: 6, duration: 1.8, target: b.root?.position || null });
+                    camRig.focus({ height: 6, back: 3.5, duration: 1.8, target: b.root?.position || null });
                     sfx.phase();
                 }
             }
@@ -681,6 +726,22 @@ function frame() {
     });
 
     composer.render();
+
+    // S6: luminance sampler — must run in the same task as the render (no
+    // preserveDrawingBuffer, so readPixels elsewhere returns black).
+    if (window.__ssLumRequest) {
+        const gl = renderer.getContext();
+        const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+        const px = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        let sum = 0, n = 0;
+        for (let i = 0; i < px.length; i += 64) { // every 16th pixel
+            sum += 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
+            n++;
+        }
+        window.__ssLumRequest(sum / n);
+        window.__ssLumRequest = null;
+    }
 }
 
 // Test / debug hooks
@@ -697,6 +758,7 @@ window.__sovereignScar = {
     scene,
     menu,
     ending,
+    dev,
     save() {
         return saveSovereignProgress({
             currentBeat: game.levelId,
@@ -705,6 +767,23 @@ window.__sovereignScar = {
             playTime: game.playTime,
             mood: mood.mood,
         });
+    },
+    measure() {
+        const box = (o) => {
+            const b = new THREE.Box3().setFromObject(o);
+            return { h: b.max.y - b.min.y, minY: b.min.y };
+        };
+        const out = { player: box(player.rig), mobs: [], boss: null };
+        for (const e of game.level?.enemies || []) {
+            if (e === game.level?.boss || e.bossId) continue;
+            if (e.rig) out.mobs.push(box(e.rig));
+        }
+        const b = game.level?.boss;
+        if (b?.root) out.boss = box(b.root);
+        return out;
+    },
+    sampleLuminance() {
+        return new Promise((resolve) => { window.__ssLumRequest = resolve; });
     },
 };
 

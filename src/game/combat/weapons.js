@@ -6,6 +6,18 @@ export function arcMove(range, arcDeg, vertical = 1.2, extra = {}) {
     return { range, depthTolerance, vertical, ...extra };
 }
 
+// S-extra (P1-4): starting weapon — the player salvages the Anchor Link from
+// the Crypt Warden in Beat 01, so they begin with bare fists.
+export const BARE_STRIKE = arcMove(1.2, 50, 1.0, {
+    id: 'bare_strike',
+    name: 'Bare Strike',
+    damage: 0.5,
+    cooldown: 0.35,
+    knockback: 1.2,
+    smearColor: 0x9aa8bc,
+    heavy: false,
+});
+
 export const ANCHOR_LINK = arcMove(1.8, 60, 1.2, {
     id: 'anchor_link',
     name: 'Anchor Link',
@@ -68,6 +80,7 @@ export const MAGNETIC_GRAPPLE = {
 };
 
 export const WEAPONS = {
+    bare_strike: BARE_STRIKE,
     anchor_link: ANCHOR_LINK,
     tectonic_wedge: TECTONIC_WEDGE,
     heavy_mallet: HEAVY_MALLET,

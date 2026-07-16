@@ -48,11 +48,11 @@ export class Player {
             [buildLeg(pal, 1), [5, 0, 0]],
             [buildLeg(pal, -1), [-5, 0, 0]],
         ];
-        const scale = S * 3.0;
-        this.rig = buildFigure(parts, scale);
-        this.rig.position.set(0, 1.2, 0);
+        const scale = S * 0.39;
+        this.rig = new THREE.Group();
+        const inner = buildFigure(parts, scale);
 
-        // Glow eyes (emissive bloom)
+        // Glow eyes (emissive bloom) — added to inner so the grounding shift applies
         try {
             const eyes = buildGlowEyes(pal);
             const eyeScale = scale;
@@ -60,9 +60,17 @@ export class Player {
             eyes.right.scale.setScalar(eyeScale);
             eyes.left.position.set(-2.5 * eyeScale, 6 * eyeScale + 24 * scale, 5.5 * eyeScale);
             eyes.right.position.set(2.5 * eyeScale, 6 * eyeScale + 24 * scale, 5.5 * eyeScale);
-            this.rig.add(eyes.left, eyes.right);
+            inner.add(eyes.left, eyes.right);
             this._eyes = eyes;
         } catch (_) { /* optional */ }
+
+        // Ground the mesh: feet must rest at the physics body's bottom face
+        // (rig.position.y - 0.95, see VoxelPhysicsBody halfExtents below).
+        const bbox = new THREE.Box3().setFromObject(inner);
+        inner.position.y = -0.95 - bbox.min.y;
+        this.rig.add(inner);
+        this._inner = inner;
+        this.rig.position.set(0, 1.95, 0);
 
         scene.add(this.rig);
 
@@ -90,7 +98,7 @@ export class Player {
         this.arcSmear = new ArcSmear(scene); // C8: true 8-way swing arcs
         this.frictionName = 'default';
         this._stepAcc = 0;
-        this.spawnPoint = { x: 0, y: 1.2, z: 0 };
+        this.spawnPoint = { x: 0, y: 1.95, z: 0 };
     }
 
     setGetVoxelAt(fn) {

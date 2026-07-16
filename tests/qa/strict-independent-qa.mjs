@@ -103,7 +103,7 @@ export async function run(t) {
         t.ok('boot: physics uses vx not .vel',
             boot.physicsKeys.includes('vx') && !boot.physicsKeys.includes('vel'),
             JSON.stringify(boot.physicsKeys));
-        t.ok('boot: default weapon anchor_link', boot.weapon === 'anchor_link', boot.weapon);
+        t.ok('boot: default weapon bare_strike', boot.weapon === 'bare_strike', boot.weapon);
 
         await page.screenshot({ path: path.join(OUT, 'boot.png') });
 

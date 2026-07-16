@@ -1,0 +1,20 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sovereign-scar",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/serve.mjs", "8799"],
+      "cwd": "D:\\Zelda\\sovereign-scar",
+      "port": 8799
+    },
+    {
+      "name": "sovereign-scar-alt",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/serve.mjs"],
+      "cwd": "D:\\Zelda\\sovereign-scar",
+      "port": 8801,
+      "autoPort": true
+    }
+  ]
+}

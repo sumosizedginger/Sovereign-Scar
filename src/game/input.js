@@ -17,6 +17,11 @@ export class Input {
         this._muteToggle = false;
         this._anyKey = false;
 
+        // Dev mode (D1): edge-triggered dev inputs, gated at the consume site
+        this._devToggle = false;
+        this._devKey = null;
+        this.devActive = false; // set by dev-mode on toggle; enables F-key preventDefault
+
         // Gamepad state (B5)
         this.padActive = false;          // true once a pad has been used
         this.padMove = { x: 0, z: 0 };   // left stick (deadzoned, analog)
@@ -39,6 +44,18 @@ export class Input {
             if (e.code === 'KeyG') this._grapple = true;
             if (e.code === 'Enter' || e.code === 'NumpadEnter') this._storyAdvance = true;
             if (e.code === 'KeyN') this._muteToggle = true;
+            // Dev mode (D1)
+            if (e.code === 'KeyD' && e.ctrlKey && e.shiftKey) {
+                this._devToggle = true;
+                e.preventDefault();
+            }
+            if (e.code === 'F1' && e.shiftKey) this._devKey = 'ShiftF1';
+            else if (['F1', 'F2', 'F3', 'F10', 'Backquote', 'KeyH'].includes(e.code)) {
+                this._devKey = e.code;
+            }
+            if (this.devActive && ['F1', 'F2', 'F3', 'F10'].includes(e.code)) {
+                e.preventDefault();
+            }
             this._anyKey = true;
             // prevent page scroll on space
             if (e.code === 'Space') e.preventDefault();
@@ -206,6 +223,19 @@ export class Input {
     consumeAnyKey() {
         const v = this._anyKey;
         this._anyKey = false;
+        return v;
+    }
+
+    consumeDevToggle() {
+        const v = this._devToggle;
+        this._devToggle = false;
+        return v;
+    }
+
+    /** One dev key code per frame: F1 | ShiftF1 | F2 | F3 | F10 | Backquote | KeyH. */
+    consumeDevKey() {
+        const v = this._devKey;
+        this._devKey = null;
         return v;
     }
 

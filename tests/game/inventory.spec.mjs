@@ -2,7 +2,11 @@ import { Inventory } from '../../src/game/kernel/inventory.js';
 
 export function run(t) {
     const inv = new Inventory();
-    t.ok('default weapon', inv.activeWeapon === 'anchor_link');
+    t.ok('default weapon', inv.activeWeapon === 'bare_strike');
+    t.ok('default weapon list', inv.weapons.length === 1 && inv.weapons[0] === 'bare_strike');
+    inv.addWeapon('anchor_link');
+    t.ok('anchor link added', inv.weapons.includes('anchor_link'));
+    t.ok('anchor link auto-equipped', inv.activeWeapon === 'anchor_link');
     inv.grantItem('heavy_mallet');
     t.ok('grant mallet', inv.hasItem('heavy_mallet'));
     t.ok('weapon list', inv.weapons.includes('heavy_mallet'));
