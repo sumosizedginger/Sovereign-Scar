@@ -103,6 +103,8 @@ export function makeKeyStore(dungeonId) {
         markPickupTaken: (pid) => { markPickupTaken(dungeonId, pid); refresh(); },
         markVisited: (roomId) => { markVisited(dungeonId, roomId); refresh(); },
         visited: () => cache.visited.slice(),
+        mapPickup: () => cache.mapPickup === true,
+        markMapPickup: () => { markMapPickup(dungeonId); refresh(); },
     };
 }
 

@@ -24,6 +24,7 @@ import { createWrapPass, updateWrapPass } from './render/wrap-shader-pass.js';
 import { LEVELS, DEV_LEVELS, getLevel, nextLevelId, prevLevelId } from './levels/registry.js';
 import { loadSovereignProgress, saveSovereignProgress, unlockBeat, recordBossDefeat, resetSovereignProgress } from './kernel/progress.js';
 import { MenuOverlay } from './ui/menu.js';
+import { MapScreen } from './ui/map-screen.js';
 import { EndingSequence } from './ui/credits.js';
 import { Inventory } from './kernel/inventory.js';
 import { bossHeartMax } from './kernel/health.js';
@@ -283,6 +284,8 @@ function goToTitle() {
     menu.openTitle();
 }
 
+const mapScreen = new MapScreen(); // W6
+
 const menu = new MenuOverlay({
     ctx: {
         levels: () => LEVELS,
@@ -537,6 +540,22 @@ function frame() {
         input.consumeLevelPrev();
         input.consumeAnyKey();
         input.consumeDevKey();
+        input.consumeMapToggle();
+    }
+
+    // W6: Tab map (inert on title / during the ending)
+    if (input.consumeMapToggle()) {
+        if (!game.atTitle && !ending.isActive) mapScreen.toggle(game);
+    }
+    if (mapScreen.isOpen) {
+        // map is modal: drain gameplay inputs like the menu does
+        input.consumeAttack();
+        input.consumeDash();
+        input.consumeInteract();
+        input.consumeWeaponCycle();
+        input.consumeGrapple();
+        input.consumeStoryAdvance();
+        if (input.consumePause()) mapScreen.close(game); // Esc closes
     }
 
     // Dev mode (Phase D): one gate — when disabled every dev key is a no-op
@@ -767,6 +786,7 @@ window.__sovereignScar = {
     menu,
     ending,
     dev,
+    mapScreen,
     save() {
         return saveSovereignProgress({
             currentBeat: game.levelId,

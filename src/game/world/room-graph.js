@@ -548,6 +548,30 @@ export function createDungeon(ctx, def, opts = {}) {
         enterRoom,
         bakedRooms: () => [...baked.keys()],
         def,
+        // W6: room-graph view for the Tab map
+        mapData() {
+            const visited = keyStore.visited?.() || [];
+            return {
+                kind: 'dungeon',
+                name: def.name,
+                mapAll: keyStore.mapPickup?.() === true,
+                rooms: Object.entries(def.rooms).map(([rid, r]) => ({
+                    id: rid,
+                    gx: r.grid[0],
+                    gy: r.grid[1],
+                    visited: visited.includes(rid),
+                    current: rid === currentRoomId,
+                    boss: !!r.boss,
+                    doors: (r.doors || [])
+                        .filter((d) => d.type !== 'exit' && def.rooms[d.to])
+                        .map((d) => ({
+                            to: d.to,
+                            type: d.type || 'open',
+                            opened: keyStore.isOpen(doorKey(def.id, rid, d.to)),
+                        })),
+                })),
+            };
+        },
     };
 
     enterRoom(def.start, null);

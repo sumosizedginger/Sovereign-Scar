@@ -196,6 +196,25 @@ export function createOverworld(ctx, screensDef, opts = {}) {
         return true;
     };
 
+    // W6: overworld view for the Tab map (screens instead of rooms)
+    level.mapData = () => {
+        const visited = getOverworldState().visited;
+        return {
+            kind: 'overworld',
+            name: def.name,
+            state: mood,
+            screens: Object.entries(screensDef.screens).map(([sid, s]) => ({
+                id: sid,
+                sx: s.grid[0],
+                sy: s.grid[1],
+                visited: visited.includes(sid),
+                current: sid === level.currentRoomId(),
+                entrance: !!(s.entrances && s.entrances.length),
+                monolith: !!s.monolith,
+            })),
+        };
+    };
+
     // Save position on every screen transition (natural checkpoint) and
     // track visited screens for the map (W6).
     level.onRoomEnter = (sid, game) => {

@@ -315,6 +315,56 @@ export async function run(t) {
         t.ok('trapped spawn nudged to a free cell', trap.standingInsideWall === false);
         t.ok('nudged spot still has floor', trap.onFloor === true);
 
+        // ── W6: Tab map — overworld grid + dungeon room graph ──
+        const mapRes = await page.evaluate(async () => {
+            const s = window.__sovereignScar;
+            const out = {};
+            const owData = s.game.level.mapData();
+            out.ow = {
+                kind: owData.kind,
+                total: owData.screens.length,
+                visited: owData.screens.filter((x) => x.visited).length,
+                current: owData.screens.find((x) => x.current)?.id,
+                hasEntranceIcon: owData.screens.some((x) => x.entrance),
+                hasMonolith: owData.screens.some((x) => x.monolith),
+            };
+            s.mapScreen.toggle(s.game);
+            out.opened = s.mapScreen.isOpen
+                && document.getElementById('ss-map').style.display !== 'none';
+            s.mapScreen.toggle(s.game);
+            out.closed = !s.mapScreen.isOpen;
+
+            s.loadLevel('w-test-dungeon');
+            await new Promise((r) => setTimeout(r, 150));
+            const dData = s.game.level.mapData();
+            out.dungeon = {
+                kind: dData.kind,
+                rooms: dData.rooms.length,
+                visitedRooms: dData.rooms.filter((x) => x.visited).length,
+                openedDoor: dData.rooms
+                    .find((x) => x.id === 'hall')?.doors
+                    .find((d) => d.to === 'vault')?.opened === true,
+            };
+            // A plain arena level has no map
+            s.loadLevel('beat-01-crypt');
+            await new Promise((r) => setTimeout(r, 100));
+            out.arenaHasMap = !!s.game.level.mapData;
+            return out;
+        });
+        t.ok('overworld map data', mapRes.ow.kind === 'overworld' && mapRes.ow.total === 4,
+            JSON.stringify(mapRes.ow));
+        t.ok('map shows visited screens', mapRes.ow.visited >= 3, `v=${mapRes.ow.visited}`);
+        t.ok('map marks current screen', mapRes.ow.current === 'r0c0', mapRes.ow.current);
+        t.ok('map has entrance + monolith icons', mapRes.ow.hasEntranceIcon && mapRes.ow.hasMonolith);
+        t.ok('map overlay opens', mapRes.opened);
+        t.ok('map overlay closes', mapRes.closed);
+        t.ok('dungeon map data', mapRes.dungeon.kind === 'dungeon' && mapRes.dungeon.rooms === 3,
+            JSON.stringify(mapRes.dungeon));
+        t.ok('dungeon map remembers visited rooms', mapRes.dungeon.visitedRooms >= 2,
+            `v=${mapRes.dungeon.visitedRooms}`);
+        t.ok('dungeon map shows opened door', mapRes.dungeon.openedDoor === true);
+        t.ok('arena levels have no map', mapRes.arenaHasMap === false);
+
         t.ok('no fatal pageerrors', errors.filter((e) => !/AudioContext|favicon/i.test(e)).length === 0,
             errors.slice(0, 5).join(' | '));
     } finally {

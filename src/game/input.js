@@ -17,6 +17,8 @@ export class Input {
         this._muteToggle = false;
         this._anyKey = false;
 
+        this._mapToggle = false; // W6
+
         // Dev mode (D1): edge-triggered dev inputs, gated at the consume site
         this._devToggle = false;
         this._devKey = null;
@@ -44,6 +46,10 @@ export class Input {
             if (e.code === 'KeyG') this._grapple = true;
             if (e.code === 'Enter' || e.code === 'NumpadEnter') this._storyAdvance = true;
             if (e.code === 'KeyN') this._muteToggle = true;
+            if (e.code === 'Tab') {
+                this._mapToggle = true;
+                e.preventDefault(); // keep focus in the game
+            }
             // Dev mode (D1)
             if (e.code === 'KeyD' && e.ctrlKey && e.shiftKey) {
                 this._devToggle = true;
@@ -223,6 +229,12 @@ export class Input {
     consumeAnyKey() {
         const v = this._anyKey;
         this._anyKey = false;
+        return v;
+    }
+
+    consumeMapToggle() {
+        const v = this._mapToggle;
+        this._mapToggle = false;
         return v;
     }
 
