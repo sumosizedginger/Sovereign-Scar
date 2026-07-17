@@ -29,6 +29,7 @@ import { run as runKeys } from './game/keys.spec.mjs';
 import { run as runBlockers } from './game/blockers.spec.mjs';
 import { run as runMigration } from './game/migration.spec.mjs';
 import { run as runWorld7 } from './game/world7.spec.mjs';
+import { run as runMotifs } from './game/motifs.spec.mjs';
 
 const unitOnly = process.argv.includes('--unit-only');
 
@@ -72,6 +73,7 @@ async function main() {
     runNamed('blockers', runBlockers);
     runNamed('migration', runMigration);
     runNamed('world7', runWorld7);
+    runNamed('motifs', runMotifs);
 
     if (!unitOnly) {
         const { run: runSmoke } = await import('./smoke.spec.mjs');

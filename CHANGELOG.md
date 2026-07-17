@@ -23,8 +23,11 @@ Executes the Completion Plan (Phases S/D/W/C) via the Builder Guide.
   the Anchor Link is salvaged from the Crypt Warden.
 - **Dev mode** (`?dev=1` / Ctrl+Shift+D): god/one-hit, F2 boss kill, F3 phase
   force, teleport/grant panel, perf + luminance overlays, hitbox geometry.
-- Visual-sanity and campaign/world e2e suites (388 → 900+ assertions),
-  per-level luminance sampler, character `measure()` hook.
+- Visual-sanity and campaign/world e2e suites (388 → 955 assertions),
+  per-level luminance sampler, character `measure()` hook, Phase V
+  certification captures (`CERTIFICATION.md` + `docs/media/certification/`).
+- Per-dungeon story pass (intro/mid/post-boss lines), per-beat/region music
+  motifs, boss-reveal stinger, economy audit.
 
 ### Fixed
 - P0-1: characters were ~7× world scale with feet below the floor (player

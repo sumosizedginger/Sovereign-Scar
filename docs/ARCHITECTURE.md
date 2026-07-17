@@ -13,24 +13,33 @@ index.html
        ├─ kernel/               health, inventory, progress
        ├─ physics/              VoxelPhysicsBody (Y) + friction
        ├─ combat/               sweeper, weapons, grapple
-       ├─ world/                destructible, gears, fluid, frustum, light lines
-       ├─ fx/ + render/         mood, phase-shift, flicker, wrap
+       ├─ world/                room graph, keys, blockers, altar, destructible,
+       │                        gears, fluid, frustum, light lines
+       ├─ overworld/            7×7 world builder + screens (screens-as-rooms)
+       ├─ dev/                  dev mode: gate, panel, overlays, hit geometry
+       ├─ fx/ + render/         mood, motifs, phase-shift, flicker, wrap
        ├─ assets/               palettes + procedural props
-       ├─ levels/               15 loaders + registry
+       ├─ levels/               overworld + sandbox + 14 dungeon defs + registry
        ├─ bosses/               BossBase + 14 multi-phase bosses + attachBoss
-       └─ ui/                   HUD (boss bar) + StoryPanel
+       └─ ui/                   HUD (boss bar), StoryPanel, map screen, ending
 src/engine|voxel|combat|audio|characters  FROZEN kit (My-Engine 0.2.0)
   audio/synth.js also owns music beds (startMusicBed / updateMusicBed)
 ```
 
 ## Boss contract
 
-Every beat boss implements combat fields (`root`, `hitRadius`, `hp`, `state`, `onHit`, `onDeath`) and is registered with `attachBoss(level, boss, { nextBeat, toast, onDefeat })`.
+Every beat boss implements combat fields (`root`, `hitRadius`, `hp`, `state`, `onHit`, `onDeath`) and is registered with `attachBoss(level, boss, { nextBeat, toast, onDefeat, defeatStory })`.
 
 - `managedBySystem = true` prevents double-update in the level shell
 - Phase thresholds (e.g. `[0.66, 0.33]`) fire `onPhaseChange`
 - Telegraphs: `boss.telegraphAt(x, z, radius, life, color)`
-- Defeat is single-fire: records `bossesDefeated`, unlocks next beat, optional story line
+- Defeat is single-fire: records `bossesDefeated`, unlocks next beat, queues
+  the SYSTEM line + optional `defeatStory` lines
+- `boss.home` = arena anchor captured at construction — all orbit/patrol math
+  offsets from it, never from the world origin
+- Wake gate: outside 40 units of `boss.home` the boss still animates but is
+  passed `player: null` (every targeting path guards on it) — prebaked bosses
+  can't snipe across the dungeon
 
 ## Physics split
 
@@ -90,7 +99,7 @@ getProgress().sovereignProgress = {
   version, currentBeat, unlockedBeats, inventory, hp, maxHp, playTime, deaths,
   bossesDefeated, mood, settings, upgrades, lastRun, campaignComplete,
   dungeons: { [id]: { smallKeys, bossKey, opened, visited, taken, mapPickup } },
-  overworld: { pos: { screen, x, z }, state, visited },
+  overworld: { pos: { world, screen, x, z }, state, visited },
 }
 ```
 

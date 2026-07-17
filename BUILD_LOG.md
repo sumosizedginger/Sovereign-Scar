@@ -191,9 +191,14 @@ Per [../Sovereign-Scar-Builder-Guide.md](../Sovereign-Scar-Builder-Guide.md). Ba
 - Gate item 4 ✅: README (955 count, scope, layout), CHANGELOG `[0.3.0] — 2026-07-17`, `package.json` 0.1.0 → **0.3.0**, tag `v0.3.0`.
 - Gate items 1–2 (⚠ human QA outstanding): the fresh-save dev-off manual playthrough and the overlays-on 60 FPS pass need real hands + a real GPU — headless swiftshader runs at ~1.5 FPS, so an agent cannot meaningfully certify frame rate or feel. Automated stand-ins are green: `world-e2e` full real-combat Beat 01 loop (overworld → arch → keys → locks → secret → Warden kill → exit), `campaign-e2e` fresh-save all-14 sweep to credits, Phase V luminance sweep in band everywhere. **Log timer/deaths here after the by-hand run.**
 
+## Session 5 (cont.) — post-release docs-truth pass
+
+- ARCHITECTURE.md brought current: layer tree gains `overworld/`/`dev/` + world subsystems, boss contract documents `defeatStory`, `boss.home` anchoring, and the 40-unit wake gate; progress schema shows `pos.world`. CHANGELOG suite count finalized; stale "smear still ±X-biased" polish bullet removed (C8 fixed it in Session 3).
+- New `tests/game/motifs.spec.mjs` (25 asserts): every beat and region has a valid, distinct motif; no orphan table entries. Suite **955 → 980/980**.
+
 ## Known remaining polish (not blockers)
-- Character smear still ±X-biased (engine side-view heritage)
 - Boss fights are arena-scripted phases (not full cinematic cutscenes / unique OST stems)
+- Music is synthesized beds + motifs, not composed tracks
 - Some arena floors share shell scale — visual variety is props + boss mesh + mood, not bespoke terrain tools
 
 ## How to run
