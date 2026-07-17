@@ -8,6 +8,7 @@ import { BEAT01_DEF } from '../../src/game/levels/beat-01-crypt.js';
 import { BEAT02_DEF } from '../../src/game/levels/beat-02-spindle.js';
 import { BEAT03_DEF } from '../../src/game/levels/beat-03-sink.js';
 import { BEAT04_DEF } from '../../src/game/levels/beat-04-sky.js';
+import { BEAT05_DEF } from '../../src/game/levels/beat-05-citadel.js';
 
 export function run(t) {
     // doorKey is order-independent
@@ -132,4 +133,28 @@ export function run(t) {
     t.ok('beat-04 eight rooms reachable', b04.reachable.length === 8, String(b04.reachable.length));
     t.ok('beat-04 has multi-Y platform rooms', Object.values(BEAT04_DEF.rooms)
         .filter((r) => typeof r.platforms === 'function').length >= 3);
+
+    // Beat 05 (C2): the phase-shift citadel
+    const b05 = validateDungeonDef(BEAT05_DEF);
+    t.ok('beat-05 def valid', b05.ok, b05.reasons.join('; '));
+    t.ok('beat-05 eight rooms reachable', b05.reachable.length === 8, String(b05.reachable.length));
+    t.ok('beat-05 boss room + secret', Object.values(BEAT05_DEF.rooms).some((r) => r.boss)
+        && !!BEAT05_DEF.rooms.reliquary);
+
+    // C2 sweep: every Act I dungeon meets the per-dungeon checklist shape
+    for (const [name, def] of [['b01', BEAT01_DEF], ['b02', BEAT02_DEF],
+        ['b03', BEAT03_DEF], ['b04', BEAT04_DEF], ['b05', BEAT05_DEF]]) {
+        const rooms = Object.values(def.rooms);
+        const n = rooms.length;
+        t.ok(`${name} room count in band`, n >= 6 && n <= 14, String(n));
+        t.ok(`${name} has locked door + small key`,
+            rooms.some((r) => (r.doors || []).some((d) => d.type === 'locked'))
+            && (def.keys || []).some((k) => k.type === 'small'));
+        t.ok(`${name} has boss key + boss door`,
+            rooms.some((r) => (r.doors || []).some((d) => d.type === 'boss'))
+            && (def.keys || []).some((k) => k.type === 'boss'));
+        t.ok(`${name} has an exit to the overworld`,
+            rooms.some((r) => (r.doors || []).some((d) => d.type === 'exit'))
+            && typeof def.onExit === 'function');
+    }
 }
