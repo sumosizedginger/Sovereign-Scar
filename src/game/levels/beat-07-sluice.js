@@ -159,6 +159,15 @@ export const BEAT07_DEF = {
                 addKeyPickup(level, 'beat-07-sluice', 'drowned-key',
                     { x: origin.x + 6, y: 1.2, z: origin.z + 6 }, 'small');
             },
+            onEnter(game) {
+                if (!this._storyShown) {
+                    this._storyShown = true;
+                    game.hud?.story?.queue?.([
+                        { speaker: 'PREDECESSOR', text: 'Every tear the Crust ever shed drains through here. Do not drink.' },
+                        { speaker: 'PREDECESSOR', text: 'The Grapple crosses what the acid keeps. Copper pegs hold true.' },
+                    ]);
+                }
+            },
         },
         brinepocket: { // secret: a ledge-guarded brine hollow
             grid: [1, -2],
@@ -218,6 +227,9 @@ export const BEAT07_DEF = {
                 attachBoss(level, cloud, {
                     nextBeat: 'beat-08-bone',
                     toast: 'Hydroid dispersed — Bone Forest awaits',
+                    defeatStory: [
+                        { speaker: 'PREDECESSOR', text: 'The Cloud disperses. The Sluice runs clear for the first time in an age — two of seven free.' },
+                    ],
                 });
             },
             onEnter(game) {

@@ -153,6 +153,15 @@ export const BEAT08_DEF = {
                 addKeyPickup(level, 'beat-08-bone', 'ossuary-key',
                     { x: origin.x - 6, y: 1.2, z: origin.z - 6 }, 'small');
             },
+            onEnter(game) {
+                if (!this._storyShown) {
+                    this._storyShown = true;
+                    game.hud?.story?.queue?.([
+                        { speaker: 'PREDECESSOR', text: 'The forest grew down, not up. Roots know things branches never will.' },
+                        { speaker: 'PREDECESSOR', text: 'The bladed one prunes the canopy. Bait its scythes into iron.' },
+                    ]);
+                }
+            },
         },
         marrowcyst: { // secret: wedge-cracked marrow pocket
             grid: [-1, -2],
@@ -214,6 +223,9 @@ export const BEAT08_DEF = {
                 attachBoss(level, mantis, {
                     nextBeat: 'beat-09-town',
                     toast: 'Mantis broken — Ruined Town stirs',
+                    defeatStory: [
+                        { speaker: 'PREDECESSOR', text: 'The Mantis folds. The roots breathe out — three of seven walk free.' },
+                    ],
                 });
             },
             onEnter(game) {

@@ -148,6 +148,15 @@ export const BEAT03_DEF = {
                 addKeyPickup(level, 'beat-03-sink', 'slipway-key',
                     { x: origin.x + 5, y: 1.2, z: origin.z + 6 }, 'small');
             },
+            onEnter(game) {
+                if (!this._storyShown) {
+                    this._storyShown = true;
+                    game.hud?.story?.queue?.([
+                        { speaker: 'PREDECESSOR', text: 'The Sink swallowed the survey teams whole. Keep to the high stone.' },
+                        { speaker: 'PREDECESSOR', text: 'Something segmented moves under the dust. It hunts by footfall.' },
+                    ]);
+                }
+            },
         },
         hollow: { // secret: a sink hole spanned by a grapple gap
             grid: [1, -2],
@@ -217,6 +226,9 @@ export const BEAT03_DEF = {
                 attachBoss(level, spur, {
                     nextBeat: 'beat-04-sky',
                     toast: 'Sand Spur broken — Sky Monument unlocks',
+                    defeatStory: [
+                        { speaker: 'PREDECESSOR', text: 'The Spur is still. The Sink key surfaces — one more and the monolith opens.' },
+                    ],
                     onDefeat(game) {
                         game.player.inventory.grantMemoryKey('sink');
                         game.hud?.toast?.('Memory Key — Sink');

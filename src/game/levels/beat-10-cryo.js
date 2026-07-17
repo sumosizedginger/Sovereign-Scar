@@ -161,6 +161,15 @@ export const BEAT10_DEF = {
                 addKeyPickup(level, 'beat-10-cryo', 'glacier-key',
                     { x: origin.x - 6, y: 1.2, z: origin.z - 6 }, 'small');
             },
+            onEnter(game) {
+                if (!this._storyShown) {
+                    this._storyShown = true;
+                    game.hud?.story?.queue?.([
+                        { speaker: 'PREDECESSOR', text: 'Frost preserves what it cannot save. The vault remembers warmth.' },
+                        { speaker: 'PREDECESSOR', text: 'Two heads argue over the floor state. Let them — then strike the fuel.' },
+                    ]);
+                }
+            },
         },
         icecomb: { // secret: honeycombed ice pocket behind a ledge
             grid: [-1, -2],
@@ -218,6 +227,9 @@ export const BEAT10_DEF = {
                 attachBoss(level, twins, {
                     nextBeat: 'beat-11-mire',
                     toast: 'Twins quenched — the Rot Mire festers on',
+                    defeatStory: [
+                        { speaker: 'PREDECESSOR', text: 'Twin heads, one quiet. The ice is only water waiting — five of seven free.' },
+                    ],
                 });
             },
             onEnter(game) {

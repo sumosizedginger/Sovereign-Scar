@@ -174,6 +174,8 @@ Per [../Sovereign-Scar-Builder-Guide.md](../Sovereign-Scar-Builder-Guide.md). Ba
 - **C4 item-gating budget check ✓**: real overworld carries exactly 2 blockers per item (world7 BLOCKERS); dungeon-side — grapple 03/04/07×2, boot 03/07/10/13, wedge 02/05/08/11/14, caster 04/06/09/12. Every item gates ≥2 overworld blockers + ≥1 dungeon shortcut.
 - world-graph sweep extended to BEAT13_DEF/BEAT14_DEF; the "plain arena has no map" e2e now points at `sandbox-combat` — the last non-dungeon level. Suite **955/955**.
 
+- C5 story pass ✅: every dungeon now has intro (load) + mid (altar-room `onEnter`, once-guarded) + post-boss lines (`attachBoss` gains `defeatStory`, queued after the SYSTEM defeat line). Arc threads carried through: Act I counts memory keys 1→3, the Proxy defeat announces the phase shift, Act II counts the seven engineers freed 1→7, GUMOI speaks from Beat 12's defeat onward, Beat 14 hands off to the ending. Epilogue expanded 5→9 lines (committed with the docs refresh). Suite **955/955**.
+
 ## Known remaining polish (not blockers)
 - Character smear still ±X-biased (engine side-view heritage)
 - Boss fights are arena-scripted phases (not full cinematic cutscenes / unique OST stems)

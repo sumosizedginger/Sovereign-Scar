@@ -100,6 +100,15 @@ export const BEAT14_DEF = {
                     });
                 }
             },
+            onEnter(game) {
+                if (!this._storyShown) {
+                    this._storyShown = true;
+                    game.hud?.story?.queue?.([
+                        { speaker: 'PREDECESSOR', text: 'It will copy itself until one of you runs out of world. Watch for the gold trail.' },
+                        { speaker: 'PREDECESSOR', text: 'When the screen folds, walk off one edge and trust the other.' },
+                    ]);
+                }
+            },
         },
         foldpocket: { // secret: a wedge-cracked fold in the recursion
             grid: [-1, -2],
@@ -161,6 +170,9 @@ export const BEAT14_DEF = {
                 });
                 attachBoss(level, levi, {
                     toast: 'Leviathan Core terminated — the Scar is quiet',
+                    defeatStory: [
+                        { speaker: 'PREDECESSOR', text: 'Stand clear. The Scar is letting go.' },
+                    ],
                     onDefeat(game) {
                         game.unlockAndSave?.('sandbox-combat');
                         // B4: collapse cascade → whiteout → ending sequence

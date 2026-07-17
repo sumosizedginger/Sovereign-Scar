@@ -143,6 +143,15 @@ export const BEAT13_DEF = {
                 addKeyPickup(level, 'beat-13-gumoi', 'archive-key',
                     { x: origin.x - 6, y: 1.2, z: origin.z - 6 }, 'small');
             },
+            onEnter(game) {
+                if (!this._storyShown) {
+                    this._storyShown = true;
+                    game.hud?.story?.queue?.([
+                        { speaker: 'GUMOI', text: 'Filed: your hesitation. Filed: your dead. Climb anyway — the index is patient.' },
+                        { speaker: 'PREDECESSOR', text: 'Last altar before the crown. Spend what you carry; the Tower keeps no change.' },
+                    ]);
+                }
+            },
         },
         nullcell: { // secret: a null-indexed cell behind a ledge
             grid: [-1, -2],
@@ -203,6 +212,10 @@ export const BEAT13_DEF = {
                 attachBoss(level, witness, {
                     nextBeat: 'beat-14-leviathan',
                     toast: 'Witness erased — Leviathan Core stirs',
+                    defeatStory: [
+                        { speaker: 'GUMOI', text: 'Index closed. I was only ever the door\'s way of watching you knock.' },
+                        { speaker: 'PREDECESSOR', text: 'The Core is below everything now. Bring the Wedge home.' },
+                    ],
                     onDefeat(game) {
                         game.player.inventory.setFlag('gumoi_sigil', true);
                         game.hud?.toast?.('GUMOI Sigil — the Core awakens');

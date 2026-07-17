@@ -298,6 +298,7 @@ export function attachBoss(level, boss, opts = {}) {
                 if (game.hud?.story) {
                     game.hud.story.queue([
                         { speaker: 'SYSTEM', text: msg },
+                        ...(opts.defeatStory || []),
                     ]);
                 }
             }

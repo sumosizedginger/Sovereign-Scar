@@ -143,6 +143,15 @@ export const BEAT02_DEF = {
                 addKeyPickup(level, 'beat-02-spindle', 'vaultrow-key',
                     { x: origin.x - 6, y: 1.2, z: origin.z - 6 }, 'small');
             },
+            onEnter(game) {
+                if (!this._storyShown) {
+                    this._storyShown = true;
+                    game.hud?.story?.queue?.([
+                        { speaker: 'PREDECESSOR', text: 'The gears never stopped. They just forgot what they were turning.' },
+                        { speaker: 'PREDECESSOR', text: 'The Compiler crown is north. Rest at the altar first — it still honors our shards.' },
+                    ]);
+                }
+            },
         },
         capacitor: { // secret: narrow side vault
             grid: [1, -2],
@@ -210,6 +219,9 @@ export const BEAT02_DEF = {
                 attachBoss(level, boss, {
                     nextBeat: 'beat-03-sink',
                     toast: 'Tri-Compiler offline — Memory Key ready',
+                    defeatStory: [
+                        { speaker: 'PREDECESSOR', text: 'Three compilers, one silence. The Spindle key is yours — two remain.' },
+                    ],
                     onDefeat(game) {
                         game.player.inventory.grantMemoryKey('spindle');
                         game.hud?.toast?.('Memory Key — Spindle');

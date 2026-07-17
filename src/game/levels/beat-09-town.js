@@ -168,6 +168,15 @@ export const BEAT09_DEF = {
                 addKeyPickup(level, 'beat-09-town', 'street-key',
                     { x: origin.x - 5, y: 1.2, z: origin.z - 7 }, 'small');
             },
+            onEnter(game) {
+                if (!this._storyShown) {
+                    this._storyShown = true;
+                    game.hud?.story?.queue?.([
+                        { speaker: 'PREDECESSOR', text: 'The town is only there when you look away. Trust your back.' },
+                        { speaker: 'PREDECESSOR', text: 'Something here wears our shape. Do not let it stand behind you.' },
+                    ]);
+                }
+            },
         },
         cellar: { // secret: a shrouded cellar under the high street
             grid: [-1, -2],
@@ -229,6 +238,9 @@ export const BEAT09_DEF = {
                 attachBoss(level, phantasm, {
                     nextBeat: 'beat-10-cryo',
                     toast: 'Phantasm dispelled — the Cryo Vault thaws',
+                    defeatStory: [
+                        { speaker: 'PREDECESSOR', text: 'The Phantasm keeps no shape to bury. Walk on — four of seven free.' },
+                    ],
                 });
             },
             onEnter(game) {

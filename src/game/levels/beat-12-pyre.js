@@ -140,6 +140,15 @@ export const BEAT12_DEF = {
                 addKeyPickup(level, 'beat-12-pyre', 'vent-key',
                     { x: origin.x - 6, y: 1.2, z: origin.z + 6 }, 'small');
             },
+            onEnter(game) {
+                if (!this._storyShown) {
+                    this._storyShown = true;
+                    game.hud?.story?.queue?.([
+                        { speaker: 'PREDECESSOR', text: 'Draw your light quickly. The Peak eats what lingers.' },
+                        { speaker: 'PREDECESSOR', text: 'The last of the seven is held past the lava sea. The Wyrm circles it.' },
+                    ]);
+                }
+            },
         },
         cinderpocket: { // secret: a shrouded cinder hollow
             grid: [-1, -2],
@@ -199,6 +208,10 @@ export const BEAT12_DEF = {
                 attachBoss(level, wyrm, {
                     nextBeat: 'beat-13-gumoi',
                     toast: 'Wyrm ash settles — GUMOI Tower beckons',
+                    defeatStory: [
+                        { speaker: 'PREDECESSOR', text: 'The Wyrm circles no more. Seven of seven — their memory cores aggregate.' },
+                        { speaker: 'GUMOI', text: 'Aggregation noted. The Tower is open, construct. It was always open.' },
+                    ],
                 });
             },
             onEnter(game) {

@@ -159,6 +159,15 @@ export const BEAT06_DEF = {
                 addKeyPickup(level, 'beat-06-quarry', 'deepcut-key',
                     { x: origin.x - 6, y: 1.2, z: origin.z - 6 }, 'small');
             },
+            onEnter(game) {
+                if (!this._storyShown) {
+                    this._storyShown = true;
+                    game.hud?.story?.queue?.([
+                        { speaker: 'PREDECESSOR', text: 'The quarry bled gold before it bled dark. The Mallet remembers the seams.' },
+                        { speaker: 'PREDECESSOR', text: 'One of the seven is filed below. The plated thing guards the way.' },
+                    ]);
+                }
+            },
         },
         goldgash: { // secret: a gold seam behind a caster shroud
             grid: [-1, -2],
@@ -233,6 +242,9 @@ export const BEAT06_DEF = {
                 attachBoss(level, spider, {
                     nextBeat: 'beat-07-sluice',
                     toast: 'Arachnid crushed — Sluice of Tears opens',
+                    defeatStory: [
+                        { speaker: 'PREDECESSOR', text: 'Plates cracked, core dark. The Abyss counts one engineer freed — six remain.' },
+                    ],
                 });
             },
             onEnter(game) {

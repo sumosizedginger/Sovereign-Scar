@@ -157,6 +157,15 @@ export const BEAT04_DEF = {
                 addKeyPickup(level, 'beat-04-sky', 'ascent-key',
                     { x: origin.x - 6, y: 5.4, z: origin.z - 6 }, 'small');
             },
+            onEnter(game) {
+                if (!this._storyShown) {
+                    this._storyShown = true;
+                    game.hud?.story?.queue?.([
+                        { speaker: 'PREDECESSOR', text: 'They built the Monument to look down on the Scar. The Scar looked back.' },
+                        { speaker: 'PREDECESSOR', text: 'Falling is allowed here. Landing is the lesson.' },
+                    ]);
+                }
+            },
         },
         aerie: { // secret: a shrouded nest high on the west face
             grid: [-1, -2],
@@ -220,6 +229,9 @@ export const BEAT04_DEF = {
                 attachBoss(level, core, {
                     nextBeat: 'beat-05-citadel',
                     toast: 'Kinetic Core shattered — Citadel awaits',
+                    defeatStory: [
+                        { speaker: 'PREDECESSOR', text: 'The Core spins down. Three keys now — the monolith will open for you.' },
+                    ],
                     onDefeat(game) {
                         game.player.inventory.grantMemoryKey('sky');
                         game.hud?.toast?.('Memory Key — Sky');

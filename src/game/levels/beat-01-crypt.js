@@ -170,6 +170,10 @@ export const BEAT01_DEF = {
                 attachBoss(level, warden, {
                     nextBeat: 'beat-02-spindle',
                     toast: 'Crypt Warden fallen — Eastern Spindle unlocked',
+                    defeatStory: [
+                        { speaker: 'PREDECESSOR', text: 'The Link hums in your grip. It remembers being held.' },
+                        { speaker: 'PREDECESSOR', text: 'Three memory keys open the monolith. The Spindle holds the first.' },
+                    ],
                     onDefeat(game) {
                         // grantItem alone only sets a flag for this id (S-extra)
                         game.player.inventory.grantItem?.('anchor_link');

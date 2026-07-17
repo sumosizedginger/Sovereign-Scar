@@ -152,6 +152,15 @@ export const BEAT05_DEF = {
                     },
                 });
             },
+            onEnter(game) {
+                if (!this._storyShown) {
+                    this._storyShown = true;
+                    game.hud?.story?.queue?.([
+                        { speaker: 'PREDECESSOR', text: 'The Wedge waits inside the monolith. So does the thing wearing our permissions.' },
+                        { speaker: 'PREDECESSOR', text: 'Three keys, one crown. Whatever happens up there — hold on to something real.' },
+                    ]);
+                }
+            },
         },
         reliquary: { // secret: cracked reliquary — the Wedge you just claimed opens it
             grid: [-1, -2],
@@ -206,6 +215,10 @@ export const BEAT05_DEF = {
                 attachBoss(level, proxy, {
                     nextBeat: 'beat-06-quarry',
                     toast: 'Proxy defeated — the Abyss opens',
+                    defeatStory: [
+                        { speaker: 'SYSTEM', text: 'PHASE SHIFT. Coordinate authority revoked.' },
+                        { speaker: 'PREDECESSOR', text: 'That was not a victory. That was a door. The Abyss keeps the seven — go get them.' },
+                    ],
                     onDefeat(game) {
                         if (!game.player.inventory.hasItem('tectonic_wedge')) {
                             game.player.inventory.grantItem('tectonic_wedge');

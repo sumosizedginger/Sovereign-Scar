@@ -166,6 +166,15 @@ export const BEAT11_DEF = {
                 addKeyPickup(level, 'beat-11-mire', 'reading-key',
                     { x: origin.x - 6, y: 1.2, z: origin.z - 6 }, 'small');
             },
+            onEnter(game) {
+                if (!this._storyShown) {
+                    this._storyShown = true;
+                    game.hud?.story?.queue?.([
+                        { speaker: 'PREDECESSOR', text: 'The Mire rises on the tick. Count with it and you will not sink.' },
+                        { speaker: 'PREDECESSOR', text: 'The Golem reforms after every strike. Dry it out first.' },
+                    ]);
+                }
+            },
         },
         inkwell: { // secret: wedge-cracked ink cistern
             grid: [-1, -2],
@@ -226,6 +235,9 @@ export const BEAT11_DEF = {
                 attachBoss(level, golem, {
                     nextBeat: 'beat-12-pyre',
                     toast: 'Golem dissolved — Pyre Peak burns above',
+                    defeatStory: [
+                        { speaker: 'PREDECESSOR', text: 'The Golem dries to stone. Stone we can work with — six of seven free.' },
+                    ],
                 });
             },
             onEnter(game) {
