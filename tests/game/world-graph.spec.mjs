@@ -14,6 +14,7 @@ import { BEAT07_DEF } from '../../src/game/levels/beat-07-sluice.js';
 import { BEAT08_DEF } from '../../src/game/levels/beat-08-bone.js';
 import { BEAT09_DEF } from '../../src/game/levels/beat-09-town.js';
 import { BEAT10_DEF } from '../../src/game/levels/beat-10-cryo.js';
+import { BEAT11_DEF } from '../../src/game/levels/beat-11-mire.js';
 
 export function run(t) {
     // doorKey is order-independent
@@ -156,7 +157,7 @@ export function run(t) {
     for (const [name, def] of [['b01', BEAT01_DEF], ['b02', BEAT02_DEF],
         ['b03', BEAT03_DEF], ['b04', BEAT04_DEF], ['b05', BEAT05_DEF],
         ['b06', BEAT06_DEF], ['b07', BEAT07_DEF], ['b08', BEAT08_DEF],
-        ['b09', BEAT09_DEF], ['b10', BEAT10_DEF]]) {
+        ['b09', BEAT09_DEF], ['b10', BEAT10_DEF], ['b11', BEAT11_DEF]]) {
         const rooms = Object.values(def.rooms);
         const n = rooms.length;
         t.ok(`${name} room count in band`, n >= 6 && n <= 14, String(n));
