@@ -91,6 +91,11 @@ async function main() {
         await runBossE2E(bossE2E);
         sinks.push(bossE2E);
 
+        const { run: runBossCombat } = await import('./boss-combat-e2e.spec.mjs');
+        const bossCombat = createSink('boss-combat-e2e');
+        await runBossCombat(bossCombat);
+        sinks.push(bossCombat);
+
         const { run: runVisualSanity } = await import('./visual-sanity.spec.mjs');
         const visualSanity = createSink('visual-sanity');
         await runVisualSanity(visualSanity);

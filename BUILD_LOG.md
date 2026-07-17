@@ -196,6 +196,12 @@ Per [../Sovereign-Scar-Builder-Guide.md](../Sovereign-Scar-Builder-Guide.md). Ba
 - ARCHITECTURE.md brought current: layer tree gains `overworld/`/`dev/` + world subsystems, boss contract documents `defeatStory`, `boss.home` anchoring, and the 40-unit wake gate; progress schema shows `pos.world`. CHANGELOG suite count finalized; stale "smear still ±X-biased" polish bullet removed (C8 fixed it in Session 3).
 - New `tests/game/motifs.spec.mjs` (25 asserts): every beat and region has a valid, distinct motif; no orphan table entries. Suite **955 → 980/980**.
 
+## Session 5 (cont.) — real-combat boss gauntlet
+
+- New `tests/boss-combat-e2e.spec.mjs` (15 asserts): warps into each of the 14 boss rooms (`enterRoom`) and kills the boss through the **real** player path — `player.tryAttack` with swept arcs, honoring every shield/armor/phase-window/multi-core, weapon-rotating when a fight stalls. This is the automated stand-in for the "boss beatable" half of the Phase R manual gate; `boss-e2e` only ever set `hp=0`. God-heal each tick — we certify killability, not survivability.
+- Two findings, both **design confirmations, not bugs**: (1) the **Obsidian Arachnid** is unhittable at point-blank — that's the intended leap-bait (shielded except mid-leap, and the leap only triggers at player distance 3–12). The spec now plays it like a player: kite at range 6 while `shielded`/`canHit===false`, dart to 1.2 and swing when the window opens. (2) the **GUMOI Witness** orbits at y≈9.2 and is melee-immune by design — it falls to the Light Caster ray (the spec's weapon-rotation lands on `light_caster` and kills it in ~31s). All 12 others fall to the Tectonic Wedge in <4s.
+- Wired into `run-all.mjs` before visual-sanity. Suite **980 → 995/995**.
+
 ## Known remaining polish (not blockers)
 - Boss fights are arena-scripted phases (not full cinematic cutscenes / unique OST stems)
 - Music is synthesized beds + motifs, not composed tracks
@@ -204,7 +210,7 @@ Per [../Sovereign-Scar-Builder-Guide.md](../Sovereign-Scar-Builder-Guide.md). Ba
 ## How to run
 ```bash
 cd sovereign-scar
-npm test          # full suite (955)
+npm test          # full suite (995)
 npm run test:unit
 npm run serve     # http://127.0.0.1:8799/
 ```
