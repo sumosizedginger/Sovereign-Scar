@@ -271,7 +271,7 @@ function startNewGame() {
     menu.close();
     game.atTitle = false;
     game.paused = false;
-    loadLevel('beat-01-crypt');
+    loadLevel('overworld'); // C1: new game starts on the Scarred Crust
 }
 
 function goToTitle() {
@@ -295,7 +295,7 @@ const menu = new MenuOverlay({
         hasProgress: () => {
             const p = loadSovereignProgress();
             return (p.bossesDefeated || []).length > 0
-                || p.currentBeat !== 'beat-01-crypt'
+                || p.currentBeat !== 'overworld'
                 || (p.playTime || 0) > 60
                 || (p.deaths || 0) > 0;
         },

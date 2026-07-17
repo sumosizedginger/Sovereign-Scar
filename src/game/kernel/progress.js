@@ -4,8 +4,9 @@ import { getProgress, setProgress } from '../../engine/settings.js';
 
 const DEFAULT_SOVEREIGN = () => ({
     version: 2,
-    currentBeat: 'beat-01-crypt',
-    unlockedBeats: ['beat-01-crypt', 'sandbox-combat'],
+    // C1: a fresh game begins on the overworld, LttP-style
+    currentBeat: 'overworld',
+    unlockedBeats: ['overworld', 'beat-01-crypt', 'sandbox-combat'],
     inventory: null,
     hp: 6,
     maxHp: 6,

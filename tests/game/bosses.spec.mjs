@@ -82,7 +82,7 @@ export function run(t) {
     t.ok('createLeviathanCore fn', typeof createLeviathanCore === 'function');
 
     // Registry
-    t.ok('15 levels registered', LEVELS.length === 15, `n=${LEVELS.length}`);
+    t.ok('16 levels registered', LEVELS.length === 16, `n=${LEVELS.length}`);
     t.ok('14 story beats', LEVELS.filter((l) => l.id.startsWith('beat-')).length === 14);
 
     // attachBoss win wiring

@@ -67,7 +67,7 @@ export async function run(t) {
         });
         t.ok('game hook present', hook.ok, hook.reason || '');
         t.ok('player alive', hook.hp > 0, `hp=${hook.hp}`);
-        t.ok('15 levels registered', hook.levelCount === 15);
+        t.ok('16 levels registered', hook.levelCount === 16);
         t.ok('frames drawing', hook.calls > 0 || hook.triangles >= 0, JSON.stringify(hook));
 
         // Move and attack

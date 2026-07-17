@@ -145,6 +145,12 @@ Per [../Sovereign-Scar-Builder-Guide.md](../Sovereign-Scar-Builder-Guide.md). Ba
 - **CRUST_REGION overworld** (4 screens: scarfield w/ Crypt entrance arch, ridge w/ monolith, flats, sink w/ a grapple-gap): registry id `'overworld'` (DEV_LEVELS until C1); test grid moved to `'w-test-overworld'`; `createOverworld` takes `levelId` (mirror-swap was reloading the wrong overworld).
 - Full loop e2e'd in `world-e2e` (14 gate asserts): overworld → arch → tomb → corridor key → locked door → secret boss key → boss door → Warden kill fires the real defeat path → Anchor Link equipped → exit lands at the arch. `BEAT01_DEF` structurally validated in `world-graph.spec`. Certified by eye via headless captures in `docs/media/w-gate/` (tomb, corridor, predecessor, warden, scarfield, Tab map). **Suite 674/674.** This slice is the Phase C template.
 
+## Session 4 (cont.) — Phase C started: C1 overworld 7×7 ✅
+
+- `src/game/overworld/world7.js` — the full 49-screen world generated from a region table (8 regions mapped to the bible's mood geography: tombfields/spindle/sinklands/citadel/quarry/bonetown/cryomire/pyre) with seeded-deterministic terrain per screen × state, plus hand-authored gate screens folded in at their original grids (scarfield stays [10,10] — gate e2e coordinates hold). 14 dungeon entrances (one per beat), 4 monolith sites, 8 region secret caches, ≥2 overworld blockers per gating item (C4 budget pre-satisfied on the overworld side).
+- `'overworld'` promoted into LEVELS (16 total); new game + fresh saves start on the Scarred Crust (`currentBeat: 'overworld'`, unlocked by default). Overworld saved positions now scoped by `pos.world` (the dev test grid shares screen names with the real world — unscoped restore crashed the gate flow).
+- Overworld screens support `floorColor`/`onBake` pass-throughs; new `CRUST_COLORS.clayField` field tone (clayDark read 92/255 full-frame, just over band). `tests/game/world7.spec.mjs`: 49 unique cells, edge symmetry (side/at/width), full BFS connectivity, 14 entrance targets valid, monolith/secret/blocker budgets. Suite **693/693**.
+
 ## Known remaining polish (not blockers)
 - Character smear still ±X-biased (engine side-view heritage)
 - Boss fights are arena-scripted phases (not full cinematic cutscenes / unique OST stems)

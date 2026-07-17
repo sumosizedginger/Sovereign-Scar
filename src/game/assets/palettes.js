@@ -18,6 +18,7 @@ export const CRUST_COLORS = {
     floor: 0x6a707a,
     wall: 0x949aa4,
     accent: 0xc9b896,
+    clayField: 0x877b68, // C1: overworld field tone (clayDark reads ~92/255 in full frame)
 };
 
 /** High-entropy Abyss: basalt, charcoal, neon violet, kintsugi gold. */

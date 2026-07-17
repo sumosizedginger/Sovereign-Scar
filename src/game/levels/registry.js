@@ -17,10 +17,13 @@ import { loadBeat13 } from './beat-13-gumoi.js';
 import { loadBeat14 } from './beat-14-leviathan.js';
 import { loadTestDungeon } from './dev-test-dungeon.js';
 import { createOverworld } from '../overworld/overworld.js';
-import { TEST_SCREENS, CRUST_REGION } from '../overworld/screens.js';
+import { TEST_SCREENS } from '../overworld/screens.js';
+import { WORLD7 } from '../overworld/world7.js';
 
 export const LEVELS = [
     { id: 'sandbox-combat', name: 'Combat Sandbox', load: loadSandboxCombat, mood: 'crust', bossId: null },
+    // C1: the connected overworld — 7×7 screens, both mirror states
+    { id: 'overworld', name: 'The Scarred Crust', load: (ctx) => createOverworld(ctx, WORLD7, { levelId: 'overworld' }), mood: 'crust', bossId: null },
     { id: 'beat-01-crypt', name: '01 Crypt Breach', load: loadBeat01, mood: 'crust', bossId: 'crypt_warden' },
     { id: 'beat-02-spindle', name: '02 Eastern Spindle', load: loadBeat02, mood: 'crust', bossId: 'tri_compiler' },
     { id: 'beat-03-sink', name: '03 Duval Sink', load: loadBeat03, mood: 'crust', bossId: 'sand_spur' },
@@ -42,9 +45,6 @@ export const LEVELS = [
 export const DEV_LEVELS = [
     { id: 'w-test-dungeon', name: 'W Test Dungeon (dev)', load: loadTestDungeon, mood: 'crust', bossId: null },
     { id: 'w-test-overworld', name: 'W Test Overworld (dev)', load: (ctx) => createOverworld(ctx, TEST_SCREENS, { levelId: 'w-test-overworld' }), mood: 'crust', bossId: null },
-    // The real overworld ships here until Phase C1 fills the full 7×7 grid,
-    // then moves into LEVELS as 'The Scarred Crust'.
-    { id: 'overworld', name: 'The Scarred Crust', load: (ctx) => createOverworld(ctx, CRUST_REGION, { levelId: 'overworld' }), mood: 'crust', bossId: null },
 ];
 
 export function getLevel(id) {

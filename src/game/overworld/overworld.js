@@ -31,9 +31,11 @@ export function createOverworld(ctx, screensDef, opts = {}) {
     const levelId = opts.levelId || 'overworld';
     const saved = getOverworldState();
     const mood = saved.state === 'abyss' ? 'abyss' : 'crust';
-    const startScreen = (saved.pos && screensDef.screens[saved.pos.screen])
-        ? saved.pos.screen
-        : screensDef.start;
+    // Saved positions are scoped to their overworld id — the dev test grid
+    // and the real world share screen names but not geography.
+    const savedPos = (saved.pos && saved.pos.world === levelId
+        && screensDef.screens[saved.pos.screen]) ? saved.pos : null;
+    const startScreen = savedPos ? savedPos.screen : screensDef.start;
 
     const rooms = {};
     for (const [sid, s] of Object.entries(screensDef.screens)) {
@@ -42,8 +44,10 @@ export function createOverworld(ctx, screensDef, opts = {}) {
             half: SCREEN_HALF,
             wallH: 2, // low border cliffs
             spawn: s.spawn || { x: 0, z: 0 },
-            floorColor: mood === 'abyss' ? ABYSS_COLORS.abyssFloor : CRUST_COLORS.clayDark,
+            floorColor: (mood === 'abyss' ? s.abyssFloorColor : s.floorColor)
+                || (mood === 'abyss' ? ABYSS_COLORS.abyssFloor : CRUST_COLORS.clayField),
             wallColor: mood === 'abyss' ? ABYSS_COLORS.abyssWall : CRUST_COLORS.slate,
+            onBake: s.onBake,
             doors: (s.edges || []).map((e) => ({
                 to: e.to,
                 side: e.side,
@@ -83,7 +87,7 @@ export function createOverworld(ctx, screensDef, opts = {}) {
         const other = mood === 'crust' ? 'abyss' : 'crust';
         patchOverworld({
             state: other,
-            pos: { screen: sid, x: p.x - room.grid[0] * 64, z: p.z - room.grid[1] * 64 },
+            pos: { world: levelId, screen: sid, x: p.x - room.grid[0] * 64, z: p.z - room.grid[1] * 64 },
         });
         game.mood?.startRamp?.(other, 1.5);
         game.hud?.toast?.(other === 'abyss'
@@ -140,7 +144,7 @@ export function createOverworld(ctx, screensDef, opts = {}) {
                     if (game.input?.consumeInteract?.()) {
                         // Remember where we are so the dungeon exit returns here
                         patchOverworld({
-                            pos: { screen: sid, x: en.x, z: en.z + 2 },
+                            pos: { world: levelId, screen: sid, x: en.x, z: en.z + 2 },
                         });
                         sfx.heave?.();
                         game.loadLevel?.(en.to);
@@ -154,12 +158,12 @@ export function createOverworld(ctx, screensDef, opts = {}) {
     const level = createDungeon(ctx, def, opts);
 
     // Restore exact position when returning mid-screen
-    if (saved.pos && saved.pos.screen === startScreen) {
+    if (savedPos && savedPos.screen === startScreen) {
         const room = rooms[startScreen];
         level.spawn = {
-            x: room.grid[0] * 64 + saved.pos.x,
+            x: room.grid[0] * 64 + savedPos.x,
             y: 1.95,
-            z: room.grid[1] * 64 + saved.pos.z,
+            z: room.grid[1] * 64 + savedPos.z,
         };
     }
 
@@ -226,6 +230,7 @@ export function createOverworld(ctx, screensDef, opts = {}) {
             const p = game.player.root.position;
             patchOverworld({
                 pos: {
+                    world: levelId,
                     screen: sid,
                     x: p.x - room.grid[0] * 64,
                     z: p.z - room.grid[1] * 64,

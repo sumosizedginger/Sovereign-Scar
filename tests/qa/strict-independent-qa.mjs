@@ -95,7 +95,7 @@ export async function run(t) {
             };
         });
         t.ok('boot: title', /Sovereign Scar/i.test(boot.title), boot.title);
-        t.ok('boot: 15 levels', boot.levelCount === 15, String(boot.levelCount));
+        t.ok('boot: 16 levels', boot.levelCount === 16, String(boot.levelCount));
         t.ok('boot: canvas drawing', boot.canvas && (boot.calls > 0 || boot.triangles > 0), JSON.stringify({ c: boot.calls, t: boot.triangles }));
         t.ok('boot: HUD brand', /SOVEREIGN SCAR/i.test(boot.hud));
         t.ok('boot: HUD bosses 0/14', /Bosses:\s*0\/14/i.test(boot.hud), boot.hud.slice(0, 200));

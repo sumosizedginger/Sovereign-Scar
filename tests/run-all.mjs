@@ -28,6 +28,7 @@ import { run as runWorldGraph } from './game/world-graph.spec.mjs';
 import { run as runKeys } from './game/keys.spec.mjs';
 import { run as runBlockers } from './game/blockers.spec.mjs';
 import { run as runMigration } from './game/migration.spec.mjs';
+import { run as runWorld7 } from './game/world7.spec.mjs';
 
 const unitOnly = process.argv.includes('--unit-only');
 
@@ -70,6 +71,7 @@ async function main() {
     runNamed('keys', runKeys);
     runNamed('blockers', runBlockers);
     runNamed('migration', runMigration);
+    runNamed('world7', runWorld7);
 
     if (!unitOnly) {
         const { run: runSmoke } = await import('./smoke.spec.mjs');

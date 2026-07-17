@@ -114,7 +114,7 @@ export async function run(t) {
         t.ok('boot: title contains Sovereign Scar', /Sovereign Scar/i.test(boot.title || ''), boot.title);
         t.ok('boot: canvas present', boot.canvas);
         t.ok('boot: canvas sized', boot.canvasW > 0 && boot.canvasH > 0, `${boot.canvasW}x${boot.canvasH}`);
-        t.ok('boot: 15 levels', boot.levelCount === 15, `count=${boot.levelCount}`);
+        t.ok('boot: 16 levels', boot.levelCount === 16, `count=${boot.levelCount}`);
         t.ok('boot: player HP > 0', boot.hp > 0, `hp=${boot.hp}`);
         t.ok('boot: HUD shows SOVEREIGN SCAR', /SOVEREIGN SCAR/i.test(boot.hudText || ''), boot.hudText?.slice(0, 80));
         t.ok('boot: HUD shows hearts or HP', /HP|♥|♡/.test(boot.hudText || ''), boot.hudText?.slice(0, 80));
