@@ -9,6 +9,7 @@ import { BEAT02_DEF } from '../../src/game/levels/beat-02-spindle.js';
 import { BEAT03_DEF } from '../../src/game/levels/beat-03-sink.js';
 import { BEAT04_DEF } from '../../src/game/levels/beat-04-sky.js';
 import { BEAT05_DEF } from '../../src/game/levels/beat-05-citadel.js';
+import { BEAT06_DEF } from '../../src/game/levels/beat-06-quarry.js';
 
 export function run(t) {
     // doorKey is order-independent
@@ -141,9 +142,16 @@ export function run(t) {
     t.ok('beat-05 boss room + secret', Object.values(BEAT05_DEF.rooms).some((r) => r.boss)
         && !!BEAT05_DEF.rooms.reliquary);
 
-    // C2 sweep: every Act I dungeon meets the per-dungeon checklist shape
+    // Beat 06 (C3): first Abyss dungeon
+    const b06 = validateDungeonDef(BEAT06_DEF);
+    t.ok('beat-06 def valid', b06.ok, b06.reasons.join('; '));
+    t.ok('beat-06 eight rooms reachable', b06.reachable.length === 8, String(b06.reachable.length));
+    t.ok('beat-06 is abyss', BEAT06_DEF.mood === 'abyss');
+
+    // Dungeon sweep: every rebuilt beat meets the per-dungeon checklist shape
     for (const [name, def] of [['b01', BEAT01_DEF], ['b02', BEAT02_DEF],
-        ['b03', BEAT03_DEF], ['b04', BEAT04_DEF], ['b05', BEAT05_DEF]]) {
+        ['b03', BEAT03_DEF], ['b04', BEAT04_DEF], ['b05', BEAT05_DEF],
+        ['b06', BEAT06_DEF]]) {
         const rooms = Object.values(def.rooms);
         const n = rooms.length;
         t.ok(`${name} room count in band`, n >= 6 && n <= 14, String(n));

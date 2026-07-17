@@ -151,6 +151,10 @@ Per [../Sovereign-Scar-Builder-Guide.md](../Sovereign-Scar-Builder-Guide.md). Ba
 - `'overworld'` promoted into LEVELS (16 total); new game + fresh saves start on the Scarred Crust (`currentBeat: 'overworld'`, unlocked by default). Overworld saved positions now scoped by `pos.world` (the dev test grid shares screen names with the real world — unscoped restore crashed the gate flow).
 - Overworld screens support `floorColor`/`onBake` pass-throughs; new `CRUST_COLORS.clayField` field tone (clayDark read 92/255 full-frame, just over band). `tests/game/world7.spec.mjs`: 49 unique cells, edge symmetry (side/at/width), full BFS connectivity, 14 entrance targets valid, monolith/secret/blocker budgets. Suite **693/693**.
 
+## Session 4 (cont.) — C3 in progress (Act II)
+
+- Beat 06 rebuilt as an 8-room abyss Quarry (`BEAT06_DEF`): pitgate → quarryfloor (boulders, key 1) with orecrush (Heavy Mallet + boulders) and siftery (map) wings → locked → deepcut (altar, key 2, narrow secret door) → goldgash secret (caster-shroud gold seam) → locked → veinworks (boss key behind a destructible gold-vein wall) → boss door → molthall (Obsidian Arachnid). Suite **809/809**.
+
 ## Session 4 (cont.) — C2 complete ✅ (Act I, beats 01–05)
 
 - Beat 05 rebuilt as an 8-room Citadel (`BEAT05_DEF`): approach → greathall (kintsugi pillars, key 1) with westgallery (map) and eastgallery (stepped-platform key 2) wings → locked → monolith room (altar, the Tectonic Wedge gated on all 3 memory keys + phase shift, narrow secret door) → reliquary secret (wedge-crack cache — the Wedge you just claimed opens it) → locked → sanctum (boss-key gauntlet) → boss door → proxythrone (Proxy; defeat grants the Wedge fallback, `mirror_free` for W5 free swaps, and the abyss phase shift). C2 sweep assert: every Act I def has 6–14 rooms, locked door + small key, boss key + boss door, overworld exit. Suite **788/788**.
