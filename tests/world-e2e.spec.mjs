@@ -345,8 +345,8 @@ export async function run(t) {
                     .find((x) => x.id === 'hall')?.doors
                     .find((d) => d.to === 'vault')?.opened === true,
             };
-            // A plain arena level has no map (beats 01–12 are dungeons now)
-            s.loadLevel('beat-13-gumoi');
+            // Only the sandbox remains a plain arena (all 14 beats are dungeons)
+            s.loadLevel('sandbox-combat');
             await new Promise((r) => setTimeout(r, 100));
             out.arenaHasMap = !!s.game.level.mapData;
             return out;

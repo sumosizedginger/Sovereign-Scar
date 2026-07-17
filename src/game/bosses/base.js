@@ -270,9 +270,19 @@ export function attachBoss(level, boss, opts = {}) {
     level.bossId = boss.bossId || opts.id;
     level.bossName = boss.bossName || opts.name;
 
+    // Bosses live at their room's grid origin now, not the world origin:
+    // a prebaked boss must not target the player from elsewhere in the
+    // dungeon. While the player is outside the wake radius the boss still
+    // animates, but sees no player (every targeting path guards on it).
+    const anchor = boss.home || boss.cores?.[0]?.home || boss.root?.position;
+    const WAKE_RADIUS = 40;
+
     level.addSystem({
         update(dt, game) {
-            if (boss.update) boss.update(dt, game.player, game);
+            const p = game.player?.root?.position;
+            const awake = !anchor || !p
+                || Math.hypot(p.x - anchor.x, p.z - anchor.z) <= WAKE_RADIUS;
+            if (boss.update) boss.update(dt, awake ? game.player : null, game);
             // Win condition (getter-safe for multi-core)
             const dead = !!(boss.defeated
                 || boss.state?.current === 'DEAD'

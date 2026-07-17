@@ -912,7 +912,8 @@ export class GumoiWitness extends BossBase {
         const R = 2 + this.phase;
         this.root.position.x = this.home.x + Math.cos(this.t * 0.7) * R;
         this.root.position.z = this.home.z + Math.sin(this.t * 0.7) * R;
-        if (game?.level) game.level.flicker = Math.min(1, 0.5 + this.flickerBoost + Math.sin(this.t * 5) * 0.15);
+        // Only override the level's base flicker while the fight is live
+        if (player && game?.level) game.level.flicker = Math.min(1, 0.5 + this.flickerBoost + Math.sin(this.t * 5) * 0.15);
         this.castCd -= dt;
         if (player && this.castCd <= 0) {
             this.castCd = this.phase >= 3 ? 1.0 : 1.8;
