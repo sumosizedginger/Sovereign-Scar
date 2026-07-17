@@ -151,7 +151,9 @@ Per [../Sovereign-Scar-Builder-Guide.md](../Sovereign-Scar-Builder-Guide.md). Ba
 - `'overworld'` promoted into LEVELS (16 total); new game + fresh saves start on the Scarred Crust (`currentBeat: 'overworld'`, unlocked by default). Overworld saved positions now scoped by `pos.world` (the dev test grid shares screen names with the real world — unscoped restore crashed the gate flow).
 - Overworld screens support `floorColor`/`onBake` pass-throughs; new `CRUST_COLORS.clayField` field tone (clayDark read 92/255 full-frame, just over band). `tests/game/world7.spec.mjs`: 49 unique cells, edge symmetry (side/at/width), full BFS connectivity, 14 entrance targets valid, monolith/secret/blocker budgets. Suite **693/693**.
 
-## Session 4 (cont.) — C3 in progress (Act II)
+## Session 4 (cont.) — C3 complete ✅ (Act II, beats 06–12)
+
+- Beats 07–12 rebuilt as 8-room abyss dungeons on the room-graph template, each with 2 small keys + locks, boss key + boss door, map pickup, secret room, altar, and their signature systems carried over: 07 Sluice (grapple-gap traversal, spare grapple), 08 Bone Forest (bone-arch decks, shatter cage, wedge marrowcyst), 09 Ruined Town (phantom frustum walls, belltower spiral), 10 Cryo Vault (ice friction, meltable ice walls, boot-ledge icecomb), 11 Rot Mire (per-room sludge FluidPlanes + islets, wedge inkwell), 12 Pyre Peak (magma vents, Vector Staff light-line patch, caster cinderpocket). **Boss arena-home fix**: `BossBase.home` — Proxy/Frost&Fuel/GUMOI/Leviathan orbits, Phantasm mirror-chase, MagmaWyrm figure-8 all anchored to placement instead of the world origin. Suite **923/923**.
 
 - Beat 06 rebuilt as an 8-room abyss Quarry (`BEAT06_DEF`): pitgate → quarryfloor (boulders, key 1) with orecrush (Heavy Mallet + boulders) and siftery (map) wings → locked → deepcut (altar, key 2, narrow secret door) → goldgash secret (caster-shroud gold seam) → locked → veinworks (boss key behind a destructible gold-vein wall) → boss door → molthall (Obsidian Arachnid). Suite **809/809**.
 

@@ -1,39 +1,236 @@
-import { createLevelShell, ABYSS_COLORS } from './_common.js';
+// Beat 12 — Pyre Peak (Turtle Rock).
+// C3: 8-room volcanic ascent. Magma vents, the Vector Staff (light-line
+// casts carried over via the tryAttack patch), the Magma Wyrm's caldera.
+//
+// Layout:                [caldera]      Magma Wyrm (boss door)
+//                        [ashgallery]   boss key gauntlet
+//      [cinderpocket*] — [ventfield]    locked, altar, key 2
+//    [slagworks] — [pyreterrace] — [emberrun]
+//        map           key 1         Vector Staff + vents
+//                        [scoriagate]   start; S exit → overworld
+
+import { createDungeon } from '../world/room-graph.js';
+import { addKeyPickup } from '../world/keys.js';
+import { ABYSS_COLORS } from '../assets/palettes.js';
 import { LightLineSystem } from '../world/light-line-system.js';
 import { buildMagmaVent, stampMap } from '../assets/props.js';
-import { fillBox } from '../../voxel/helpers.js';
 import { MagmaWyrm, attachBoss } from '../bosses/index.js';
+import { addAltar } from '../world/altar.js';
+
+export const BEAT12_DEF = {
+    id: 'beat-12-pyre',
+    name: '12 Pyre Peak',
+    mood: 'abyss',
+    start: 'scoriagate',
+    prebake: true,
+    floorColor: 0x2a1810,
+    wallColor: 0x3a2018,
+    banner: 'A dragon of ore and spite rivers through the peak.',
+    keys: [
+        { room: 'pyreterrace', type: 'small' },
+        { room: 'ventfield', type: 'small' },
+        { room: 'ashgallery', type: 'boss' },
+    ],
+    onExit(game) {
+        game.loadLevel?.('overworld');
+    },
+    rooms: {
+        scoriagate: {
+            grid: [0, 0],
+            half: 7,
+            wallH: 4,
+            spawn: { x: 0, z: 4 },
+            build(map, h) {
+                stampMap(map, buildMagmaVent(-3, -3), 0, 1, 0);
+                stampMap(map, buildMagmaVent(3, -3), 0, 1, 0);
+            },
+            doors: [
+                { to: 'pyreterrace', side: 'N', at: 0, type: 'open' },
+                { to: '_world', side: 'S', at: 0, type: 'exit' },
+            ],
+        },
+        pyreterrace: {
+            grid: [0, -1],
+            half: 11,
+            wallH: 4,
+            build(map, h) {
+                stampMap(map, buildMagmaVent(-5, -4), 0, 1, 0);
+                stampMap(map, buildMagmaVent(5, 3), 0, 1, 0);
+                h.fillBox(map, -2, 2, 1, 2, 6, 8, ABYSS_COLORS.basalt);
+            },
+            enemies: [
+                { x: -5, z: 4, kind: 'sentinel', hp: 5 },
+                { x: 5, z: -5, kind: 'frost', hp: 4, ai: 'ranged' },
+            ],
+            doors: [
+                { to: 'scoriagate', side: 'S', at: 0, type: 'open' },
+                { to: 'ventfield', side: 'N', at: 0, type: 'locked' },
+                { to: 'slagworks', side: 'W', at: 0, type: 'open' },
+                { to: 'emberrun', side: 'E', at: 0, type: 'open' },
+            ],
+            onBake(level, origin) {
+                addKeyPickup(level, 'beat-12-pyre', 'terrace-key',
+                    { x: origin.x + 9, y: 1.2, z: origin.z + 9 }, 'small');
+            },
+        },
+        slagworks: {
+            grid: [-1, -1],
+            half: 7,
+            wallH: 4,
+            build(map, h) {
+                h.fillBox(map, -5, -4, 1, 3, -5, 4, 0x3a2018);
+            },
+            enemies: [{ x: 3, z: 3, kind: 'scarab', hp: 4, ai: 'charge' }],
+            doors: [{ to: 'pyreterrace', side: 'E', at: 0, type: 'open' }],
+            onBake(level, origin) {
+                if (!level.keyStore.mapPickup()) {
+                    level.addPickup({ x: origin.x - 4, y: 1.2, z: origin.z - 4 }, {
+                        color: 0x9ad0ff,
+                        label: 'Slag charts',
+                        onPickup(game) {
+                            level.keyStore.markMapPickup();
+                            game.hud?.toast?.('Slag charts — the map reveals the vents');
+                        },
+                    });
+                }
+            },
+        },
+        emberrun: {
+            grid: [1, -1],
+            half: 8,
+            wallH: 4,
+            build(map, h) {
+                stampMap(map, buildMagmaVent(-3, -3), 0, 1, 0);
+                stampMap(map, buildMagmaVent(3, 2), 0, 1, 0);
+            },
+            enemies: [{ x: 0, z: -4, kind: 'frost', hp: 4, ai: 'ranged' }],
+            doors: [{ to: 'pyreterrace', side: 'W', at: 0, type: 'open' }],
+            onBake(level, origin) {
+                level.addPickup({ x: origin.x, y: 1.2, z: origin.z + 4 }, {
+                    color: 0xffa040,
+                    label: 'Vector Staff',
+                    onPickup(game) {
+                        game.player.inventory.grantItem('vector_staff');
+                        game.player.inventory.grantItem('light_caster');
+                        game.hud?.toast?.('Vector Staff — light lines on cast');
+                    },
+                });
+            },
+        },
+        ventfield: {
+            grid: [0, -2],
+            half: 9,
+            wallH: 4,
+            build(map, h) {
+                stampMap(map, buildMagmaVent(-5, 0), 0, 1, 0);
+                stampMap(map, buildMagmaVent(5, 0), 0, 1, 0);
+                stampMap(map, buildMagmaVent(0, -5), 0, 1, 0);
+            },
+            enemies: [
+                { x: -4, z: 4, kind: 'scarab', hp: 4, ai: 'charge' },
+                { x: 4, z: 4, kind: 'sentinel', hp: 5 },
+            ],
+            doors: [
+                { to: 'pyreterrace', side: 'S', at: 0, type: 'locked' },
+                { to: 'ashgallery', side: 'N', at: 0, type: 'locked' },
+                { to: 'cinderpocket', side: 'W', at: -3, type: 'open', width: 1 },
+            ],
+            onBake(level, origin, ctx) {
+                addAltar(level, ctx, { x: origin.x + 6, z: origin.z + 6 });
+                addKeyPickup(level, 'beat-12-pyre', 'vent-key',
+                    { x: origin.x - 6, y: 1.2, z: origin.z + 6 }, 'small');
+            },
+        },
+        cinderpocket: { // secret: a shrouded cinder hollow
+            grid: [-1, -2],
+            half: 5,
+            wallH: 4,
+            doors: [{ to: 'ventfield', side: 'E', at: -3, type: 'open', width: 1 }],
+            blockers: [
+                { type: 'caster_dark', id: 'b12-cinder-dark', rect: { x0: -3, x1: 3, z0: -3, z1: 3 } },
+            ],
+            onBake(level, origin) {
+                level.addPickup({ x: origin.x, y: 1.2, z: origin.z }, {
+                    color: 0x7fe0ff,
+                    label: 'Cinder cache',
+                    onPickup(game) {
+                        game.player.inventory.addShards(30);
+                        game.hud?.toast?.('Cinder cache — 30 shards');
+                    },
+                });
+            },
+        },
+        ashgallery: {
+            grid: [0, -3],
+            half: 8,
+            wallH: 4,
+            build(map, h) {
+                stampMap(map, buildMagmaVent(0, 0), 0, 1, 0);
+            },
+            enemies: [
+                { x: -3, z: -3, kind: 'scarab', hp: 5, ai: 'charge' },
+                { x: 3, z: -3, kind: 'frost', hp: 4, ai: 'ranged' },
+                { x: 0, z: 3, kind: 'sentinel', hp: 5 },
+            ],
+            doors: [
+                { to: 'ventfield', side: 'S', at: 0, type: 'locked' },
+                { to: 'caldera', side: 'N', at: 0, type: 'boss' },
+            ],
+            onBake(level, origin) {
+                addKeyPickup(level, 'beat-12-pyre', 'ash-boss-key',
+                    { x: origin.x, y: 1.4, z: origin.z - 5 }, 'boss');
+            },
+        },
+        caldera: {
+            grid: [0, -4],
+            half: 12,
+            wallH: 5,
+            build(map, h) {
+                stampMap(map, buildMagmaVent(-5, -4), 0, 1, 0);
+                stampMap(map, buildMagmaVent(5, 3), 0, 1, 0);
+                stampMap(map, buildMagmaVent(0, -7), 0, 1, 0);
+                h.fillBox(map, -2, 2, 1, 2, 6, 8, ABYSS_COLORS.basalt);
+            },
+            doors: [{ to: 'ashgallery', side: 'S', at: 0, type: 'boss' }],
+            boss(ctx, level, origin) {
+                const wyrm = new MagmaWyrm(ctx.scene, {
+                    x: origin.x, y: 1.3, z: origin.z - 4,
+                });
+                attachBoss(level, wyrm, {
+                    nextBeat: 'beat-13-gumoi',
+                    toast: 'Wyrm ash settles — GUMOI Tower beckons',
+                });
+            },
+            onEnter(game) {
+                const boss = game?.level?.boss;
+                if (boss && !boss.defeated && !this._introFired) {
+                    this._introFired = true;
+                    game.bossIntro = { t: 0.6, boss, fired: false };
+                    game.mood?.setMusicProfile?.('boss');
+                }
+            },
+        },
+    },
+};
 
 export function loadBeat12(ctx) {
-    const level = createLevelShell(ctx, {
-        id: 'beat-12-pyre',
-        name: '12 Pyre Peak',
-        half: 12,
-        mood: 'abyss',
-        floorColor: 0x2a1810,
-        wallColor: 0x3a2018,
-        banner: 'Magma Wyrm trails fire. Vector Staff light lines carve the peak.',
-        stamp(map) {
-            stampMap(map, buildMagmaVent(-5, -4), 0, 1, 0);
-            stampMap(map, buildMagmaVent(5, 3), 0, 1, 0);
-            stampMap(map, buildMagmaVent(0, -7), 0, 1, 0);
-            fillBox(map, -2, 2, 1, 2, 6, 8, ABYSS_COLORS.basalt);
-        },
-    });
-
-    level.musicBed = 'boss';
+    const level = createDungeon(ctx, BEAT12_DEF);
+    level.suppressBossIntro = true;
+    level.musicBed = 'abyss';
     level.story = [
         { speaker: 'PREDECESSOR', text: 'A dragon of ore and spite. Its body is a river of heat.' },
         { speaker: 'SYSTEM', text: 'Do not stand in fire trails. Aim for the head of the chain.' },
     ];
 
+    // Vector Staff light-lines: Light Caster casts also fire a light line
     const lines = new LightLineSystem(ctx.scene, ctx.collisionWorld);
     let patched = false;
     let originalTryAttack = null;
+    let gameRef = null;
 
-    function restoreAttack(game) {
-        if (patched && game?.player && originalTryAttack) {
-            game.player.tryAttack = originalTryAttack;
+    function restoreAttack() {
+        if (patched && gameRef?.player && originalTryAttack) {
+            gameRef.player.tryAttack = originalTryAttack;
             patched = false;
             originalTryAttack = null;
         }
@@ -42,16 +239,15 @@ export function loadBeat12(ctx) {
     level.addSystem({
         update(dt) { lines.update(dt); },
         dispose() {
-            restoreAttack(ctx._gameRef);
+            restoreAttack();
             lines.dispose();
         },
     });
     level.lightLines = lines;
 
     level.onEnter = (game) => {
-        ctx._gameRef = game;
-        game.player.inventory.grantItem('light_caster');
-        restoreAttack(game);
+        gameRef = game;
+        restoreAttack();
         originalTryAttack = game.player.tryAttack.bind(game.player);
         game.player.tryAttack = (enemies, destructibles) => {
             const hits = originalTryAttack(enemies, destructibles);
@@ -65,31 +261,7 @@ export function loadBeat12(ctx) {
             return hits;
         };
         patched = true;
-        const prevDispose = level.dispose.bind(level);
-        level.dispose = () => {
-            restoreAttack(game);
-            prevDispose();
-        };
     };
-
-    level.addPickup({ x: 0, y: 1, z: 7 }, {
-        color: 0xffa040,
-        label: 'Vector Staff',
-        onPickup(game) {
-            game.player.inventory.grantItem('vector_staff');
-            game.player.inventory.grantItem('light_caster');
-            game.hud.toast('Vector Staff — light lines on cast');
-        },
-    });
-
-    level.addEnemy({ x: -4, y: 1, z: 0 }, { kind: 'sentinel', hp: 4 });
-    level.addEnemy({ x: 4, y: 1, z: -3 }, { kind: 'frost', hp: 4, ai: 'ranged' });
-
-    const wyrm = new MagmaWyrm(ctx.scene, { x: 0, y: 1.3, z: -4 });
-    attachBoss(level, wyrm, {
-        nextBeat: 'beat-13-gumoi',
-        toast: 'Wyrm ash settles — GUMOI Tower beckons',
-    });
 
     return level;
 }
