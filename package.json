@@ -1,6 +1,6 @@
 {
   "name": "sovereign-scar",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Sovereign Scar — a 14-beat Zelda-like 3D WebGL voxel labyrinth on My-Engine 0.2.0. Zero-build, offline-first.",
   "scripts": {

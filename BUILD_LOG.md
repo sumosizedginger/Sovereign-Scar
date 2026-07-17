@@ -185,6 +185,12 @@ Per [../Sovereign-Scar-Builder-Guide.md](../Sovereign-Scar-Builder-Guide.md). Ba
 - Headless capture sweep → `docs/media/certification/` (44 shots): entry + mid-fight boss room per dungeon (via `level.enterRoom` warp — raw position teleports trip the current room's door trigger and snap the player to the adjacent doorway), one screen per overworld region per mirror state (via saved-pos loads — cross-screen teleports fall into unbaked void and capture the death screen). All rows in [CERTIFICATION.md](CERTIFICATION.md) now ✅ with lum + shot links; zero pageerrors across every run.
 - Fix-forward fixes: Beat 03 spurpit clay floor 91→72 (clayDark) · Beat 09 moothall 11→39 (bone flagstone plaza + abyssWall floor) · Beat 11 golemwallow 18→36 (islets recolored parched-clay so "keep to the dry islets" reads, +3 islets, bone shelf ruins, new `rotPale` floor) · five crust region floors retuned (tombfields/sinklands→clayField, spindle→iron, quarry→slate, bonetown→new `ashField`; screens read 20–105 → 57–84, abyss all 35–42). Suite **955/955**.
 
+## Session 5 — Phase R: release gate (v0.3.0)
+
+- Gate item 3 ✅: `npm test` green — final count **955/955** (baseline 388 at guide start).
+- Gate item 4 ✅: README (955 count, scope, layout), CHANGELOG `[0.3.0] — 2026-07-17`, `package.json` 0.1.0 → **0.3.0**, tag `v0.3.0`.
+- Gate items 1–2 (⚠ human QA outstanding): the fresh-save dev-off manual playthrough and the overlays-on 60 FPS pass need real hands + a real GPU — headless swiftshader runs at ~1.5 FPS, so an agent cannot meaningfully certify frame rate or feel. Automated stand-ins are green: `world-e2e` full real-combat Beat 01 loop (overworld → arch → keys → locks → secret → Warden kill → exit), `campaign-e2e` fresh-save all-14 sweep to credits, Phase V luminance sweep in band everywhere. **Log timer/deaths here after the by-hand run.**
+
 ## Known remaining polish (not blockers)
 - Character smear still ±X-biased (engine side-view heritage)
 - Boss fights are arena-scripted phases (not full cinematic cutscenes / unique OST stems)
@@ -193,7 +199,7 @@ Per [../Sovereign-Scar-Builder-Guide.md](../Sovereign-Scar-Builder-Guide.md). Ba
 ## How to run
 ```bash
 cd sovereign-scar
-npm test          # full 284
+npm test          # full suite (955)
 npm run test:unit
 npm run serve     # http://127.0.0.1:8799/
 ```

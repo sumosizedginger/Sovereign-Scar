@@ -3,7 +3,7 @@
 All notable changes to this project are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.3.0] — 2026-07-16 (unreleased until the Phase R gate passes)
+## [0.3.0] — 2026-07-17
 
 The "LttP scope" release: the fifteen single arenas became a connected world.
 Executes the Completion Plan (Phases S/D/W/C) via the Builder Guide.
