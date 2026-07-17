@@ -19,15 +19,19 @@ jobs:
 
       - run: npm ci
 
-      # CI only runs the pure-node unit specs (collision/hitbox/settings,
-      # 44 assertions incl. the vectorized-vs-classic-cone equivalence proof)
-      # — fast and fully deterministic. The browser smoke test is left to
-      # local `npm test`: GitHub's hosted runners have no GPU, and headless
-      # Chrome + SwiftShader software rendering proved unreliable here across
-      # several attempts (a GPU-less runner refusing WebGL under --use-gl=angle,
-      # then hanging on repeated navigation/context creation under SwiftShader
-      # even after working around that). Rather than keep chasing runner-image
-      # flakiness, the smoke test stays a required local pre-release check
-      # (see CONTRIBUTING.md) instead of a CI gate.
+      # CI runs the full pure-node unit suite via --unit-only (engine
+      # collision/hitbox/settings — incl. the vectorized-vs-classic-cone
+      # equivalence proof — plus every src/game unit spec: health, inventory,
+      # weapons, bosses, world-graph, motifs, and the rest; 480 assertions,
+      # fast and fully deterministic). The browser E2E half (smoke, boss-e2e,
+      # boss-combat-e2e, visual-sanity, campaign/world-e2e — 995 assertions
+      # total under local `npm test`) is left to local runs: GitHub's hosted
+      # runners have no GPU, and headless Chrome + SwiftShader software
+      # rendering proved unreliable here across several attempts (a GPU-less
+      # runner refusing WebGL under --use-gl=angle, then hanging on repeated
+      # navigation/context creation under SwiftShader even after working
+      # around that). Rather than keep chasing runner-image flakiness, the
+      # browser suite stays a required local pre-release check (see
+      # CONTRIBUTING.md) instead of a CI gate.
       - name: Run unit suite
         run: npm run test:unit
