@@ -345,8 +345,8 @@ export async function run(t) {
                     .find((x) => x.id === 'hall')?.doors
                     .find((d) => d.to === 'vault')?.opened === true,
             };
-            // A plain arena level has no map (beats 01–06 are dungeons now)
-            s.loadLevel('beat-07-sluice');
+            // A plain arena level has no map (beats 01–07 are dungeons now)
+            s.loadLevel('beat-08-bone');
             await new Promise((r) => setTimeout(r, 100));
             out.arenaHasMap = !!s.game.level.mapData;
             return out;
