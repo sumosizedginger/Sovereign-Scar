@@ -31,15 +31,15 @@ function rng(seed) {
 // Keyed by "band" — which zone a (row, col) falls into.
 const REGIONS = {
     tombfields: { // NW: beats 01–02 country — slate + bone
-        crustFloor: CRUST_COLORS.clayDark, crustAccent: CRUST_COLORS.limestone,
+        crustFloor: CRUST_COLORS.clayField, crustAccent: CRUST_COLORS.limestone,
         abyssAccent: ABYSS_COLORS.goldVein, density: 0.5, enemies: ['sentinel'],
     },
     spindle: { // N/NE: computing-vault heights — grey slate, iron
-        crustFloor: CRUST_COLORS.floor, crustAccent: CRUST_COLORS.iron,
+        crustFloor: CRUST_COLORS.iron, crustAccent: CRUST_COLORS.slate,
         abyssAccent: ABYSS_COLORS.violet, density: 0.7, enemies: ['sentinel', 'scarab'],
     },
     sinklands: { // mid-west: dust flats — clay, rust
-        crustFloor: CRUST_COLORS.clay, crustAccent: CRUST_COLORS.rust,
+        crustFloor: CRUST_COLORS.clayField, crustAccent: CRUST_COLORS.rust,
         abyssAccent: ABYSS_COLORS.goldVein, density: 0.35, enemies: ['scarab'],
     },
     citadel: { // center: the Proxy's approach — gold-veined slate
@@ -47,11 +47,11 @@ const REGIONS = {
         abyssAccent: ABYSS_COLORS.violetHot, density: 0.8, enemies: ['sentinel', 'scarab'],
     },
     quarry: { // SW: bleeding quarry country — dark slate, basalt
-        crustFloor: CRUST_COLORS.slateDark, crustAccent: CRUST_COLORS.slate,
+        crustFloor: CRUST_COLORS.slate, crustAccent: CRUST_COLORS.slateDark,
         abyssAccent: ABYSS_COLORS.basalt, density: 0.75, enemies: ['scarab', 'sentinel'],
     },
     bonetown: { // S: bone forest + ruined town — limestone, moss
-        crustFloor: CRUST_COLORS.ash, crustAccent: CRUST_COLORS.tombMoss,
+        crustFloor: CRUST_COLORS.ashField, crustAccent: CRUST_COLORS.tombMoss,
         abyssAccent: ABYSS_COLORS.bone, density: 0.9, enemies: ['sentinel', 'frost'],
     },
     cryomire: { // SE: cryo vault + rot mire — ice + sludge

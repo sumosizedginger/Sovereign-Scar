@@ -19,6 +19,7 @@ export const CRUST_COLORS = {
     wall: 0x949aa4,
     accent: 0xc9b896,
     clayField: 0x877b68, // C1: overworld field tone (clayDark reads ~92/255 in full frame)
+    ashField: 0x848b96, // V: bonetown field tone (ash reads ~105/255 in full frame)
 };
 
 /** High-entropy Abyss: basalt, charcoal, neon violet, kintsugi gold. */
@@ -37,6 +38,7 @@ export const ABYSS_COLORS = {
     iceDark: 0x3a6a8a,
     bone: 0xefe6d0,
     rot: 0x3d5c34,
+    rotPale: 0x4f6644, // V: golem arena floor (rot read 30/255 under sludge)
     sludge: 0x4a5c28,
     pyre: 0xff6a20,
 };

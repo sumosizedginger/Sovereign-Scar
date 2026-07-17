@@ -16,7 +16,9 @@ import { FluidPlane } from '../world/fluid-plane.js';
 import { SludgeGolem, attachBoss } from '../bosses/index.js';
 import { addAltar } from '../world/altar.js';
 
-const ISLET = 0x4a4030;
+// V: dry islets must READ dry against the sludge (0x4a4030 sank the arena
+// to 18/255) — parched clay, clearly walkable
+const ISLET = 0x8a7a58;
 
 function addSludge(level, ctx, origin, size) {
     const fluid = new FluidPlane(ctx.scene, {
@@ -221,11 +223,20 @@ export const BEAT11_DEF = {
             grid: [0, -4],
             half: 13,
             wallH: 5,
+            // V: arena read 30/255 — paler wet-rot floor + more dry islets
+            floorColor: ABYSS_COLORS.rotPale,
             build(map, h) {
                 h.fillBox(map, -3, 3, 1, 1, -3, 3, ISLET);
                 h.fillBox(map, -9, -6, 1, 1, 4, 8, ISLET);
                 h.fillBox(map, 6, 9, 1, 1, -8, -5, ISLET);
                 h.fillBox(map, -1, 1, 1, 1, 6, 9, ISLET);
+                h.fillBox(map, -10, -7, 1, 1, -7, -4, ISLET);
+                h.fillBox(map, 7, 10, 1, 1, 3, 6, ISLET);
+                h.fillBox(map, -6, -3, 1, 1, 9, 11, ISLET);
+                // Drowned shelf rows — bone-pale ruins of the library
+                h.fillBox(map, -11, -10, 1, 2, -9, 0, ABYSS_COLORS.bone);
+                h.fillBox(map, 10, 11, 1, 2, -3, 7, ABYSS_COLORS.bone);
+                h.fillBox(map, -4, 4, 1, 2, -11, -10, ABYSS_COLORS.bone);
             },
             doors: [{ to: 'stacksump', side: 'S', at: 0, type: 'boss' }],
             boss(ctx, level, origin) {

@@ -225,7 +225,11 @@ export const BEAT09_DEF = {
             grid: [0, -4],
             half: 12,
             wallH: 5,
+            // V: the hall read 11/255 — lift the floor and give the moot its
+            // bone-flagstone plaza (the town gathered here once)
+            floorColor: ABYSS_COLORS.abyssWall,
             build(map, h) {
+                h.fillBox(map, -5, 5, 0, 0, -5, 5, ABYSS_COLORS.bone);
                 h.fillBox(map, -8, -6, 1, 3, -4, 4, ABYSS_COLORS.basalt);
                 h.fillBox(map, 6, 8, 1, 3, -4, 4, ABYSS_COLORS.basalt);
                 h.fillBox(map, -3, 3, 1, 2, -8, -6, ABYSS_COLORS.charcoal);

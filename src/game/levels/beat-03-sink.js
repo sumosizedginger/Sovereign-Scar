@@ -211,6 +211,8 @@ export const BEAT03_DEF = {
             grid: [0, -4],
             half: 12,
             wallH: 5,
+            // V: churned nest dust — the open clay pit read 91/255 (band ≤90)
+            floorColor: CRUST_COLORS.clayDark,
             build(map, h) {
                 h.fillBox(map, -3, 3, 1, 1, -9, -8, CRUST_COLORS.slate);
                 h.fillBox(map, -9, -8, 1, 2, 6, 8, CRUST_COLORS.iron);

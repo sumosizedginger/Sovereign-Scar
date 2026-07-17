@@ -180,6 +180,11 @@ Per [../Sovereign-Scar-Builder-Guide.md](../Sovereign-Scar-Builder-Guide.md). Ba
 
 - C7 audio pass ✅: `src/game/fx/motifs.js` — per-beat + per-region motifs (`{transpose, pattern}`, just-intonation ratios); `startMusicBed`/`updateMusicBed` gain an optional motif param (additive synth change — transposes the bed layers, pulse walks the ratio cycle), `MoodController.setMusicMotif` restarts the live bed; index.js applies `BEAT_MOTIFS[id]` at load (boss beds inherit the beat's motif), overworld screens carry their region motif (applied on `onRoomEnter` + `level.initialMotif` at load). New `sfx.stinger` boss-reveal hit replaces the generic phase whoosh on the boss card. Consistency: room-graph pickups now play `sfx.pickup` (dungeon caches/keys/maps were silent; rejected pickups — keyless Wedge — stay silent). Browser-probed: b02→1.125 spindle motif, b11→0.79 mire, overworld screen walk tombfields 1.0 → pyre 1.33, 0 pageerrors. Suite **955/955**.
 
+## Session 5 — Phase V complete ✅ (visual certification)
+
+- Headless capture sweep → `docs/media/certification/` (44 shots): entry + mid-fight boss room per dungeon (via `level.enterRoom` warp — raw position teleports trip the current room's door trigger and snap the player to the adjacent doorway), one screen per overworld region per mirror state (via saved-pos loads — cross-screen teleports fall into unbaked void and capture the death screen). All rows in [CERTIFICATION.md](CERTIFICATION.md) now ✅ with lum + shot links; zero pageerrors across every run.
+- Fix-forward fixes: Beat 03 spurpit clay floor 91→72 (clayDark) · Beat 09 moothall 11→39 (bone flagstone plaza + abyssWall floor) · Beat 11 golemwallow 18→36 (islets recolored parched-clay so "keep to the dry islets" reads, +3 islets, bone shelf ruins, new `rotPale` floor) · five crust region floors retuned (tombfields/sinklands→clayField, spindle→iron, quarry→slate, bonetown→new `ashField`; screens read 20–105 → 57–84, abyss all 35–42). Suite **955/955**.
+
 ## Known remaining polish (not blockers)
 - Character smear still ±X-biased (engine side-view heritage)
 - Boss fights are arena-scripted phases (not full cinematic cutscenes / unique OST stems)
