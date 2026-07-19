@@ -30,6 +30,15 @@ export class Input {
         this.padAim = null;              // right stick facing, or null
         this._prevButtons = [];
         this._menuCodes = [];            // synthesized nav codes for menus
+        // Stick arming: a stick is only trusted once it has been SEEN at rest.
+        // A drifting or stuck stick (e.g. a worn DualSense resting at x≈0.94)
+        // otherwise pins movement hard in one direction forever and the player
+        // cannot walk — moveVector() falls back to the pad whenever no key is
+        // held, so the drift wins every frame. Un-armed sticks read as zero;
+        // a healthy stick is near neutral on its first poll and arms instantly.
+        this._padId = null;
+        this._armMove = false;
+        this._armAim = false;
 
         this._onKeyDown = (e) => {
             this.padActive = false; // keyboard use reverts the pad legend
@@ -121,17 +130,35 @@ export class Input {
             this.padMove.z = 0;
             this.padAim = null;
             this._prevButtons = [];
+            this._padId = null;
+            this._armMove = false;
+            this._armAim = false;
             return;
         }
         const prev = this._prevButtons;
         const b = gp.buttons.map((x) => !!(x && x.pressed));
         const pressed = (i) => b[i] && !prev[i];
-        const dz = (v) => (Math.abs(v || 0) > 0.18 ? v : 0);
+        const DEADZONE = 0.18;
+        const dz = (v) => (Math.abs(v || 0) > DEADZONE ? v : 0);
 
-        this.padMove.x = dz(gp.axes?.[0]);
-        this.padMove.z = dz(gp.axes?.[1]);
-        const ax = dz(gp.axes?.[2]);
-        const az = dz(gp.axes?.[3]);
+        // A different pad (or a reconnect) must re-arm from scratch.
+        if (gp.id !== this._padId) {
+            this._padId = gp.id;
+            this._armMove = false;
+            this._armAim = false;
+        }
+        const rx = gp.axes?.[0] || 0, rz = gp.axes?.[1] || 0;
+        const rax = gp.axes?.[2] || 0, raz = gp.axes?.[3] || 0;
+        // Arm each stick the first time it is observed at rest, then trust it
+        // for good. A stick already off-centre at connect (held, drifting, or
+        // stuck) stays un-armed and reads zero instead of pinning movement.
+        if (Math.hypot(rx, rz) <= DEADZONE) this._armMove = true;
+        if (Math.hypot(rax, raz) <= DEADZONE) this._armAim = true;
+
+        this.padMove.x = this._armMove ? dz(rx) : 0;
+        this.padMove.z = this._armMove ? dz(rz) : 0;
+        const ax = this._armAim ? dz(rax) : 0;
+        const az = this._armAim ? dz(raz) : 0;
         this.padAim = Math.hypot(ax, az) > 0.3 ? { x: ax, z: az } : null;
 
         if (pressed(0)) { this._attackPressed = true; this._menuCodes.push('Enter'); }

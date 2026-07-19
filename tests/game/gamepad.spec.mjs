@@ -5,9 +5,9 @@ import { Input } from '../../src/game/input.js';
 
 const fakeDom = { addEventListener() {}, removeEventListener() {} };
 
-function pad({ buttons = [], axes = [0, 0, 0, 0] } = {}) {
+function pad({ buttons = [], axes = [0, 0, 0, 0], id = 'test-pad' } = {}) {
     const b = Array.from({ length: 17 }, (_, i) => ({ pressed: buttons.includes(i) }));
-    return { connected: true, buttons: b, axes };
+    return { id, connected: true, buttons: b, axes };
 }
 
 export function run(t) {
@@ -67,4 +67,35 @@ export function run(t) {
     t.ok('pad marked active', input.padActive === true);
     input._onKeyDown({ code: 'KeyW' });
     t.ok('keyboard reverts padActive', input.padActive === false);
+
+    // Stick arming: a pad whose stick is already off-centre when it connects
+    // (held, drifting, or stuck) must NOT pin movement. Regression guard for a
+    // real DualSense resting at x≈0.94 that shoved the player into a wall and
+    // made the game unplayable on keyboard (moveVector falls back to the pad).
+    const drift = new Input(fakeDom);
+    const stuck = { axes: [0.94, -0.18, 0, 0], id: 'drifting-pad' };
+    drift.pollGamepad([pad(stuck)]);
+    t.ok('stuck stick does not move the player',
+        drift.padMove.x === 0 && drift.padMove.z === 0);
+    drift.pollGamepad([pad(stuck)]);
+    t.ok('stuck stick stays suppressed while held',
+        drift.padMove.x === 0 && drift.padMove.z === 0);
+    t.ok('stuck stick does not flip the HUD to pad prompts', drift.padActive === false);
+    t.ok('keyboard still steers past a stuck stick',
+        drift.moveVector().x === 0 && drift.moveVector().z === 0);
+    // Released/centred → the stick arms and works normally from then on
+    drift.pollGamepad([pad({ axes: [0, 0, 0, 0], id: 'drifting-pad' })]);
+    drift.pollGamepad([pad({ axes: [0.94, -0.18, 0, 0], id: 'drifting-pad' })]);
+    t.ok('stick works once seen at rest', drift.padMove.x === 0.94);
+
+    // A right stick pinned at rest must not force-steer facing either
+    const aimDrift = new Input(fakeDom);
+    aimDrift.pollGamepad([pad({ axes: [0, 0, -1, 0], id: 'aim-drift' })]);
+    t.ok('stuck right stick yields no aim', aimDrift.padAim === null);
+
+    // Reconnecting a different pad re-arms from scratch
+    const swap = new Input(fakeDom);
+    swap.pollGamepad([pad({ axes: [0, 0, 0, 0], id: 'pad-a' })]);
+    swap.pollGamepad([pad({ axes: [0.9, 0, 0, 0], id: 'pad-b' })]);
+    t.ok('new pad re-arms (stuck stick ignored)', swap.padMove.x === 0);
 }
