@@ -2,10 +2,9 @@
 
 | Input | Action |
 |---|---|
-| **W A S D** / Arrows | Move (8-way) |
-| **Mouse** | Aim facing |
-| **LMB** / **Space** / **J** | Attack (active weapon) |
-| **Shift** / **K** | Dash (full power with the Phase Boot) |
+| **W A S D** / Arrows | Move (8-way) — you always face the way you walk |
+| **Space** / **J** | Attack (active weapon) |
+| **Shift** / **K** | Dash — grants ~0.3s of invulnerability (full distance with the Phase Boot) |
 | **Q** / **R** | Cycle weapon |
 | **E** / **F** | Interact (altars, dungeon entrances, monoliths) |
 | **G** | Magnetic Grapple at anchors (when owned) |
@@ -15,6 +14,17 @@
 | **N** | Mute |
 | **P** / **Esc** | Pause |
 | **Enter** | Advance / skip story line |
+
+The mouse does not control the game. Facing follows movement (A Link to the
+Past style), so attacking while standing still swings in the direction you
+last walked.
+
+## Combat
+
+Every enemy attack winds up before it lands: the enemy stops, a ring marks the
+ground it is about to strike, and damage is resolved only when that ring
+expires — against where you are *then*. Walk out of the ring or dash through it
+and the blow whiffs. Slain enemies drop hearts, more often when you are hurt.
 
 Gamepad (standard mapping): left stick move, right stick aim, **A** attack,
 **B** dash, **X** interact, **Y** grapple, **LB/RB** weapon, **Select** map,

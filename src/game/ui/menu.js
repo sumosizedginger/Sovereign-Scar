@@ -60,7 +60,7 @@ export function buildScreens() {
 
     const controlsItems = () => ([
         { type: 'text', label: 'WASD / arrows — move' },
-        { type: 'text', label: 'Mouse — aim · LMB / Space — attack' },
+        { type: 'text', label: 'You face the way you walk · Space / J — attack' },
         { type: 'text', label: 'Shift — dash · G — grapple · E — interact' },
         { type: 'text', label: 'Q / R — cycle weapon · M — mood shift' },
         { type: 'text', label: 'N — mute · P / Esc — pause · Enter — story' },

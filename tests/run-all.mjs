@@ -30,6 +30,7 @@ import { run as runBlockers } from './game/blockers.spec.mjs';
 import { run as runMigration } from './game/migration.spec.mjs';
 import { run as runWorld7 } from './game/world7.spec.mjs';
 import { run as runMotifs } from './game/motifs.spec.mjs';
+import { run as runCombatFeel } from './game/combat-feel.spec.mjs';
 
 const unitOnly = process.argv.includes('--unit-only');
 
@@ -74,6 +75,7 @@ async function main() {
     runNamed('migration', runMigration);
     runNamed('world7', runWorld7);
     runNamed('motifs', runMotifs);
+    runNamed('combat-feel', runCombatFeel);
 
     if (!unitOnly) {
         const { run: runSmoke } = await import('./smoke.spec.mjs');
@@ -110,6 +112,11 @@ async function main() {
         const worldE2E = createSink('world-e2e');
         await runWorldE2E(worldE2E);
         sinks.push(worldE2E);
+
+        const { run: runCombatFeelE2E } = await import('./combat-feel-e2e.spec.mjs');
+        const combatFeelE2E = createSink('combat-feel-e2e');
+        await runCombatFeelE2E(combatFeelE2E);
+        sinks.push(combatFeelE2E);
     }
 
     writeStepSummary(sinks);

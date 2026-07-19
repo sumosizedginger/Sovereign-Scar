@@ -97,8 +97,8 @@ export class HUD {
             pointerEvents: 'none',
         });
         this.helpEl.textContent =
-            'WASD move · Mouse aim · LMB/Space attack\n' +
-            'Shift dash · Q/R weapon · E interact · G grapple\n' +
+            'WASD move + face · Space attack · Shift dash\n' +
+            'Q/R weapon · E interact · G grapple · Tab map\n' +
             'N mute · P pause · Enter advance story';
         document.body.appendChild(this.helpEl);
 
@@ -207,9 +207,9 @@ export class HUD {
         } else if (!state.pad && this._padLegend) {
             this._padLegend = false;
             this.helpEl.textContent =
-                'WASD move · Mouse aim · LMB/Space attack\n' +
-                'Shift dash · Q/R weapon · E interact · G grapple\n' +
-                'Tab map · N mute · P pause · Enter advance story';
+                'WASD move + face · Space attack · Shift dash\n' +
+                'Q/R weapon · E interact · G grapple · Tab map\n' +
+                'N mute · P pause · Enter advance story';
         }
         const hp = state.hp ?? 0;
         const max = state.maxHp ?? 6;

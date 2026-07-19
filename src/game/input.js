@@ -85,11 +85,11 @@ export class Input {
             this.mouse.x = e.clientX;
             this.mouse.y = e.clientY;
         };
+        // The mouse no longer drives gameplay — facing comes from movement
+        // (A Link to the Past style) and attacking is Space/J. Button state is
+        // still tracked because menus read it; it just does not attack.
         this._onMouseDown = (e) => {
-            if (e.button === 0) {
-                this.mouse.down = true;
-                this._attackPressed = true;
-            }
+            if (e.button === 0) this.mouse.down = true;
             if (e.button === 2) this.mouse.right = true;
         };
         this._onMouseUp = (e) => {

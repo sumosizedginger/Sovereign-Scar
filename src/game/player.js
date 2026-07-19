@@ -123,28 +123,6 @@ export class Player {
         this.state.current = 'IDLE';
     }
 
-    /**
-     * Mouse aim: project screen coords onto y=player plane.
-     */
-    aimAtScreen(mx, my, camera, renderer) {
-        if (!camera || !renderer) return;
-        const rect = renderer.domElement.getBoundingClientRect();
-        const ndcX = ((mx - rect.left) / rect.width) * 2 - 1;
-        const ndcY = -((my - rect.top) / rect.height) * 2 + 1;
-        const origin = new THREE.Vector3();
-        const dir = new THREE.Vector3();
-        origin.setFromMatrixPosition(camera.matrixWorld);
-        dir.set(ndcX, ndcY, 0.5).unproject(camera).sub(origin).normalize();
-        // Ray vs y = player.y plane
-        if (Math.abs(dir.y) < 1e-4) return;
-        const t = (this.rig.position.y - origin.y) / dir.y;
-        if (t < 0) return;
-        const hit = origin.clone().addScaledVector(dir, t);
-        const dx = hit.x - this.rig.position.x;
-        const dz = hit.z - this.rig.position.z;
-        if (Math.hypot(dx, dz) > 0.1) this.state.setFacing(dx, dz);
-    }
-
     tryAttack(enemies, destructibles, opts = {}) {
         if (this.attackCd > 0 || this.health.dead) return [];
         const weapon = getWeapon(this.inventory.activeWeapon);
@@ -208,8 +186,13 @@ export class Player {
         this.physics.applyImpulse(fv.x * power, 0, fv.z * power);
         this.dashTimer = dur;
         this.dashCd = ownsBoot ? boot.cooldown : boot.cooldown * 1.2;
-        // C3: Ghost-step upgrade extends dash i-frames
-        this.health.iFrames = Math.max(this.health.iFrames, dur + 0.05 + (this.dashIframeBonus || 0));
+        // C3: Ghost-step upgrade extends dash i-frames.
+        // Floor the window at 0.3s: the raw dash is 0.14s (0.084s before the
+        // Phase Boot), which is shorter than a reaction and made dashing
+        // useless as a defensive option — there was effectively no way to
+        // avoid a hit once it was coming.
+        const iWindow = Math.max(0.3, dur + 0.05) + (this.dashIframeBonus || 0);
+        this.health.iFrames = Math.max(this.health.iFrames, iWindow);
         sfx.dash();
         this.arcSmear.spawn({
             position: this.rig.position,
@@ -237,14 +220,14 @@ export class Player {
             this.physics.resetVelocity();
         } else {
             const mv = input.moveVector();
-            // Face from movement if no recent mouse aim preference
+            // A Link to the Past facing model: you face where you walk, and
+            // standing still keeps your last facing. Mouse aim used to
+            // overwrite this every single frame, so the keyboard never
+            // actually controlled which way you were pointing — you swung
+            // wherever the cursor happened to sit. It is gone; the pad's
+            // right stick is the only optional aim override.
             if (mv.x || mv.z) this.state.setFacing(mv.x, mv.z);
-            if (input.padAim) {
-                // Right stick has aim priority over mouse (B5)
-                this.state.setFacing(input.padAim.x, input.padAim.z);
-            } else if (input.mouse && camera && renderer) {
-                this.aimAtScreen(input.mouse.x, input.mouse.y, camera, renderer);
-            }
+            if (input.padAim) this.state.setFacing(input.padAim.x, input.padAim.z);
 
             const result = this.physics.update(this.collisionWorld, dt, {
                 wishX: mv.x,

@@ -80,6 +80,19 @@ export class Enemy {
         this._flash = 0;
         this._chargeT = 0;
         this._chargeDir = null;
+        // Attack telegraphs. Every hostile action winds up first: the enemy
+        // freezes, a ring marks the ground it is about to strike, and only
+        // when the windup expires is damage resolved — against the player's
+        // position AT THAT MOMENT. Previously an enemy simply called
+        // player.health.damage() the instant its cooldown expired and you
+        // were in range, so a hit was unavoidable and unreadable: no tell to
+        // react to, and no way to step out of it once committed.
+        this.windup = opts.windup != null ? opts.windup : 0.45;
+        this._windupT = 0;
+        this._pendingStrike = null;
+        this._tell = null;
+        this._tellLife = 0;
+        this._tellMax = 0;
         this.loot = opts.loot || null;
         this.onDeath = opts.onDeath || null;
         this.projectiles = [];
@@ -90,13 +103,98 @@ export class Enemy {
         };
     }
 
+    /**
+     * Mark the ground the enemy is committing to strike. Mirrors the boss
+     * telegraph (bosses/base.js) so both read the same to the player.
+     */
+    telegraphAt(x, z, radius, life, color = 0xff5533) {
+        this.clearTelegraph();
+        const geo = new THREE.RingGeometry(Math.max(0.15, radius * 0.5), radius, 24);
+        const mat = new THREE.MeshBasicMaterial({
+            color,
+            transparent: true,
+            opacity: 0.7,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+        });
+        const ring = new THREE.Mesh(geo, mat);
+        ring.rotation.x = -Math.PI / 2;
+        // Sit just above the floor the enemy is standing on. An absolute y
+        // here (as the boss telegraph uses) buries the ring: room floors are
+        // at y = 1, so the tell rendered underneath the ground and the player
+        // saw no warning at all.
+        ring.position.set(x, this.rig.position.y + 0.06, z);
+        this.scene.add(ring);
+        this._tell = ring;
+        this._tellLife = life;
+        this._tellMax = life;
+    }
+
+    clearTelegraph() {
+        if (this._tell) {
+            if (this._tell.parent) this._tell.parent.remove(this._tell);
+            this._tell.geometry?.dispose();
+            this._tell.material?.dispose();
+            this._tell = null;
+        }
+        this._tellLife = 0;
+    }
+
+    /**
+     * Commit to an attack that lands `windup` seconds from now. The enemy
+     * holds still while winding up (that pause IS the tell), and `resolve`
+     * decides at strike time whether it actually connects.
+     */
+    _beginWindup(resolve, opts = {}) {
+        const dur = opts.windup != null ? opts.windup : this.windup;
+        this._windupT = dur;
+        this._pendingStrike = resolve;
+        const fv = this.state.facingVec;
+        const reach = opts.reach != null ? opts.reach : 0.9;
+        this.telegraphAt(
+            this.rig.position.x + fv.x * reach,
+            this.rig.position.z + fv.z * reach,
+            opts.radius || (this.attackRange + 0.3),
+            dur,
+            opts.color
+        );
+        sfx.whoosh();
+    }
+
+    /**
+     * Land a melee strike only if the player is still inside the marked area.
+     * This is what makes a hit avoidable: walking or dashing clear during the
+     * windup means the swing whiffs.
+     */
+    _resolveMelee(player, damage, reach) {
+        const dx = player.root.position.x - this.rig.position.x;
+        const dz = player.root.position.z - this.rig.position.z;
+        if (Math.hypot(dx, dz) > reach) {
+            sfx.step(); // whiff — the player got out in time
+            return false;
+        }
+        const res = player.health.damage(damage, 0.9);
+        if (res.accepted) sfx.hurt();
+        return res.accepted;
+    }
+
     update(dt, player) {
         if (this.state.current === 'DEAD') {
             this.rig.visible = false;
+            this.clearTelegraph();
             this._clearProjectiles();
             return;
         }
         if (this.attackCd > 0) this.attackCd -= dt;
+
+        // Telegraph ring pulses brighter as the strike approaches
+        if (this._tell && this._tellLife > 0) {
+            this._tellLife -= dt;
+            const u = Math.max(0, this._tellLife / (this._tellMax || 1));
+            this._tell.material.opacity = 0.8 - u * 0.45;
+            this._tell.scale.setScalar(0.75 + (1 - u) * 0.35);
+            if (this._tellLife <= 0) this.clearTelegraph();
+        }
         if (this._flash > 0) {
             this._flash -= dt;
             this.rig.traverse((c) => {
@@ -120,6 +218,21 @@ export class Enemy {
         const dz = pz - this.rig.position.z;
         const dist = Math.hypot(dx, dz);
 
+        // Committed attack: hold still, keep facing locked to where the
+        // telegraph was placed, and resolve when the windup runs out. Facing
+        // must NOT track the player here — a tell that re-aims every frame is
+        // not a tell, and sidestepping it would be impossible.
+        if (this._windupT > 0) {
+            this._windupT -= dt;
+            if (this._windupT <= 0) {
+                const strike = this._pendingStrike;
+                this._pendingStrike = null;
+                this._windupT = 0;
+                if (strike) strike(player, dist);
+            }
+            return;
+        }
+
         if (dist >= this.aggroRange) return;
 
         this.state.setFacing(dx, dz);
@@ -138,11 +251,12 @@ export class Enemy {
         if (dist > this.attackRange && dist > 0.2) {
             this._move(dx, dz, dist, this.speed * dt);
         } else if (this.attackCd <= 0) {
-            this.attackCd = 0.9;
-            if (player.health && !player.health.invulnerable) {
-                const res = player.health.damage(this.damage, 0.8);
-                if (res.accepted) sfx.hurt();
-            }
+            this.attackCd = 0.9 + this.windup;
+            const reach = this.attackRange + 0.4;
+            this._beginWindup((p) => this._resolveMelee(p, this.damage, reach), {
+                reach: 0.9,
+                radius: reach,
+            });
         }
     }
 
@@ -160,16 +274,25 @@ export class Enemy {
             return;
         }
         if (dist > 3.5 && this.attackCd <= 0) {
-            this.attackCd = 2.2;
-            this._chargeT = 0.55;
-            this._chargeDir = { x: dx / dist, z: dz / dist };
-            sfx.whoosh();
+            // Rear up before charging, marking the lane it will run down, so
+            // the charge can be read and stepped out of instead of simply
+            // arriving. The direction is locked at windup time.
+            this.attackCd = 2.2 + this.windup;
+            const dir = { x: dx / dist, z: dz / dist };
+            this._beginWindup(() => {
+                this._chargeT = 0.55;
+                this._chargeDir = dir;
+                sfx.stomp();
+            }, { windup: 0.5, reach: 2.2, radius: 1.6, color: 0xffaa33 });
         } else if (dist > this.attackRange) {
             this._move(dx, dz, dist, this.speed * 0.7 * dt);
         } else if (this.attackCd <= 0) {
-            this.attackCd = 1.0;
-            player.health.damage(this.damage, 0.7);
-            sfx.hurt();
+            this.attackCd = 1.0 + this.windup;
+            const reach = this.attackRange + 0.4;
+            this._beginWindup((p) => this._resolveMelee(p, this.damage, reach), {
+                reach: 0.9,
+                radius: reach,
+            });
         }
     }
 
@@ -181,9 +304,13 @@ export class Enemy {
             this._move(dx, dz, dist, this.speed * 0.7 * dt);
         }
         if (this.attackCd <= 0 && dist < this.attackRange) {
-            this.attackCd = 1.6;
-            this._spawnProjectile(dx / dist, dz / dist);
-            sfx.whoosh();
+            // Take aim first — the shot leads where you were, not where you
+            // are, so moving during the windup makes it miss.
+            this.attackCd = 1.6 + this.windup;
+            const dir = { x: dx / dist, z: dz / dist };
+            this._beginWindup(() => this._spawnProjectile(dir.x, dir.z), {
+                windup: 0.55, reach: 1.1, radius: 0.9, color: 0x66ccff,
+            });
         }
     }
 
@@ -256,6 +383,7 @@ export class Enemy {
 
     dispose() {
         this._clearProjectiles();
+        this.clearTelegraph();
         if (this.rig.parent) this.rig.parent.remove(this.rig);
     }
 }

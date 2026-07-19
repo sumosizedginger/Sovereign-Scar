@@ -5,9 +5,29 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
-First by-hand playtest feedback, fixed.
+By-hand playtest feedback, fixed.
+
+### Added
+- Enemy attack telegraphs. Every hostile action now winds up: the enemy holds
+  still, a ring marks the ground it is about to strike, and damage resolves
+  only when the ring expires — against where you are at that moment. Walking
+  clear or dashing through makes the blow whiff. Previously enemies dealt
+  damage the instant their cooldown expired while you were in range, with no
+  tell and no way to avoid it.
+- Heart recovery. Slain enemies drop hearts (odds rise the more hurt you
+  are), and boss phase changes always drop one. `HealthPool.heal()` existed
+  but nothing in the game had ever called it — dying was the only way to get
+  HP back.
 
 ### Changed
+- The game is keyboard-driven. You face the way you walk, A Link to the Past
+  style, and standing still holds your last facing. Mouse aim (which
+  overwrote facing every frame) and LMB-attack are gone.
+- Camera scale is constant everywhere. Entering a dungeon no longer zooms in:
+  overworld and every dungeon now frame the same 24 world units, where
+  dungeons previously framed 21 against the overworld's 47.
+- Dash grants at least 0.3s of invulnerability (was 0.13s, shorter than a
+  human reaction) so it works as a dodge.
 - Gameplay camera reads top-down instead of 3/4-perspective: FOV 65° → 40°
   and a steeper rig tilt (visible floor area preserved at the tighter FOV).
 
@@ -22,6 +42,11 @@ First by-hand playtest feedback, fixed.
   2-unit-wide centred door gap.
 - The boss-intro camera push-in is now cancelled on level change; it could
   previously bleed into the next level and leave the camera inside a wall.
+- Boss attack telegraphs are visible. Rings were drawn at an absolute height
+  of y≈0.08 while room floors sit at y=1, so every boss telegraph in the game
+  had been rendering a full unit underground since the boss framework landed.
+- Dying no longer respawns you into empty space. Respawn uses the room you
+  died in rather than the spawn point captured at level load.
 
 ## [0.3.0] — 2026-07-17
 

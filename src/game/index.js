@@ -32,6 +32,7 @@ import { bossHeartMax } from './kernel/health.js';
 import { tryPurchase, damageMult, dashIframeBonus, grappleRange, UPGRADES } from './kernel/upgrades.js';
 import { getWeapon } from './combat/weapons.js';
 import { dev } from './dev/dev-mode.js';
+import { HeartDropManager } from './world/heart-drops.js';
 
 // ── Boot ──────────────────────────────────────────────────────────────────
 // S4: capture the engine lights so MoodController can drive ambient/key.
@@ -59,7 +60,12 @@ mood.bindLights({
 // tilt closer to a bird's-eye look.
 camera.fov = 40;
 camera.updateProjectionMatrix();
-const camRig = new CameraRig({ height: 24, back: 8 });
+// One camera distance for the whole game (see loadLevel). At 40° FOV with
+// back = 0.35·height this frames ~24 world units across a 16:9 viewport —
+// wide enough that a 14-unit dungeon room sits inside the frame with its
+// walls visible, tight enough that the hero still reads at overworld scale.
+const CAM_HEIGHT = 17.5;
+const camRig = new CameraRig({ height: CAM_HEIGHT, back: CAM_HEIGHT * 0.35 });
 
 // Custom passes before OutputPass
 const flickerPass = createFlickerPass();
@@ -114,6 +120,7 @@ applyVolumes();
 
 const player = new Player(scene, collisionWorld, () => false);
 const soulMotes = new SoulMotes(scene);
+const heartDrops = new HeartDropManager(scene);
 
 // Juice feeds (A1–A3, A5)
 player.health.onDamage = () => {
@@ -183,6 +190,7 @@ function unloadLevel() {
         try { game.level.dispose(); } catch (e) { console.warn('level dispose', e); }
         game.level = null;
     }
+    heartDrops.clear(); // loose hearts must not survive into the next level
     collisionWorld.clear();
     // Keep border-safe empty world
 }
@@ -209,16 +217,15 @@ function loadLevel(id) {
 
     const sp = level.spawn || { x: 0, y: 1.2, z: 0 };
     player.setSpawn(sp.x, sp.y != null ? sp.y : 1.2, sp.z);
-    // S5: fit the camera to the room size. Coefficients are solved against
-    // MEASURED coverage (visible width ÷ room width) at the 40° FOV, so that
-    // narrowing the lens does not silently change how zoomed the game feels:
-    //   dungeon room (half 7): 1.54  (pre-40°-FOV camera: 1.65)
-    //   overworld screen (half 23): 1.04  (pre: 0.93)
-    // Only the tilt changed; zoom stays where it has always been. A naive
-    // height bump alongside the FOV change measured 2.00 here — rooms sat in
-    // void at half the frame width — which is why these are fitted, not eyeballed.
+    // Camera scale is CONSTANT everywhere — the world is drawn at one size
+    // whether you are on the overworld or inside a dungeon, exactly like A
+    // Link to the Past. It used to scale with level.halfSize, which meant a
+    // dungeon room (half 7) framed ~21 world units wide while an overworld
+    // screen (half 23) framed ~47: walking through a dungeon arch jerked the
+    // camera to less than half its previous scale. Rooms narrower than the
+    // view are centred by the room-lock clamp; wider screens scroll.
     camRig.clearFocus(); // a boss-intro push-in must not bleed into the next level
-    camRig.height = 7.4 + (level.halfSize || 12) * 1.16;
+    camRig.height = CAM_HEIGHT;
     camRig.back = camRig.height * 0.35;
     camRig.snapTo(player.root.position);
 
@@ -690,6 +697,21 @@ function frame() {
         updateFlickerPass(flickerPass, sdt, game.level?.flicker || 0);
         updateWrapPass(wrapPass, sdt, game.level?.wrap || 0);
 
+        // Hearts from slain enemies — the only in-run way to recover HP
+        heartDrops.update(sdt, enemies, player);
+
+        // Boss arenas have no trash mobs to farm, so walking in at 1 HP was
+        // unwinnable with no way to recover. Each phase change drops a heart.
+        {
+            const b = game.activeBoss;
+            const phase = b && !b.defeated ? (b.phase || 1) : 0;
+            if (phase > 0 && game._lastBossPhase && phase > game._lastBossPhase) {
+                const bp = b.root?.position;
+                if (bp) heartDrops.spawn(bp.x, player.root.position.y - 0.95, bp.z);
+            }
+            game._lastBossPhase = phase;
+        }
+
         if (particles.update) particles.update(sdt);
         updateSmears(sdt);
         camRig.setBounds(game.level?.cameraBounds || null); // W2 room-lock
@@ -840,6 +862,7 @@ window.__sovereignScar = {
     ending,
     dev,
     mapScreen,
+    heartDrops,
     save() {
         return saveSovereignProgress({
             currentBeat: game.levelId,

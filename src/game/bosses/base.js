@@ -43,6 +43,11 @@ export class BossBase {
         this._flash = 0;
         this._telegraph = null;
         this._telegraphLife = 0;
+        // Height of the floor the arena is built on. Telegraph rings used to
+        // be pinned at an absolute y = 0.08, but room floors sit at y = 1, so
+        // every boss telegraph in the game rendered a full unit UNDERGROUND
+        // and the player never saw the wind-up they were meant to dodge.
+        this.floorY = opts.floorY != null ? opts.floorY : 1.0;
         this.alive = true;
         this.defeated = false;
 
@@ -158,7 +163,7 @@ export class BossBase {
         });
         const ring = new THREE.Mesh(geo, mat);
         ring.rotation.x = -Math.PI / 2;
-        ring.position.set(x, 0.08, z);
+        ring.position.set(x, this.floorY + 0.08, z);
         this.scene.add(ring);
         this._telegraph = ring;
         this._telegraphLife = life;
