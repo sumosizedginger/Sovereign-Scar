@@ -42,6 +42,13 @@ By-hand playtest feedback, fixed.
   2-unit-wide centred door gap.
 - The boss-intro camera push-in is now cancelled on level change; it could
   previously bleed into the next level and leave the camera inside a wall.
+- Locked and boss doors can be opened. The gold plug filling a locked doorway
+  is a solid collider, but the unlock trigger sat 0.3 past the wall line —
+  behind that solid matter. The plug stopped the player ~0.9 short, so the
+  trigger never fired and the key was never spent: **no locked or boss door
+  in the campaign could be opened on foot.** Plugged doors now unlock on
+  approach. All 80 locked/boss doors verified by walking a physics body into
+  each one.
 - Boss attack telegraphs are visible. Rings were drawn at an absolute height
   of y≈0.08 while room floors sit at y=1, so every boss telegraph in the game
   had been rendering a full unit underground since the boss framework landed.

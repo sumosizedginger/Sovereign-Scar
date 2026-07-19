@@ -6,7 +6,8 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["scripts/serve.mjs", "8799"],
       "cwd": "D:\\Zelda\\sovereign-scar",
-      "port": 8799
+      "port": 8799,
+      "autoPort": false
     },
     {
       "name": "sovereign-scar-alt",

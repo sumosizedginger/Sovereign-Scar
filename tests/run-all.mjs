@@ -113,6 +113,11 @@ async function main() {
         await runWorldE2E(worldE2E);
         sinks.push(worldE2E);
 
+        const { run: runLockedDoorsE2E } = await import('./locked-doors-e2e.spec.mjs');
+        const lockedDoorsE2E = createSink('locked-doors-e2e');
+        await runLockedDoorsE2E(lockedDoorsE2E);
+        sinks.push(lockedDoorsE2E);
+
         const { run: runCombatFeelE2E } = await import('./combat-feel-e2e.spec.mjs');
         const combatFeelE2E = createSink('combat-feel-e2e');
         await runCombatFeelE2E(combatFeelE2E);

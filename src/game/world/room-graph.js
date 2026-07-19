@@ -423,6 +423,27 @@ export function createDungeon(ctx, def, opts = {}) {
         startTransition(door, game);
     }
 
+    /**
+     * How close the player must get for a door to react.
+     *
+     * An OPEN door is an empty gap: the player walks into the doorway itself
+     * and 0.3 past the wall line starts the room transition.
+     *
+     * A LOCKED or BOSS door is not a gap — `bakePlug` fills the doorway with
+     * solid gold (or blood-red) voxels registered in the collision world. The
+     * plug stops the player 0.9 short of the wall line, so a 0.3 trigger sat
+     * *behind* solid matter and could never be reached: the key was never
+     * spent and every locked door in the game was impassable on foot. A
+     * plugged door therefore reacts on approach instead. Once it opens the
+     * plug is removed, this returns to 0.3, and the next step walks through.
+     */
+    function triggerReach(door) {
+        const type = door.type || 'open';
+        if (type !== 'locked' && type !== 'boss') return 0.3;
+        const dk = doorKey(def.id, currentRoomId, door.to);
+        return keyStore.isOpen(dk) ? 0.3 : 1.2;
+    }
+
     function checkDoorTriggers(game) {
         const room = def.rooms[currentRoomId];
         const o = roomOrigin(room);
@@ -430,13 +451,14 @@ export function createDungeon(ctx, def, opts = {}) {
         for (const door of room.doors || []) {
             const w = (door.width || DOOR_WIDTH) / 2 + 0.5;
             const c = doorWorldCenter(currentRoomId, door);
+            const reach = triggerReach(door);
             if (door.side === 'N' || door.side === 'S') {
                 const wallZ = door.side === 'N' ? o.z - room.half + 0.5 : o.z + room.half + 0.5;
-                const outward = door.side === 'N' ? p.z < wallZ + 0.3 : p.z > wallZ - 0.3;
+                const outward = door.side === 'N' ? p.z < wallZ + reach : p.z > wallZ - reach;
                 if (outward && Math.abs(p.x - c.x) < w) { tryDoor(door, game); return; }
             } else {
                 const wallX = door.side === 'W' ? o.x - room.half + 0.5 : o.x + room.half + 0.5;
-                const outward = door.side === 'W' ? p.x < wallX + 0.3 : p.x > wallX - 0.3;
+                const outward = door.side === 'W' ? p.x < wallX + reach : p.x > wallX - reach;
                 if (outward && Math.abs(p.z - c.z) < w) { tryDoor(door, game); return; }
             }
         }

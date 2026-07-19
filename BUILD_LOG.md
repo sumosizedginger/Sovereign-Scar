@@ -237,6 +237,14 @@ like A Link to the Past. All five closed.
 - Suite **1012 → 1053/1053**: `tests/game/combat-feel.spec.mjs` (27 asserts — telegraph, whiff-on-dodge, i-frame absorb, floor height, drop odds, facing model) and `tests/combat-feel-e2e.spec.mjs` (14 asserts through the real browser loop — measured camera width per level, live keyboard facing with a cursor sweep, telegraph on a real enemy, heart pickup, boss-phase heart).
 - **Verification note:** camera parity was proven by unprojecting the frustum onto the floor plane per level, not by eyeballing shots — the Session 6 lesson held up, and the screenshot pass then caught two *rendering* faults (buried rings, hearts modelled in the XY plane reading as flat bars under a top-down camera) that every numeric assert had missed. Both classes of check were necessary.
 
+## Session 7 (cont.) — the golden door was a real bug all along
+
+- **Locked doors were impassable campaign-wide (`fix(doors)`)** ✅ — *"first golden door, blocked"*, reported at beat-03 and, in Session 6, at beat-01. `bakePlug` fills a locked doorway with solid `goldLeaf` voxels registered in the **collision world** (not in the room's voxel map — which is why probing `getVoxelAt` showed an empty gap while the player was physically stopped). The unlock trigger required `p.z < wallZ + 0.3`; the plug halts the player at `wallZ + 0.9`. **The trigger line sat behind solid matter, so it could never fire, the key was never spent, and not one locked or boss door in the game could be opened on foot.** Plugged doors now react at 1.2 (approach), then drop back to 0.3 once the plug is removed so the next step walks through.
+- **Why every prior test missed it:** all 80 locked/boss doors had coverage, and all of it either called `enterRoom()` directly or teleported the player past the wall line. Not one test drove the physics body into a door. `world-e2e`'s "boss key opens the Warden arena" passed throughout.
+- **New `tests/locked-doors-e2e.spec.mjs`** — walks the real `VoxelPhysicsBody` into **all 80** locked/boss doors across all 14 dungeons and asserts each opens. Approach starts 2 units from the wall so the spec measures the trigger-vs-plug interaction rather than cross-room pathing (terraces, magma vents and meltable ice walls sit on some door centre lines; widening offsets until the suite went green would have proven nothing). **Verified the guard bites: reverting the fix turns it red, and the first door it names is `beat-01-crypt corridor->predecessor` — precisely the door reported in Session 6.**
+- **Correction to the Session 6 entry.** That session attributed the beat-01 "gold door won't open" report *entirely* to gamepad stick drift. The drift was real and did break the suite, but it was never the whole story: the door was independently impassable for every player, pad or no pad. A plausible root cause that explained the symptom was accepted without ever walking a player into that specific door. **Lesson: a confirmed bug that explains a symptom is not proof it is the only cause — reproduce the exact reported action, not an adjacent one.**
+- Suite **1053 → 1056/1056**.
+
 ## Known remaining polish (not blockers)
 - Boss fights are arena-scripted phases (not full cinematic cutscenes / unique OST stems)
 - Music is synthesized beds + motifs, not composed tracks
@@ -245,7 +253,7 @@ like A Link to the Past. All five closed.
 ## How to run
 ```bash
 cd sovereign-scar
-npm test          # full suite (1053)
+npm test          # full suite (1056)
 npm run test:unit
 npm run serve     # http://127.0.0.1:8799/
 ```
