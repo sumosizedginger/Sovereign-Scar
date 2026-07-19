@@ -65,6 +65,12 @@ export class CameraRig {
         this._focus = { t: 0, dur: duration, toH: height, toB: back, target };
     }
 
+    /** Cancel an in-flight push-in — call on level change so a boss-intro
+     * dip can never bleed its height/back blend into the next level. */
+    clearFocus() {
+        this._focus = null;
+    }
+
     update(dt, target) {
         if (!target) return;
         let x = target.x, y = target.y || 0, z = target.z;

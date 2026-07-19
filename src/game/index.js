@@ -53,7 +53,13 @@ mood.bindLights({
     rimWarm: gameLights?.rimWarm,
     ambient: ambientLight,
 });
-const camRig = new CameraRig({ height: 12, back: 8 });
+// Narrower FOV cuts the wide-lens perspective distortion (converging walls,
+// near/far scale mismatch) that reads as "3D game at an angle" rather than
+// classic top-down Zelda; a steeper height:back ratio (below) pushes the
+// tilt closer to a bird's-eye look.
+camera.fov = 40;
+camera.updateProjectionMatrix();
+const camRig = new CameraRig({ height: 24, back: 8 });
 
 // Custom passes before OutputPass
 const flickerPass = createFlickerPass();
@@ -203,9 +209,12 @@ function loadLevel(id) {
 
     const sp = level.spawn || { x: 0, y: 1.2, z: 0 };
     player.setSpawn(sp.x, sp.y != null ? sp.y : 1.2, sp.z);
-    // S5: fit the camera to the room size
-    camRig.height = 8 + (level.halfSize || 12) * 0.35;
-    camRig.back = camRig.height * 0.66;
+    // S5: fit the camera to the room size (steeper back:height ratio for a
+    // bird's-eye read; height coefficients rebalanced to match the old
+    // visible-area coverage at the new narrower FOV, see camera.fov above)
+    camRig.clearFocus(); // a boss-intro push-in must not bleed into the next level
+    camRig.height = 16 + (level.halfSize || 12) * 0.7;
+    camRig.back = camRig.height * 0.35;
     camRig.snapTo(player.root.position);
 
     const moodName = level.mood || meta.mood || 'crust';
