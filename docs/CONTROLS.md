@@ -1,22 +1,31 @@
 # Sovereign Scar — Controls
 
+This table is the same data the game draws in the corner of the screen: both
+are generated from `CONTROLS` in `src/game/input.js`, and
+`tests/game/controls.spec.mjs` reads the input handler's own source and fails if
+a key it responds to is missing from either. They used to be three separate
+hand-written lists that disagreed — the on-screen sheet never mentioned guard
+or lock-on, and this file never mentioned the Vial or the Dust.
+
 | Input | Action |
 |---|---|
-| **W A S D** / Arrows | Move (8-way) — you face the way you walk unless locked on |
+| **W A S D** / Arrows | Move + face (8-way) — you face the way you walk unless locked on |
 | **Space** / **J** | Attack (active weapon) |
 | **Shift** / **K** | Dash — grants ~0.3s of invulnerability (full distance with the Phase Boot) |
-| **Right mouse** / **L** | **Guard** — hold to block, tap to parry |
+| **Right mouse** / **L** | **Guard** — hold to block, tap to parry. Needs the Bulwark Shield |
 | **T** | **Lock on** — toggle the nearest target |
-| **Y** | Cycle to the next target while locked on |
+| **Y** | Switch target while locked on |
 | **Q** / **R** | Cycle weapon |
 | **E** / **F** | Interact (altars, dungeon entrances, monoliths) |
-| **G** | Magnetic Grapple at anchors (when owned) |
+| **G** | Grapple at anchors (Magnetic Grapple, when owned) |
+| **V** | Memory Vial — heal, if you are carrying one |
+| **C** | Entropy Dust — consumable, if you are carrying one |
 | **Tab** | World / dungeon map |
 | **M** | Mirror travel (after the Proxy falls; otherwise inert) |
-| **[** / **]** or PageUp/PageDown | Previous / next unlocked beat |
+| **[** / **]** or PageUp/PageDown | Previous / next beat (unlocked ones only) |
 | **N** | Mute |
 | **P** / **Esc** | Pause |
-| **Enter** | Advance / skip story line |
+| **Enter** | Advance story (skip the current line) |
 
 Facing follows movement (A Link to the Past style), so attacking while standing
 still swings in the direction you last walked — unless you are locked on, in
@@ -30,6 +39,13 @@ expires — against where you are *then*. Walk out of the ring or dash through i
 and the blow whiffs. Slain enemies drop hearts, more often when you are hurt.
 
 ### Guard and parry
+
+**You have to find the shield first.** The Bulwark Shield lies on the
+predecessor's body partway through the Crypt Breach, and until you pick it up
+the guard button does nothing. That is deliberate: Beat 01 exists to teach you
+to read a wind-up, and a player who can block from the first frame answers every
+telegraph by holding a button and never learns to read one. The two rooms before
+the shield hold one enemy each and are meant to be dodged.
 
 Holding guard raises a **120° frontal** block and slows you to 45% speed. A
 blocked hit costs 25% of its damage instead of all of it. It does not protect
@@ -120,10 +136,10 @@ badge shows bottom-left.
 | Input | Action |
 |---|---|
 | **F1** | God mode (**Shift+F1**: one-hit kills) |
-| **F2** | Defeat the current boss (fires the real defeat path) |
-| **F3** | Force the boss's next phase |
+| **F2** | Defeat current boss (fires the real defeat path) |
+| **F3** | Force boss's next phase |
 | **`** / **F10** | Dev panel: teleport, grants, unlocks, reset |
-| **H** | Hide all HUD chrome (clean captures) |
+| **H** | Hide HUD chrome (clean captures) |
 | **M** | Mood flip (dev only, outside the overworld) |
 | **]** | Force-skip beat locks |
 

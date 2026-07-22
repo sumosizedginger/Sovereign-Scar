@@ -26,7 +26,7 @@ export function run(t) {
     });
 
     const s = loadSovereignProgress();
-    t.ok('migrated to v3', s.version === 3);
+    t.ok('migrated to v4', s.version === 4);
     t.ok('dungeons filled empty', s.dungeons && Object.keys(s.dungeons).length === 0);
     t.ok('overworld defaults filled',
         s.overworld && s.overworld.state === 'crust' && Array.isArray(s.overworld.visited));
@@ -41,20 +41,41 @@ export function run(t) {
     t.ok('old saves default to Medium', s.runMode === 'medium');
     t.ok('old saves gain lives and score', s.lives?.maxCharges === 5 && s.score?.mode === 'medium');
 
-    // Migration persisted (one-shot): the stored blob is v3 now
+    // v4 gated guard/parry behind the Bulwark Shield. This save is deep in the
+    // campaign — it has already walked through the room the shield now sits in,
+    // without ever being offered it. Migrating it unshielded would delete a
+    // verb the player has been using for six dungeons.
+    t.ok('a mid-campaign save keeps its guard', s.inventory.items.bulwark_shield === true);
+
+    // Migration persisted (one-shot): the stored blob is v4 now
     const raw = (getProgress() || {}).sovereignProgress || {};
-    t.ok('migration persisted', raw.version === 3 && !!raw.dungeons);
+    t.ok('migration persisted', raw.version === 4 && !!raw.dungeons);
 
     // Migrated saves keep nested world state through unrelated saves
     saveSovereignProgress({ playTime: 2000 });
     const s2 = loadSovereignProgress();
     t.ok('nested fields survive top-level patch',
-        s2.version === 3 && s2.overworld.state === 'crust' && s2.playTime === 2000);
+        s2.version === 4 && s2.overworld.state === 'crust' && s2.playTime === 2000);
 
-    // Fresh saves are v3 from the start
+    // A save still inside Beat 01 is left alone: the pickup is on its route,
+    // and handing it over early would skip the lesson the gate exists to teach.
+    setProgress({
+        sovereignProgress: {
+            version: 3,
+            currentBeat: 'beat-01-crypt',
+            unlockedBeats: ['overworld', 'beat-01-crypt', 'sandbox-combat'],
+            bossesDefeated: [],
+            inventory: { weapons: ['bare_strike'], activeWeapon: 'bare_strike' },
+        },
+    });
+    const early = loadSovereignProgress();
+    t.ok('a save still inside Beat 01 is not handed the shield',
+        !early.inventory?.items?.bulwark_shield);
+
+    // Fresh saves are v4 from the start
     resetSovereignProgress();
     const fresh = loadSovereignProgress();
-    t.ok('fresh save is v3', fresh.version === 3 && !!fresh.dungeons && !!fresh.overworld);
+    t.ok('fresh save is v4', fresh.version === 4 && !!fresh.dungeons && !!fresh.overworld);
     t.ok('fresh progression opens overworld and beat 01',
         isBeatUnlocked('overworld', fresh) && isBeatUnlocked('beat-01-crypt', fresh));
 

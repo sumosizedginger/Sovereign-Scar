@@ -11,8 +11,41 @@ import { createActorRig } from '../../src/game/characters/actor-rig.js';
 import { createActorAnimator } from '../../src/game/characters/actor-animator.js';
 import { ARCHETYPES } from '../../src/game/characters/archetypes.js';
 import { HERO_PALETTE, ENEMY_PALETTES } from '../../src/game/assets/palettes.js';
+import { HAND_OFFSET, HAND_TILT, weaponTipY } from '../../src/game/assets/weapon-models.js';
 
 const DT = 0.05;
+
+// The weapons that SWING. The Light Caster points, and is tested apart.
+// `bare_strike` draws no model on purpose (empty hands are the readable state
+// for "you have not found a weapon yet"), so its business end is the fist —
+// it belongs in the direction tests but not in the blade tests.
+const MELEE_WEAPONS = ['bare_strike', 'anchor_link', 'tectonic_wedge', 'heavy_mallet'];
+const ARMED_MELEE = MELEE_WEAPONS.filter((id) => id !== 'bare_strike');
+/** How far in front the business end must get: a blade outreaches a fist. */
+const MIN_FORWARD = { bare_strike: 0.4 };
+
+/**
+ * Put a marker where the blade tip really is, assembled exactly the way
+ * `HeldWeapon` assembles the real model: a grip group at HAND_OFFSET carrying
+ * HAND_TILT, with the tip a child of it at the model's measured top. Applying
+ * the offset but not the tilt would test a weapon the game never draws.
+ */
+function mountTip(rig, weaponId) {
+    const grip = new THREE.Object3D();
+    grip.position.set(HAND_OFFSET.x, HAND_OFFSET.y, HAND_OFFSET.z);
+    grip.rotation.set(HAND_TILT.x, 0, HAND_TILT.z);
+    const tip = new THREE.Object3D();
+    tip.position.set(0, weaponTipY(weaponId), 0);
+    grip.add(tip);
+    (rig.hand || rig.armR).add(grip);
+    return tip;
+}
+
+const _v = new THREE.Vector3();
+function worldOf(obj, rig) {
+    rig.root.updateMatrixWorld(true);
+    return obj.getWorldPosition(_v).clone();
+}
 
 function heroRig() {
     return createActorRig({
@@ -107,35 +140,93 @@ export function run(t) {
         && Math.abs(a.armL.rotation.x - b.armL.rotation.x) < 1e-9);
     a.dispose(); b.dispose();
 
-    // ── Combat: telegraph and pose agree ──
-    const fighter = heroRig();
-    const fan = createActorAnimator(fighter, { archetype: 'sentinel' });
-    fan.startWindup(0.45, 'anchor_link');
-    let peakRaise = 0;
-    for (let i = 0; i < 9; i++) { // 0.45s of windup
-        fan.update(DT);
-        peakRaise = Math.min(peakRaise, fighter.armR.rotation.x);
+    // ── Combat: the swing goes WHERE THE HERO IS LOOKING ──
+    //
+    // These assertions are deliberately about world-space positions and not
+    // about the sign of a pivot angle. The version that checked signs passed
+    // for eighteen months against a hero who wound up in front of their own
+    // face and struck behind their back: `armR.rotation.x < -1.2` is satisfied
+    // just as neatly by a backwards swing, because a radian has no opinion
+    // about which way the actor is facing. Anything that claims a direction
+    // has to be measured as one.
+    for (const weaponId of MELEE_WEAPONS) {
+        const rig = heroRig();
+        const an = createActorAnimator(rig, { archetype: 'hero' });
+        rig.root.rotation.y = 0;               // facing world +Z
+        const tip = mountTip(rig, weaponId);
+
+        an.attack(weaponId, { windup: 0.07, strikeDur: 0.12, recover: 0.3 });
+        const track = [];
+        for (let i = 0; i < 13; i++) {
+            an.update(0.02);
+            track.push({ phase: an.combatPhase(), p: worldOf(tip, rig) });
+        }
+        const strike = track.filter((s) => s.phase === 'strike');
+        const fwd = Math.max(...track.map((s) => s.p.z));
+        const lateral = Math.max(...strike.map((s) => s.p.x))
+            - Math.min(...strike.map((s) => s.p.x));
+
+        t.ok(`${weaponId}: the swing ends up in FRONT of the hero`,
+            fwd > (MIN_FORWARD[weaponId] ?? 0.8), `furthest forward z=${fwd.toFixed(2)}`);
+        t.ok(`${weaponId}: the strike drives the blade forward, not backward`,
+            strike[strike.length - 1].p.z > strike[0].p.z,
+            `${strike[0].p.z.toFixed(2)} -> ${strike[strike.length - 1].p.z.toFixed(2)}`);
+        t.ok(`${weaponId}: the strike is an ARC, not a vertical chop`,
+            lateral > 1.0, `lateral travel=${lateral.toFixed(2)}`);
+        rig.dispose();
     }
-    t.ok('windup raises the striking arm toward its peak as the ring peaks',
-        peakRaise < -1.2, `peak=${peakRaise.toFixed(2)}`);
-    t.ok('windup phase is live until the resolve', fan.combatPhase() === 'windup'
-        || fan.combatPhase() === 'recover');
-    fan.strike(0.12, 0.3);
-    fan.update(0.06); // mid-strike
-    const midStrike = fighter.armR.rotation.x;
-    fan.update(0.1); // strike done → recover
-    t.ok('strike sweeps the arm through the facing line',
-        midStrike > peakRaise + 0.5, `mid=${midStrike.toFixed(2)}`);
-    t.ok('strike hands off to recover', fan.combatPhase() === 'recover');
+
+    // The tip must LEAD the hand. Built blade-up (+Y) and mounted on an arm
+    // that runs −Y, every weapon pointed 180° away from the limb: at rest it
+    // stood straight up past the hero's head, and through a swing the tip
+    // trailed the fist instead of leading it.
+    for (const weaponId of ARMED_MELEE) {
+        const rig = heroRig();
+        const an = createActorAnimator(rig, { archetype: 'hero' });
+        rig.root.rotation.y = 0;
+        const tip = mountTip(rig, weaponId);
+        const grip = tip.parent;
+        an.update(0.016);
+        const tp = worldOf(tip, rig);
+        const gp = worldOf(grip, rig);
+        t.ok(`${weaponId}: at rest the tip leads the grip`,
+            tp.z > gp.z + 0.3, `tip z=${tp.z.toFixed(2)} grip z=${gp.z.toFixed(2)}`);
+        t.ok(`${weaponId}: at rest the tip is not above the hero's head`,
+            tp.y < 0.9, `tip y=${tp.y.toFixed(2)}`);
+        t.ok(`${weaponId}: at rest the tip is not through the floor`,
+            tp.y > -0.95, `tip y=${tp.y.toFixed(2)}`);
+        rig.dispose();
+    }
 
     // Ray/point profile must not play a melee sweep.
     const caster = heroRig();
-    const can = createActorAnimator(caster, { archetype: 'frost' });
+    const can = createActorAnimator(caster, { archetype: 'hero' });
+    caster.root.rotation.y = 0;
+    const castTip = mountTip(caster, 'light_caster');
     can.attack('light_caster', { windup: 0.05, strikeDur: 0.16, recover: 0.2 });
-    for (let i = 0; i < 3; i++) can.update(DT); // into the strike hold
-    t.ok('light caster holds a point pose instead of sweeping past centre',
-        caster.armR.rotation.x < -0.8, caster.armR.rotation.x.toFixed(2));
+    const castTrack = [];
+    for (let i = 0; i < 8; i++) {
+        can.update(DT);
+        if (can.combatPhase() === 'strike') castTrack.push(worldOf(castTip, caster));
+    }
+    t.ok('light caster aims down the facing line',
+        castTrack.length > 0 && castTrack.every((p) => p.z > 0.8),
+        castTrack.map((p) => p.z.toFixed(2)).join(' '));
+    t.ok('light caster holds its aim instead of sweeping an arc',
+        Math.max(...castTrack.map((p) => p.x)) - Math.min(...castTrack.map((p) => p.x)) < 0.3);
     caster.dispose();
+
+    // ── Combat phase machine ──
+    const fighter = heroRig();
+    const fan = createActorAnimator(fighter, { archetype: 'sentinel' });
+    fan.startWindup(0.45, 'anchor_link');
+    for (let i = 0; i < 9; i++) fan.update(DT);
+    t.ok('windup phase is live until the resolve', fan.combatPhase() === 'windup'
+        || fan.combatPhase() === 'recover');
+    fan.strike(0.12, 0.3);
+    fan.update(0.06);
+    fan.update(0.1); // strike done → recover
+    t.ok('strike hands off to recover', fan.combatPhase() === 'recover');
 
     // ── Death: collapse, grounded, combat cleared immediately ──
     fan.startWindup(0.6, 'anchor_link');

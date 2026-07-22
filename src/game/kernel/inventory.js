@@ -11,6 +11,9 @@ const DEFAULT_STATE = () => ({
         heavy_mallet: false,
         tectonic_wedge: false,
         vector_staff: false,
+        // Guard and parry are gated on this. Found on the predecessor's body
+        // in Beat 01, after two rooms that have to be dodged.
+        bulwark_shield: false,
     },
     memoryKeys: {
         spindle: false,

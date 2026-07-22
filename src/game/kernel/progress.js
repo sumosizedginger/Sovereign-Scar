@@ -12,7 +12,7 @@ function createRunId() {
 const DEFAULT_SOVEREIGN = (mode = 'medium') => {
     const runMode = normalizeRunMode(mode);
     return {
-    version: 3,
+    version: 4,
     // C1: a fresh game begins on the overworld, LttP-style
     currentBeat: 'overworld',
     unlockedBeats: ['overworld', 'beat-01-crypt', 'sandbox-combat'],
@@ -55,11 +55,34 @@ function migrateToV3(s) {
     };
 }
 
+/**
+ * v4 gated guard/parry behind the Bulwark Shield, which is found partway
+ * through Beat 01. A save that is already past Beat 01 has walked through the
+ * room the shield now sits in without ever being offered it, so migrating it
+ * unshielded would silently delete a verb the player already had. Grant it.
+ *
+ * A save still inside Beat 01 is left alone — the pickup is on their route.
+ */
+function migrateToV4(s) {
+    const pastCrypt = (s.bossesDefeated || []).length > 0
+        || (s.unlockedBeats || []).some((b) => b !== 'overworld'
+            && b !== 'beat-01-crypt' && b !== 'sandbox-combat');
+    if (!pastCrypt) return { ...s, version: 4 };
+    const inv = s.inventory ? { ...s.inventory } : {};
+    inv.items = { ...(inv.items || {}), bulwark_shield: true };
+    inv.flags = { ...(inv.flags || {}), bulwark_shield: true };
+    return { ...s, version: 4, inventory: inv };
+}
+
 export function loadSovereignProgress() {
     const p = getProgress() || {};
     let s = p.sovereignProgress || {};
     if (Object.keys(s).length && (s.version || 1) < 3) {
         s = migrateToV3(s);
+        setProgress({ sovereignProgress: s });
+    }
+    if (Object.keys(s).length && (s.version || 1) < 4) {
+        s = migrateToV4(s);
         setProgress({ sovereignProgress: s });
     }
     if (Object.keys(s).length && !s.runId) {

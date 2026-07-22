@@ -1,6 +1,7 @@
 // DOM HUD — HP, weapon, mood, beat, boss bar, story hook.
 
 import { StoryPanel } from './story.js';
+import { controlSheet } from '../input.js';
 
 /**
  * Z3: poise readout. The guard is only a real decision if its cost is visible —
@@ -116,10 +117,10 @@ export class HUD {
             whiteSpace: 'pre-wrap',
             pointerEvents: 'none',
         });
-        this.helpEl.textContent =
-            'WASD move + face · Space attack · Shift dash\n' +
-            'Q/R weapon · E interact · G grapple · V vial · C dust · Tab map\n' +
-            'N mute · P pause · Enter advance story';
+        // Built from the binding table, never typed out here — the two
+        // hardcoded copies this replaced had already drifted apart from each
+        // other and from the actual handler.
+        this.helpEl.textContent = controlSheet();
         document.body.appendChild(this.helpEl);
 
         // Boss intro name card (A6)
@@ -241,11 +242,7 @@ export class HUD {
                 'Select map · D-up mood · Start pause';
         } else if (!state.pad && this._padLegend) {
             this._padLegend = false;
-            this.helpEl.textContent =
-                'WASD move + face · Space attack · Shift dash\n' +
-                'RMB/L guard (tap = parry) · T lock-on · Y switch target\n' +
-                'Q/R weapon · E interact · G grapple · V vial · C dust · Tab map\n' +
-                'N mute · P pause · Enter advance story';
+            this.helpEl.textContent = controlSheet();
         }
         const hp = state.hp ?? 0;
         const max = state.maxHp ?? 6;

@@ -10,7 +10,7 @@
 
 import {
     makePose, evalRest, evalLocomotion, evalCombat, evalDash, evalGrapple,
-    evalHurt, evalDead, weaponProfile,
+    evalGuard, evalHurt, evalDead, weaponProfile,
 } from './pose-library.js';
 import { archetypeFor } from './archetypes.js';
 
@@ -30,6 +30,8 @@ export function createActorAnimator(rig, opts = {}) {
     let dashT = 0;
     let dashDur = 0.42;
     let grappleActive = false;
+    let guarding = false;
+    let guardW = 0;           // guard layer weight (smoothed, so it raises)
     let hurtT = 0;            // remaining flinch time
     let dead = false;
     let deadW = 0;
@@ -74,6 +76,9 @@ export function createActorAnimator(rig, opts = {}) {
         if (moveW > 0.01 && !dashing) phi += TAU * freq * dt;
 
         if (dashing) dashT += dt;
+        // ~0.12s to raise or drop. Instant would read as a pop, and the parry
+        // window is 0.18s — the shield has to be visibly moving inside it.
+        guardW += ((guarding && !dead ? 1 : 0) - guardW) * Math.min(1, dt * 8);
         if (hurtT > 0) hurtT -= dt;
         deadW += ((dead ? 1 : 0) - deadW) * Math.min(1, dt * 6);
 
@@ -103,6 +108,9 @@ export function createActorAnimator(rig, opts = {}) {
         // ── compose layers into the pose object (priority via weights) ──
         evalRest(pose, arch, time);
         if (moveW > 0.01 && !dashing) evalLocomotion(pose, arch, phi, moveW);
+        // Guard sits above locomotion (you can walk behind the shield) and
+        // below combat (a swing overrides it).
+        if (guardW > 0.01 && !dead) evalGuard(pose, guardW);
         if (grappleActive && !dead) evalGrapple(pose, 1);
         if (dashing && !dead) evalDash(pose, Math.min(1, dashT / dashDur), 0.38, 1);
         if (combat.phase && !dead) {
@@ -141,6 +149,8 @@ export function createActorAnimator(rig, opts = {}) {
             if (duration) dashDur = duration;
         },
         setGrapple(active) { grappleActive = !!active; },
+        setGuarding(active) { guarding = !!active; },
+        guardWeight: () => guardW,
         hit() { hurtT = 0.2; },
         setDead(v) {
             dead = !!v;

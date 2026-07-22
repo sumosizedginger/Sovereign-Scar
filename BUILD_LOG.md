@@ -482,6 +482,51 @@ New specs `music` (309 assertions) and `game-feel-visuals`; probes
 `synth.channelGain(channel)`, so game-side persistent buses honour the same
 volume settings.
 
+### Session 12 — the hero was swinging backwards
+
+**Reported from a screenshot:** the sword did not arc out in front, did not
+appear to move, and pointed backwards. Three separate defects stacked on top of
+each other, which is why it looked so comprehensively broken.
+
+Rig-local **+Z** is forward (`player.js` sets `rig.rotation.y = atan2(fv.x,
+fv.z)`), the arm hangs along −Y, and THREE resolves an `'XYZ'` euler as `Rx·Rz·v`
+— so the arm points forward only when `rx` is negative. **The melee profiles
+were signed the other way**: every weapon wound up in front of the hero's face
+and struck behind their back. The blade was independently 180° out, because
+models are built blade-up (`+Y`) and were mounted raw on an arm running `−Y`;
+at rest the blade stood straight up past the head, which is the white glow above
+the shoulder in the owner's screenshot. And there was no arc at all — `evalCombat`
+only ever wrote `armRx`, a vertical chop, while `ArcSmear` drew a fan and
+`combatSweep` resolved a cone.
+
+Measured with a new probe (`tests/qa/swing-readout.mjs`): the blade tip used to
+reach **0.27 units** in front of a hero whose weapon reaches 1.8, and only during
+*recover*, after the hitbox had resolved. It now reaches **1.32**, with 2.3 units
+of lateral travel. Verified again end-to-end in the running game.
+
+**Why a green suite missed it:** the spec asserted the *sign of a pivot angle*,
+which a backwards swing satisfies exactly as well as a forwards one. Replaced
+with world-space assertions — yaw the actor, mount a marker at the measured tip,
+require it to end up in front and sweep laterally. Restoring the old orientation
+fails eight of them.
+
+**The shield became a real item.** Guard and parry were innate and completely
+invisible — no mesh, no pose, the off hand empty. The Bulwark Shield is now
+found on the predecessor's body partway through Beat 01, whose declared theme is
+`telegraph` / "Read the Wind-Up": the two rooms before it hold one enemy each and
+must be dodged, the shield arrives as a second answer, and the antechamber
+combines both. `evalGuard` gives it a pose; save v4 grants it to anyone already
+past Beat 01 so nobody loses a verb they had.
+
+**Controls had three disagreeing lists** — and the on-screen sheet, which never
+mentioned guard or lock-on, kept two hardcoded copies of itself that had drifted
+apart. `CONTROLS` in `input.js` is now the source of truth for both the HUD and
+the docs, and `tests/game/controls.spec.mjs` reads the input handler's own source
+to fail on drift in either direction.
+
+`docs/VISUAL_PLAN.md` was rewritten from an audit into six executable tickets,
+and `HANDOFF.md` added. Suite 1927 unit / **2575 total**.
+
 ### Session 11 — the drone under the music, and a look at the renderer
 
 **The hum the score was written to remove was still playing.** The owner

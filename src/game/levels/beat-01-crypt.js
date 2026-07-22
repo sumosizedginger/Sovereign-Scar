@@ -120,6 +120,36 @@ export const BEAT01_DEF = {
             ],
             onBake(level, origin, ctx) {
                 addAltar(level, ctx, { x: origin.x + 6, z: origin.z + 6 });
+                // THE BULWARK SHIELD. Guard and parry are gated on this, and
+                // this is where the gate opens.
+                //
+                // Beat 01's declared theme is `telegraph` — "Read the Wind-Up".
+                // A player who starts with a shield answers every telegraph by
+                // holding a button, and never learns to read one. So the two
+                // rooms before this teach the dodge with one enemy each, the
+                // shield arrives here as a SECOND answer to a question the
+                // player can already answer, and the antechamber's two-enemy
+                // fight is where both get combined. Introduce → develop →
+                // combine → test, with the item as the hinge.
+                //
+                // It comes off the predecessor's body, so the mechanical gate
+                // and the story beat are the same moment.
+                level.addPickup({ x: origin.x + 1, y: 1.2, z: origin.z - 5 }, {
+                    color: 0x8a94a4,
+                    label: 'Bulwark Shield',
+                    reward: { type: 'item' },
+                    onPickup(game) {
+                        const inv = game.player?.inventory;
+                        if (!inv || inv.hasItem('bulwark_shield')) return;
+                        inv.grantItem('bulwark_shield');
+                        game.hud?.toast?.('Bulwark Shield recovered — hold guard to block, tap to parry', 3600);
+                        sfx.pickup();
+                        game.hud?.story?.queue?.([
+                            { speaker: 'PREDECESSOR', text: 'Take the plate. It did not save me, but it bought me the seconds I used badly.' },
+                            { speaker: 'PREDECESSOR', text: 'Hold it and a blow only bruises. Raise it as the blow lands and you take nothing at all.' },
+                        ]);
+                    },
+                });
                 // Z7: the campaign's first Scar Suture, tucked behind the dead
                 // console in the very first dungeon. A player who never learns
                 // in Beat 01 that looking around pays will not start looking in

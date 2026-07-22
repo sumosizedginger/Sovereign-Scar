@@ -12,7 +12,11 @@ export const ARCHETYPES = {
         bobAmp: 0.045,
         strideLean: 0.10,
         sway: 0,
-        rest: {},
+        // The hero is the only actor who holds something, so the weapon arm
+        // carries a slight ready angle. With the arm hanging dead straight the
+        // blade's own length put its point below the hero's feet while they
+        // stood still; this lifts the tip clear and reads as "weapon up".
+        rest: { armRx: -0.18 },
     },
     sentinel: {
         // Tall, deliberate guard: slow gait, left arm forward in a shield-side

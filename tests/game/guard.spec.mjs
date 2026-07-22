@@ -168,4 +168,35 @@ export function run(t) {
         t.ok('a pool with no damageFilter behaves exactly as before',
             health.hp === 7 && health.iFrames === 0.5, `hp=${health.hp}`);
     }
+
+    // --- the shield gate --------------------------------------------------
+    //
+    // Guard and parry are not innate. The hero finds the Bulwark Shield on the
+    // predecessor's body partway through Beat 01, whose declared theme is
+    // reading a wind-up — a player handed a shield on frame one answers every
+    // telegraph by holding a button and never learns to read one.
+    {
+        const { health, guard } = rig();
+        guard.hasShield = false;
+        guard.update(0.016, true);
+        t.ok('guard will not raise without a shield', guard.raised === false);
+        t.ok('...and the parry window never opens', guard.parryReady === false);
+
+        health.damage(2, 0.5, 'hostile', { from: { x: 0, z: -2 } });
+        t.ok('a frontal blow lands in full while unarmed',
+            health.hp === 8, `hp=${health.hp}`);
+        t.ok('poise is untouched, so the shield works the moment it is found',
+            guard.poise === POISE_MAX, `poise=${guard.poise}`);
+    }
+    {
+        const { health, guard } = rig();
+        guard.hasShield = false;
+        guard.update(0.016, true);
+        guard.hasShield = true;
+        guard.update(0.016, true);
+        t.ok('the same held button raises the guard once the shield is owned',
+            guard.raised === true);
+        health.damage(2, 0.5, 'hostile', { from: { x: 0, z: -2 } });
+        t.ok('...and it chips from that frame on', health.hp > 8, `hp=${health.hp}`);
+    }
 }

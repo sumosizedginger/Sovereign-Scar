@@ -149,8 +149,12 @@ export function run(t) {
         const { picked } = harvest(def);
         for (const p of picked) {
             if (!p.reward) continue;
+            // `item` is a progression grant rather than a collectible — the
+            // Bulwark Shield in Beat 01 is the first of them. It has had a
+            // silhouette in `pickup-shapes.js` all along; until now nothing
+            // had been placed that used it.
             t.ok(`${def.id} "${p.label}" declares a known reward type`,
-                ['suture', 'vial', 'lore', 'currency'].includes(p.reward.type),
+                ['suture', 'vial', 'lore', 'currency', 'item'].includes(p.reward.type),
                 p.reward.type);
         }
     }

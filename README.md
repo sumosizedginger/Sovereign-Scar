@@ -13,7 +13,7 @@ Built on **[My-Engine](https://github.com/sumosizedginger/My-Engine) 0.2.0** (pi
 
 ```bash
 npm run serve          # http://127.0.0.1:8799/
-npm test               # unit + browser E2E (2478 assertions)
+npm test               # unit + browser E2E (2575 assertions)
 npm run test:unit      # unit only
 ```
 
@@ -33,8 +33,10 @@ lies north.
   multi-Y towers, grapple chasms, phantom walls, meltable ice, sludge pools,
   magma vents, flicker gauntlets)
 - **A full combat verb set** — telegraphed enemy attacks answered by a **guard
-  and a 0.18 s parry**, plus **lock-on** so you can circle what you are
-  fighting instead of only backing away from it
+  and a 0.18 s parry** (once you find the Bulwark Shield partway through the
+  first dungeon — before it, telegraphs have to be read and dodged), plus
+  **lock-on** so you can circle what you are fighting instead of only backing
+  away from it
 - **Seven enemy kinds that ask different questions** — the bulwark's front
   plate must be flanked or parried, the mote must be answered at range, the
   lancer's lunge must be dodged sideways, the brood splits when it dies. No two
@@ -72,6 +74,10 @@ Design sources (parent folder):
 - `../Sovereign-Scar-Narrative-Bible.md`
 - `../Sovereign-Scar-Completion-Plan.md`
 - `../Sovereign-Scar-Builder-Guide.md`
+
+**Picking this up cold?** Start with [HANDOFF.md](HANDOFF.md) — current state,
+what to do next, and the traps that have each already produced a green suite
+that was lying.
 
 Implementation log: [BUILD_LOG.md](BUILD_LOG.md) · Controls: [docs/CONTROLS.md](docs/CONTROLS.md) · Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Design audit: [ZeldaLevel.md](ZeldaLevel.md) · Rendering roadmap: [docs/VISUAL_PLAN.md](docs/VISUAL_PLAN.md)
 

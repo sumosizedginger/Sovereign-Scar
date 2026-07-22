@@ -91,6 +91,40 @@ const BUILDERS = {
     // for "you have not found a weapon yet", and Beat 01 depends on it.
 };
 
+/**
+ * The Bulwark Shield — prised off the predecessor's body in Beat 01.
+ *
+ * Guard and parry were innate and invisible: you held a button and nothing on
+ * screen changed except three pips in the corner. A defensive verb the player
+ * cannot see themselves performing is one they cannot learn the timing of, so
+ * the shield exists to be *looked at* — wide enough to read as cover from the
+ * overhead camera, and battered, because its last owner did not survive it.
+ *
+ * Built face-on in the XY plane so the guard pose can simply present it forward.
+ */
+export function buildShieldModel() {
+    const g = boxes([
+        { w: 0.62, h: 0.74, d: 0.07, color: 0x6d7480, metal: 0.45, rough: 0.55 }, // face
+        { y: 0.30, w: 0.52, h: 0.10, d: 0.09, color: 0x8a94a4, metal: 0.55 },     // top band
+        { y: -0.30, w: 0.52, h: 0.10, d: 0.09, color: 0x8a94a4, metal: 0.55 },    // bottom band
+        { z: 0.06, w: 0.20, h: 0.22, d: 0.06, color: 0xd4a84b, metal: 0.7,        // boss sigil
+            rough: 0.35 },
+        { x: -0.26, w: 0.08, h: 0.62, d: 0.08, color: 0x4a5058, rough: 0.8 },     // edge rail
+        { x: 0.26, w: 0.08, h: 0.62, d: 0.08, color: 0x4a5058, rough: 0.8 },
+        { z: -0.09, w: 0.10, h: 0.30, d: 0.06, color: 0x3a2f1c, rough: 0.95 },    // grip strap
+    ]);
+    g.name = 'shield:bulwark_shield';
+    return g;
+}
+
+/**
+ * Where the shield sits on the off hand. It hangs off `handL`, so the guard
+ * pose raises it by moving the arm rather than by animating the prop — the same
+ * reason weapons hang off `hand`.
+ */
+export const SHIELD_OFFSET = { x: 0.0, y: -0.16, z: 0.10 };
+export const SHIELD_TILT = { x: 1.35, z: -0.12 };
+
 /** Ids that draw something. */
 export const MODELLED_WEAPONS = Object.keys(BUILDERS);
 
@@ -104,12 +138,44 @@ export function buildWeaponModel(id) {
 }
 
 /**
- * Attach point on the actor rig, in the arm pivot's local space.
+ * Distance from the grip origin to the business end, along the blade axis.
  *
- * The rig's `armR` pivot sits at the shoulder, and the animator rotates it, so
- * a weapon parented there swings with the arm for free — no separate animation
- * and no chance of the two drifting apart. The offset drops it to roughly hand
- * height and tilts it forward so it does not read as growing out of the elbow.
+ * Measured off the built geometry rather than written down, because a hand-kept
+ * number is one edit away from lying — and the swing specs use this to find the
+ * tip in world space. If it drifts, they stop testing the tip.
  */
-export const HAND_OFFSET = { x: 0.06, y: -0.34, z: 0.12 };
-export const HAND_TILT = { x: -0.35, z: 0.18 };
+export function weaponTipY(id) {
+    const m = buildWeaponModel(id);
+    if (!m) return 0;
+    const box = new THREE.Box3().setFromObject(m);
+    const top = box.max.y;
+    m.traverse((o) => {
+        o.geometry?.dispose?.();
+        o.material?.dispose?.();
+    });
+    return top;
+}
+
+/**
+ * Attach point on the actor rig, in the `hand` pivot's local space.
+ *
+ * The weapon parents to a rig pivot the animator already rotates, so it
+ * inherits every swing for free and cannot drift out of sync with the arm.
+ * It hangs off `hand` (the far end of the arm) rather than `armR` (the
+ * shoulder) — mounted at the shoulder it swung on a radius twice the length of
+ * the arm and read as growing out of the collarbone.
+ *
+ * THE TILT IS NOT COSMETIC. Every model here is built blade-up, +Y from the
+ * grip, while the arm runs −Y from the shoulder. Mounted raw, the blade points
+ * 180° away from the limb in every pose: at rest it stood straight up past the
+ * hero's head, and through a swing the tip TRAILED the hand instead of leading
+ * it. `HAND_TILT.x` past π/2 lays the blade back along the arm's line and then
+ * cants it forward, so the tip is the leading edge of the arc — which is what
+ * makes a swing legible, and what makes the visible blade agree with the
+ * hitbox `combatSweep` actually resolves.
+ */
+// Just past perpendicular to the arm: far enough that the tip leads the hand
+// through a sweep, shallow enough that a hero standing still is not holding
+// the point through the floor. `tests/qa/swing-readout.mjs` prints both.
+export const HAND_OFFSET = { x: 0.0, y: -0.04, z: 0.06 };
+export const HAND_TILT = { x: 1.85, z: 0.10 };

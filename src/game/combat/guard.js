@@ -53,6 +53,17 @@ export function inGuardArc(pos, facingVec, from) {
 export class GuardController {
     constructor() {
         this.active = false;      // holding guard this frame
+        /**
+         * Whether the player owns something to guard WITH. The hero starts the
+         * campaign bare-handed and finds the Bulwark Shield on the predecessor's
+         * body in Beat 01, so the first two rooms have to be read and dodged —
+         * which is the dungeon's stated theme ("Read the Wind-Up").
+         *
+         * Defaults true so this class stays a pure mechanism: it knows about
+         * poise and arcs and windows, not about inventories. `Player.update`
+         * sets it from the inventory each frame.
+         */
+        this.hasShield = true;
         this.poise = POISE_MAX;
         this.parryT = 0;          // remaining parry window
         this.breakT = 0;          // remaining guard-break stun
@@ -69,9 +80,9 @@ export class GuardController {
         return this.breakT > 0;
     }
 
-    /** True while the guard is genuinely up (held, and not stunned). */
+    /** True while the guard is genuinely up (held, armed, and not stunned). */
     get raised() {
-        return this.active && this.breakT <= 0;
+        return this.active && this.hasShield && this.breakT <= 0;
     }
 
     /** True during the window where a block upgrades to a parry. */
@@ -89,6 +100,16 @@ export class GuardController {
             this._wasHeld = held;
             // Poise refills during the stun — the punishment is the stun
             // itself, not a death spiral of never getting the guard back.
+            this.poise = Math.min(POISE_MAX, this.poise + POISE_REGEN * dt);
+            return;
+        }
+
+        // Nothing to raise. Fall through to the resting regen so the poise pool
+        // is full the moment the shield is found.
+        if (!this.hasShield) {
+            this.active = false;
+            this._wasHeld = held;
+            this.parryT = 0;
             this.poise = Math.min(POISE_MAX, this.poise + POISE_REGEN * dt);
             return;
         }

@@ -53,6 +53,8 @@ import { run as runPedagogy } from './game/dungeon-pedagogy.spec.mjs';
 import { run as runCameraContract } from './game/camera-contract.spec.mjs';
 import { run as runTraversal } from './game/traversal-legibility.spec.mjs';
 import { run as runSecretTaxonomy } from './game/secret-taxonomy.spec.mjs';
+import { run as runShieldGate } from './game/shield-gate.spec.mjs';
+import { run as runControls } from './game/controls.spec.mjs';
 import { run as runCoach } from './game/coach.spec.mjs';
 import { run as runThreatCurve } from './game/threat-curve.spec.mjs';
 import { run as runMusic } from './game/music.spec.mjs';
@@ -124,6 +126,8 @@ async function main() {
     runNamed('camera-contract', runCameraContract);
     runNamed('traversal-legibility', runTraversal);
     runNamed('secret-taxonomy', runSecretTaxonomy);
+    runNamed('shield-gate', runShieldGate);
+    runNamed('controls', runControls);
     runNamed('coach', runCoach);
     runNamed('threat-curve', runThreatCurve);
     runNamed('music', runMusic);

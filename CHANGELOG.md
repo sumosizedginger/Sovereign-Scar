@@ -5,6 +5,115 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### The shield is a thing you find
+
+Asked by the owner: *"is there a point at which you collect a shield you can
+use?"* There was not. Guard and parry — a 0.18 s window, a poise economy, a
+120° arc, the deepest mechanic in the combat system — were innate from the first
+frame of a new save, and had **no visual at all**: no mesh, no pose, nothing on
+screen but three pips in the corner. The hero's off hand was empty while
+blocking.
+
+- **The Bulwark Shield is now an item**, found on the predecessor's body in
+  Beat 01. `GuardController.raised` is false without it.
+- **It is placed to teach.** Beat 01's declared theme is already `telegraph` —
+  *"Read the Wind-Up"*. A player handed a shield on frame one answers every
+  telegraph by holding a button and never learns to read one. So the route is
+  now: `tomb` (empty) → `corridor` (one sentinel, dodge it) → `predecessor`
+  (one charger, **and the shield**) → `antechamber` (two enemies, both answers)
+  → `warden`. Introduce → develop → combine → test, with the item as the hinge.
+  `tests/game/shield-gate.spec.mjs` fails if anyone moves the shield earlier or
+  stacks a second enemy into the dodge-only stretch — the gate is only
+  defensible while the rooms in front of it are honestly clearable without it.
+  It comes off the predecessor's body, so the gate and the story beat are the
+  same moment.
+- **Guard has a pose now.** `evalGuard` puts the shield arm up and across, drops
+  the weapon hand, blades the torso and crouches slightly, weighted in over
+  ~0.12 s — the parry window is 0.18 s, so the shield has to be visibly moving
+  inside it. The shield model hangs off the new `handL` pivot, so it inherits
+  the raise and can never be up while the arm is down.
+- **Save v4 migrates.** A save already past Beat 01 has walked through the room
+  the shield now sits in without being offered it, so migrating it unshielded
+  would silently delete a verb the player had been using for six dungeons — it
+  is granted. A save still *inside* Beat 01 is left alone; the pickup is on its
+  route.
+
+### Three lists of controls, all of them wrong
+
+The on-screen cheat sheet never mentioned **guard, lock-on, switch-target,
+mirror travel or the beat cycle**, and `docs/CONTROLS.md` never mentioned the
+**Memory Vial or the Entropy Dust**. The HUD also kept *two* hardcoded copies of
+its own sheet — the one shown at boot and the one restored when a gamepad
+disconnects — which had already drifted apart from each other.
+
+The shield work makes this worse than an omission: the game now gates a verb
+behind an item, tells you so in a toast, and then shows you a control list with
+no guard key on it.
+
+- **`CONTROLS` in `src/game/input.js` is the single source of truth.** The HUD
+  sheet is generated from it; `docs/CONTROLS.md` is written from it.
+- **`tests/game/controls.spec.mjs` reads the input handler's own source**,
+  extracts every `e.code` the game actually responds to, and fails if any is
+  missing from the table or the docs — and fails the other way too, if the
+  table advertises a key the handler ignores. Adding a binding without
+  documenting it is now a test failure rather than something the player finds
+  out years later.
+
+### The hero was swinging backwards
+
+Reported by the owner from a screenshot: *"when you swing this weapon and your
+sword it does not arc out and animate in front of you, the sword does not move,
+and this actually points backwards."* All three observations were correct, and
+they were three separate defects stacked on top of each other.
+
+**Which way is forward.** `player.js` sets `rig.rotation.y = atan2(fv.x, fv.z)`,
+which lands rig-local **+Z** on the facing vector. The arm hangs along −Y from
+its shoulder pivot and THREE resolves an `'XYZ'` euler as `Rx·Rz·v`, so the arm
+direction is `(sin rz, −cos rz·cos rx, −cos rz·sin rx)` — it points forward only
+when `rx` is **negative**.
+
+- **The melee profiles were signed the wrong way.** `anchor_link` wound up at
+  `rx = −1.9` (up and *in front of the hero's face*) and struck at `rx = +0.9`
+  (down and *behind their back*). Every melee weapon, every swing, since the
+  pose library was written. `tests/qa/swing-readout.mjs` — added here — measured
+  the blade tip never getting further than **0.27 units in front** of a hero
+  whose weapon reaches 1.8, and reaching even that only during *recover*, after
+  the hitbox had already resolved. It is now **1.32**.
+- **The blade pointed 180° away from the arm.** Weapon models are built
+  blade-up (`+Y` from the grip); they were mounted raw on an arm running `−Y`.
+  At rest the blade stood straight up past the hero's head — that is the white
+  glow above the shoulder in the owner's screenshot, the Light Caster's emissive
+  tip aimed at the ceiling. Through a swing the tip *trailed* the fist instead
+  of leading it. Fixed with a grip orientation (`HAND_TILT`) that lays the blade
+  along the limb and cants it forward.
+- **Weapons now hang off a `hand` pivot**, added to `actor-rig.js` at the
+  measured far end of each arm, instead of off the shoulder — mounted at the
+  shoulder a weapon swings on a radius twice the length of the arm and reads as
+  growing out of the collarbone. `HeldWeapon` falls back to `armR` if a rig has
+  no hand, so nothing that predates the pivot throws.
+- **There was no arc.** `evalCombat` only ever wrote `armRx` — a vertical chop.
+  A slash is a *lateral* sweep, and only `armRz` carries lateral motion. Each
+  phase is now a full `(rx, rz)` pose: the strike travels ~2.3 units across the
+  hero's front, so the pose finally describes the same arc the smear draws and
+  `combatSweep` resolves. The strike also eases *out* rather than in, so the
+  blade is fastest on the frames the hitbox actually lands.
+- **The hero rest pose gained a slight ready angle** (`armRx: −0.18`). With the
+  arm hanging dead straight, the blade's own length put its point below the
+  hero's feet while they stood still.
+- **The Light Caster was already correct** and is unchanged in character: it
+  holds a point pose down the facing line and does not sweep.
+
+**Why a green suite missed it.** `tests/game/actor-anim.spec.mjs` asserted the
+**sign of a pivot angle** (`armR.rotation.x < −1.2`). A hero striking backwards
+satisfies that exactly as well as one striking forwards, because a radian has no
+opinion about which way the actor is facing. The replacement assertions are all
+**world-space**: mount a marker at the measured blade tip, yaw the hero to face
+world +Z, and require that the tip end up in front, travel forward across the
+strike, and sweep laterally. Restoring the old orientation fails eight of them,
+including *"furthest forward z=−0.13"*. This is the same failure mode as the
+truncated audio render last session — a spec that passes for the wrong reason —
+and it is now written down in `HANDOFF.md` as a standing trap.
+
 ### The drone under the music
 
 Reported by the owner after the soundtrack landed: *"your sound is still a drone

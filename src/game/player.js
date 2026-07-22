@@ -8,6 +8,7 @@ import { juice } from './fx/juice.js';
 import { vsfx } from './fx/vsfx.js';
 import { gsfx } from './audio/sfx-bank.js';
 import { HeldWeapon } from './fx/held-weapon.js';
+import { HeldShield } from './fx/held-shield.js';
 import { GrappleRope } from './fx/grapple-rope.js';
 import { HERO_PALETTE } from './assets/palettes.js';
 import { VoxelPhysicsBody } from './physics/voxel-physics-body.js';
@@ -19,6 +20,7 @@ import { combatSweep, applyHit } from './combat/combat-sweeper.js';
 import { GrappleController } from './combat/grapple.js';
 import { GuardController, GUARD_SPEED_MULT } from './combat/guard.js';
 import { LockOnController } from './combat/lock-on.js';
+import { coach } from './ui/coach.js';
 
 export class Player {
     constructor(scene, collisionWorld, getVoxelAt) {
@@ -71,6 +73,7 @@ export class Player {
         // weapon reach and arc differ enough that you have to be able to see
         // what you are holding.
         this.heldWeapon = new HeldWeapon(this.rig);
+        this.heldShield = new HeldShield(this.rig);
         this.grappleRope = new GrappleRope(scene);
         this.arcSmear = new ArcSmear(scene); // C8: true 8-way swing arcs
 
@@ -266,6 +269,11 @@ export class Player {
         // defensive options stay mutually exclusive so neither is strictly
         // dominant, and i-frames cannot be stacked on top of chip reduction.
         const wantGuard = !!input.guardHeld?.() && this.dashTimer <= 0 && !this.health.dead;
+        // You cannot raise what you do not have. The Bulwark Shield is found on
+        // the predecessor's body in Beat 01, whose whole theme is reading a
+        // wind-up — so the rooms before it teach the dodge, and the shield
+        // arrives as a SECOND answer to a question you already know.
+        this.guard.hasShield = this.inventory.hasItem('bulwark_shield');
         const wasRaised = this.guard.raised;
         const wasBroken = this.guard.broken;
         this.guard.update(dt, wantGuard);
@@ -273,10 +281,15 @@ export class Player {
             if (this.guard.raised) gsfx.guardUp(); else gsfx.guardDown();
         }
         if (this.guard.broken && !wasBroken) gsfx.guardBreak();
+        if (wantGuard && !this.guard.hasShield) {
+            coach('guard-unarmed',
+                'Nothing to block with yet — read the ring and walk out of it.');
+        }
 
-        // Keep the hand matched to the inventory. Cheap — a no-op unless the
-        // equipped id actually changed.
+        // Keep the hands matched to the inventory. Cheap — both are a no-op
+        // unless what the player owns actually changed.
         this.heldWeapon.set(this.inventory.activeWeapon);
+        this.heldShield.set(this.guard.hasShield);
 
         // Grapple override
         const g = this.grapple.update(dt, this.collisionWorld, 0.4);
@@ -374,6 +387,7 @@ export class Player {
             });
             this.animator.setDashing(this.dashTimer > 0);
             this.animator.setGrapple(!!g.active);
+            this.animator.setGuarding(this.guard.raised);
             this.animator.setDead(this.health.dead);
             this.animator.update(dt);
         }
@@ -383,6 +397,7 @@ export class Player {
     dispose() {
         this.arcSmear.dispose();
         this.heldWeapon?.dispose();
+        this.heldShield?.dispose();
         this.grappleRope?.dispose();
         if (this.rig.parent) this.rig.parent.remove(this.rig);
     }

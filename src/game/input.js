@@ -1,5 +1,60 @@
 // Keyboard + mouse aim input for Sovereign Scar.
 
+/**
+ * EVERY BINDING THE GAME HAS, in one place.
+ *
+ * There used to be three lists: the handler below, the on-screen cheat sheet in
+ * `ui/hud.js`, and `docs/CONTROLS.md` — and all three disagreed. The HUD never
+ * mentioned guard, lock-on, cycle-target, mirror travel or the beat cycle; the
+ * docs never mentioned the vial or the dust; and the HUD kept two hardcoded
+ * copies of itself that had already drifted apart from each other. A player
+ * cannot use a verb they are never told about, so a defensive move nobody
+ * mentions may as well not be implemented.
+ *
+ * `codes` are the real KeyboardEvent.code values, so `tests/game/controls.spec.mjs`
+ * can read this file, find every code the handler actually looks at, and fail
+ * if any of them is missing here or absent from the docs. Adding a binding
+ * without documenting it is now a test failure rather than a discovery the
+ * player makes years later.
+ */
+export const CONTROLS = [
+    { codes: ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'],
+        label: 'WASD / Arrows', action: 'Move + face', group: 'move' },
+    { codes: ['Space', 'KeyJ'], label: 'Space / J', action: 'Attack', group: 'move' },
+    { codes: ['ShiftLeft', 'ShiftRight', 'KeyK'], label: 'Shift / K', action: 'Dash', group: 'move' },
+    { codes: ['KeyL'], mouse: 'right', label: 'RMB / L', action: 'Guard (tap = parry)', group: 'fight' },
+    { codes: ['KeyT'], label: 'T', action: 'Lock on', group: 'fight' },
+    { codes: ['KeyY'], label: 'Y', action: 'Switch target', group: 'fight' },
+    { codes: ['KeyQ', 'KeyR'], label: 'Q/R', action: 'Cycle weapon', group: 'fight' },
+    { codes: ['KeyE', 'KeyF'], label: 'E / F', action: 'Interact', group: 'use' },
+    { codes: ['KeyG'], label: 'G', action: 'Grapple', group: 'use' },
+    { codes: ['KeyV'], label: 'V', action: 'Memory Vial', group: 'use' },
+    { codes: ['KeyC'], label: 'C', action: 'Entropy Dust', group: 'use' },
+    { codes: ['Tab'], label: 'Tab', action: 'Map', group: 'use' },
+    { codes: ['KeyM'], label: 'M', action: 'Mirror travel', group: 'use' },
+    { codes: ['BracketLeft', 'BracketRight', 'PageUp', 'PageDown'],
+        label: '[ / ]', action: 'Previous / next beat', group: 'meta' },
+    { codes: ['Enter', 'NumpadEnter'], label: 'Enter', action: 'Advance story', group: 'meta' },
+    { codes: ['KeyN'], label: 'N', action: 'Mute', group: 'meta' },
+    { codes: ['KeyP', 'Escape'], label: 'P / Esc', action: 'Pause', group: 'meta' },
+    // Dev-only: documented, but kept off the player's cheat sheet.
+    { codes: ['F1'], label: 'F1', action: 'God mode', dev: true },
+    { codes: ['F2'], label: 'F2', action: 'Defeat current boss', dev: true },
+    { codes: ['F3'], label: 'F3', action: "Force boss's next phase", dev: true },
+    { codes: ['F10', 'Backquote'], label: '` / F10', action: 'Dev panel', dev: true },
+    { codes: ['KeyH'], label: 'H', action: 'Hide HUD chrome', dev: true },
+];
+
+/** The player-facing cheat sheet, grouped, built from the table above. */
+export function controlSheet() {
+    const line = (g) => CONTROLS
+        .filter((c) => !c.dev && c.group === g)
+        .map((c) => `${c.label} ${c.action.toLowerCase()}`)
+        .join(' · ');
+    return [line('move'), line('fight'), line('use'), line('meta')]
+        .filter(Boolean).join('\n');
+}
+
 export class Input {
     constructor(dom = window) {
         this.keys = new Set();

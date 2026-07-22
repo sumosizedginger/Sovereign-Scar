@@ -84,11 +84,24 @@ export function createActorRig(opts = {}) {
     const neckY = meshBottomY(headMesh);
     const shoulderY = Math.max(meshTopY(armRMesh), meshTopY(armLMesh));
 
+    // Hands sit at the FAR end of each arm. Measured, like every other socket
+    // here — a weapon hung off the shoulder pivot instead swings on a radius
+    // twice as long as the arm and reads as growing out of the collarbone.
+    const handY = Math.min(meshBottomY(armRMesh), meshBottomY(armLMesh)) - shoulderY;
+
     const legR = pivotize(legRMesh, legRMesh.position.x, hipY, legRMesh.position.z);
     const legL = pivotize(legLMesh, legLMesh.position.x, hipY, legLMesh.position.z);
     const armR = pivotize(armRMesh, armRMesh.position.x, shoulderY, armRMesh.position.z);
     const armL = pivotize(armLMesh, armLMesh.position.x, shoulderY, armLMesh.position.z);
     const head = pivotize(headMesh, 0, neckY, 0);
+
+    // Empty groups, so they cost nothing on rigs that never hold anything.
+    const hand = new THREE.Group();
+    hand.position.set(0, handY, 0);
+    armR.add(hand);
+    const handL = new THREE.Group();
+    handL.position.set(0, handY, 0);
+    armL.add(handL);
 
     // Glow eyes ride the head pivot so look poses carry them.
     let eyes = null;
@@ -121,6 +134,8 @@ export function createActorRig(opts = {}) {
     armR.name = 'armR';
     legL.name = 'legL';
     legR.name = 'legR';
+    hand.name = 'hand';
+    handL.name = 'handL';
 
     const inner = new THREE.Group();
     inner.add(body);
@@ -141,6 +156,8 @@ export function createActorRig(opts = {}) {
         head,
         armL,
         armR,
+        hand,
+        handL,
         legL,
         legR,
         eyes,

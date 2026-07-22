@@ -23,9 +23,16 @@ export class HeldWeapon {
         if (!this.rigRoot) return;
         // The pivot is named by the rig builder; searching by name rather than
         // by traversal index keeps this working if the rig gains parts.
+        // `hand` is the far end of the arm and the correct socket; `armR` is
+        // the shoulder, kept as a fallback so rigs built before the hand pivot
+        // existed still hold their weapon rather than throwing.
+        let hand = null;
+        let arm = null;
         this.rigRoot.traverse((o) => {
-            if (!this.mount && o.name === 'armR') this.mount = o;
+            if (!hand && o.name === 'hand') hand = o;
+            if (!arm && o.name === 'armR') arm = o;
         });
+        this.mount = hand || arm;
     }
 
     /** Swap to `id`. Cheap to call every frame — a no-op unless it changed. */
