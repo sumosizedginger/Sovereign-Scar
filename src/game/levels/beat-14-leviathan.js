@@ -19,12 +19,26 @@ export const BEAT14_DEF = {
     id: 'beat-14-leviathan',
     name: '14 Leviathan Core',
     mood: 'abyss',
+    // Per-level luminance trim into the Abyss certification band [35,75]
+    // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
+    lightTune: { ambient: 1.2 },
     start: 'threshold',
     prebake: true,
-    floorColor: 0x1a1424,
+    floorColor: 0x483a5c, // certification retune: old 0x1a1424 was near-black in linear terms
     wallColor: ABYSS_COLORS.violet,
     wrap: 0.35,
     banner: 'The wound that remembers waits below. End the OS.',
+    // Z6 — this dungeon's one idea, and the four rooms that carry it:
+    // introduce it safely, complicate it, fuse it with combat, then examine it.
+    theme: {
+        id: 'final',
+        name: 'Everything At Once',
+        hint: "Plate, swarm, lane, and sky. The Core kept one of each.",
+        teach: 'wraithway',
+        develop: 'recursion',
+        combine: 'coregate',
+        test: 'corechamber',
+    },
     keys: [
         { room: 'wraithway', type: 'small' },
         { room: 'coregate', type: 'boss' },
@@ -57,9 +71,9 @@ export const BEAT14_DEF = {
                 h.fillBox(map, 7, 8, 1, 3, -4, 4, ABYSS_COLORS.basalt);
             },
             enemies: [
-                { x: -5, z: 3, kind: 'sentinel', hp: 5, ai: 'charge' },
-                { x: 5, z: 3, kind: 'frost', hp: 5, ai: 'ranged' },
-                { x: 0, z: -5, kind: 'scarab', hp: 5, ai: 'charge' },
+                { x: -5, z: 3, kind: 'brood', hp: 5 },
+                { x: 5, z: 3, kind: 'bulwark', hp: 5 },
+                { x: 0, z: -5, kind: 'mote', hp: 5 },
             ],
             doors: [
                 { to: 'threshold', side: 'S', at: 0, type: 'open' },
@@ -79,8 +93,8 @@ export const BEAT14_DEF = {
                 h.fillBox(map, -3, 3, 1, 1, -3, 3, ABYSS_COLORS.basalt);
             },
             enemies: [
-                { x: -4, z: 0, kind: 'frost', hp: 5, ai: 'ranged' },
-                { x: 4, z: 0, kind: 'sentinel', hp: 5 },
+                { x: -4, z: 0, kind: 'lancer', hp: 5 },
+                { x: 4, z: 0, kind: 'brood', hp: 5 },
             ],
             doors: [
                 { to: 'wraithway', side: 'S', at: 0, type: 'locked' },
@@ -89,6 +103,16 @@ export const BEAT14_DEF = {
             ],
             onBake(level, origin, ctx) {
                 addAltar(level, ctx, { x: origin.x + 6, z: origin.z + 6 });
+                level.addPickup({ x: origin.x + 7, y: 1.2, z: origin.z - 7 }, {
+                    color: 0xff7a90,
+                    label: 'Scar Suture',
+                    reward: { type: 'suture' },
+                    onPickup(game) {
+                        if (game.collectSuture?.('b14-recursion')) {
+                            game.hud?.toast?.('The last Scar Suture. Bind it and go down.', 2800);
+                        }
+                    },
+                });
                 if (!level.keyStore.mapPickup()) {
                     level.addPickup({ x: origin.x - 6, y: 1.2, z: origin.z + 6 }, {
                         color: 0x9ad0ff,
@@ -120,11 +144,16 @@ export const BEAT14_DEF = {
             ],
             onBake(level, origin) {
                 level.addPickup({ x: origin.x + 2, y: 1.2, z: origin.z + 2 }, {
-                    color: 0x7fe0ff,
-                    label: 'Fold cache',
+                    color: 0xd4a84b,
+                    label: 'Folded testimony',
+                    reward: { type: 'lore' },
                     onPickup(game) {
-                        game.player.inventory.addShards(40);
-                        game.hud?.toast?.('Fold cache — 40 shards');
+                        if (!game.player.inventory.getFlag('lore:core-fold')) {
+                            game.player.inventory.setFlag('lore:core-fold', true);
+                            game.hud?.story?.queue?.([
+                                { speaker: 'GUMOI', text: "Index closed, and still you kept walking. I have no entry for that. Make one." },
+                            ]);
+                        }
                     },
                 });
             },
@@ -139,9 +168,9 @@ export const BEAT14_DEF = {
                 h.fillBox(map, 5, 6, 1, 2, -6, -5, ABYSS_COLORS.neon);
             },
             enemies: [
-                { x: -3, z: -3, kind: 'scarab', hp: 5, ai: 'charge' },
-                { x: 3, z: -3, kind: 'scarab', hp: 5, ai: 'charge' },
-                { x: 0, z: 3, kind: 'frost', hp: 5, ai: 'ranged' },
+                { x: -3, z: -3, kind: 'bulwark', hp: 5 },
+                { x: 3, z: -3, kind: 'mote', hp: 5 },
+                { x: 0, z: 3, kind: 'lancer', hp: 5 },
             ],
             doors: [
                 { to: 'recursion', side: 'S', at: 0, type: 'open' },

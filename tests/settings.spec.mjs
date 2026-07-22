@@ -35,7 +35,7 @@ export async function run(t) {
         }
         if (mod) {
             t.ok('degrades with no localStorage (import)', true);
-            t.ok('defaults present with no storage', mod.getSetting('difficulty') === 'normal');
+            t.ok('defaults present with no storage', mod.getSetting('difficulty') === 'medium');
             let threw = false;
             try { mod.setSetting('masterVolume', 0.5); } catch (e) { threw = true; }
             t.ok('setSetting does not throw with no storage', !threw);
@@ -102,11 +102,30 @@ export async function run(t) {
         mod.setSetting('difficulty', 'hard');
         mod.markProgressFlag('hintsSeen', 'dash');
         mod.resetAll();
-        t.ok('resetAll restores setting defaults', mod.getSetting('difficulty') === 'normal');
+        t.ok('resetAll restores setting defaults', mod.getSetting('difficulty') === 'medium');
         t.ok('resetAll clears progress arrays', mod.getProgress().hintsSeen.length === 0);
         mod.markProgressFlag('hintsSeen', 'roll');
         t.ok('resetAll array fields are independent (no aliasing)',
             mod.getProgress().hintsSeen.length === 1);
+    }
+
+    // Scoreboards are isolated by immutable run mode and score version.
+    {
+        globalThis.window = { localStorage: memoryStorage() };
+        const mod = await import(MODULE_PATH + '?case=score-boards');
+        mod.addScore({ score: 100, runMode: 'medium', scoreVersion: 1 });
+        mod.addScore({ score: 900, runMode: 'survival', scoreVersion: 1 });
+        mod.addScore({ score: 800, runMode: 'medium', scoreVersion: 2 });
+        mod.addScore({ score: 999, runMode: 'survival', scoreVersion: 1, runId: 'same-run' });
+        mod.addScore({ score: 999, runMode: 'survival', scoreVersion: 1, runId: 'same-run' });
+        t.ok('score boards isolate run modes',
+            mod.getScores({ runMode: 'medium', scoreVersion: 1 }).length === 1
+            && mod.getScores({ runMode: 'medium', scoreVersion: 1 })[0].score === 100);
+        t.ok('score boards isolate score versions',
+            mod.getScores({ runMode: 'medium', scoreVersion: 2 })[0].score === 800);
+        t.ok('score submission is idempotent by run ID',
+            mod.getScores({ runMode: 'survival', scoreVersion: 1 })
+                .filter((entry) => entry.runId === 'same-run').length === 1);
     }
 
     // difficultyMultipliers.
@@ -116,7 +135,7 @@ export async function run(t) {
         mod.setSetting('difficulty', 'easy');
         t.ok('easy multipliers', mod.difficultyMultipliers().enemyHp === 0.7);
         mod.setSetting('difficulty', 'hard');
-        t.ok('hard multipliers', mod.difficultyMultipliers().enemyDmg === 1.25);
+        t.ok('hard multipliers', mod.difficultyMultipliers().enemyDmg === 1.35);
         mod.setSetting('difficulty', 'normal');
         const n = mod.difficultyMultipliers();
         t.ok('normal multipliers', n.enemyHp === 1 && n.enemyDmg === 1);

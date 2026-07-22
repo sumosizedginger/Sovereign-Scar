@@ -19,6 +19,7 @@ import { fillBox } from '../../voxel/helpers.js';
 import { abyssTint } from '../world/level-builder.js';
 import { ObsidianArachnid, attachBoss } from '../bosses/index.js';
 import { addAltar } from '../world/altar.js';
+import { grantBuriedFrequency } from '../narrative/item-chains.js';
 
 function addBoulders(level, ctx, origin, spots, prefix) {
     for (let i = 0; i < spots.length; i++) {
@@ -41,9 +42,23 @@ export const BEAT06_DEF = {
     id: 'beat-06-quarry',
     name: '06 Bleeding Quarry',
     mood: 'abyss',
+    // Per-level luminance trim into the Abyss certification band [35,75]
+    // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
+    lightTune: { ambient: 2.4 },
     start: 'pitgate',
     prebake: true,
     banner: 'The quarry bleeds gold. Something larger molts in the dark.',
+    // Z6 — this dungeon's one idea, and the four rooms that carry it:
+    // introduce it safely, complicate it, fuse it with combat, then examine it.
+    theme: {
+        id: 'crowd',
+        name: 'Make Space',
+        hint: "Brood come apart when they die. Kill them where you have room, not where you are cornered.",
+        teach: 'quarryfloor',
+        develop: 'orecrush',
+        combine: 'veinworks',
+        test: 'molthall',
+    },
     keys: [
         { room: 'quarryfloor', type: 'small' },
         { room: 'deepcut', type: 'small' },
@@ -77,8 +92,8 @@ export const BEAT06_DEF = {
                 h.fillBox(map, 4, 8, 1, 3, -2, 2, ABYSS_COLORS.basalt);
             },
             enemies: [
-                { x: -5, z: 4, kind: 'scarab', hp: 4, ai: 'charge' },
-                { x: 5, z: -5, kind: 'sentinel', hp: 4 },
+                { x: -5, z: 4, kind: 'brood', hp: 4 },
+                { x: 5, z: -5, kind: 'scarab', hp: 4 },
             ],
             doors: [
                 { to: 'pitgate', side: 'S', at: 0, type: 'open' },
@@ -99,7 +114,7 @@ export const BEAT06_DEF = {
             build(map, h) {
                 abyssTint(map);
             },
-            enemies: [{ x: 3, z: -3, kind: 'scarab', hp: 4, ai: 'charge' }],
+            enemies: [{ x: 3, z: -3, kind: 'brood', hp: 4, ai: 'charge' }],
             doors: [{ to: 'quarryfloor', side: 'E', at: 0, type: 'open' }],
             onBake(level, origin, ctx) {
                 addBoulders(level, ctx, origin, [[-3, 2], [2, -4]], 'b06-crush');
@@ -121,9 +136,21 @@ export const BEAT06_DEF = {
                 abyssTint(map);
                 h.fillBox(map, -4, 4, 0, 0, -4, 4, ABYSS_COLORS.goldVein); // sifting pans
             },
-            enemies: [{ x: 0, z: -3, kind: 'frost', hp: 3, ai: 'ranged' }],
+            enemies: [{ x: 0, z: -3, kind: 'scarab', hp: 3, ai: 'ranged' }],
             doors: [{ to: 'quarryfloor', side: 'W', at: 0, type: 'open' }],
             onBake(level, origin) {
+                // Z7: one Scar Suture per dungeon, no exceptions — the rule is
+                // only worth having if the player can rely on it.
+                level.addPickup({ x: origin.x + 5, y: 1.2, z: origin.z - 5 }, {
+                    color: 0xff7a90,
+                    label: 'Scar Suture',
+                    reward: { type: 'suture' },
+                    onPickup(game) {
+                        if (game.collectSuture?.('b06-siftery')) {
+                            game.hud?.toast?.('Scar Suture recovered from the sifting pans.', 2600);
+                        }
+                    },
+                });
                 if (!level.keyStore.mapPickup()) {
                     level.addPickup({ x: origin.x + 4, y: 1.2, z: origin.z + 4 }, {
                         color: 0x9ad0ff,
@@ -146,8 +173,8 @@ export const BEAT06_DEF = {
                 h.fillBox(map, 6, 7, 1, 3, -3, 3, ABYSS_COLORS.basalt);
             },
             enemies: [
-                { x: -4, z: 0, kind: 'scarab', hp: 4, ai: 'charge' },
-                { x: 4, z: 0, kind: 'sentinel', hp: 4 },
+                { x: -4, z: 0, kind: 'brood', hp: 4 },
+                { x: 4, z: 0, kind: 'scarab', hp: 4 },
             ],
             doors: [
                 { to: 'quarryfloor', side: 'S', at: 0, type: 'locked' },
@@ -182,11 +209,13 @@ export const BEAT06_DEF = {
             ],
             onBake(level, origin) {
                 level.addPickup({ x: origin.x, y: 1.2, z: origin.z }, {
-                    color: 0x7fe0ff,
-                    label: 'Gold seam',
+                    color: 0x9ad0ff,
+                    label: 'Memory Vial chassis',
+                    reward: { type: 'vial' },
                     onPickup(game) {
-                        game.player.inventory.addShards(35);
-                        game.hud?.toast?.('Gold seam — 35 shards');
+                        if (game.collectMemoryVial?.('b06-goldseam')) {
+                            game.hud?.toast?.("A Memory Vial chassis, intact in the seam.", 2600);
+                        }
                     },
                 });
             },
@@ -199,7 +228,7 @@ export const BEAT06_DEF = {
                 abyssTint(map);
             },
             enemies: [
-                { x: -3, z: -3, kind: 'scarab', hp: 4, ai: 'charge' },
+                { x: -3, z: -3, kind: 'brood', hp: 4 },
                 { x: 3, z: -3, kind: 'scarab', hp: 4, ai: 'charge' },
             ],
             doors: [
@@ -245,6 +274,9 @@ export const BEAT06_DEF = {
                     defeatStory: [
                         { speaker: 'PREDECESSOR', text: 'Plates cracked, core dark. The Abyss counts one engineer freed — six remain.' },
                     ],
+                    // §7 Resonance Fork chain, step 1: the freed engineer
+                    // core broadcasts the Buried Frequency.
+                    onDefeat(game) { grantBuriedFrequency(game); },
                 });
             },
             onEnter(game) {

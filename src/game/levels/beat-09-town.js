@@ -48,11 +48,25 @@ export const BEAT09_DEF = {
     id: 'beat-09-town',
     name: '09 Ruined Town',
     mood: 'abyss',
+    // Per-level luminance trim into the Abyss certification band [35,75]
+    // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
+    lightTune: { ambient: 3.2, key: 1.4 },
     start: 'towngate',
     prebake: true,
     floorColor: ABYSS_COLORS.abyssFloor,
     wallColor: ABYSS_COLORS.abyssWall,
     banner: 'The town remembers its people. Something wears their faces.',
+    // Z6 — this dungeon's one idea, and the four rooms that carry it:
+    // introduce it safely, complicate it, fuse it with combat, then examine it.
+    theme: {
+        id: 'denial',
+        name: 'Nowhere to Stand',
+        hint: "The town fights for the floor. Take the ground back one room at a time.",
+        teach: 'townsquare',
+        develop: 'chapel',
+        combine: 'belltower',
+        test: 'moothall',
+    },
     keys: [
         { room: 'townsquare', type: 'small' },
         { room: 'highstreet', type: 'small' },
@@ -86,8 +100,8 @@ export const BEAT09_DEF = {
                 h.fillBox(map, -1, 1, 1, 2, 0, 1, ABYSS_COLORS.charcoal); // dry fountain
             },
             enemies: [
-                { x: -5, z: 5, kind: 'sentinel', hp: 4 },
-                { x: 5, z: -5, kind: 'frost', hp: 3, ai: 'ranged' },
+                { x: -5, z: 5, kind: 'mote', hp: 5 },
+                { x: 5, z: -5, kind: 'sentinel', hp: 4 },
             ],
             doors: [
                 { to: 'towngate', side: 'S', at: 0, type: 'open' },
@@ -108,7 +122,7 @@ export const BEAT09_DEF = {
             build(map, h) {
                 h.fillBox(map, -1, 1, 1, 4, -5, -4, ABYSS_COLORS.bone); // altar wall
             },
-            enemies: [{ x: 3, z: 3, kind: 'sentinel', hp: 4 }],
+            enemies: [{ x: 3, z: 3, kind: 'scarab', hp: 5 }],
             doors: [{ to: 'townsquare', side: 'E', at: 0, type: 'open' }],
             onBake(level, origin) {
                 if (!level.keyStore.mapPickup()) {
@@ -131,7 +145,7 @@ export const BEAT09_DEF = {
                 h.fillBox(map, -5, -3, 1, 2, -3, -2, ABYSS_COLORS.charcoal); // stalls
                 h.fillBox(map, 2, 4, 1, 2, 2, 3, ABYSS_COLORS.charcoal);
             },
-            enemies: [{ x: 0, z: -4, kind: 'scarab', hp: 4, ai: 'charge' }],
+            enemies: [{ x: 0, z: -4, kind: 'mote', hp: 5, ai: 'charge' }],
             doors: [{ to: 'townsquare', side: 'W', at: 0, type: 'open' }],
             onBake(level, origin, ctx) {
                 // A phantom-wall alley hides the market cache
@@ -139,6 +153,7 @@ export const BEAT09_DEF = {
                 level.addPickup({ x: origin.x + 6, y: 1.2, z: origin.z - 6 }, {
                     color: 0x7fe0ff,
                     label: 'Market cache',
+                    reward: { type: 'currency' },
                     onPickup(game) {
                         game.player.inventory.addShards(25);
                         game.hud?.toast?.('Market cache — 25 shards');
@@ -155,8 +170,8 @@ export const BEAT09_DEF = {
                 h.fillBox(map, 6, 7, 1, 3, -5, 5, ABYSS_COLORS.basalt);
             },
             enemies: [
-                { x: -4, z: 0, kind: 'frost', hp: 3, ai: 'ranged' },
-                { x: 4, z: 0, kind: 'scarab', hp: 4, ai: 'charge' },
+                { x: -4, z: 0, kind: 'sentinel', hp: 4, ai: 'ranged' },
+                { x: 4, z: 0, kind: 'scarab', hp: 5, ai: 'charge' },
             ],
             doors: [
                 { to: 'townsquare', side: 'S', at: 0, type: 'locked' },
@@ -188,11 +203,13 @@ export const BEAT09_DEF = {
             ],
             onBake(level, origin) {
                 level.addPickup({ x: origin.x, y: 1.2, z: origin.z }, {
-                    color: 0x7fe0ff,
-                    label: 'Cellar cache',
+                    color: 0xff7a90,
+                    label: 'Scar Suture',
+                    reward: { type: 'suture' },
                     onPickup(game) {
-                        game.player.inventory.addShards(30);
-                        game.hud?.toast?.('Cellar cache — 30 shards');
+                        if (game.collectSuture?.('b09-cellar')) {
+                            game.hud?.toast?.("Scar Suture recovered from the cellar.", 2600);
+                        }
                     },
                 });
             },
@@ -202,9 +219,9 @@ export const BEAT09_DEF = {
             half: 8,
             wallH: 5,
             enemies: [
-                { x: -3, z: -3, kind: 'sentinel', hp: 4 },
-                { x: 3, z: -3, kind: 'frost', hp: 3, ai: 'ranged' },
-                { x: 0, z: 3, kind: 'scarab', hp: 4, ai: 'charge' },
+                { x: -3, z: -3, kind: 'mote', hp: 5 },
+                { x: 3, z: -3, kind: 'sentinel', hp: 4, ai: 'ranged' },
+                { x: 0, z: 3, kind: 'scarab', hp: 5, ai: 'charge' },
             ],
             platforms(map, h) {
                 for (let lvl = 1; lvl <= 4; lvl++) {
@@ -226,10 +243,15 @@ export const BEAT09_DEF = {
             half: 12,
             wallH: 5,
             // V: the hall read 11/255 — lift the floor and give the moot its
-            // bone-flagstone plaza (the town gathered here once)
-            floorColor: ABYSS_COLORS.abyssWall,
+            // bone-flagstone plaza (the town gathered here once). The plaza is a
+            // WEATHERED bone, not raw bone (0xefe6d0 ≈ 230/255): at full value it
+            // blew out the whole boss arena and buried the Phantasm's read.
+            // Floor is the standard Abyss floor, not the (brighter) WALL tone —
+            // using abyssWall here on top of the plaza is what made this arena
+            // read far hotter than every other Abyss boss room.
+            floorColor: ABYSS_COLORS.abyssFloor,
             build(map, h) {
-                h.fillBox(map, -5, 5, 0, 0, -5, 5, ABYSS_COLORS.bone);
+                h.fillBox(map, -5, 5, 0, 0, -5, 5, 0x6f6a5c);
                 h.fillBox(map, -8, -6, 1, 3, -4, 4, ABYSS_COLORS.basalt);
                 h.fillBox(map, 6, 8, 1, 3, -4, 4, ABYSS_COLORS.basalt);
                 h.fillBox(map, -3, 3, 1, 2, -8, -6, ABYSS_COLORS.charcoal);

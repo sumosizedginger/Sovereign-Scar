@@ -7,8 +7,10 @@
 // 'blocker:<id>' in the owning level's keyStore opened list.
 //
 // Types:
-//   grapple_gap  — floor chasm + far-side anchor post; G pulls across.
-//                  Falling in = 1 damage + respawn at the near edge.
+//   grapple_gap  — floor chasm + anchor post(s); G pulls to a post in range.
+//                  Supports `anchor` and optional `reverseAnchor` so the gap
+//                  is crossable both ways (return from a boss is common).
+//                  Falling in = 1 damage + respawn at the nearest edge.
 //   wedge_crack  — destructible plug only tectonic_wedge damage breaks.
 //   boot_ledge   — 2-high barrier; dashing into it with phase_boot hops over.
 //   caster_dark  — dark shroud dispelled while light_caster is equipped.
@@ -86,45 +88,139 @@ export function createBlockerRuntime(ctx, level, b, origin = { x: 0, z: 0 }) {
     const isCleared = () => level.keyStore?.isOpen?.(persistId) === true;
 
     if (b.type === 'grapple_gap') {
-        // Far-side anchor post (solid 1×3 column, grapple target at its top)
-        const anchorW = W(b.anchor);
-        const postMap = new Map();
-        fillBox(postMap, 0, 0, 1, 3, 0, 0, ABYSS_COLORS.goldVein);
-        const post = meshAndCollide(postMap, ctx.scene, ctx.collisionWorld, {
-            origin: { x: anchorW.x, y: 0, z: anchorW.z },
-            solidPrefix: `blk:${b.id}:post`,
-        });
-        const edgeW = W(b.edge);
+        // Anchor posts: primary + optional reverse so the gap works both ways.
+        // If reverseAnchor is omitted, mirror across the chasm rect on the
+        // dominant axis so return trips (e.g. post-boss exit) still work.
+        // Cleared gaps (keyStore `blocker:<id>`) get a permanent floor bridge
+        // so boss-routed exits never softlock when grapple reach is tight.
+        const posts = [];
+        const anchorsLocal = [];
+        if (b.anchor) anchorsLocal.push(b.anchor);
+        if (b.reverseAnchor) {
+            anchorsLocal.push(b.reverseAnchor);
+        } else if (b.anchor && b.rect) {
+            const rx = (b.rect.x0 + b.rect.x1) / 2;
+            const rz = (b.rect.z0 + b.rect.z1) / 2;
+            const dx = b.anchor.x - rx;
+            const dz = b.anchor.z - rz;
+            anchorsLocal.push({ x: rx - dx, z: rz - dz });
+        }
+        const seen = new Set();
+        for (const a of anchorsLocal) {
+            const key = `${Math.round(a.x)},${Math.round(a.z)}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const aw = W(a);
+            const postMap = new Map();
+            fillBox(postMap, 0, 0, 1, 3, 0, 0, ABYSS_COLORS.goldVein);
+            // Visual + grapple target only — no XZ solid so posts don't wall off
+            // the rim (blocked return walks after placing reverse pegs).
+            posts.push({
+                local: a,
+                world: aw,
+                built: meshAndCollide(postMap, ctx.scene, null, {
+                    origin: { x: aw.x, y: 0, z: aw.z },
+                    solidPrefix: `blk:${b.id}:post:${key}`,
+                }),
+            });
+        }
+        const edgesLocal = [];
+        if (b.edge) edgesLocal.push(b.edge);
+        for (const a of anchorsLocal) edgesLocal.push(a);
+        const edgesW = edgesLocal.map((e) => W(e));
+        let bridge = null;
+        let unsubVoxel = null;
+        const ensureBridge = () => {
+            if (bridge || !b.rect) return;
+            const floorMap = new Map();
+            fillBox(
+                floorMap,
+                b.rect.x0, b.rect.x1, 0, 0, b.rect.z0, b.rect.z1,
+                b.bridgeColor || ABYSS_COLORS.basalt,
+            );
+            bridge = meshAndCollide(floorMap, ctx.scene, null, {
+                origin: { x: origin.x, y: 0, z: origin.z },
+                solidPrefix: `blk:${b.id}:bridge`,
+            });
+            // Physics feet query the dungeon composite getVoxelAt
+            unsubVoxel = level.addVoxelQuery?.(bridge.getVoxelAt) || null;
+        };
+        if (isCleared()) ensureBridge();
         return {
+            // Exposed so the FX layer can highlight anchors that are actually
+            // in reach. A gold post looks like every other gold decoration in
+            // the game, so the traversal layer stayed invisible until a
+            // walkthrough told you where to stand.
+            anchorPoints: posts.map((p) => ({ x: p.world.x, y: 1, z: p.world.z })),
             update(dt, game) {
                 const player = game.player;
                 const p = player.root.position;
-                // Fall catch: inside the chasm below floor level
-                if (insideRect(p, rectW) && p.y < 1.2 && !player.grapple.active) {
-                    player.rig.position.set(edgeW.x, 1.95, edgeW.z);
-                    player.physics.resetVelocity();
-                    player.physics.grounded = true;
-                    player.health.damage(1, 0.6);
-                    game.hud?.toast?.('The gap bites — find another way across', 1400);
+                // Bridged after clear (e.g. Hydroid defeated) — walkable floor
+                if (isCleared()) {
+                    ensureBridge();
                     return;
                 }
-                // Grapple assist: aim at the anchor and pull across
+                // Fall catch → nearest rim
+                if (insideRect(p, rectW) && p.y < 1.2 && !player.grapple.active) {
+                    let best = edgesW[0] || { x: p.x, z: p.z };
+                    let bestD = Infinity;
+                    for (const e of edgesW) {
+                        const d = Math.hypot(p.x - e.x, p.z - e.z);
+                        if (d < bestD) { bestD = d; best = e; }
+                    }
+                    player.rig.position.set(best.x, 1.95, best.z);
+                    player.physics.resetVelocity();
+                    player.physics.grounded = true;
+                    player.health.damage(1, 0.6, 'environment');
+                    game.hud?.toast?.('The gap bites — grapple the copper pegs (G)', 1400);
+                    return;
+                }
                 if (player.grapple.active) return;
                 const reach = (player.grappleRange || 8) + 2;
                 const hasGrapple = player.inventory.hasItem('magnetic_grapple');
-                const anchorTarget = { x: anchorW.x + 0.5, y: p.y, z: anchorW.z + 0.5 };
-                if (grappleAimOk(p, player.state.facingVec, anchorTarget, reach)) {
-                    if (game.input?.consumeGrapple?.()) {
-                        if (!hasGrapple) {
-                            game.hud?.toast?.('Needs the Magnetic Grapple', 1200);
-                            return;
-                        }
-                        player.grapple.start(p, anchorTarget, 12);
-                        sfx.whoosh?.();
+                let bestTarget = null;
+                let bestDot = 0.7;
+                for (const post of posts) {
+                    // Land short of the post solid so the pull is not cancelled.
+                    const raw = {
+                        x: post.world.x + 0.5,
+                        y: p.y,
+                        z: post.world.z + 0.5,
+                    };
+                    const dx0 = raw.x - p.x;
+                    const dz0 = raw.z - p.z;
+                    const d0 = Math.hypot(dx0, dz0) || 1;
+                    if (d0 < 1.6 || d0 > reach + 1.5) continue;
+                    const target = {
+                        x: p.x + dx0 * ((d0 - 1.2) / d0),
+                        y: p.y,
+                        z: p.z + dz0 * ((d0 - 1.2) / d0),
+                    };
+                    if (!grappleAimOk(p, player.state.facingVec, raw, reach + 1.5)) continue;
+                    const dx = target.x - p.x;
+                    const dz = target.z - p.z;
+                    const d = Math.hypot(dx, dz) || 1;
+                    const dot = (dx / d) * player.state.facingVec.x
+                        + (dz / d) * player.state.facingVec.z;
+                    if (dot >= bestDot) {
+                        bestDot = dot;
+                        bestTarget = target;
                     }
                 }
+                if (bestTarget && game.input?.consumeGrapple?.()) {
+                    if (!hasGrapple) {
+                        game.hud?.toast?.('Needs the Magnetic Grapple', 1200);
+                        return;
+                    }
+                    player.grapple.start(p, bestTarget, Math.max(14, reach + 2));
+                    sfx.whoosh?.();
+                }
             },
-            dispose() { post.dispose(); },
+            dispose() {
+                for (const post of posts) post.built.dispose();
+                try { unsubVoxel?.(); } catch (_) {}
+                try { bridge?.dispose(); } catch (_) {}
+            },
         };
     }
 
@@ -169,11 +265,21 @@ export function createBlockerRuntime(ctx, level, b, origin = { x: 0, z: 0 }) {
     }
 
     if (b.type === 'boot_ledge') {
+        let promptCooldown = 0;
         return {
             update(dt, game) {
                 const player = game.player;
+                promptCooldown = Math.max(0, promptCooldown - dt);
                 if (player.dashTimer <= 0) return;
-                if (!player.inventory.hasItem('phase_boot')) return;
+                if (!player.inventory.hasItem('phase_boot')) {
+                    if (promptCooldown <= 0) {
+                        promptCooldown = 1.5;
+                        game.hud?.toast?.('Needs the Phase Boot', 1200);
+                        game.anchorThread?.failed?.(`ledge:${b.id || 'phase'}`,
+                            'SYSTEM: Acquire the Phase Boot before crossing this dash seam.');
+                    }
+                    return;
+                }
                 const p = player.root.position;
                 const local = { x: p.x - origin.x, z: p.z - origin.z };
                 const hop = ledgeHopTarget(

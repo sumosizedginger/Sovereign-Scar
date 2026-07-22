@@ -23,6 +23,17 @@ export const BEAT02_DEF = {
     start: 'gatehouse',
     prebake: true,
     banner: 'The Spindle turns. Sever every Tri-Compiler core.',
+    // Z6 — this dungeon's one idea, and the four rooms that carry it:
+    // introduce it safely, complicate it, fuse it with combat, then examine it.
+    theme: {
+        id: 'reach',
+        name: 'Reach',
+        hint: "The Spindle keeps its distance. Answer it in kind — the Caster does not care how far.",
+        teach: 'gearworks',
+        develop: 'coilhall',
+        combine: 'prebosscourt',
+        test: 'spindlecrown',
+    },
     keys: [
         { room: 'gearworks', type: 'small' },
         { room: 'vaultrow', type: 'small' },
@@ -58,7 +69,7 @@ export const BEAT02_DEF = {
             },
             enemies: [
                 { x: -5, z: 4, kind: 'sentinel', hp: 3 },
-                { x: 5, z: -5, kind: 'scarab', hp: 2, ai: 'charge' },
+                { x: 5, z: -5, kind: 'frost', hp: 2, ai: 'charge' },
             ],
             doors: [
                 { to: 'gatehouse', side: 'S', at: 0, type: 'open' },
@@ -130,8 +141,8 @@ export const BEAT02_DEF = {
                 h.fillBox(map, 6, 7, 1, 3, -2, 2, CRUST_COLORS.slate);
             },
             enemies: [
-                { x: -4, z: -4, kind: 'scarab', hp: 3, ai: 'charge' },
-                { x: 4, z: 4, kind: 'sentinel', hp: 3 },
+                { x: -4, z: -4, kind: 'sentinel', hp: 3, ai: 'charge' },
+                { x: 4, z: 4, kind: 'frost', hp: 3 },
             ],
             doors: [
                 { to: 'gearworks', side: 'S', at: 0, type: 'locked' },
@@ -165,12 +176,15 @@ export const BEAT02_DEF = {
                 { type: 'wedge_crack', id: 'b02-capacitor-crack', at: { x: 2, z: -3 }, w: 2, h: 2 },
             ],
             onBake(level, origin) {
-                level.addPickup({ x: origin.x, y: 1.2, z: origin.z }, {
-                    color: 0x7fe0ff,
-                    label: 'Capacitor cache',
+                // Sits ON the centre plinth (top y=2); y=1.2 buried it inside.
+                level.addPickup({ x: origin.x, y: 2.4, z: origin.z }, {
+                    color: 0xff7a90,
+                    label: 'Scar Suture',
+                    reward: { type: 'suture' },
                     onPickup(game) {
-                        game.player.inventory.addShards(30);
-                        game.hud?.toast?.('Capacitor cache — 30 shards');
+                        if (game.collectSuture?.('b02-capacitor')) {
+                            game.hud?.toast?.("Scar Suture recovered. Four will bind a heart.", 2600);
+                        }
                     },
                 });
             },
@@ -187,9 +201,9 @@ export const BEAT02_DEF = {
                 h.fillBox(map, 4, 5, 1, 2, 0, 1, CRUST_COLORS.iron);
             },
             enemies: [
-                { x: -3, z: -3, kind: 'scarab', hp: 3, ai: 'charge' },
-                { x: 3, z: -3, kind: 'scarab', hp: 3, ai: 'charge' },
-                { x: 0, z: 3, kind: 'frost', hp: 2, ai: 'ranged' },
+                { x: -3, z: -3, kind: 'sentinel', hp: 3, ai: 'charge' },
+                { x: 3, z: -3, kind: 'frost', hp: 3, ai: 'charge' },
+                { x: 0, z: 3, kind: 'sentinel', hp: 2, ai: 'ranged' },
             ],
             doors: [
                 { to: 'vaultrow', side: 'S', at: 0, type: 'locked' },

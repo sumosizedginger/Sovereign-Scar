@@ -6,27 +6,33 @@ import { sfx } from '../../audio/synth.js';
 
 export class KineticCore extends BossBase {
     constructor(scene, collisionWorld, center, opts = {}) {
+        // Bright enough to read on the raised corona plate under top-down cam.
+        // Dark slate + low emissive used to vanish into floor/bloom.
         const mesh = new THREE.Mesh(
             new THREE.IcosahedronGeometry(0.95, 1),
             new THREE.MeshStandardMaterial({
-                color: 0x4a5060,
-                metalness: 0.7,
-                roughness: 0.35,
-                emissive: 0x201008,
-                emissiveIntensity: 0.5,
+                color: 0x8a96a8,
+                metalness: 0.55,
+                roughness: 0.32,
+                emissive: 0x305070,
+                emissiveIntensity: 1.15,
             })
         );
         mesh.castShadow = true;
         const weak = new THREE.Mesh(
-            new THREE.SphereGeometry(0.28, 8, 8),
+            new THREE.SphereGeometry(0.32, 10, 10),
             new THREE.MeshStandardMaterial({
-                color: 0xffd060,
+                color: 0xffe080,
                 emissive: 0xffd060,
-                emissiveIntensity: 2.0,
+                emissiveIntensity: 2.4,
             })
         );
-        weak.position.set(0, -0.75, 0);
+        weak.position.set(0, -0.78, 0);
         mesh.add(weak);
+
+        // Corona plate tops at y≈2 (y=1 voxel). Hover centre above the plate so
+        // the sphere never sinks into geometry mid-bob (looked like “disappearing”).
+        const hoverY = opts.hoverY != null ? opts.hoverY : 2.95;
 
         super(scene, {
             id: 'kinetic_core',
@@ -35,17 +41,22 @@ export class KineticCore extends BossBase {
             hitRadius: 0.95,
             contactDamage: 1,
             contactRadius: 1.45,
-            position: { x: center.x, y: 1.2, z: center.z },
+            position: { x: center.x, y: hoverY, z: center.z },
             mesh,
             phaseThresholds: [0.55, 0.28],
+            floorY: opts.floorY != null ? opts.floorY : 2.0,
         });
         this.collisionWorld = collisionWorld;
         this.center = center;
         this.radius = opts.arenaRadius || 8;
+        this.hoverY = hoverY;
         this.weak = weak;
         this.vx = 4.5;
         this.vz = 3.2;
         this.splits = [];
+        // Always draw — canHit/shielded are combat gates, not visibility.
+        this.root.visible = true;
+        mesh.visible = true;
     }
 
     onPhaseChange(phase) {
@@ -56,12 +67,16 @@ export class KineticCore extends BossBase {
         if (phase === 3 && this.splits.length === 0) {
             for (let i = 0; i < 2; i++) {
                 const m = new THREE.Mesh(
-                    new THREE.IcosahedronGeometry(0.45, 0),
+                    new THREE.IcosahedronGeometry(0.5, 0),
                     new THREE.MeshStandardMaterial({
-                        color: 0x6a7080, metalness: 0.6, emissive: 0xff4020, emissiveIntensity: 1,
+                        color: 0xa0a8b8,
+                        metalness: 0.55,
+                        emissive: 0xff5520,
+                        emissiveIntensity: 1.6,
                     })
                 );
                 m.position.copy(this.root.position);
+                m.position.y = this.hoverY;
                 this.scene.add(m);
                 this.splits.push({
                     mesh: m,
@@ -73,25 +88,23 @@ export class KineticCore extends BossBase {
     }
 
     tickAI(dt, player) {
+        // Keep the mesh drawn even if a system toggled it.
+        if (this.root) this.root.visible = true;
+
         // ── Ricochet, then charge ───────────────────────────────────────────
         // The Core bounces the arena as its resting pattern, but on a timer it
         // stops dead, sights down the line to the player and rams along it,
         // burying itself in the far wall. The wall stuns it: that is the
         // opening, and it is the only one that does not depend on catching the
         // bob at the right instant.
-        //
-        // Ricochet alone never read the player at all — its whole path was a
-        // function of the clock, so there was nothing to dodge and nothing to
-        // bait, only a timer to wait out.
         if (this.busy) {
             const a = this.action;
             if (a.stage === 'windup') {
                 this.root.rotation.x += dt * 18; // spinning up in place
+                this.root.position.y = this.hoverY;
             } else {
                 // Travel the charge over the first slice of the recovery
-                // instead of teleporting to the wall. A hit that never occupies
-                // the ground between here and there cannot be dodged, blocked,
-                // or even seen — it just happens.
+                // instead of teleporting to the wall.
                 if (this._dash) {
                     const dsh = this._dash;
                     const step = Math.min(dsh.left, 26 * dt);
@@ -99,12 +112,13 @@ export class KineticCore extends BossBase {
                     this.root.position.z += dsh.dir.z * step;
                     dsh.left -= step;
                     this.root.rotation.x += dt * 24;
+                    this.root.position.y = this.hoverY;
                     if (player && !player.health?.dead && !dsh.hit) {
                         if (Math.hypot(
                             player.root.position.x - this.root.position.x,
                             player.root.position.z - this.root.position.z
                         ) < 1.6) {
-                            player.health.damage(this.phase >= 2 ? 2 : 1, 0.4);
+                            this.hitPlayer(player, this.phase >= 2 ? 2 : 1, 0.4);
                             dsh.hit = true;
                         }
                     }
@@ -118,7 +132,8 @@ export class KineticCore extends BossBase {
                     }
                     return;
                 }
-                this.root.position.y = 0.9;      // slumped against the wall
+                // Slump against the wall — stay above the plate, don't sink.
+                this.root.position.y = this.hoverY - 0.2;
                 this.canHit = true;
                 this.shielded = false;
                 if (this.weak) this.weak.material.emissiveIntensity = 3.4;
@@ -142,17 +157,14 @@ export class KineticCore extends BossBase {
                 }),
                 onWindup: () => { sfx.whoosh(); },
                 strike: () => {
-                    // Launch the ram; the dash itself plays out over the
-                    // recovery so it crosses real ground the player can leave.
                     this._dash = { dir, left: this.radius * 1.8, hit: false };
-                    this.root.position.y = 1.1;
-                    // Send it off at a fresh angle once it peels off the wall.
+                    this.root.position.y = this.hoverY;
                     const spd = Math.hypot(this.vx, this.vz) || 5;
                     const ang = Math.atan2(-dir.z, -dir.x) + (Math.random() - 0.5);
                     this.vx = Math.cos(ang) * spd;
                     this.vz = Math.sin(ang) * spd;
                 },
-                onRecover: () => { this.root.position.y = 1.2; },
+                onRecover: () => { this.root.position.y = this.hoverY; },
             });
             return;
         }
@@ -167,14 +179,14 @@ export class KineticCore extends BossBase {
         this.root.position.z = pos.z;
         this.root.rotation.x += dt * (3 + this.phase);
         this.root.rotation.z += dt * (2.2 + this.phase * 0.4);
-        // Bob exposes underside weak point (gold seam): only hittable near apex of bob
-        const bob = Math.sin(this.t * 4) * (0.35 + this.phase * 0.05);
-        this.root.position.y = 1.2 + bob;
+        // Bob around hover height (never below the arena plate top).
+        const bob = Math.sin(this.t * 4) * (0.28 + this.phase * 0.04);
+        this.root.position.y = this.hoverY + bob;
         // Weak window when bob is high (underside readable from top-down)
-        this.canHit = bob > 0.12 || this.phase >= 3;
+        this.canHit = bob > 0.1 || this.phase >= 3;
         this.shielded = !this.canHit;
         if (this.weak) {
-            this.weak.material.emissiveIntensity = this.canHit ? 2.8 : 0.6;
+            this.weak.material.emissiveIntensity = this.canHit ? 3.0 : 1.2;
         }
 
         for (const s of this.splits) {
@@ -185,14 +197,15 @@ export class KineticCore extends BossBase {
             bounceArena(p, v, this.center, this.radius);
             s.vx = v.x; s.vz = v.z;
             s.mesh.position.x = p.x; s.mesh.position.z = p.z;
-            s.mesh.position.y = 1.0;
+            s.mesh.position.y = this.hoverY - 0.15;
+            s.mesh.visible = true;
             s.mesh.rotation.x += dt * 5;
             if (player && !player.health?.dead) {
                 if (Math.hypot(
                     player.root.position.x - p.x,
                     player.root.position.z - p.z
                 ) < 1.0) {
-                    player.health.damage(1, 0.7);
+                    this.hitPlayer(player, 1, 0.7);
                 }
             }
         }

@@ -63,9 +63,14 @@ class DevMode {
             this._wrapped = true;
             const health = game.player.health;
             const orig = health.damage.bind(health);
-            health.damage = (n, iframes) => {
+            // Forward EVERY argument. This wrapper used to take (n, iframes)
+            // and drop the rest, which silently ate the `source` and `meta`
+            // that the Z3 guard resolves direction from — every hit arrived
+            // with no known origin, so the shield never engaged. A pass-
+            // through wrapper must not have an opinion about arity.
+            health.damage = (...args) => {
                 if (this.enabled && this.god) return { accepted: false };
-                return orig(n, iframes);
+                return orig(...args);
             };
         }
 

@@ -18,6 +18,8 @@ import { BEAT11_DEF } from '../../src/game/levels/beat-11-mire.js';
 import { BEAT12_DEF } from '../../src/game/levels/beat-12-pyre.js';
 import { BEAT13_DEF } from '../../src/game/levels/beat-13-gumoi.js';
 import { BEAT14_DEF } from '../../src/game/levels/beat-14-leviathan.js';
+import { fillBox } from '../../src/voxel/helpers.js';
+import { OVERWORLD_SUTURES } from '../../src/game/overworld/world7.js';
 
 export function run(t) {
     // doorKey is order-independent
@@ -156,6 +158,45 @@ export function run(t) {
     t.ok('beat-06 eight rooms reachable', b06.reachable.length === 8, String(b06.reachable.length));
     t.ok('beat-06 is abyss', BEAT06_DEF.mood === 'abyss');
 
+    // GUMOI's raised arena geometry must stay out of build(), whose y>=1
+    // columns become infinite-height planar collision solids.
+    const crown = BEAT13_DEF.rooms.witnesscrown;
+    t.ok('GUMOI terraces use the platform map', typeof crown.platforms === 'function');
+    const crownPlatforms = new Map();
+    crown.platforms(crownPlatforms, { fillBox });
+    // The arena must stay FLAT. The rig looks down from height 17.5, so mass
+    // more than a cell or two off the floor sits between the lens and the fight:
+    // the old crown platform at y=9 eclipsed the whole boss arena. (It was also
+    // stacked two cells per step, which the 1-cell step-up could never climb.)
+    const crownMaxY = Math.max(
+        ...[...crownPlatforms.keys()].map((key) => Number(key.split(',')[1])));
+    t.ok('GUMOI arena stays camera-readable (no tall staging)', crownMaxY <= 2,
+        `maxY=${crownMaxY}`);
+    const crownSolids = new Map();
+    crown.build?.(crownSolids, { fillBox });
+    t.ok('GUMOI solid map has no raised terrace columns',
+        ![...crownSolids.keys()].some((key) => Number(key.split(',')[1]) >= 1));
+
+    // Beat-07: post-boss return across the weeping-hall chasm.
+    // Dual rim anchors + Hydroid onDefeat must clear blocker:b07-hall-gap
+    // so blockers.js can spawn a physics-registered floor bridge.
+    {
+        const hall = BEAT07_DEF.rooms.weepinghall;
+        const gap = (hall.blockers || []).find((b) => b.id === 'b07-hall-gap');
+        t.ok('b07 hall has grapple_gap', !!gap && gap.type === 'grapple_gap');
+        t.ok('b07 hall gap has reverseAnchor for return trip',
+            gap && gap.reverseAnchor && gap.anchor
+            && gap.reverseAnchor.z < gap.rect.z0
+            && gap.anchor.z > gap.rect.z1);
+        const cross = Math.abs((gap?.anchor?.z ?? 0) - (gap?.reverseAnchor?.z ?? 0));
+        t.ok('b07 hall peg span within base grapple reach (≤10)',
+            cross > 0 && cross <= 10, `span=${cross}`);
+        // onDefeat is closed over attachBoss; smoke the source contract via
+        // cloudcourt.boss factory presence (runtime e2e walks the bridge).
+        t.ok('b07 cloudcourt defines boss factory',
+            typeof BEAT07_DEF.rooms.cloudcourt.boss === 'function');
+    }
+
     // Dungeon sweep: every rebuilt beat meets the per-dungeon checklist shape
     for (const [name, def] of [['b01', BEAT01_DEF], ['b02', BEAT02_DEF],
         ['b03', BEAT03_DEF], ['b04', BEAT04_DEF], ['b05', BEAT05_DEF],
@@ -174,5 +215,67 @@ export function run(t) {
         t.ok(`${name} has an exit to the overworld`,
             rooms.some((r) => (r.doors || []).some((d) => d.type === 'exit'))
             && typeof def.onExit === 'function');
+    }
+
+    // ── Scar Suture ledger.
+    //
+    // Z7 moved the authoritative count to secret-taxonomy.spec.mjs, which
+    // reads the explicit `reward: { type }` field instead of guessing from
+    // display labels, and which counts Sutures across the WHOLE campaign
+    // rather than only beats 07-14 (heart pieces now start in Beat 01 — a
+    // player who never learns that looking around pays will not start looking
+    // in the ninth dungeon).
+    //
+    // What survives here is the narrower thing this file is actually about:
+    // the legacy cache-label hook still works for pickups that have not
+    // declared a reward, so old content keeps paying out.
+    {
+        const sutureBeats = [
+            [7, BEAT07_DEF], [8, BEAT08_DEF], [9, BEAT09_DEF], [10, BEAT10_DEF],
+            [11, BEAT11_DEF], [12, BEAT12_DEF], [13, BEAT13_DEF], [14, BEAT14_DEF],
+        ];
+        let dungeonGrants = 0;
+        for (const [, def] of sutureBeats) {
+            for (const room of Object.values(def.rooms)) {
+                if (typeof room.onBake !== 'function') continue;
+                const picked = [];
+                const stubLevel = {
+                    addPickup(pos, data) { picked.push(data || {}); return {}; },
+                    addSystem() {},
+                    addVoxelQuery() { return () => {}; },
+                    destructibles: [],
+                    keyStore: {
+                        isOpen: () => false,
+                        isPickupTaken: () => false,
+                        markPickupTaken() {},
+                        grantSmallKey() {},
+                        grantBossKey() {},
+                        mapPickup: () => false,
+                        markMapPickup() {},
+                    },
+                };
+                const stubCtx = {
+                    scene: { add() {}, remove() {} },
+                    particles: {},
+                    collisionWorld: { addSolid() {}, removeSolid() {} },
+                };
+                try {
+                    room.onBake(stubLevel, { x: 0, y: 0, z: 0 }, stubCtx);
+                } catch (err) {
+                    // A room whose onBake needs deeper runtime than the stub
+                    // provides still surfaces its pickups first or fails
+                    // loudly here — either way the ledger stays honest.
+                    t.ok(`${def.id} onBake bakeable with stub`, false, String(err));
+                    continue;
+                }
+                dungeonGrants += picked.filter((p) => p.scoreType === 'secret'
+                    || (!p.scoreType && /cache/i.test(p.label || ''))).length;
+            }
+        }
+        t.ok('the legacy cache-label Suture hook still pays out',
+            dungeonGrants > 0, String(dungeonGrants));
+        t.ok('two item-gated overworld Suture grants authored',
+            Object.keys(OVERWORLD_SUTURES).length === 2,
+            JSON.stringify(OVERWORLD_SUTURES));
     }
 }

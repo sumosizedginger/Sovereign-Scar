@@ -111,6 +111,18 @@ export function buildMagmaVent(ox = 0, oz = 0) {
 }
 
 /** Bone arch (Bone Forest). */
+/**
+ * Z1: the arch is BROKEN at the crown, and deliberately so.
+ *
+ * It used to close: a solid lintel across the full span, which from a camera
+ * at height 17.5 is a roof — walk under one and the player vanishes. That was
+ * the last outstanding violation of the camera contract in the campaign.
+ *
+ * Two ribs that corbel inward and stop short read as the same silhouette (a
+ * dead god's ribs never met either; a spine would have) while leaving the
+ * crown open, so each side contributes only a two-cell overhang and the play
+ * space underneath stays visible from above.
+ */
 export function buildBoneArch(ox = 0, oz = 0, w = 4, h = 5) {
     const m = new Map();
     const bone = ABYSS_COLORS.bone;
@@ -118,7 +130,13 @@ export function buildBoneArch(ox = 0, oz = 0, w = 4, h = 5) {
         m.set(vkey(ox - w, y, oz), bone);
         m.set(vkey(ox + w, y, oz), bone);
     }
-    for (let x = -w; x <= w; x++) m.set(vkey(ox + x, h, oz), bone);
+    // Corbel: one cell in at the shoulder, two at the tip. The gap between the
+    // tips is what keeps this a rib and not a lintel.
+    for (const s of [-1, 1]) {
+        m.set(vkey(ox + s * (w - 1), h - 1, oz), bone);
+        m.set(vkey(ox + s * (w - 1), h, oz), bone);
+        if (w >= 3) m.set(vkey(ox + s * (w - 2), h, oz), bone);
+    }
     return m;
 }
 

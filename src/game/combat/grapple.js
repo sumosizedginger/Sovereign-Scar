@@ -1,5 +1,7 @@
 // Magnetic Grapple — short swept pull with cancel if path blocked.
 
+import { gsfx } from '../audio/sfx-bank.js';
+
 export class GrappleController {
     constructor() {
         this.active = false;
@@ -32,6 +34,13 @@ export class GrappleController {
             y: playerPos.y + dy * 0.3,
             z: playerPos.z + dz * s,
         };
+        // The grapple was entirely silent — no launch, no bite, no reel. A
+        // traversal verb the player cannot hear reads as a teleport. The hook
+        // biting and the reel are scheduled from `update` on arrival, so the
+        // three sounds describe the move rather than stacking on its first
+        // frame.
+        gsfx.grappleFire();
+        this._bit = false;
         return true;
     }
 
@@ -44,6 +53,7 @@ export class GrappleController {
 
         this.t += dt;
         const u = Math.min(1, this.t / this.duration);
+        if (!this._bit && u > 0.18) { this._bit = true; gsfx.grappleHit(); gsfx.grapplePull(); }
         // Ease out
         const e = 1 - (1 - u) * (1 - u);
         let x = this.from.x + (this.to.x - this.from.x) * e;

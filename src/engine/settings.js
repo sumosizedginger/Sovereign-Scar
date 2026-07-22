@@ -14,7 +14,7 @@ const KEYS = {
 };
 
 export const SETTING_DEFAULTS = {
-    difficulty: 'normal',        // easy | normal | hard
+    difficulty: 'medium',        // legacy preference only; run mode lives in campaign progress
     masterVolume: 1,
     sfxVolume: 1,
     musicVolume: 1,
@@ -111,22 +111,43 @@ export function markProgressFlag(arrayField, id) {
     }
 }
 
-export function getScores() {
-    return scores.slice();
+export function getScores(filter = null) {
+    let out = scores.slice();
+    if (filter?.runMode) out = out.filter((s) => s.runMode === filter.runMode);
+    if (filter?.scoreVersion != null) out = out.filter((s) => s.scoreVersion === filter.scoreVersion);
+    return out.sort((a, b) => b.score - a.score);
 }
 
-/** Record a run; keeps the top MAX_SCORES sorted descending. */
+/** Record a run; keeps a separate top ten for each mode and score version. */
 export function addScore(entry) {
-    scores.push({
+    if (entry.runId && scores.some((score) => score.runId === entry.runId)) {
+        return getScores({ runMode: entry.runMode || 'medium', scoreVersion: entry.scoreVersion || 1 });
+    }
+    const stored = {
         score: entry.score | 0,
         hero: entry.hero || '',
         ending: entry.ending || null,
-        date: entry.date || new Date().toISOString().slice(0, 10)
-    });
-    scores.sort((a, b) => b.score - a.score);
-    scores = scores.slice(0, MAX_SCORES);
+        runMode: entry.runMode || 'medium',
+        completed: !!entry.completed,
+        beatReached: entry.beatReached || null,
+        bosses: entry.bosses | 0,
+        secrets: entry.secrets | 0,
+        deaths: entry.deaths | 0,
+        playTime: Number(entry.playTime) || 0,
+        scoreVersion: entry.scoreVersion || 1,
+        eligible: entry.eligible !== false,
+        runId: entry.runId || null,
+        date: entry.date || new Date().toISOString().slice(0, 10),
+    };
+    scores.push(stored);
+    const group = (s) => `${s.runMode || 'medium'}:${s.scoreVersion || 1}`;
+    const key = group(stored);
+    const keep = scores.filter((s) => group(s) === key)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, MAX_SCORES);
+    scores = scores.filter((s) => group(s) !== key).concat(keep);
     writeJSON(KEYS.scores, scores);
-    return scores;
+    return getScores({ runMode: stored.runMode, scoreVersion: stored.scoreVersion });
 }
 
 /**
@@ -135,8 +156,8 @@ export function addScore(entry) {
  */
 export function difficultyMultipliers() {
     const d = settings.difficulty;
-    if (d === 'easy') return { enemyHp: 0.7, enemyDmg: 0.7 };
-    if (d === 'hard') return { enemyHp: 1.3, enemyDmg: 1.25 };
+    if (d === 'easy') return { enemyHp: 0.7, enemyDmg: 0.6 };
+    if (d === 'hard') return { enemyHp: 1.2, enemyDmg: 1.35 };
     return { enemyHp: 1, enemyDmg: 1 };
 }
 

@@ -17,16 +17,31 @@ import { buildBoneArch, stampMap, buildBoulder } from '../assets/props.js';
 import { DestructibleVoxelMesh } from '../world/destructible-voxel-mesh.js';
 import { SkeletalMantis, attachBoss } from '../bosses/index.js';
 import { addAltar } from '../world/altar.js';
+import { collectUnstableSpore } from '../narrative/item-chains.js';
 
 export const BEAT08_DEF = {
     id: 'beat-08-bone',
     name: '08 Bone Forest',
     mood: 'abyss',
+    // Per-level luminance trim into the Abyss certification band [35,75]
+    // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
+    lightTune: { ambient: 2.6 },
     start: 'rootgate',
     prebake: true,
-    floorColor: 0x2a2618,
+    floorColor: 0x544c34, // certification retune: old 0x2a2618 sat under 2% linear reflectance
     wallColor: ABYSS_COLORS.abyssWall,
     banner: 'Ribs of a dead god form this canopy. Something prays with blades.',
+    // Z6 — this dungeon's one idea, and the four rooms that carry it:
+    // introduce it safely, complicate it, fuse it with combat, then examine it.
+    theme: {
+        id: 'flanking',
+        name: 'Behind the Plate',
+        hint: "Lock on with T, then circle. Facing stops following your feet — that is how you get behind armour.",
+        teach: 'bonegrove',
+        develop: 'gravecanopy',
+        combine: 'ribvault',
+        test: 'prayerhollow',
+    },
     keys: [
         { room: 'bonegrove', type: 'small' },
         { room: 'ossuary', type: 'small' },
@@ -59,8 +74,8 @@ export const BEAT08_DEF = {
                 stampMap(map, buildBoneArch(6, -4, 3, 5), 0, 1, 0);
             },
             enemies: [
-                { x: -5, z: 4, kind: 'sentinel', hp: 4 },
-                { x: 5, z: -5, kind: 'scarab', hp: 4, ai: 'charge' },
+                { x: -5, z: 4, kind: 'bulwark', hp: 4 },
+                { x: 5, z: -5, kind: 'lancer', hp: 4 },
             ],
             doors: [
                 { to: 'rootgate', side: 'S', at: 0, type: 'open' },
@@ -80,7 +95,7 @@ export const BEAT08_DEF = {
             build(map, h) {
                 stampMap(map, buildBoneArch(0, 0, 3, 4), 0, 1, 0);
             },
-            enemies: [{ x: 3, z: 3, kind: 'frost', hp: 3, ai: 'ranged' }],
+            enemies: [{ x: 3, z: 3, kind: 'bulwark', hp: 3, ai: 'ranged' }],
             doors: [{ to: 'bonegrove', side: 'E', at: 0, type: 'open' }],
             onBake(level, origin) {
                 if (!level.keyStore.mapPickup()) {
@@ -99,7 +114,7 @@ export const BEAT08_DEF = {
             grid: [1, -1],
             half: 8,
             wallH: 4,
-            enemies: [{ x: -3, z: -3, kind: 'scarab', hp: 4, ai: 'charge' }],
+            enemies: [{ x: -3, z: -3, kind: 'lancer', hp: 4, ai: 'charge' }],
             platforms(map, h) {
                 // A bone deck reached by 1-high vertebra steps
                 for (let lvl = 1; lvl <= 3; lvl++) {
@@ -124,6 +139,7 @@ export const BEAT08_DEF = {
                 level.addPickup({ x: origin.x + 4, y: 1.2, z: origin.z + 3 }, {
                     color: 0x7fe0ff,
                     label: 'Caged cache',
+                    reward: { type: 'currency' },
                     onPickup(game) {
                         game.player.inventory.addShards(25);
                         game.hud?.toast?.('Caged cache — 25 shards');
@@ -140,8 +156,8 @@ export const BEAT08_DEF = {
                 h.fillBox(map, 6, 7, 1, 3, -3, 3, ABYSS_COLORS.bone);
             },
             enemies: [
-                { x: -4, z: 0, kind: 'sentinel', hp: 4 },
-                { x: 4, z: 0, kind: 'frost', hp: 3, ai: 'ranged' },
+                { x: -4, z: 0, kind: 'bulwark', hp: 4 },
+                { x: 4, z: 0, kind: 'lancer', hp: 3 },
             ],
             doors: [
                 { to: 'bonegrove', side: 'S', at: 0, type: 'locked' },
@@ -173,12 +189,22 @@ export const BEAT08_DEF = {
             ],
             onBake(level, origin) {
                 level.addPickup({ x: origin.x + 2, y: 1.2, z: origin.z + 2 }, {
-                    color: 0x7fe0ff,
-                    label: 'Marrow cache',
+                    color: 0xff7a90,
+                    label: 'Scar Suture',
+                    reward: { type: 'suture' },
                     onPickup(game) {
-                        game.player.inventory.addShards(30);
-                        game.hud?.toast?.('Marrow cache — 30 shards');
+                        if (game.collectSuture?.('b08-marrow')) {
+                            game.hud?.toast?.("Scar Suture recovered from the marrow.", 2600);
+                        }
                     },
+                });
+                // §7 Entropy Dust chain, step 1: the unstable spore grows in
+                // the same wedge-cracked pocket. No 'cache' label — this is a
+                // quest object, not a Suture-eligible secret.
+                level.addPickup({ x: origin.x - 2, y: 1.2, z: origin.z + 2 }, {
+                    color: 0xa0ff60,
+                    label: 'Unstable spore',
+                    onPickup(game) { collectUnstableSpore(game); },
                 });
             },
         },
@@ -187,9 +213,9 @@ export const BEAT08_DEF = {
             half: 8,
             wallH: 5,
             enemies: [
-                { x: -3, z: -3, kind: 'scarab', hp: 4, ai: 'charge' },
-                { x: 3, z: -3, kind: 'sentinel', hp: 4 },
-                { x: 0, z: 3, kind: 'frost', hp: 3, ai: 'ranged' },
+                { x: -3, z: -3, kind: 'bulwark', hp: 4 },
+                { x: 3, z: -3, kind: 'lancer', hp: 4 },
+                { x: 0, z: 3, kind: 'bulwark', hp: 3 },
             ],
             platforms(map, h) {
                 for (let lvl = 1; lvl <= 3; lvl++) {

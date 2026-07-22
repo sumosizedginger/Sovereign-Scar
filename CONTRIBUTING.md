@@ -33,6 +33,28 @@ attempts (see the `fix:` commit history around the CI workflow if you're
 curious). Run `npm test` locally — it's the real check for anything that
 touches rendering, and it's required before tagging a release.
 
+## Writing specs for gameplay rules
+
+Two rules earned the hard way, both by shipping a green suite over a broken
+game. See [ZeldaLevel.md](ZeldaLevel.md) §6 for the full post-mortems.
+
+**Test reachability, not just the mechanism.** A spec that *constructs* the
+situation it tests only proves the mechanism exists. `bestiary.spec.mjs`
+asserted a bulwark's front plate blocked melee by placing the attacker in front
+of it by hand — and passed for the entire time the bulwark was literally
+unkillable, because enemy facing snapped at the player every frame and the flank
+was geometrically unreachable. A spec for a combat rule should **drive the real
+code from where the player actually stands**: simulate movement at player speed,
+step the production update loop, and assert the counterplay can be *reached*.
+
+**Measure the player, not only the content.** The difficulty curve looked fine
+until weapon damage went in the denominator; it was in fact running backwards,
+with beats 05–14 dying in under two hits. If a number describes a fight, express
+it in the unit the player experiences — landed hits, seconds — not in HP.
+
+And when a design rule is worth having, ship the spec that makes violating it a
+build failure. Design intent that is not enforced decays back into bugs.
+
 ## Code style
 
 Match the neighbors: 4-space indent, LF line endings, no semicolon-free

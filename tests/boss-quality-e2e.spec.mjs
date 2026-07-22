@@ -60,6 +60,8 @@ export async function run(t) {
         await page.goto(server.url, { waitUntil: 'domcontentloaded', timeout: 60000 });
         await page.waitForFunction(() => !!(window.__sovereignScar?.player), { timeout: 30000 });
         await page.mouse.click(400, 300);
+        await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('Enter');
         await sleep(500);
 
         const results = await page.evaluate(async (BEATS) => {

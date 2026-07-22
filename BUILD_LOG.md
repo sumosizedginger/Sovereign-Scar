@@ -270,16 +270,271 @@ Reported by hand at the Sand Spur: *"This is not a very Zelda like fight, it lit
 
 Suite **1056 → 1140/1140**. All 14 bosses: react ✅ · open a window ✅ · die to melee from the floor ✅.
 
+## Session 9 — gremlin audit (diagnosed, not yet fixed)
+
+Reported by hand at beat-13 GUMOI Tower: *"I was able to just run to whatever
+level this is without issue, and I might have won if I didn't get stuck in
+the boss fight. Be a gremlin, scan the codebase, provide a detailed write-up
+on everything you find that could cause similar issues."* Explicitly
+audit-only — no code touched this session.
+
+**Two confirmed root causes plus one graphics opportunity**, full detail +
+code citations in [AUDIT-progression-and-geometry.md](AUDIT-progression-and-geometry.md):
+
+- **Progression gating has a hole at the one path players actually use.**
+  The pause-menu Beat Select (`ui/menu.js:46`) and the `[`/`]` beat-cycle
+  keys (`index.js:616-628`) both correctly check `unlockedBeats` — but
+  walking up to a dungeon door on the overworld and pressing E
+  (`overworld.js:144-151`) calls `game.loadLevel?.(en.to)` with **no check
+  at all**. Worse, `loadLevel()` unconditionally persists `currentBeat` to
+  the save on every load (`index.js:262-267`), and the menu's own gate
+  treats `meta.id === prog.currentBeat` as sufficient to unlock — so one
+  un-gated walk through any door **permanently clears that beat's 🔒**,
+  independent of `unlockedBeats`/boss kills. This is the entire explanation
+  for reaching beat 13 with Bare Strike / 0 keys / Bosses 0/14: no exploit,
+  just ordinary overworld exploration.
+- **beat-13's boss arena has unclimbable "climbable" terraces.** The engine's
+  `CollisionWorld` is 2D XZ-only (no Y at all); `meshAndCollide()` registers
+  *any* column with a voxel at y≥1 as a full-height wall forever
+  (`level-builder.js:61-75`, comment says as much). The project's own fix
+  for this is the `platforms()` builder path, meshed with `collisionWorld:
+  null` specifically so tops are standable (`room-graph.js:236-243`) — used
+  correctly everywhere else, including beat-13's own `stairworks` room. But
+  `witnesscrown` (the GUMOI Witness's own room) puts its five-tier "tower-top
+  terraces, climbable to the Witness" inside `build()` instead
+  (`beat-13-gumoi.js:199-206`) — every tier registers as an impassable wall.
+  Bosses never touch `CollisionWorld` (`bosses/base.js` has zero references),
+  so the Witness can freely corner the player against these accidentally-
+  solid faces while the player can't step around them — plausible root cause
+  for both "stuck in the boss fight" and "camera clipped into large geometry
+  blocks" (worsened by the boss-intro camera dip, `index.js:666`, pulling
+  the camera tight the instant the room is entered).
+- **Graphics opportunity (informational, not a bug):** live research
+  (2026-07-19) found `GTAOPass` — dynamic contact AO, unlike the existing
+  baked per-vertex voxel AO which can't darken where a moving character
+  presses against static geometry — drops into the existing
+  `EffectComposer` pipeline in `renderer.js` with no WebGPU/TSL migration
+  needed. Gateable behind the `ultra` quality tier. Touches frozen
+  `src/engine/`, so it needs explicit sign-off separate from the audit-only
+  directive covering the two findings above.
+
+Checked and ruled out: dev mode (`dev-mode.js:18`, off by default), the Tab
+map (`ui/map-screen.js`, read-only, no travel calls), mirror travel
+(`startSwap`, mood-only). Checked for recurrence: swept every `build()` body
+across all 14 beats for the same "climbable terrain in the wrong builder"
+mistake — `witnesscrown` is the only occurrence.
+
+Suite unchanged: **1140/1140** (no code modified, no new tests added yet —
+neither finding is currently covered by the existing suite).
+
+**New:** [Key.md](Key.md) — a hand-curated data-dictionary source of truth
+(save schema, beat/boss/weapon/upgrade ids, door/blocker types, quality
+tiers, mood/palette keys, menu screens, input bindings), gathered to make
+cross-file key mismatches like Finding 1 above checkable against one doc
+instead of a grep sweep.
+
+## AUDITv2 reconstruction, tickets C–G (2026-07-20) — suite 1140 → 1436
+
+Full audit in [AUDIT-progression-and-geometryv2.md](AUDIT-progression-and-geometryv2.md);
+visual sign-off in [CERTIFICATION.md](CERTIFICATION.md) Session 7.
+
+- **C** — deterministic presentation. `mood-controller.reapplyVisual` re-derives
+  the post stack from (quality, mood) together, so the final frame no longer
+  depends on which was set last.
+- **D** — two-subject boss framing in `camera-rig.js`; foreground occlusion fade
+  (`fx/occlusion.js`); HUD toast dedupe.
+- **E** — per-region overworld grammars (`overworld/grammars.js`): eight
+  silhouettes that read apart in grayscale, Crust and Abyss differing in *form*
+  rather than palette, with route/spawn/feature protection. Replaced the
+  palette-only `buildTerrain`.
+- **F** — named-pivot actor rigs (`characters/{actor-rig,actor-animator,pose-library,archetypes}.js`),
+  so enemy kinds diverge in rest pose and gait, not only colour.
+- **G** — material families via a bounded `onBeforeCompile` (`render/materials.js`):
+  roughness/metalness by vertex-colour class with albedo untouched so luminance
+  bands hold; mean-preserving mottling; pooled local lights; synchronous shader
+  prewarm; 14 per-dungeon material kits.
+
+**Ticket H (Ultra GTAO) deliberately not taken** — no AO pass exists, so low/med/
+high would pay nothing for it, and the audit only retains it if paired on-GPU
+captures and frame measurements prove its worth, which headless CI cannot
+produce. **Ticket I is the owner's:** regenerating the 44 stale binary captures,
+which pairs with the by-hand 60 fps playthrough.
+
+Two engine-adjacent lessons worth keeping: raising `metalness` *darkens* geometry
+under this engine's minimal environment lighting (metals have no diffuse and
+there is no envmap), which pushed the metal-heavy Abyss beats below their
+luminance floor — keep the boost ≤ ~0.15. And `renderer.compileAsync` is
+unusable in CI: it polls `KHR_parallel_shader_compile` and throws under software
+GL, so prewarm uses the synchronous `renderer.compile`.
+
+## ZeldaLevel design pass, tickets Z1–Z7 (2026-07-21) — suite 1436 → 1879
+
+Design audit written to [ZeldaLevel.md](ZeldaLevel.md) and then executed. The
+audit's headline finding — *1,455 automated tests passed while the GUMOI boss
+room was inescapable* — set the shape of the work: **every ticket ships the rule
+and the spec that makes violating it a build failure.**
+
+| ticket | rule established | spec |
+|---|---|---|
+| Z1 camera contract | no contiguous overhead mass over play space (>4 cells above y=3) | `camera-contract` |
+| Z2 legible traversal | every climbable one-cell rise is visibly marked as one | `traversal-legibility` |
+| Z3 guard + parry | every telegraph has an answer that is not retreat | `guard` |
+| Z4 lock-on | the player can always face what they are fighting | `lock-on` |
+| Z5 bestiary | an enemy exists to ask a different question; no two dungeons share a roster | `bestiary` |
+| Z6 dungeon pedagogy | every dungeon introduces → develops → combines → tests one idea | `dungeon-pedagogy` |
+| Z7 secret taxonomy | reward type is data, not a guess about a display label | `secret-taxonomy` |
+
+Measured deltas: worst overhead cluster 9 → 2 cells; 565 climbable rises marked;
+enemy kinds 3 → 7 with all 14 rosters distinct; Scar Sutures redistributed to
+exactly one per dungeon (14 + 2 overworld = 16 = four optional hearts).
+
+**Two defects the unit suite could not see.** `dev-mode.js` permanently wrapped
+`player.health.damage` with a two-argument function, discarding `source` and
+`meta` — the guard resolves direction from `meta.from`, so the shield never
+engaged in the *running game* while every unit test passed, because the tests
+construct `HealthPool` directly. And rewards were dispatched by string-matching
+pickup labels, which surfaced only when Z7 renamed eight of them and the heart
+ledger broke.
+
+## ZeldaLevel follow-up pass (2026-07-21) — suite 1879 → 1971
+
+Owner playtest of the Z1–Z7 work produced one line — *"Cannot kill this mob"* —
+that 1,879 green tests had missed. Full write-up in [ZeldaLevel.md](ZeldaLevel.md) §6,
+certification in [CERTIFICATION.md](CERTIFICATION.md) Session 9.
+
+- **`enemy.js` — `turnRate`.** Z5 gave the bulwark a front plate and, in the
+  same pass, made facing snap at the player every frame, so the plate tracked
+  its attacker and the kind was unkillable by melee. `Infinity` for every other
+  kind (bit-for-bit unchanged); 2.2 rad/s for plated.
+- **`enemy.js` — `_separateFrom()`.** Nothing stopped the player standing inside
+  an enemy, and at zero separation `inFrontArc` has no bearing to work from. The
+  enemy yields, never the player.
+- **`enemy.js` — `freeSpotNear()`.** Brood children were placed blind at radius
+  1.1; killing one against a wall buried half the litter in masonry, where
+  nothing could reach it and every room-clear gate waited forever.
+- **`ui/coach.js` (new).** One-shot hints fired at the moment a mechanic refuses
+  input, via an injected sink — combat code has no HUD handle.
+- **49 `ai:` overrides stripped** from `beat-*.js`: 65 of ~120 authored enemies
+  contradicted their own kind (18 lancers that never lunged, 12 motes that never
+  burst). ~11 deliberate variants kept.
+- **`world/threat-curve.js` (new).** Enemy and boss HP scale with the beat they
+  spawn in. Authored HP was flat while player damage tripled, so beats 05–14 all
+  died in under two hits and nine of fourteen bosses died faster than the beat-01
+  tutorial boss. Beats 1–4 untouched; beat 05 deliberately the softest of the
+  back half (it grants the Wedge). Applied in `room-graph.bakeRoom` and after the
+  boss factory.
+- New specs `threat-curve`, `coach`; probes `tests/qa/{time-to-kill,difficulty-curve,ai-override-audit}.mjs`.
+
+## Audio-visual pass (2026-07-22) — suite 1971 → 2315
+
+Owner brief: *"All music needs to be changed to music that a human will
+actually enjoy listening to, we need sounds for attacks and other things the
+player does, we need graphics for grappling and other tools you collect."*
+
+**Music — `src/game/audio/{theory,instruments,tracks,score}.js` (new).**
+The previous soundtrack was three sine drones and a tick every 0.9 s,
+transposed per dungeon by a frequency ratio; a ratio is not a key and a drone
+is not a tune. Replaced with a generated score: real modes, chord progressions
+with voice leading, melodies notated as scale degrees, nine synth voices, a
+shared convolution reverb and a tempo-synced delay. Four base pieces with
+twenty-two variations, so the campaign shares musical DNA. Timing moved off the
+render loop onto a ~200 ms lookahead against the AudioContext clock — the old
+pulse advanced by `dt`, so a dropped frame was a late note. Layers fade in on a
+scene-derived intensity, so combat thickens the tune rather than switching it.
+
+Register bug caught by `tests/qa/score-readout.mjs`, which prints the score as
+note names: voice leading alone walked the Am–F–C–G pad down two octaves across
+four bars and then leapt back on the loop. `theory.recenter` shifts voicings by
+whole octaves (harmony-preserving) to hold the register.
+
+**Sound — `src/game/audio/sfx-bank.js` (new).** 30 sounds over the kit's
+generic primitives. The headline fix: a parry and a failed block both called
+`sfx.block()`, so the game's most and least skilful outcomes were acoustically
+identical. Parry is now the loudest sound in the bank at ~4× a block. Per-weapon
+swings weighted by mass; four distinct combat outcomes; and audio added to
+lock-on, guard raise/lower/break, doors, locked doors, boss doors, the grapple's
+launch/bite/reel, menus, low health, and five kinds of pickup that previously
+shared one chime.
+
+**Visuals.**
+- `assets/weapon-models.js` + `fx/held-weapon.js` — all five weapons rendered as
+  an empty fist. Models parent to the rig's `armR` pivot so they inherit every
+  swing the animator already drives. A legibility fix, not a cosmetic one: the
+  Wedge reaches 2.2 and the Mallet sweeps 90°.
+- `fx/grapple-rope.js` — the grapple had no rope, hook or anchor markers at all.
+  Rope with a leading hook and slack take-up, plus pulsing markers on anchors in
+  reach (which teaches the range). `blockers.js` exposes `anchorPoints`;
+  room-graph exposes `grappleAnchors()`.
+- `assets/pickup-shapes.js` — every pickup was the same octahedron in a
+  different colour. Seven reward types, seven silhouettes. Colour alone does not
+  survive the Abyss grade, bloom, or a colour-blind player.
+
+**Suite reliability.** The luminance certification gate took max-of-two
+samples, which catches flicker peaks rather than rejecting them — Beat 13
+(flicker 0.45) failed intermittently at 96.6 against a 75 ceiling while
+actually sitting at ~36. Now median-of-five. Beat 01's tomb also gained
+gold-leaf wall seams: it sat ~0.2 above the crust floor, and pale accent
+geometry is the documented remedy rather than a lighting change. Full suite now
+passes twice consecutively at 2315/2315.
+
+New specs `music` (309 assertions) and `game-feel-visuals`; probes
+`tests/qa/score-readout.mjs`. One additive engine export under SS-027:
+`synth.channelGain(channel)`, so game-side persistent buses honour the same
+volume settings.
+
+### Session 11 — the drone under the music, and a look at the renderer
+
+**The hum the score was written to remove was still playing.** The owner
+reported a drone under the new soundtrack, and they were right three times
+over — but only one of the three was in the score engine. `MoodController`
+started a raw oscillator on every mood change (square 80 Hz in the Crust,
+triangle 220 Hz in the Abyss) that predated the score and survived the rewrite;
+the chord voice held 105% of a bar so consecutive chords overlapped; and the
+reverb return at 0.9 filled the remaining gaps back in. Chords are now *struck*
+on a per-track `comp` rhythm with their length derived from the distance to the
+next strike, the mood drone and its preset data are gone, and the Abyss noise
+pulse moved to the effects bus.
+
+**The measurement mattered more than the fix.** Every audio check the project
+had could only prove sound was being produced, which was never the claim in
+dispute. `score.renderOffline` renders the real scheduler through the real
+voices into an `OfflineAudioContext`, and `tests/audio-render-e2e.spec.mjs`
+asserts the signal falls to near-silence between notes: the previous
+arrangement measures 11.4% of peak in its quietest windows and fails; the
+current one measures 1.1–3.7%. Dynamic range went from 7.4× to 21–70×.
+
+The envelope probe (`tests/qa/audio-envelope.mjs`) earned its keep on the first
+run by catching the spec **passing for the wrong reason** — an offline render
+started before the page has ever had a live AudioContext returns truncated, and
+five seconds of digital silence is a superb 5th percentile. `renders to the end`
+is asserted before anything else now. Suite 2478/2478.
+
+**Renderer audit.** Measured, not guessed, and written up in
+[docs/VISUAL_PLAN.md](docs/VISUAL_PLAN.md) rather than acted on: the sun's
+shadow frustum is a ±30 box at the world origin and never moves, while rooms sit
+on a 64-unit grid — so **five of Beat 01's six rooms have no sun shadows**, and
+the reason nobody noticed is that every dungeon starts in the room at the grid
+origin. Only 1 of 96 meshes receives shadows. `scene.environment` is null and
+the engine's PMREM builder is never called, which is why `materials.js`
+deliberately caps metalness at 0.12. Ambient sits at 1.7 against a key of 1.9.
+And the luminance certification gate measures the *mean*, which cannot tell a
+well-lit room from a flat one — so it has been quietly rewarding flatness. The
+gate needs a contrast floor before the lighting work can happen.
+
 ## Known remaining polish (not blockers)
 - Boss fights are arena-scripted phases (not full cinematic cutscenes / unique OST stems)
-- Music is synthesized beds + motifs, not composed tracks
+- Music is generated in-engine rather than composed and recorded — deliberate (zero-build, offline, no binaries), but whether it is *enjoyable* is a judgement only ears make
 - Some arena floors share shell scale — visual variety is props + boss mesh + mood, not bespoke terrain tools
+
+## Known issues (not yet fixed)
+- Overworld dungeon entrances skip beat-unlock gating, and `loadLevel` retro-unlocks the Beat Select entry as a side effect — see Session 9 above and [AUDIT-progression-and-geometry.md](AUDIT-progression-and-geometry.md).
+- beat-13 `witnesscrown` boss-arena terraces are built as solid walls instead of climbable platforms — same doc.
 
 ## How to run
 ```bash
 cd sovereign-scar
-npm test          # full suite (1140)
+npm test          # full suite (2478)
 npm run test:unit
 npm run serve     # http://127.0.0.1:8799/
 ```
-Controls: [docs/CONTROLS.md](docs/CONTROLS.md) · Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+Controls: [docs/CONTROLS.md](docs/CONTROLS.md) · Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Rendering roadmap: [docs/VISUAL_PLAN.md](docs/VISUAL_PLAN.md)

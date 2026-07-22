@@ -22,4 +22,13 @@ export function run(t) {
     const inv2 = Inventory.fromJSON(json);
     t.ok('round-trip keys', inv2.memoryKeyCount === 3);
     t.ok('round-trip item', inv2.hasItem('heavy_mallet'));
+    for (let i = 0; i < 3; i++) t.ok(`suture ${i + 1} does not form heart`, !inv.grantScarSuture().heartEarned);
+    t.ok('fourth Scar Suture forms a heart', inv.grantScarSuture().heartEarned);
+    const inv3 = Inventory.fromJSON(inv.toJSON());
+    t.ok('Scar Sutures persist', inv3.scarSutures === 4);
+    for (let i = 0; i < 4; i++) t.ok(`Memory Vial chassis ${i + 1} is found`, inv.grantMemoryVialSlot());
+    t.ok('Memory Vial chassis cap is four', !inv.grantMemoryVialSlot());
+    const inv4 = Inventory.fromJSON(inv.toJSON());
+    t.ok('Memory Vial chassis and fills persist', inv4.memoryVialSlots === 4
+        && inv4.consumables.memoryVials === 4);
 }

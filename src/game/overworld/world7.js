@@ -6,7 +6,8 @@
 
 import { CRUST_COLORS, ABYSS_COLORS } from '../assets/palettes.js';
 import { CRUST_REGION } from './screens.js';
-import { REGION_MOTIFS } from '../fx/motifs.js';
+import { addForkDigSite, addWeatherRelay, addEngineerCamp } from '../narrative/item-chains.js';
+import { runGrammar } from './grammars.js';
 
 // ── Seeded rand (mulberry32 over a string hash) ────────────────────────────
 function hash(str) {
@@ -64,7 +65,7 @@ const REGIONS = {
     },
 };
 
-function regionOf(r, c) {
+export function regionOf(r, c) {
     if (r <= 1 && c <= 2) return 'tombfields';
     if (r <= 1 && c <= 4) return 'spindle';
     if (r <= 1) return 'pyre';
@@ -119,8 +120,27 @@ const BLOCKERS = {
     'r6c0': [{ type: 'caster_dark', id: 'ow7-dark-sluice', rect: { x0: 8, x1: 16, z0: 6, z1: 12 } }],
 };
 
+// Scar Sutures: the campaign ledger promises SIXTEEN automatic grants (four
+// optional hearts at four Sutures each). Fourteen come from cache-labelled
+// dungeon pickups in beats 07-14; these two item-gated overworld secrets
+// complete the count. Each sits past a C4 blocker so the acquisition needs
+// its gating item, per the spec's "item-gated overworld secrets" pattern.
+export const OVERWORLD_SUTURES = {
+    'r3c0': { x: -20, z: 1 },   // across the sinklands grapple gap (magnetic_grapple)
+    'r6c3': { x: -11, z: -16 }, // beyond the bone dash ledge (phase_boot)
+};
+
+// §7 acquisition-chain props (narrative/item-chains.js): the Fork's buried
+// dig site sings in the quarry region, its waking relay stands two screens
+// east, and the rescued systems engineer camps west of the Bone Forest gate.
+export const CHAIN_PROPS = {
+    'r4c2': { kind: 'digsite', x: 10, z: -6 },
+    'r4c4': { kind: 'relay', x: -8, z: 8 },
+    'r6c1': { kind: 'camp', x: 8, z: 6 },
+};
+
 // ≥1 secret shard cache per region (screen → cache spot)
-const SECRETS = {
+export const SECRETS = {
     'r0c0': { x: -18, z: -18, shards: 20 }, // tombfields
     'r0c2': { x: 16, z: -16, shards: 20 },  // spindle
     'r2c0': { x: -16, z: 14, shards: 20 },  // sinklands
@@ -131,32 +151,22 @@ const SECRETS = {
     'r1c6': { x: 16, z: 4, shards: 25 },    // pyre
 };
 
-function buildTerrain(sid, region, variant) {
+// Per-screen decorative feature anchors the grammar must keep clear so denser
+// dressing never buries a secret cache, suture, or acquisition-chain prop.
+function screenFeatures(sid) {
+    const feats = [];
+    if (SECRETS[sid]) feats.push(SECRETS[sid]);
+    if (OVERWORLD_SUTURES[sid]) feats.push(OVERWORLD_SUTURES[sid]);
+    if (CHAIN_PROPS[sid]) feats.push(CHAIN_PROPS[sid]);
+    return feats;
+}
+
+// Ticket E: delegate terrain to the regional grammar registry. `s` is captured
+// by reference so the grammar's route protection reads the screen's finished
+// edges/entrances/monolith/blockers at bake time, not at closure-creation time.
+function buildTerrain(sid, region, variant, s, features) {
     return (map, h) => {
-        const rand = rng(sid + ':' + variant);
-        const R = REGIONS[region];
-        const n = Math.floor(4 + R.density * 8);
-        for (let i = 0; i < n; i++) {
-            const x = Math.floor(rand() * 38) - 19;
-            const z = Math.floor(rand() * 38) - 19;
-            const kind = rand();
-            if (Math.hypot(x, z) < 5) continue; // keep spawn/center clear
-            if (kind < 0.45) {
-                // slab
-                const w = 1 + Math.floor(rand() * 3);
-                h.fillBox(map, x, x + w, 1, 1 + Math.floor(rand() * 2), z, z + Math.floor(rand() * 2) + 1,
-                    variant === 'abyss' ? R.abyssAccent : R.crustAccent);
-            } else if (kind < 0.65) {
-                // pillar
-                h.fillBox(map, x, x, 1, 3 + Math.floor(rand() * 2), z, z,
-                    variant === 'abyss' ? ABYSS_COLORS.violet : CRUST_COLORS.slate);
-            } else {
-                // floor stain / vein
-                h.fillBox(map, x, x + 2 + Math.floor(rand() * 3), 0, 0, z, z + 1,
-                    variant === 'abyss' ? ABYSS_COLORS.goldVein
-                        : (region === 'bonetown' ? CRUST_COLORS.tombMoss : CRUST_COLORS.bloodStain));
-            }
-        }
+        runGrammar(region, variant, rng(sid + ':' + variant), s, features, map, h);
     };
 }
 
@@ -184,21 +194,24 @@ export function buildWorld7() {
                 const src = hand[handAt[sid]];
                 screens[handAt[sid]] = {
                     ...src, edges: [...src.edges], grid: [8 + c, 8 + r],
-                    motif: REGION_MOTIFS[region] || null, // C7
+                    track: region, // region composition (audio/tracks.js)
                 };
                 continue;
             }
 
+            const feats = screenFeatures(sid);
             const s = {
                 grid: [8 + c, 8 + r],
                 floorColor: R.crustFloor,
                 edges: [],
-                build: buildTerrain(sid, region, 'shared'),
-                crust: { build: buildTerrain(sid, region, 'crust') },
-                abyss: { build: buildTerrain(sid, region, 'abyss') },
-                motif: REGION_MOTIFS[region] || null, // C7
+                track: region, // region composition (audio/tracks.js)
                 enemies: [],
             };
+            // Grammar closures capture `s` so route/feature protection reads the
+            // finished screen (edges are appended later, before any bake).
+            s.build = buildTerrain(sid, region, 'shared', s, feats);
+            s.crust = { build: buildTerrain(sid, region, 'crust', s, feats) };
+            s.abyss = { build: buildTerrain(sid, region, 'abyss', s, feats) };
             const mobCount = 1 + Math.floor(rand() * 2 + R.density);
             for (let i = 0; i < mobCount; i++) {
                 const kind = R.enemies[Math.floor(rand() * R.enemies.length)];
@@ -215,16 +228,39 @@ export function buildWorld7() {
             if (MONOLITHS.has(sid)) s.monolith = { x: 12, z: 12 };
             if (BLOCKERS[sid]) s.blockers = BLOCKERS[sid];
             const secret = SECRETS[sid];
-            if (secret) {
-                s.onBake = (level, origin) => {
-                    level.addPickup({ x: origin.x + secret.x, y: 1.2, z: origin.z + secret.z }, {
-                        color: 0x7fe0ff,
-                        label: 'Hidden cache',
-                        onPickup(game) {
-                            game.player.inventory.addShards(secret.shards);
-                            game.hud?.toast?.(`Hidden cache — ${secret.shards} shards`);
-                        },
-                    });
+            const suture = OVERWORLD_SUTURES[sid];
+            const chainProp = CHAIN_PROPS[sid];
+            s.secret = !!secret;
+            if (secret || suture || chainProp) {
+                s.onBake = (level, origin, ctx) => {
+                    if (chainProp) {
+                        const at = { x: origin.x + chainProp.x, z: origin.z + chainProp.z };
+                        if (chainProp.kind === 'digsite') addForkDigSite(level, ctx, at);
+                        else if (chainProp.kind === 'relay') addWeatherRelay(level, ctx, at);
+                        else if (chainProp.kind === 'camp') addEngineerCamp(level, ctx, at);
+                    }
+                    if (secret) {
+                        level.addPickup({ x: origin.x + secret.x, y: 1.2, z: origin.z + secret.z }, {
+                            color: 0x7fe0ff,
+                            label: 'Hidden cache',
+                            onPickup(game) {
+                                game.player.inventory.addShards(secret.shards);
+                                if (sid === 'r0c0') game.collectMemoryVial?.(`overworld:${sid}`);
+                                game.hud?.toast?.(`Hidden cache — ${secret.shards} shards`);
+                            },
+                        });
+                    }
+                    if (suture) {
+                        level.addPickup({ x: origin.x + suture.x, y: 1.2, z: origin.z + suture.z }, {
+                            color: 0xffd060,
+                            label: 'Scar Suture',
+                            onPickup(game) {
+                                // Same grant path as the dungeon cache hook;
+                                // collectSuture is idempotent per stable id.
+                                game.collectSuture?.(`overworld:${sid}`);
+                            },
+                        });
+                    }
                 };
             }
             screens[sid] = s;

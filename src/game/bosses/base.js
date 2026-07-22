@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { sfx } from '../../audio/synth.js';
 import { juice } from '../fx/juice.js';
+import { getActiveRunMode } from '../kernel/run-mode.js';
 
 /**
  * Base class for every Sovereign Scar arena boss.
@@ -23,10 +24,12 @@ export class BossBase {
      * @param {THREE.Object3D} [opts.mesh] if provided, used as root; else subclass must set this.root
      */
     constructor(scene, opts = {}) {
+        const mode = getActiveRunMode();
         this.scene = scene;
         this.bossId = opts.id || 'boss';
         this.bossName = opts.name || 'Unknown Construct';
-        this.maxHp = opts.hp != null ? opts.hp : 12;
+        const baseHp = opts.hp != null ? opts.hp : 12;
+        this.maxHp = Math.max(1, baseHp * mode.bossHp);
         this.hp = this.maxHp;
         this.hitRadius = opts.hitRadius != null ? opts.hitRadius : 1.2;
         this.contactDamage = opts.contactDamage != null ? opts.contactDamage : 1;
@@ -54,6 +57,9 @@ export class BossBase {
         // ── Zelda boss grammar (see runAction / startAction below) ──────────
         this.action = null;
         this.actionCd = opts.firstActionDelay != null ? opts.firstActionDelay : 1.2;
+        this.actionFrequency = mode.actionFrequency;
+        this.telegraphDuration = mode.telegraphDuration;
+        this.recoveryDuration = mode.bossRecovery;
         // Damage multiplier applied to the boss while it is recovering. 1 =
         // no reward for reading the pattern, which is where the roster was.
         this.vulnerableMult = 1;
@@ -240,11 +246,11 @@ export class BossBase {
         if (this.action || this.state.current === 'DEAD') return false;
         const target = player || this._actionPlayer;
         if (def.aim && !target) return false;
-        const windup = def.windup != null ? def.windup : 0.7;
+        const windup = (def.windup != null ? def.windup : 0.7) * this.telegraphDuration;
         const aim = def.aim ? def.aim(target) : null;
         this.action = {
             def, aim, stage: 'windup', t: windup,
-            windup, recover: def.recover != null ? def.recover : 0.9,
+            windup, recover: (def.recover != null ? def.recover : 0.9) * this.recoveryDuration,
         };
         if (aim) {
             this.telegraphShape(aim.shape || 'circle', {
@@ -288,7 +294,7 @@ export class BossBase {
             this._preRecoverShield = null;
         }
         this._hideRecoverCue();
-        this.actionCd = a.def.cooldown != null ? a.def.cooldown : 1.4;
+        this.actionCd = (a.def.cooldown != null ? a.def.cooldown : 1.4) / this.actionFrequency;
         if (a.def.onRecover) a.def.onRecover(game);
         this.action = null;
     }
@@ -397,6 +403,53 @@ export class BossBase {
     }
 
     /**
+     * Z3: the single point every boss deals player damage through. It exists so
+     * the guard can be DIRECTIONAL — the filter needs to know where the blow
+     * came from, and threading that through twenty-odd call sites by hand is
+     * how you get nineteen of them right.
+     *
+     * `origin` overrides the hit's apparent source for attacks that land away
+     * from the boss's body (a fireball, a floor slam at a telegraphed point):
+     * you guard the direction of the thing hitting you, not the thing that
+     * threw it.
+     */
+    hitPlayer(player, amount, iFrameTime = 0.7, origin = null) {
+        if (!player || !player.health) return { accepted: false };
+        const res = player.health.damage(amount, iFrameTime, 'hostile', {
+            from: origin || this.root?.position, attacker: this,
+        });
+        if (res?.accepted) sfx.hurt();
+        return res;
+    }
+
+    /**
+     * Z3: a parried boss is forced straight into its recovery window — the
+     * attack it committed to never resolves, and the punish halo opens early.
+     * Reusing the existing recover stage means a parry reward is already
+     * telegraphed, already doubles damage, and already cleans itself up.
+     */
+    stagger(sec = 0.9) {
+        if (this.state.current === 'DEAD') return false;
+        const a = this.action;
+        if (a && a.stage === 'windup') {
+            this.clearTelegraph();
+            a.stage = 'recover';
+            a.t = Math.max(a.recover, sec);
+            this._preRecoverShield = this.shielded;
+            this.shielded = false;
+            this.vulnerableMult = this.staggerMult;
+            this._showRecoverCue();
+            return true;
+        }
+        if (a && a.stage === 'recover') {
+            a.t = Math.max(a.t, sec); // extend an open window
+            return true;
+        }
+        this.actionCd = Math.max(this.actionCd, sec);
+        return false;
+    }
+
+    /**
      * Damage player if within contact radius (respects i-frames via health.damage).
      */
     tryContact(player, dt) {
@@ -408,8 +461,7 @@ export class BossBase {
         const dx = p.x - b.x;
         const dz = p.z - b.z;
         if (Math.hypot(dx, dz) < this.contactRadius && Math.abs(p.y - b.y) < 2.5) {
-            const res = player.health.damage(this.contactDamage, 0.85);
-            if (res?.accepted !== false) sfx.hurt();
+            this.hitPlayer(player, this.contactDamage, 0.85);
             this._contactCd = 0.75;
         }
     }

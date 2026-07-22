@@ -45,12 +45,26 @@ export const BEAT11_DEF = {
     id: 'beat-11-mire',
     name: '11 Rot Mire',
     mood: 'abyss',
+    // Per-level luminance trim into the Abyss certification band [35,75]
+    // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
+    lightTune: { ambient: 1.2 },
     start: 'lichgate',
     prebake: true,
     friction: 'sludge',
     floorColor: ABYSS_COLORS.rot,
-    wallColor: 0x2a3820,
+    wallColor: 0x4c6238, // certification retune: brighter moss-green, same hue
     banner: 'The mire was a library once. Keep to the dry islets.',
+    // Z6 — this dungeon's one idea, and the four rooms that carry it:
+    // introduce it safely, complicate it, fuse it with combat, then examine it.
+    theme: {
+        id: 'armor_swarm',
+        name: 'Plate and Spawn',
+        hint: "Armour in front, numbers behind. Break the plate first — the swarm will not wait.",
+        teach: 'mirefloor',
+        develop: 'cardfile',
+        combine: 'stacksump',
+        test: 'golemwallow',
+    },
     keys: [
         { room: 'mirefloor', type: 'small' },
         { room: 'readingroom', type: 'small' },
@@ -65,7 +79,8 @@ export const BEAT11_DEF = {
             half: 7,
             wallH: 4,
             spawn: { x: 0, z: 4 },
-            build(map, h) {
+            // Islets are walkable platforms (y>=1 in build() becomes an XZ wall).
+            platforms(map, h) {
                 h.fillBox(map, -2, 2, 1, 1, -2, 0, ISLET);
             },
             doors: [
@@ -77,15 +92,15 @@ export const BEAT11_DEF = {
             grid: [0, -1],
             half: 11,
             wallH: 4,
-            build(map, h) {
+            platforms(map, h) {
                 h.fillBox(map, -3, 3, 1, 1, -3, 3, ISLET);
                 h.fillBox(map, -9, -6, 1, 1, 4, 8, ISLET);
                 h.fillBox(map, 6, 9, 1, 1, -8, -5, ISLET);
                 h.fillBox(map, -1, 1, 1, 1, 6, 9, ISLET);
             },
             enemies: [
-                { x: -5, z: 4, kind: 'scarab', hp: 4, ai: 'charge' },
-                { x: 5, z: -5, kind: 'sentinel', hp: 5 },
+                { x: -5, z: 4, kind: 'bulwark', hp: 4 },
+                { x: 5, z: -5, kind: 'brood', hp: 5 },
             ],
             doors: [
                 { to: 'lichgate', side: 'S', at: 0, type: 'open' },
@@ -107,7 +122,7 @@ export const BEAT11_DEF = {
                 h.fillBox(map, -5, -4, 1, 3, -5, 4, 0x3a4428); // rotted drawers
                 h.fillBox(map, -1, 0, 1, 3, -5, 4, 0x3a4428);
             },
-            enemies: [{ x: 3, z: 3, kind: 'frost', hp: 4, ai: 'ranged' }],
+            enemies: [{ x: 3, z: 3, kind: 'bulwark', hp: 4, ai: 'ranged' }],
             doors: [{ to: 'mirefloor', side: 'E', at: 0, type: 'open' }],
             onBake(level, origin) {
                 if (!level.keyStore.mapPickup()) {
@@ -129,9 +144,11 @@ export const BEAT11_DEF = {
             build(map, h) {
                 h.fillBox(map, -6, -5, 1, 3, -6, 6, 0x3a4428); // sunken shelves
                 h.fillBox(map, -2, -1, 1, 3, -6, 6, 0x3a4428);
+            },
+            platforms(map, h) {
                 h.fillBox(map, 2, 3, 1, 1, -2, 2, ISLET);
             },
-            enemies: [{ x: 5, z: -4, kind: 'scarab', hp: 4, ai: 'charge' }],
+            enemies: [{ x: 5, z: -4, kind: 'brood', hp: 4, ai: 'charge' }],
             doors: [{ to: 'mirefloor', side: 'W', at: 0, type: 'open' }],
             onBake(level, origin, ctx) {
                 addSludge(level, ctx, origin, 15);
@@ -152,11 +169,13 @@ export const BEAT11_DEF = {
             build(map, h) {
                 h.fillBox(map, -7, -6, 1, 3, -3, 3, 0x3a4428);
                 h.fillBox(map, 6, 7, 1, 3, -3, 3, 0x3a4428);
+            },
+            platforms(map, h) {
                 h.fillBox(map, -2, 2, 1, 1, -2, 2, ISLET); // lectern islet
             },
             enemies: [
-                { x: -4, z: 0, kind: 'sentinel', hp: 5 },
-                { x: 4, z: 0, kind: 'frost', hp: 4, ai: 'ranged' },
+                { x: -4, z: 0, kind: 'bulwark', hp: 5 },
+                { x: 4, z: 0, kind: 'brood', hp: 4 },
             ],
             doors: [
                 { to: 'mirefloor', side: 'S', at: 0, type: 'locked' },
@@ -188,11 +207,13 @@ export const BEAT11_DEF = {
             ],
             onBake(level, origin) {
                 level.addPickup({ x: origin.x + 2, y: 1.2, z: origin.z + 2 }, {
-                    color: 0x7fe0ff,
-                    label: 'Inkwell cache',
+                    color: 0x9ad0ff,
+                    label: 'Memory Vial chassis',
+                    reward: { type: 'vial' },
                     onPickup(game) {
-                        game.player.inventory.addShards(30);
-                        game.hud?.toast?.('Inkwell cache — 30 shards');
+                        if (game.collectMemoryVial?.('b11-inkwell')) {
+                            game.hud?.toast?.("A Memory Vial chassis, pickled in the inkwell.", 2600);
+                        }
                     },
                 });
             },
@@ -201,13 +222,13 @@ export const BEAT11_DEF = {
             grid: [0, -3],
             half: 8,
             wallH: 4,
-            build(map, h) {
+            platforms(map, h) {
                 h.fillBox(map, -3, 3, 1, 1, -1, 1, ISLET);
             },
             enemies: [
-                { x: -3, z: -3, kind: 'scarab', hp: 4, ai: 'charge' },
-                { x: 3, z: -3, kind: 'scarab', hp: 4, ai: 'charge' },
-                { x: 0, z: 3, kind: 'frost', hp: 4, ai: 'ranged' },
+                { x: -3, z: -3, kind: 'bulwark', hp: 4 },
+                { x: 3, z: -3, kind: 'brood', hp: 4 },
+                { x: 0, z: 3, kind: 'bulwark', hp: 4 },
             ],
             doors: [
                 { to: 'readingroom', side: 'S', at: 0, type: 'locked' },
@@ -226,6 +247,12 @@ export const BEAT11_DEF = {
             // V: arena read 30/255 — paler wet-rot floor + more dry islets
             floorColor: ABYSS_COLORS.rotPale,
             build(map, h) {
+                // Drowned shelf rows — bone-pale ruins of the library
+                h.fillBox(map, -11, -10, 1, 2, -9, 0, ABYSS_COLORS.bone);
+                h.fillBox(map, 10, 11, 1, 2, -3, 7, ABYSS_COLORS.bone);
+                h.fillBox(map, -4, 4, 1, 2, -11, -10, ABYSS_COLORS.bone);
+            },
+            platforms(map, h) {
                 h.fillBox(map, -3, 3, 1, 1, -3, 3, ISLET);
                 h.fillBox(map, -9, -6, 1, 1, 4, 8, ISLET);
                 h.fillBox(map, 6, 9, 1, 1, -8, -5, ISLET);
@@ -233,10 +260,6 @@ export const BEAT11_DEF = {
                 h.fillBox(map, -10, -7, 1, 1, -7, -4, ISLET);
                 h.fillBox(map, 7, 10, 1, 1, 3, 6, ISLET);
                 h.fillBox(map, -6, -3, 1, 1, 9, 11, ISLET);
-                // Drowned shelf rows — bone-pale ruins of the library
-                h.fillBox(map, -11, -10, 1, 2, -9, 0, ABYSS_COLORS.bone);
-                h.fillBox(map, 10, 11, 1, 2, -3, 7, ABYSS_COLORS.bone);
-                h.fillBox(map, -4, 4, 1, 2, -11, -10, ABYSS_COLORS.bone);
             },
             doors: [{ to: 'stacksump', side: 'S', at: 0, type: 'boss' }],
             boss(ctx, level, origin) {

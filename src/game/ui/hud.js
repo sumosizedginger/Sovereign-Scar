@@ -2,6 +2,22 @@
 
 import { StoryPanel } from './story.js';
 
+/**
+ * Z3: poise readout. The guard is only a real decision if its cost is visible —
+ * a player who cannot see the pool draining cannot know they are about to be
+ * broken, and a break that arrives unannounced reads as the game cheating.
+ */
+function guardLine(g) {
+    if (!g) return '';
+    if (g.broken) return `Guard: <span style="color:#ff7a90">BROKEN</span>\n`;
+    const pips = Math.max(0, Math.round(g.poise));
+    const max = Math.max(1, Math.round(g.poiseMax));
+    const bar = '▮'.repeat(Math.min(pips, max)) + '▯'.repeat(Math.max(0, max - pips));
+    const color = g.raised ? '#7fe0ff' : '#5a6478';
+    return `Guard: <span style="color:${color}">${bar}</span>`
+        + (g.parries ? ` · Parries: ${g.parries}` : '') + `\n`;
+}
+
 export class HUD {
     constructor() {
         this.el = document.createElement('div');
@@ -77,6 +93,10 @@ export class HUD {
         });
         document.body.appendChild(this.toastEl);
         this._toastTimer = null;
+        this._toastMsg = null;    // Ticket D: last message + when/how long it
+        this._toastShownAt = -1e9; // was shown, so an identical repeat while
+        this._toastMs = 0;         // still on screen refreshes instead of re-emitting.
+        this._toastEmits = 0;      // count of ACTUAL visual emits (QA hook).
 
         this.helpEl = document.createElement('div');
         Object.assign(this.helpEl.style, {
@@ -98,7 +118,7 @@ export class HUD {
         });
         this.helpEl.textContent =
             'WASD move + face · Space attack · Shift dash\n' +
-            'Q/R weapon · E interact · G grapple · Tab map\n' +
+            'Q/R weapon · E interact · G grapple · V vial · C dust · Tab map\n' +
             'N mute · P pause · Enter advance story';
         document.body.appendChild(this.helpEl);
 
@@ -172,7 +192,8 @@ export class HUD {
         }, hold * 1000);
     }
 
-    showDeath() {
+    showDeath(message = 'THE SCAR RECLAIMS YOU') {
+        this.deathEl.textContent = message;
         this.deathEl.style.opacity = '1';
     }
 
@@ -181,12 +202,25 @@ export class HUD {
     }
 
     toast(msg, ms = 2200) {
-        this.toastEl.textContent = msg;
-        this.toastEl.style.opacity = '1';
+        // Ticket D — UI never repeats the same message. A message identical to
+        // the one currently on screen only refreshes its dwell; it does not
+        // re-emit (no flicker, no stacked duplicates). Proximity prompts and
+        // rapid repeated pickups can fire every frame without spamming. Once
+        // the toast has faded, the same text may legitimately show again.
+        const now = performance.now();
+        const stillShowing = msg === this._toastMsg
+            && now - this._toastShownAt < this._toastMs;
+        this._toastShownAt = now;
+        this._toastMs = ms;
         clearTimeout(this._toastTimer);
         this._toastTimer = setTimeout(() => {
             this.toastEl.style.opacity = '0';
         }, ms);
+        if (stillShowing) return; // dwell refreshed, nothing re-rendered
+        this._toastMsg = msg;
+        this._toastEmits++;
+        this.toastEl.textContent = msg;
+        this.toastEl.style.opacity = '1';
     }
 
     update(state) {
@@ -202,13 +236,15 @@ export class HUD {
             this._padLegend = true;
             this.helpEl.textContent =
                 'Left stick move · Right stick aim · A attack\n' +
-                'B dash · X interact · Y grapple · LB/RB weapon\n' +
-                'Select map · D-up mood · LT mute · Start pause';
+                'B dash · RT guard/parry · LT lock-on · L3 switch target\n' +
+                'X interact · Y grapple · LB/RB weapon\n' +
+                'Select map · D-up mood · Start pause';
         } else if (!state.pad && this._padLegend) {
             this._padLegend = false;
             this.helpEl.textContent =
                 'WASD move + face · Space attack · Shift dash\n' +
-                'Q/R weapon · E interact · G grapple · Tab map\n' +
+                'RMB/L guard (tap = parry) · T lock-on · Y switch target\n' +
+                'Q/R weapon · E interact · G grapple · V vial · C dust · Tab map\n' +
                 'N mute · P pause · Enter advance story';
         }
         const hp = state.hp ?? 0;
@@ -221,9 +257,19 @@ export class HUD {
         this.el.innerHTML =
             `<b style="color:#7fe0ff">SOVEREIGN SCAR</b>\n` +
             `Beat: <span style="color:#ffd060">${state.beatName || state.beatId || '?'}</span>\n` +
+            `Mode: <span style="color:${state.runMode === 'survival' ? '#ff7a90' : '#a8b4c8'}">${String(state.runMode || 'medium').toUpperCase()}</span>` +
+            (state.charges != null ? ` · Reconstitutions: ${state.charges}` : '') + `\n` +
             `HP ${hearts} (${Number.isInteger(Number(hp)) ? hp : Number(hp).toFixed(1)}/${max})\n` +
+            guardLine(state.guard) +
             `Weapon: ${state.weapon || '—'}\n` +
-            `Keys: ${keys}/3 · Shards: ${state.scarShards || 0} · Mood: ${state.mood || 'crust'}` +
+            `Keys: ${keys}/3 · Shards: ${state.scarShards || 0}` +
+            (state.bankedShards ? ` carried / ${state.bankedShards} banked` : '') +
+            ` · Mood: ${state.mood || 'crust'}` +
+            (state.vialSlots ? `\nMemory Vials: ${state.vials || 0}/${state.vialSlots}` : '') +
+            (state.entropyCharges != null ? ` · Entropy: ${state.entropyCharges}` : '') +
+            (state.sutures ? `\nScar Sutures: ${state.sutures % 4}/4` : '') +
+            (state.score != null ? `\nWitness: ${state.score}${state.chain > 1 ? ` · Chain x${Number(state.chain).toFixed(2)}` : ''}` : '') +
+            (state.thread ? `\n<span style="color:#d4a84b">Thread: ${state.thread}</span>` : '') +
             (state.smallKeys != null ? `\n<span style="color:#ffd060">Small keys: ${state.smallKeys}${state.hasBossKey ? ' · BOSS KEY' : ''}</span>` : '') +
             (bosses != null ? ` · Bosses: ${bosses}/14` : '') +
             (state.showTimer ? `\nTime: ${Math.floor((state.playTime || 0) / 60)}:${String(Math.floor((state.playTime || 0) % 60)).padStart(2, '0')}` : '') +

@@ -19,6 +19,9 @@ const DEFAULT_STATE = () => ({
     },
     flags: {},
     scarShards: 0,
+    consumables: { memoryVials: 0, resonanceCharges: 0, entropyCharges: 0 },
+    memoryVialSlots: 0,
+    scarSutures: 0,
 });
 
 export class Inventory {
@@ -30,6 +33,10 @@ export class Inventory {
         this.memoryKeys = { ...d.memoryKeys, ...(initial?.memoryKeys || {}) };
         this.flags = { ...(initial?.flags || {}) };
         this.scarShards = Number.isFinite(initial?.scarShards) ? initial.scarShards : 0;
+        this.consumables = { ...d.consumables, ...(initial?.consumables || {}) };
+        this.scarSutures = Number.isFinite(initial?.scarSutures) ? Math.max(0, Math.floor(initial.scarSutures)) : 0;
+        this.memoryVialSlots = Number.isFinite(initial?.memoryVialSlots)
+            ? Math.max(0, Math.min(4, Math.floor(initial.memoryVialSlots))) : 0;
     }
 
     addShards(n = 1) {
@@ -95,6 +102,22 @@ export class Inventory {
         return !!this.flags[k];
     }
 
+    grantScarSuture() {
+        this.scarSutures += 1;
+        return {
+            total: this.scarSutures,
+            heartEarned: this.scarSutures % 4 === 0,
+            towardNext: this.scarSutures % 4,
+        };
+    }
+
+    grantMemoryVialSlot() {
+        if (this.memoryVialSlots >= 4) return false;
+        this.memoryVialSlots += 1;
+        this.consumables.memoryVials += 1;
+        return true;
+    }
+
     toJSON() {
         return {
             weapons: [...this.weapons],
@@ -103,6 +126,9 @@ export class Inventory {
             memoryKeys: { ...this.memoryKeys },
             flags: { ...this.flags },
             scarShards: this.scarShards,
+            consumables: { ...this.consumables },
+            scarSutures: this.scarSutures,
+            memoryVialSlots: this.memoryVialSlots,
         };
     }
 

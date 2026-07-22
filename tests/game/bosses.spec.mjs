@@ -76,6 +76,33 @@ export function run(t) {
         t.ok(`class ${C.name} is function`, typeof C === 'function', typeof C);
     }
 
+    // Beat 07 Hydroid Cloud: listed as 2 phases — must actually transition
+    // and run onPhaseChange (swarm growth), not just shave cooldowns.
+    {
+        let cloud;
+        try {
+            cloud = new HydroidCloud({ add() {}, remove() {} }, { x: 0, y: 2, z: 0 });
+        } catch (e) {
+            t.ok('HydroidCloud constructs', false, String(e));
+            cloud = null;
+        }
+        if (cloud) {
+            t.ok('Hydroid lists 2 phases', cloud.maxPhase === 2, `max=${cloud.maxPhase}`);
+            t.ok('Hydroid starts phase 1', cloud.phase === 1, `phase=${cloud.phase}`);
+            const orbsP1 = cloud.orbs.length;
+            cloud.hp = cloud.maxHp * 0.35; // under 0.4 threshold
+            cloud._phaseDirty = true;
+            cloud.update(0.016, null, null);
+            t.ok('Hydroid enters phase 2 at ≤40% HP', cloud.phase === 2, `phase=${cloud.phase} frac=${cloud.hpFrac}`);
+            t.ok('Hydroid phase 2 grows the swarm', cloud.orbs.length > orbsP1,
+                `orbs ${orbsP1}→${cloud.orbs.length}`);
+            t.ok('Hydroid phase 2 raises contact damage', cloud.contactDamage >= 2,
+                `contact=${cloud.contactDamage}`);
+            cloud.onDeath?.();
+            cloud.dispose?.();
+        }
+    }
+
     // Legacy factories
     t.ok('createMultiCoreBoss fn', typeof createMultiCoreBoss === 'function');
     t.ok('createPhantasm fn', typeof createPhantasm === 'function');

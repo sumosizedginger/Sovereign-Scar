@@ -29,9 +29,34 @@ import { run as runKeys } from './game/keys.spec.mjs';
 import { run as runBlockers } from './game/blockers.spec.mjs';
 import { run as runMigration } from './game/migration.spec.mjs';
 import { run as runWorld7 } from './game/world7.spec.mjs';
-import { run as runMotifs } from './game/motifs.spec.mjs';
 import { run as runCombatFeel } from './game/combat-feel.spec.mjs';
 import { run as runBossGrammar } from './game/boss-grammar.spec.mjs';
+import { run as runRunMode } from './game/run-mode.spec.mjs';
+import { run as runLives } from './game/lives.spec.mjs';
+import { run as runScore } from './game/score.spec.mjs';
+import { run as runAnchorThread } from './game/anchor-thread.spec.mjs';
+import { run as runItemChains } from './game/item-chains.spec.mjs';
+import { run as runActorAnim } from './game/actor-anim.spec.mjs';
+import { run as runHudToast } from './game/hud-toast.spec.mjs';
+import { run as runOcclusion } from './game/occlusion.spec.mjs';
+import { run as runOverworldGrammar } from './game/overworld-grammar.spec.mjs';
+import { run as runMaterialHierarchy } from './game/material-hierarchy.spec.mjs';
+import { run as runDungeonKits } from './game/dungeon-kits.spec.mjs';
+import { run as runOverheadCollision } from './game/overhead-collision.spec.mjs';
+import { run as runPickupReach } from './game/pickup-reachability.spec.mjs';
+import { run as runRoomEntry } from './game/room-transition-entry.spec.mjs';
+import { run as runPlatformReach } from './game/platform-reachability.spec.mjs';
+import { run as runGuard } from './game/guard.spec.mjs';
+import { run as runLockOn } from './game/lock-on.spec.mjs';
+import { run as runBestiary } from './game/bestiary.spec.mjs';
+import { run as runPedagogy } from './game/dungeon-pedagogy.spec.mjs';
+import { run as runCameraContract } from './game/camera-contract.spec.mjs';
+import { run as runTraversal } from './game/traversal-legibility.spec.mjs';
+import { run as runSecretTaxonomy } from './game/secret-taxonomy.spec.mjs';
+import { run as runCoach } from './game/coach.spec.mjs';
+import { run as runThreatCurve } from './game/threat-curve.spec.mjs';
+import { run as runMusic } from './game/music.spec.mjs';
+import { run as runFeelVisuals } from './game/game-feel-visuals.spec.mjs';
 
 const unitOnly = process.argv.includes('--unit-only');
 
@@ -75,9 +100,34 @@ async function main() {
     runNamed('blockers', runBlockers);
     runNamed('migration', runMigration);
     runNamed('world7', runWorld7);
-    runNamed('motifs', runMotifs);
     runNamed('combat-feel', runCombatFeel);
     runNamed('boss-grammar', runBossGrammar);
+    runNamed('run-mode', runRunMode);
+    runNamed('lives', runLives);
+    runNamed('score', runScore);
+    runNamed('anchor-thread', runAnchorThread);
+    runNamed('item-chains', runItemChains);
+    runNamed('actor-anim', runActorAnim);
+    runNamed('hud-toast', runHudToast);
+    runNamed('occlusion', runOcclusion);
+    runNamed('overworld-grammar', runOverworldGrammar);
+    runNamed('material-hierarchy', runMaterialHierarchy);
+    runNamed('dungeon-kits', runDungeonKits);
+    runNamed('overhead-collision', runOverheadCollision);
+    runNamed('pickup-reachability', runPickupReach);
+    runNamed('room-transition-entry', runRoomEntry);
+    runNamed('platform-reachability', runPlatformReach);
+    runNamed('guard', runGuard);
+    runNamed('lock-on', runLockOn);
+    runNamed('bestiary', runBestiary);
+    runNamed('dungeon-pedagogy', runPedagogy);
+    runNamed('camera-contract', runCameraContract);
+    runNamed('traversal-legibility', runTraversal);
+    runNamed('secret-taxonomy', runSecretTaxonomy);
+    runNamed('coach', runCoach);
+    runNamed('threat-curve', runThreatCurve);
+    runNamed('music', runMusic);
+    runNamed('game-feel-visuals', runFeelVisuals);
 
     if (!unitOnly) {
         const { run: runSmoke } = await import('./smoke.spec.mjs');
@@ -120,6 +170,11 @@ async function main() {
         await runLockedDoorsE2E(lockedDoorsE2E);
         sinks.push(lockedDoorsE2E);
 
+        const { run: runKeyProgressionE2E } = await import('./key-progression-e2e.spec.mjs');
+        const keyProgressionE2E = createSink('key-progression-e2e');
+        await runKeyProgressionE2E(keyProgressionE2E);
+        sinks.push(keyProgressionE2E);
+
         const { run: runBossQuality } = await import('./boss-quality-e2e.spec.mjs');
         const bossQuality = createSink('boss-quality-e2e');
         await runBossQuality(bossQuality);
@@ -129,6 +184,21 @@ async function main() {
         const combatFeelE2E = createSink('combat-feel-e2e');
         await runCombatFeelE2E(combatFeelE2E);
         sinks.push(combatFeelE2E);
+
+        const { run: runNarrativeSystemsE2E } = await import('./narrative-systems-e2e.spec.mjs');
+        const narrativeSystemsE2E = createSink('narrative-systems-e2e');
+        await runNarrativeSystemsE2E(narrativeSystemsE2E);
+        sinks.push(narrativeSystemsE2E);
+
+        const { run: runAudioRender } = await import('./audio-render-e2e.spec.mjs');
+        const audioRender = createSink('audio-render-e2e');
+        await runAudioRender(audioRender);
+        sinks.push(audioRender);
+
+        const { run: runPresentationDeterminism } = await import('./presentation-determinism-e2e.spec.mjs');
+        const presentationDeterminism = createSink('presentation-determinism-e2e');
+        await runPresentationDeterminism(presentationDeterminism);
+        sinks.push(presentationDeterminism);
     }
 
     writeStepSummary(sinks);

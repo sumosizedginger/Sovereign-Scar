@@ -16,8 +16,17 @@ export class Input {
         this._storyAdvance = false;
         this._muteToggle = false;
         this._anyKey = false;
+        this._vial = false;
+        this._dust = false;
 
         this._mapToggle = false; // W6
+
+        // Z3/Z4. Guard is LEVEL-triggered (held), not edge-triggered — the
+        // parry window is opened by the rising edge inside GuardController, so
+        // input only has to report the button state honestly.
+        this._padGuard = false;
+        this._lockToggle = false;
+        this._lockCycle = false;
 
         // Dev mode (D1): edge-triggered dev inputs, gated at the consume site
         this._devToggle = false;
@@ -60,6 +69,10 @@ export class Input {
             if (e.code === 'KeyG') this._grapple = true;
             if (e.code === 'Enter' || e.code === 'NumpadEnter') this._storyAdvance = true;
             if (e.code === 'KeyN') this._muteToggle = true;
+            if (e.code === 'KeyV') this._vial = true;
+            if (e.code === 'KeyC') this._dust = true;
+            if (e.code === 'KeyT') this._lockToggle = true;
+            if (e.code === 'KeyY') this._lockCycle = true;
             if (e.code === 'Tab') {
                 this._mapToggle = true;
                 e.preventDefault(); // keep focus in the game
@@ -97,6 +110,12 @@ export class Input {
             if (e.button === 2) this.mouse.right = false;
         };
 
+        // Right mouse is the guard button (Z3), so the browser context menu has
+        // to stay out of the way — otherwise raising your shield opens a menu
+        // and drops keyboard focus mid-fight.
+        this._onContextMenu = (e) => e.preventDefault();
+
+        dom.addEventListener('contextmenu', this._onContextMenu);
         dom.addEventListener('keydown', this._onKeyDown);
         dom.addEventListener('keyup', this._onKeyUp);
         dom.addEventListener('mousemove', this._onMouseMove);
@@ -104,6 +123,15 @@ export class Input {
         dom.addEventListener('mouseup', this._onMouseUp);
 
         this._dom = dom;
+    }
+
+    /**
+     * Z3: guard button state THIS frame. Held, not consumed — right mouse is
+     * the natural home for a shield, KeyL the keyboard-only fallback, RT the
+     * pad binding.
+     */
+    guardHeld() {
+        return this.mouse.right || this.keys.has('KeyL') || this._padGuard;
     }
 
     /** WASD / arrows as XZ wish vector (unnormalized); falls back to pad stick. */
@@ -139,6 +167,7 @@ export class Input {
             this._armMove = false;
             this._armAim = false;
             this.padStickHeld = false;
+            this._padGuard = false;
             return;
         }
         const prev = this._prevButtons;
@@ -174,9 +203,12 @@ export class Input {
         if (pressed(3)) this._grapple = true;
         if (pressed(4)) this._weaponCycle = -1;
         if (pressed(5)) this._weaponCycle = 1;
-        // Select/Back opens the map (the conventional slot for it, and the
-        // map was previously unreachable on a pad entirely); mute moves to LT.
-        if (pressed(6)) this._muteToggle = true;
+        // Triggers carry the defensive verbs (Z3/Z4): LT targets, RT guards —
+        // the Ocarina layout. Mute gives up its LT slot and stays on KeyN;
+        // it is a settings toggle, not something you reach for mid-fight.
+        if (pressed(6)) this._lockToggle = true;
+        this._padGuard = !!b[7];
+        if (pressed(10)) this._lockCycle = true; // L3
         if (pressed(8)) this._mapToggle = true;
         if (pressed(9)) this._pause = true;
         if (pressed(12)) { this._moodToggle = true; this._menuCodes.push('ArrowUp'); }
@@ -269,6 +301,30 @@ export class Input {
         return v;
     }
 
+    consumeVial() {
+        const v = this._vial;
+        this._vial = false;
+        return v;
+    }
+
+    consumeDust() {
+        const v = this._dust;
+        this._dust = false;
+        return v;
+    }
+
+    consumeLockToggle() {
+        const v = this._lockToggle;
+        this._lockToggle = false;
+        return v;
+    }
+
+    consumeLockCycle() {
+        const v = this._lockCycle;
+        this._lockCycle = false;
+        return v;
+    }
+
     consumeMapToggle() {
         const v = this._mapToggle;
         this._mapToggle = false;
@@ -290,6 +346,7 @@ export class Input {
 
     dispose() {
         const dom = this._dom;
+        dom.removeEventListener('contextmenu', this._onContextMenu);
         dom.removeEventListener('keydown', this._onKeyDown);
         dom.removeEventListener('keyup', this._onKeyUp);
         dom.removeEventListener('mousemove', this._onMouseMove);

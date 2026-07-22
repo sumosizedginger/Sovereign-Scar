@@ -38,6 +38,8 @@ export async function run(t) {
             timeout: 25000,
         });
         await page.mouse.click(400, 300);
+        await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('Enter');
         await sleep(200);
 
         const res = await page.evaluate(async () => {
@@ -62,9 +64,11 @@ export async function run(t) {
             };
 
             // 1) Open door N: stand at the threshold, tick → SLIDING → hall
+            s.cameraRig.focus({ height: 6, back: 3.5, duration: 5 });
             player.rig.position.set(0, 1.95, -7.4);
             tick(1);
             out.sliding = level.isTransitioning();
+            out.focusCleared = s.cameraRig._focus === null;
             tick(10); // 0.5 s > 0.35 s transition
             out.afterN = {
                 room: level.currentRoomId(),
@@ -111,6 +115,7 @@ export async function run(t) {
         t.ok('spawn in entry room', Math.abs(res.boot.spawn.z - 5) < 1, JSON.stringify(res.boot.spawn));
 
         t.ok('door trigger starts SLIDING', res.sliding === true);
+        t.ok('room transition clears active camera focus', res.focusCleared === true);
         t.ok('transition lands in hall', res.afterN.room === 'hall', res.afterN.room);
         t.ok('hall enemy joined combat list', res.afterN.enemies >= 2, `e=${res.afterN.enemies}`);
         t.ok('camera bounds moved to hall', res.afterN.boundsMinZ < -40, `minZ=${res.afterN.boundsMinZ}`);
@@ -482,16 +487,25 @@ export async function run(t) {
             const level = s.game.level;
             level.enterRoom('r1c1', s.game);
             const O = { x: 192, z: 192 };
-            // The anchor post is its own solid: probe the collision world
+            // Anchor posts are visual + grapple targets ONLY (no XZ solid) —
+            // making them solids walled off the rim and softlocked return
+            // walks after reverse-peg placement (see grapple_gap in
+            // blockers.js). Assert both halves of that contract: the post
+            // mesh exists, and walking through its cell is NOT blocked.
+            const post = s.scene.children.find((c) => c.isMesh
+                && Math.abs(c.position.x - (O.x + 15)) < 0.6
+                && Math.abs(c.position.z - (O.z - 4)) < 0.6);
             const probe = s.collisionWorld.resolveMove(O.x + 14, O.z - 3.5, O.x + 15.5, O.z - 3.5, 0.4);
             return {
                 chasm: !level.getVoxelAt(O.x + 10, 0.5, O.z - 4)
                     && level.getVoxelAt(O.x + 6, 0.5, O.z - 4),
-                anchorPost: probe.x < O.x + 15.2,
+                anchorPostVisible: !!post,
+                anchorPostPassable: probe.x >= O.x + 15.2,
                 ledge: level.getVoxelAt(O.x - 10, 1.5, O.z + 8),
             };
         });
-        t.ok('overworld chasm carved + anchor post', owBlk.chasm && owBlk.anchorPost,
+        t.ok('overworld chasm carved + anchor post visible + passable',
+            owBlk.chasm && owBlk.anchorPostVisible && owBlk.anchorPostPassable,
             JSON.stringify(owBlk));
         t.ok('overworld ledge stamped', owBlk.ledge);
 
@@ -531,8 +545,8 @@ export async function run(t) {
             tick(1);
             out.lockedHeld = s.game.level.currentRoomId() === 'corridor';
 
-            // grab the corridor key, open, pass into the predecessor chamber
-            player.rig.position.set(8, 1.95, -72.5);
+            // grab the corridor key (first east gap, south of the locked door), open, pass
+            player.rig.position.set(8, 1.95, -60.5);
             tick(1);
             out.gotSmallKey = s.game.level.keyStore.smallKeys() === 1;
             player.rig.position.set(0, 1.95, -73.4);

@@ -1,0 +1,175 @@
+{
+  "timestamp": "2026-07-20T20:48:06.593Z",
+  "diagnosis": "ANIMATED: limbs pose from gameplay clocks; statues resolved",
+  "player": {
+    "before": {
+      "rootYaw": 1.5708,
+      "rootX": 0,
+      "rootZ": 10,
+      "pivotCount": 7,
+      "pivots": {
+        "body": {
+          "rx": 0,
+          "ry": 0,
+          "rz": 0,
+          "py": -0.00254
+        },
+        "torso": {
+          "rx": 0,
+          "ry": 0,
+          "rz": -0.01683,
+          "py": 0.01755
+        },
+        "head": {
+          "rx": 0,
+          "ry": 0,
+          "rz": 0,
+          "py": 0.702
+        },
+        "armR": {
+          "rx": -0.00434,
+          "ry": 0,
+          "rz": 0,
+          "py": 0.6318
+        },
+        "armL": {
+          "rx": -0.02888,
+          "ry": 0,
+          "rz": 0,
+          "py": 0.6318
+        },
+        "legR": {
+          "rx": 0,
+          "ry": 0,
+          "rz": 0,
+          "py": 0.01755
+        },
+        "legL": {
+          "rx": 0,
+          "ry": 0,
+          "rz": 0,
+          "py": 0.01755
+        }
+      },
+      "hasAnimator": true
+    },
+    "legSwing": 0.26419,
+    "armSwing": 0.19702,
+    "attackSwing": 1.16885,
+    "rootMoved": true
+  },
+  "enemy": {
+    "kind": "sentinel",
+    "windupRaise": 1.60159,
+    "before": {
+      "rootYaw": 0,
+      "rootX": -5,
+      "rootZ": -4,
+      "pivotCount": 7,
+      "pivots": {
+        "body": {
+          "rx": 0,
+          "ry": 0,
+          "rz": 0,
+          "py": 0.0173
+        },
+        "torso": {
+          "rx": 0,
+          "ry": -0.08,
+          "rz": 0.00835,
+          "py": 0.01485
+        },
+        "head": {
+          "rx": 0,
+          "ry": 0,
+          "rz": 0,
+          "py": 0.594
+        },
+        "armR": {
+          "rx": 0.00506,
+          "ry": 0,
+          "rz": 0,
+          "py": 0.5346
+        },
+        "armL": {
+          "rx": -0.52133,
+          "ry": 0,
+          "rz": 0.12,
+          "py": 0.5346
+        },
+        "legR": {
+          "rx": 0,
+          "ry": 0,
+          "rz": 0,
+          "py": 0.01485
+        },
+        "legL": {
+          "rx": 0,
+          "ry": 0,
+          "rz": 0,
+          "py": 0.01485
+        }
+      }
+    },
+    "settled": {
+      "rootYaw": 0,
+      "rootX": -5,
+      "rootZ": -4,
+      "pivotCount": 7,
+      "pivots": {
+        "body": {
+          "rx": 0,
+          "ry": 0,
+          "rz": 0,
+          "py": 0.01726
+        },
+        "torso": {
+          "rx": 0,
+          "ry": -0.08,
+          "rz": 0.0083,
+          "py": 0.01485
+        },
+        "head": {
+          "rx": 0,
+          "ry": 0,
+          "rz": 0,
+          "py": 0.594
+        },
+        "armR": {
+          "rx": 0.00146,
+          "ry": 0,
+          "rz": 0,
+          "py": 0.5346
+        },
+        "armL": {
+          "rx": -0.5799,
+          "ry": 0,
+          "rz": 0.12,
+          "py": 0.5346
+        },
+        "legR": {
+          "rx": 0,
+          "ry": 0,
+          "rz": 0,
+          "py": 0.01485
+        },
+        "legL": {
+          "rx": 0,
+          "ry": 0,
+          "rz": 0,
+          "py": 0.01485
+        }
+      }
+    }
+  },
+  "passChecks": [
+    "player has an animator",
+    "player rig exposes all seven named pivots",
+    "legs swing while moving (> 0.15 rad peak)",
+    "arms swing while moving (> 0.08 rad peak)",
+    "root still translates/yaws (hitbox transform physics-owned)",
+    "attack drives a readable arm swing (> 0.5 rad)",
+    "enemy windup raises the striking arm (> 0.5 rad)"
+  ],
+  "failChecks": []
+}

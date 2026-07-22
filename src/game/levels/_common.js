@@ -1,10 +1,11 @@
 // Shared level context helpers.
 
 import * as THREE from 'three';
+import { buildPickupMesh, disposePickupMesh } from '../assets/pickup-shapes.js';
 import { meshAndCollide, buildRoomFloor, buildPerimeter, VS } from '../world/level-builder.js';
 import { stampMap } from '../assets/props.js';
 import { CRUST_COLORS, ABYSS_COLORS, MOOD_PRESETS } from '../assets/palettes.js';
-import { Enemy, DummyTarget } from '../enemy.js';
+import { Enemy, DummyTarget, attachSplit } from '../enemy.js';
 
 /**
  * Create a standard level shell.
@@ -67,6 +68,7 @@ export function createLevelShell(ctx, opts = {}) {
 
     function addEnemy(pos, eopts) {
         const e = new Enemy(scene, collisionWorld, pos, eopts);
+        attachSplit(e, addEnemy); // Z5: children register exactly like parents
         enemies.push(e);
         disposers.push(() => e.dispose());
         return e;
@@ -80,23 +82,14 @@ export function createLevelShell(ctx, opts = {}) {
     }
 
     function addPickup(pos, data) {
-        const mesh = new THREE.Mesh(
-            new THREE.OctahedronGeometry(0.35, 0),
-            new THREE.MeshStandardMaterial({
-                color: data.color || 0x7fe0ff,
-                emissive: data.color || 0x7fe0ff,
-                emissiveIntensity: 2,
-            })
-        );
+        // Same typed silhouettes the dungeons use — the overworld's sutures
+        // are worth exactly as much, so they must read exactly as loudly.
+        const mesh = buildPickupMesh(data);
         mesh.position.set(pos.x, pos.y != null ? pos.y : 1.0, pos.z);
         scene.add(mesh);
         const p = { mesh, ...data, taken: false };
         pickups.push(p);
-        disposers.push(() => {
-            if (mesh.parent) mesh.parent.remove(mesh);
-            mesh.geometry.dispose();
-            mesh.material.dispose();
-        });
+        disposers.push(() => disposePickupMesh(mesh));
         return p;
     }
 

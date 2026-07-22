@@ -1,7 +1,12 @@
-// W8: save-version migration — v1 saves gain the Phase W fields untouched.
+// Save migration: old campaigns gain world, mode, lives, Thread, and score state.
 
 import { getProgress, setProgress } from '../../src/engine/settings.js';
-import { loadSovereignProgress, saveSovereignProgress, resetSovereignProgress } from '../../src/game/kernel/progress.js';
+import {
+    loadSovereignProgress,
+    saveSovereignProgress,
+    resetSovereignProgress,
+    isBeatUnlocked,
+} from '../../src/game/kernel/progress.js';
 
 export function run(t) {
     // Plant a raw v1 save (pre-Phase-W shape, mid-campaign)
@@ -21,7 +26,7 @@ export function run(t) {
     });
 
     const s = loadSovereignProgress();
-    t.ok('migrated to v2', s.version === 2);
+    t.ok('migrated to v3', s.version === 3);
     t.ok('dungeons filled empty', s.dungeons && Object.keys(s.dungeons).length === 0);
     t.ok('overworld defaults filled',
         s.overworld && s.overworld.state === 'crust' && Array.isArray(s.overworld.visited));
@@ -30,19 +35,32 @@ export function run(t) {
     t.ok('progress kept: hp/max', s.hp === 4.5 && s.maxHp === 8);
     t.ok('progress kept: inventory', s.inventory.activeWeapon === 'heavy_mallet');
     t.ok('progress kept: timers', s.playTime === 1234 && s.deaths === 3);
+    t.ok('explicitly unlocked beat is open', isBeatUnlocked('beat-02-spindle', s));
+    t.ok('currentBeat does not forge an unlock', !isBeatUnlocked('beat-07-sluice', s));
 
-    // Migration persisted (one-shot): the stored blob is v2 now
+    t.ok('old saves default to Medium', s.runMode === 'medium');
+    t.ok('old saves gain lives and score', s.lives?.maxCharges === 5 && s.score?.mode === 'medium');
+
+    // Migration persisted (one-shot): the stored blob is v3 now
     const raw = (getProgress() || {}).sovereignProgress || {};
-    t.ok('migration persisted', raw.version === 2 && !!raw.dungeons);
+    t.ok('migration persisted', raw.version === 3 && !!raw.dungeons);
 
     // Migrated saves keep nested world state through unrelated saves
     saveSovereignProgress({ playTime: 2000 });
     const s2 = loadSovereignProgress();
     t.ok('nested fields survive top-level patch',
-        s2.version === 2 && s2.overworld.state === 'crust' && s2.playTime === 2000);
+        s2.version === 3 && s2.overworld.state === 'crust' && s2.playTime === 2000);
 
-    // Fresh saves are v2 from the start
+    // Fresh saves are v3 from the start
     resetSovereignProgress();
     const fresh = loadSovereignProgress();
-    t.ok('fresh save is v2', fresh.version === 2 && !!fresh.dungeons && !!fresh.overworld);
+    t.ok('fresh save is v3', fresh.version === 3 && !!fresh.dungeons && !!fresh.overworld);
+    t.ok('fresh progression opens overworld and beat 01',
+        isBeatUnlocked('overworld', fresh) && isBeatUnlocked('beat-01-crypt', fresh));
+
+    resetSovereignProgress('survival');
+    const survival = loadSovereignProgress();
+    saveSovereignProgress({ runMode: 'easy' });
+    t.ok('run mode is immutable after campaign creation',
+        survival.runMode === 'survival' && loadSovereignProgress().runMode === 'survival');
 }

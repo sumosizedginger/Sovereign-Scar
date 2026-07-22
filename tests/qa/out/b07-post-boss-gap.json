@@ -1,0 +1,43 @@
+{
+  "res": {
+    "gapOpenBefore": true,
+    "northRimSolid": true,
+    "southRimSolid": true,
+    "blockerOpen": true,
+    "gapBridged": true,
+    "gapSamplesAfter": [
+      {
+        "z": -66.5,
+        "solid": true
+      },
+      {
+        "z": -66,
+        "solid": true
+      },
+      {
+        "z": -65.5,
+        "solid": true
+      },
+      {
+        "z": -65,
+        "solid": true
+      },
+      {
+        "z": -64.5,
+        "solid": true
+      }
+    ],
+    "walk": {
+      "x": 0,
+      "y": 1.95,
+      "z": 5.9,
+      "grounded": true,
+      "hp": 6,
+      "hp0": 6
+    },
+    "walkedAcross": true,
+    "pegSpan": 4,
+    "dualPegs": true
+  },
+  "errors": []
+}

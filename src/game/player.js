@@ -1,13 +1,14 @@
 // Player construct — modular voxels, physics, combat.
 
-import * as THREE from 'three';
-import { buildTorso, buildHead, buildArm, buildLeg, buildGlowEyes, scaleProfile, TORSO_PROFILE, HEAD_PROFILE } from '../characters/builders.js';
-import { buildVoxelGeo } from '../voxel/core.js';
-import { S } from '../voxel/palette.js';
+import { createActorRig } from './characters/actor-rig.js';
+import { createActorAnimator } from './characters/actor-animator.js';
 import { makeFacing } from '../combat/facing.js';
 import { ArcSmear } from './fx/arc-smear.js';
-import { sfx } from '../audio/synth.js';
+import { juice } from './fx/juice.js';
 import { vsfx } from './fx/vsfx.js';
+import { gsfx } from './audio/sfx-bank.js';
+import { HeldWeapon } from './fx/held-weapon.js';
+import { GrappleRope } from './fx/grapple-rope.js';
 import { HERO_PALETTE } from './assets/palettes.js';
 import { VoxelPhysicsBody } from './physics/voxel-physics-body.js';
 import { getProfile } from './physics/friction-profiles.js';
@@ -16,60 +17,29 @@ import { Inventory } from './kernel/inventory.js';
 import { getWeapon, PHASE_BOOT } from './combat/weapons.js';
 import { combatSweep, applyHit } from './combat/combat-sweeper.js';
 import { GrappleController } from './combat/grapple.js';
-
-function buildFigure(parts, scale) {
-    const group = new THREE.Group();
-    for (const [m, offset] of parts) {
-        const mesh = new THREE.Mesh(
-            buildVoxelGeo(m),
-            new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })
-        );
-        mesh.scale.setScalar(scale);
-        mesh.position.set(offset[0] * scale, offset[1] * scale, offset[2] * scale);
-        mesh.castShadow = true;
-        group.add(mesh);
-    }
-    return group;
-}
+import { GuardController, GUARD_SPEED_MULT } from './combat/guard.js';
+import { LockOnController } from './combat/lock-on.js';
 
 export class Player {
     constructor(scene, collisionWorld, getVoxelAt) {
         this.scene = scene;
         this.collisionWorld = collisionWorld;
 
-        const pal = HERO_PALETTE;
-        const slim = scaleProfile(TORSO_PROFILE, 0.72);
-        const slimHead = scaleProfile(HEAD_PROFILE, 0.9);
-        const parts = [
-            [buildTorso(pal, slim, { clothingMode: 'casual' }), [0, 0, 0]],
-            [buildHead(pal, slimHead, {}), [0, 24, 0]],
-            [buildArm(pal, 1), [12, 15, 0]],
-            [buildArm(pal, -1), [-12, 15, 0]],
-            [buildLeg(pal, 1), [5, 0, 0]],
-            [buildLeg(pal, -1), [-5, 0, 0]],
-        ];
-        const scale = S * 0.39;
-        this.rig = new THREE.Group();
-        const inner = buildFigure(parts, scale);
-
-        // Glow eyes (emissive bloom) — added to inner so the grounding shift applies
-        try {
-            const eyes = buildGlowEyes(pal);
-            const eyeScale = scale;
-            eyes.left.scale.setScalar(eyeScale);
-            eyes.right.scale.setScalar(eyeScale);
-            eyes.left.position.set(-2.5 * eyeScale, 6 * eyeScale + 24 * scale, 5.5 * eyeScale);
-            eyes.right.position.set(2.5 * eyeScale, 6 * eyeScale + 24 * scale, 5.5 * eyeScale);
-            inner.add(eyes.left, eyes.right);
-            this._eyes = eyes;
-        } catch (_) { /* optional */ }
-
-        // Ground the mesh: feet must rest at the physics body's bottom face
-        // (rig.position.y - 0.95, see VoxelPhysicsBody halfExtents below).
-        const bbox = new THREE.Box3().setFromObject(inner);
-        inner.position.y = -0.95 - bbox.min.y;
-        this.rig.add(inner);
-        this._inner = inner;
+        // Ticket F: named-pivot rig + procedural animator replace the old
+        // single welded figure. Same frozen part builders, same grounding
+        // (feet at the physics body's bottom face, rig.y - 0.95).
+        this.actor = createActorRig({
+            palette: HERO_PALETTE,
+            torsoProfileScale: 0.72,
+            headProfileScale: 0.9,
+            meshScale: 0.39,
+            clothingMode: 'casual',
+            groundOffset: -0.95,
+        });
+        this.rig = this.actor.root;
+        this._inner = this.actor.inner;
+        this._eyes = this.actor.eyes;
+        this.animator = createActorAnimator(this.actor, { archetype: 'hero', isHero: true });
         this.rig.position.set(0, 1.95, 0);
 
         scene.add(this.rig);
@@ -95,7 +65,55 @@ export class Player {
         this.dashCd = 0;
         this.dashTimer = 0;
         this.grapple = new GrappleController();
+        // The hero used to swing an empty fist with every weapon, and the
+        // grapple had no visuals at all — press G and you were simply
+        // somewhere else. Both are legibility problems, not decoration:
+        // weapon reach and arc differ enough that you have to be able to see
+        // what you are holding.
+        this.heldWeapon = new HeldWeapon(this.rig);
+        this.grappleRope = new GrappleRope(scene);
         this.arcSmear = new ArcSmear(scene); // C8: true 8-way swing arcs
+
+        // Z3: the guard intercepts damage at the single HealthPool entry point,
+        // so every enemy and boss route through it without any of them knowing
+        // it exists.
+        this.guard = new GuardController();
+        this.health.damageFilter = (hit) => this.guard.resolve(
+            hit, this.rig.position, this.state.facingVec
+        );
+        this.guard.onParry = (meta) => {
+            // Its own sound, not the block clang: a parry and a failed block
+            // used to be acoustically identical, which meant the game gave the
+            // same feedback for its most and least skilful outcomes.
+            gsfx.parry();
+            // A parry is the single most skilful thing the player can do, so it
+            // gets the loudest feedback the juice layer has: a real hitstop.
+            juice.hitstop(0.09);
+            juice.addTrauma(0.35);
+            // The reward for a clean read is an opening: stagger whoever swung.
+            const src = meta && meta.attacker;
+            if (src) {
+                if (src.knockbackVel) {
+                    const dx = src.root.position.x - this.rig.position.x;
+                    const dz = src.root.position.z - this.rig.position.z;
+                    const d = Math.hypot(dx, dz) || 1;
+                    src.knockbackVel.x += (dx / d) * 6;
+                    src.knockbackVel.z += (dz / d) * 6;
+                }
+                if (src.stagger) src.stagger(0.7);
+                else if (src.attackCd != null) src.attackCd = Math.max(src.attackCd, 0.7);
+                src.onHit?.();
+            }
+        };
+        // Dull and wooden, deliberately unlike the parry's bright ring: you
+        // took the hit, you did not beat it.
+        this.guard.onBlock = () => { gsfx.guardBlock(); juice.addTrauma(0.12); };
+        this.guard.onBreak = () => { vsfx.hurt(); juice.addTrauma(0.5); };
+
+        // Z4: Z-targeting. `getCandidates` is installed by the game loop, which
+        // is the only thing that knows the live enemy list for the current room.
+        this.lockOn = new LockOnController();
+
         this.frictionName = 'default';
         this._stepAcc = 0;
         this.spawnPoint = { x: 0, y: 1.95, z: 0 };
@@ -121,6 +139,8 @@ export class Player {
         this.physics.grounded = true;
         this.health.fullRestore();
         this.state.current = 'IDLE';
+        this.guard.reset();
+        this.lockOn.release();
     }
 
     tryAttack(enemies, destructibles, opts = {}) {
@@ -129,7 +149,14 @@ export class Player {
         if (weapon.ray) {
             // Light Caster ray — handled by caller with LightLineSystem ideally
             this.attackCd = weapon.cooldown;
-            sfx.whoosh();
+            // Ray weapons POINT (no melee arc): the pose library's
+            // light_caster profile holds an aim pose instead of a sweep.
+            this.animator?.attack('light_caster', {
+                windup: 0.05,
+                strikeDur: 0.16,
+                recover: 0.2,
+            });
+            gsfx.attack('light_caster');
             const hits = [];
             const range = weapon.range || 12;
             for (const e of enemies) {
@@ -149,7 +176,14 @@ export class Player {
         }
 
         this.attackCd = weapon.cooldown || 0.3;
-        vsfx.slap();
+        // Body commits to the same swing the smear draws: snap windup,
+        // strike matching the 0.12s smear life, settle within the cooldown.
+        this.animator?.attack(this.inventory.activeWeapon, {
+            windup: 0.07,
+            strikeDur: 0.12,
+            recover: Math.max(0.12, (weapon.cooldown || 0.3) - 0.19),
+        });
+        gsfx.attack(this.inventory.activeWeapon);
         this.arcSmear.spawn({
             position: this.rig.position,
             facingVec: this.state.facingVec,
@@ -193,7 +227,7 @@ export class Player {
         // avoid a hit once it was coming.
         const iWindow = Math.max(0.3, dur + 0.05) + (this.dashIframeBonus || 0);
         this.health.iFrames = Math.max(this.health.iFrames, iWindow);
-        sfx.dash();
+        gsfx.dash();
         this.arcSmear.spawn({
             position: this.rig.position,
             facingVec: fv,
@@ -204,13 +238,53 @@ export class Player {
     }
 
     update(dt, input, enemies, destructibles, camera, renderer) {
+        // Damage lands from enemy/boss updates elsewhere in the frame; a
+        // drop since last frame drives the hurt flinch layer.
+        if (this._lastHp != null && this.health.hp < this._lastHp) {
+            this.animator?.hit();
+        }
         this.health.update(dt);
         this.arcSmear.update(dt);
         if (this.attackCd > 0) this.attackCd -= dt;
         if (this.dashCd > 0) this.dashCd -= dt;
 
+        // Z4: resolve the lock first — the facing it produces has to be in hand
+        // before movement writes facing, and dropping a dead target must not
+        // wait a frame or the guard would cover the wrong arc.
+        if (input.consumeLockToggle?.()) {
+            this.lockOn.toggle(this.rig.position, this.state.facingVec);
+            if (this.lockOn.target) gsfx.lockOn(); else gsfx.lockOff();
+        }
+        if (input.consumeLockCycle?.()) {
+            this.lockOn.cycle(this.rig.position, this.state.facingVec);
+            if (this.lockOn.target) gsfx.lockOn();
+        }
+        const lockFacing = this.health.dead ? null : this.lockOn.update(this.rig.position);
+        if (this.health.dead) this.lockOn.release();
+
+        // Z3: guard state for this frame. Dashing drops the shield — the two
+        // defensive options stay mutually exclusive so neither is strictly
+        // dominant, and i-frames cannot be stacked on top of chip reduction.
+        const wantGuard = !!input.guardHeld?.() && this.dashTimer <= 0 && !this.health.dead;
+        const wasRaised = this.guard.raised;
+        const wasBroken = this.guard.broken;
+        this.guard.update(dt, wantGuard);
+        if (this.guard.raised !== wasRaised) {
+            if (this.guard.raised) gsfx.guardUp(); else gsfx.guardDown();
+        }
+        if (this.guard.broken && !wasBroken) gsfx.guardBreak();
+
+        // Keep the hand matched to the inventory. Cheap — a no-op unless the
+        // equipped id actually changed.
+        this.heldWeapon.set(this.inventory.activeWeapon);
+
         // Grapple override
         const g = this.grapple.update(dt, this.collisionWorld, 0.4);
+        this.grappleRope.update(dt, this.grapple.active ? {
+            from: this.grapple.from,
+            to: this.grapple.to,
+            u: Math.min(1, this.grapple.t / this.grapple.duration),
+        } : null);
         if (g.active || g.cancelled) {
             if (g.x != null) {
                 this.rig.position.x = g.x;
@@ -228,19 +302,24 @@ export class Player {
             // right stick is the only optional aim override.
             if (mv.x || mv.z) this.state.setFacing(mv.x, mv.z);
             if (input.padAim) this.state.setFacing(input.padAim.x, input.padAim.z);
+            // Z4: a lock outranks both. This is the whole point — facing stops
+            // being a side effect of walking, so you can strafe and retreat
+            // while still pointed at what you are fighting.
+            if (lockFacing) this.state.setFacing(lockFacing.x, lockFacing.z);
 
             const result = this.physics.update(this.collisionWorld, dt, {
                 wishX: mv.x,
                 wishZ: mv.z,
-                speed: this.dashTimer > 0 ? 14 : this.speed,
+                speed: this.dashTimer > 0 ? 14
+                    : this.speed * (this.guard.raised ? GUARD_SPEED_MULT : 1),
                 half: 0.4,
             });
             if (this.dashTimer > 0) this.dashTimer -= dt;
 
             if (result.landed) {
-                sfx.land();
+                gsfx.land();
                 if (result.damage > 0) {
-                    this.health.damage(result.damage, 0.5);
+                    this.health.damage(result.damage, 0.5, 'environment');
                     vsfx.hurt();
                 }
             }
@@ -250,7 +329,7 @@ export class Player {
                 this._stepAcc += dt;
                 if (this._stepAcc > 0.32) {
                     this._stepAcc = 0;
-                    vsfx.step();
+                    gsfx.footstep(this.surface || 'stone');
                 }
             }
         }
@@ -266,8 +345,15 @@ export class Player {
             this.rig.visible = true;
         }
 
-        if (input.consumeAttack()) this.tryAttack(enemies, destructibles);
-        if (input.consumeDash()) this.tryDash();
+        // A broken guard is the punishment for turtling: for BREAK_STUN seconds
+        // you cannot swing, dash, or re-raise. The inputs are still drained so
+        // they do not queue up and all fire the instant the stun ends.
+        const attackPressed = input.consumeAttack();
+        const dashPressed = input.consumeDash();
+        if (!this.guard.broken) {
+            if (attackPressed) this.tryAttack(enemies, destructibles);
+            if (dashPressed) this.tryDash();
+        }
 
         const wc = input.consumeWeaponCycle();
         if (wc) this.inventory.cycleWeapon(wc);
@@ -275,10 +361,29 @@ export class Player {
         if (this.health.dead) {
             this.state.current = 'DEAD';
         }
+
+        // Ticket F: pose from the gameplay clock. The animator writes only
+        // local pivot rotations — root position/yaw above stay physics-owned.
+        if (this.animator) {
+            const mv2 = (g.active || g.cancelled) ? null : input.moveVector();
+            this.animator.setLocomotion({
+                speed: this.dashTimer > 0 ? 14 : this.speed,
+                wishX: mv2 ? mv2.x : 0,
+                wishZ: mv2 ? mv2.z : 0,
+                grounded: this.physics.grounded,
+            });
+            this.animator.setDashing(this.dashTimer > 0);
+            this.animator.setGrapple(!!g.active);
+            this.animator.setDead(this.health.dead);
+            this.animator.update(dt);
+        }
+        this._lastHp = this.health.hp;
     }
 
     dispose() {
         this.arcSmear.dispose();
+        this.heldWeapon?.dispose();
+        this.grappleRope?.dispose();
         if (this.rig.parent) this.rig.parent.remove(this.rig);
     }
 }

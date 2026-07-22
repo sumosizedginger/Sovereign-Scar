@@ -31,6 +31,17 @@ export const BEAT04_DEF = {
     start: 'plaza',
     prebake: true,
     banner: 'Climb the Monument. Ground the war-sphere.',
+    // Z6 — this dungeon's one idea, and the four rooms that carry it:
+    // introduce it safely, complicate it, fuse it with combat, then examine it.
+    theme: {
+        id: 'altitude',
+        name: 'What You Cannot Reach',
+        hint: "Motes hang above your blade. Shoot them down — or parry the pulse and drop them.",
+        teach: 'terrace',
+        develop: 'observatory',
+        combine: 'galleria',
+        test: 'corona',
+    },
     keys: [
         { room: 'terrace', type: 'small' },
         { room: 'ascent', type: 'small' },
@@ -59,8 +70,8 @@ export const BEAT04_DEF = {
             half: 10,
             wallH: 4,
             enemies: [
-                { x: -4, z: 2, kind: 'sentinel', hp: 3 },
-                { x: 5, z: -4, kind: 'frost', hp: 2, ai: 'ranged' },
+                { x: -4, z: 2, kind: 'frost', hp: 3 },
+                { x: 5, z: -4, kind: 'mote', hp: 2 },
             ],
             // Key 1 sits on a 3-step platform — the climbing tutorial
             platforms(map, h) {
@@ -139,7 +150,7 @@ export const BEAT04_DEF = {
             half: 9,
             wallH: 5,
             enemies: [
-                { x: -4, z: 0, kind: 'scarab', hp: 3, ai: 'charge' },
+                { x: -4, z: 0, kind: 'mote', hp: 3 },
                 { x: 4, z: 0, kind: 'sentinel', hp: 3 },
             ],
             platforms(map, h) {
@@ -177,11 +188,13 @@ export const BEAT04_DEF = {
             ],
             onBake(level, origin) {
                 level.addPickup({ x: origin.x - 1, y: 1.2, z: origin.z - 1 }, {
-                    color: 0x7fe0ff,
-                    label: 'Aerie cache',
+                    color: 0xff7a90,
+                    label: 'Scar Suture',
+                    reward: { type: 'suture' },
                     onPickup(game) {
-                        game.player.inventory.addShards(30);
-                        game.hud?.toast?.('Aerie cache — 30 shards');
+                        if (game.collectSuture?.('b04-aerie')) {
+                            game.hud?.toast?.("Scar Suture recovered from the aerie.", 2600);
+                        }
                     },
                 });
             },
@@ -195,8 +208,8 @@ export const BEAT04_DEF = {
             wallH: 5,
             enemies: [
                 { x: -3, z: -3, kind: 'frost', hp: 3, ai: 'ranged' },
-                { x: 3, z: -3, kind: 'frost', hp: 3, ai: 'ranged' },
-                { x: 0, z: 3, kind: 'scarab', hp: 3, ai: 'charge' },
+                { x: 3, z: -3, kind: 'mote', hp: 3 },
+                { x: 0, z: 3, kind: 'sentinel', hp: 3, ai: 'charge' },
             ],
             platforms(map, h) {
                 steps(map, h, 0, -4, 3, CRUST_COLORS.limestone);
@@ -223,9 +236,11 @@ export const BEAT04_DEF = {
             },
             doors: [{ to: 'galleria', side: 'S', at: 0, type: 'boss' }],
             boss(ctx, level, origin) {
+                // hoverY keeps the sphere above the y=1 arena plate (top ≈ 2).
                 const core = new KineticCore(ctx.scene, ctx.collisionWorld,
-                    { x: origin.x, z: origin.z - 2 }, { arenaRadius: 5.5, hp: 12 });
-                core.root.position.y = 2.2;
+                    { x: origin.x, z: origin.z - 2 }, {
+                        arenaRadius: 5.5, hp: 12, hoverY: 2.95, floorY: 2.0,
+                    });
                 attachBoss(level, core, {
                     nextBeat: 'beat-05-citadel',
                     toast: 'Kinetic Core shattered — Citadel awaits',

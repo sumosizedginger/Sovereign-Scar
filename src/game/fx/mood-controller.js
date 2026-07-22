@@ -1,13 +1,41 @@
 // Crust / Abyss mood switching — post uniforms + layered music beds.
+//
+// Combat readability rule: mood may change palette/fog/lights, but must never
+// blow out bloom/film/vignette past the active quality tier. Altar upgrades
+// are stats-only; any “graphics changed after shopping” reports were the
+// mood/quality fight (especially Abyss bloom) coinciding with progression.
 
 import * as THREE from 'three';
 import { scene, bloomPass, filmPass, vignettePass } from '../../engine/renderer.js';
+import { stopAllDrones, playNoise, initAudio } from '../../audio/synth.js';
 import {
-    playDrone, stopAllDrones, playNoise, initAudio,
-    startMusicBed, stopMusicBed, updateMusicBed,
-} from '../../audio/synth.js';
+    startScore, stopScore, updateScore, setIntensity, currentScore,
+} from '../audio/score.js';
 import { MOOD_PRESETS } from '../assets/palettes.js';
 import { getSetting } from '../../engine/settings.js';
+import { getQuality, TIERS } from '../../engine/quality.js';
+
+/** Cap mood post values so quality tiers stay the presentation ceiling. */
+function presentationPost(preset) {
+    const tier = TIERS[getQuality()] || TIERS.high;
+    const bloomCap = tier.bloom ? (tier.bloomStrength ?? 0.9) : 0;
+    return {
+        bloom: Math.min(preset.bloom ?? 0.55, bloomCap || 0.55),
+        film: Math.min(preset.film ?? 0.08, 0.14),
+        vignette: Math.min(preset.vignette ?? 1.05, 1.15),
+    };
+}
+
+function applyPost(preset) {
+    const post = presentationPost(preset);
+    if (bloomPass) bloomPass.strength = post.bloom;
+    if (filmPass?.uniforms?.intensity) {
+        filmPass.uniforms.intensity.value = post.film;
+    }
+    if (vignettePass?.uniforms?.offset) {
+        vignettePass.uniforms.offset.value = post.vignette;
+    }
+}
 
 export class MoodController {
     constructor() {
@@ -17,6 +45,11 @@ export class MoodController {
         this.musicProfile = 'crust';
         this.musicMotif = null; // C7 per-beat/region motif
         this._lights = null;
+        // Per-level luminance trim ({ ambient, key, fill } multipliers).
+        // Levels sit in one certification band per mood, but their floor
+        // palettes differ enough that a single preset cannot hold all of
+        // them inside it.
+        this.tune = null;
     }
 
     /** S4: bind engine light objects so presets can drive ambient/key. */
@@ -28,9 +61,48 @@ export class MoodController {
         return this.mood;
     }
 
-    apply(moodName, { audio = true, music } = {}) {
-        const preset = MOOD_PRESETS[moodName] || MOOD_PRESETS.crust;
+    apply(moodName, opts = {}) {
+        const { audio = true, music } = opts;
         this.mood = moodName in MOOD_PRESETS ? moodName : 'crust';
+        // Only a caller that mentions tune changes it (level loads always
+        // do); the ramp-completion apply keeps the active level's trim.
+        if ('tune' in opts) this.tune = opts.tune || null;
+
+        this.reapplyVisual();
+
+        if (audio && !getSetting('reduceHorrorAudio')) {
+            try { initAudio(); } catch (_) {}
+            // NOTHING SUSTAINED GOES UNDER THE SCORE. This used to start a raw
+            // oscillator here — a square at 80 Hz in the Crust, a triangle at
+            // 220 Hz in the Abyss — with no envelope, no reverb, no end, wired
+            // straight to the destination. It survived the rewrite that
+            // replaced the drone soundtrack with a real one, so the game came
+            // out with an actual score playing on top of the exact hum the
+            // score was written to get rid of. The Abyss one was the worse of
+            // the two: 220 Hz sits in the middle of the melody's register, so
+            // it did not read as atmosphere, it read as a fault in the mix.
+            //
+            // stopAllDrones stays as a sweep, so a save resumed from an older
+            // build cannot leave one running.
+            stopAllDrones();
+            // The per-level track wins over the generic mood bed: a dungeon
+            // gets its own key and tempo, not "the minor one" again.
+            const bed = this.musicTrack || music
+                || (this.mood === 'abyss' ? 'abyss' : 'crust');
+            this.musicProfile = bed;
+            startScore(bed);
+        }
+    }
+
+    /**
+     * Re-derive every visual value (background, fog, post, lights) from the
+     * current mood + tune + quality tier. Quality changes and mood changes
+     * both funnel here, so the composed result is identical in any call
+     * order (Ticket C determinism gate).
+     */
+    reapplyVisual() {
+        const preset = MOOD_PRESETS[this.mood] || MOOD_PRESETS.crust;
+        const tune = this.tune || {};
 
         scene.background = new THREE.Color(preset.background);
         if (scene.fog) {
@@ -38,53 +110,83 @@ export class MoodController {
             scene.fog.density = preset.fogDensity;
         }
 
-        if (bloomPass) bloomPass.strength = preset.bloom;
-        if (filmPass?.uniforms?.intensity) {
-            filmPass.uniforms.intensity.value = preset.film;
-        }
-        if (vignettePass?.uniforms?.offset) {
-            vignettePass.uniforms.offset.value = preset.vignette;
-        }
+        applyPost(preset);
 
         if (this._lights) {
             const L = this._lights;
             if (L.ambient && preset.ambient != null) {
                 L.ambient.color.setHex(preset.ambient);
-                L.ambient.intensity = preset.ambientIntensity ?? 0.5;
+                L.ambient.intensity = (preset.ambientIntensity ?? 0.5) * (tune.ambient ?? 1);
             }
             if (L.keySun && preset.key != null) {
                 L.keySun.color.setHex(preset.key);
-                L.keySun.intensity = preset.keyIntensity ?? 1.35;
+                L.keySun.intensity = (preset.keyIntensity ?? 1.35) * (tune.key ?? 1);
             }
-        }
-
-        if (audio && !getSetting('reduceHorrorAudio')) {
-            try { initAudio(); } catch (_) {}
-            stopAllDrones();
-            const d = preset.drone;
-            // Keep a thin single drone under the bed for character
-            if (d) playDrone(d.type, d.freq, (d.vol || 0.05) * 0.55, 'music', d.id || 'mood');
-            const bed = music || (this.mood === 'abyss' ? 'abyss' : 'crust');
-            this.musicProfile = bed;
-            startMusicBed(bed, this.musicMotif);
+            if (L.fillNeon && preset.fillIntensity != null) {
+                L.fillNeon.intensity = preset.fillIntensity * (tune.fill ?? 1);
+            }
         }
     }
 
-    /** Switch to boss / leviathan bed without changing visual mood. */
+    /**
+     * QA snapshot of the composed presentation values (post uniforms +
+     * bound light intensities). Used by the determinism e2e spec to prove
+     * quality→mood and mood→quality produce identical frames.
+     */
+    visualSnapshot() {
+        const L = this._lights || {};
+        return {
+            mood: this.mood,
+            tune: this.tune,
+            bloom: bloomPass ? +bloomPass.strength.toFixed(4) : null,
+            bloomEnabled: bloomPass ? !!bloomPass.enabled : null,
+            film: filmPass?.uniforms?.intensity ? +filmPass.uniforms.intensity.value.toFixed(4) : null,
+            vignette: vignettePass?.uniforms?.offset ? +vignettePass.uniforms.offset.value.toFixed(4) : null,
+            background: scene.background?.getHexString?.() || null,
+            fog: scene.fog ? { color: scene.fog.color.getHexString(), density: +scene.fog.density.toFixed(6) } : null,
+            ambient: L.ambient ? { color: L.ambient.color.getHexString(), intensity: +L.ambient.intensity.toFixed(4) } : null,
+            key: L.keySun ? { color: L.keySun.color.getHexString(), intensity: +L.keySun.intensity.toFixed(4) } : null,
+            fill: L.fillNeon ? +L.fillNeon.intensity.toFixed(4) : null,
+        };
+    }
+
+    /** Switch to the boss / leviathan piece without changing visual mood. */
     setMusicProfile(name) {
         if (getSetting('reduceHorrorAudio')) return;
         try { initAudio(); } catch (_) {}
         this.musicProfile = name;
-        startMusicBed(name, this.musicMotif);
+        startScore(name);
     }
 
-    /** C7: set the per-beat/region motif; restarts the current bed with it. */
+    /**
+     * Select the track for a dungeon or overworld region by id.
+     *
+     * Replaces the old `setMusicMotif`, which took a `{ transpose, pattern }`
+     * ratio pair and retuned three drones with it. A beat id now resolves to a
+     * whole composition — key, mode, tempo, progression, melody — in
+     * `audio/tracks.js`.
+     */
+    setMusicTrack(id) {
+        if (!id || this.musicTrack === id) return;
+        this.musicTrack = id;
+        if (getSetting('reduceHorrorAudio')) return;
+        try { initAudio(); } catch (_) {}
+        this.musicProfile = id;
+        startScore(id);
+    }
+
+    /**
+     * Adaptive layering: 0 exploring · 1 enemies awake · 2 combat · 3 boss.
+     * The tune does not change, it thickens — so there is no seam when a fight
+     * starts, and the player feels the room turn without noticing why.
+     */
+    setMusicIntensity(n) {
+        setIntensity(n);
+    }
+
+    /** Back-compat shim for the motif API this replaced. */
     setMusicMotif(motif) {
-        if (this.musicMotif === motif) return;
-        this.musicMotif = motif || null;
-        if (this.musicProfile && !getSetting('reduceHorrorAudio')) {
-            startMusicBed(this.musicProfile, this.musicMotif);
-        }
+        if (typeof motif === 'string') this.setMusicTrack(motif);
     }
 
     /** Smooth 1.5s phase-shift ramp (Beat 05). */
@@ -99,12 +201,13 @@ export class MoodController {
             this._ramp.t += dt;
             const u = Math.min(1, this._ramp.t / this._ramp.dur);
             const a = this._ramp.from, b = this._ramp.to;
-            if (bloomPass) bloomPass.strength = a.bloom + (b.bloom - a.bloom) * u;
+            const ap = presentationPost(a), bp = presentationPost(b);
+            if (bloomPass) bloomPass.strength = ap.bloom + (bp.bloom - ap.bloom) * u;
             if (filmPass?.uniforms?.intensity) {
-                filmPass.uniforms.intensity.value = a.film + (b.film - a.film) * u;
+                filmPass.uniforms.intensity.value = ap.film + (bp.film - ap.film) * u;
             }
             if (vignettePass?.uniforms?.offset) {
-                vignettePass.uniforms.offset.value = a.vignette + (b.vignette - a.vignette) * u;
+                vignettePass.uniforms.offset.value = ap.vignette + (bp.vignette - ap.vignette) * u;
             }
             const bg = new THREE.Color(a.background).lerp(new THREE.Color(b.background), u);
             scene.background = bg;
@@ -134,12 +237,17 @@ export class MoodController {
         const preset = MOOD_PRESETS[this.mood];
         if (preset?.noisePulse && !getSetting('reduceHorrorAudio')) {
             this._noiseAcc += dt;
-            if (this._noiseAcc > 2.8) {
+            // Every 2.8s on the MUSIC bus, this was a texture layer nobody
+            // wrote — a filtered noise swell arriving often enough to be heard
+            // as part of the arrangement. It is a room sound, so it belongs on
+            // the effects bus and at a spacing where it registers as the Abyss
+            // breathing rather than as a part.
+            if (this._noiseAcc > 9) {
                 this._noiseAcc = 0;
-                playNoise(0.4, 0.12, 'bandpass', 800, 2400, 0.6, 'music');
+                playNoise(0.4, 0.09, 'bandpass', 800, 2400, 0.6, 'sfx');
             }
         }
-        updateMusicBed(dt);
+        updateScore(dt);
     }
 
     toggle() {

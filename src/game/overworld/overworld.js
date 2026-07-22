@@ -8,6 +8,7 @@ import { loadSovereignProgress } from '../kernel/progress.js';
 import { CRUST_COLORS, ABYSS_COLORS } from '../assets/palettes.js';
 import { fillBox } from '../../voxel/helpers.js';
 import { sfx } from '../../audio/synth.js';
+import * as THREE from 'three';
 
 export const SCREEN_HALF = 23; // 47×47 cells ≈ the plan's 48-unit screens
 
@@ -36,6 +37,47 @@ export function createOverworld(ctx, screensDef, opts = {}) {
     const savedPos = (saved.pos && saved.pos.world === levelId
         && screensDef.screens[saved.pos.screen]) ? saved.pos : null;
     const startScreen = savedPos ? savedPos.screen : screensDef.start;
+    let threadPulse = null;
+
+    function updateThreadPulse(game, sid, s, room) {
+        const destination = game.anchorThread?.destination?.()?.screen;
+        const tier = game.anchorThread?.state?.hintTier || 0;
+        if (!destination || destination === sid || tier < 1) {
+            if (threadPulse) threadPulse.visible = false;
+            return;
+        }
+        const next = nextScreenToward(screensDef.screens, sid, destination);
+        const edge = (s.edges || []).find((candidate) => candidate.to === next);
+        if (!edge) return;
+        if (!threadPulse) {
+            threadPulse = new THREE.Mesh(
+                new THREE.TorusGeometry(0.7, 0.10, 8, 24),
+                new THREE.MeshBasicMaterial({
+                    color: 0xd4a84b, transparent: true, opacity: 0.8,
+                    depthWrite: false,
+                })
+            );
+            threadPulse.rotation.x = Math.PI / 2;
+            ctx.scene.add(threadPulse);
+        }
+        const ox = room.grid[0] * 64, oz = room.grid[1] * 64;
+        const at = edge.at || 0;
+        const pos = edge.side === 'n' ? [ox + at, oz - SCREEN_HALF + 1]
+            : edge.side === 's' ? [ox + at, oz + SCREEN_HALF - 1]
+                : edge.side === 'e' ? [ox + SCREEN_HALF - 1, oz + at]
+                    : [ox - SCREEN_HALF + 1, oz + at];
+        threadPulse.position.set(pos[0], 1.18, pos[1]);
+        threadPulse.visible = true;
+        const pulse = 0.9 + Math.sin(performance.now() * 0.006) * 0.22;
+        threadPulse.scale.setScalar(pulse);
+        threadPulse.material.opacity = 0.62 + Math.sin(performance.now() * 0.006) * 0.22;
+        const playerPos = game.player?.root?.position;
+        if (tier >= 2 && playerPos
+            && Math.hypot(playerPos.x - pos[0], playerPos.z - pos[1]) < 8) {
+            const beat = game.anchorThread?.destination?.()?.beat;
+            game.mood?.setMusicTrack?.(beat);
+        }
+    }
 
     const rooms = {};
     for (const [sid, s] of Object.entries(screensDef.screens)) {
@@ -120,6 +162,7 @@ export function createOverworld(ctx, screensDef, opts = {}) {
             const room = rooms[sid];
             const ox = room.grid[0] * 64, oz = room.grid[1] * 64;
             const p = game.player.root.position;
+            updateThreadPulse(game, sid, s, room);
 
             // W5: mirror travel — monolith interact (free-swap holders can
             // trigger it anywhere outdoors via level.onMoodToggle, wired in
@@ -137,11 +180,21 @@ export function createOverworld(ctx, screensDef, opts = {}) {
             for (const en of s.entrances) {
                 const d = Math.hypot(p.x - (ox + en.x), p.z - (oz + en.z));
                 if (d < 1.6) {
+                    const unlocked = game.isLevelUnlocked?.(en.to) !== false;
                     if (!en._hinted) {
                         en._hinted = true;
-                        game.hud?.toast?.(`E — enter ${en.label || en.to}`, 1600);
+                        game.hud?.toast?.(unlocked
+                            ? `E — enter ${en.label || en.to}`
+                            : `${en.label || en.to} is sealed`, 1600);
                     }
                     if (game.input?.consumeInteract?.()) {
+                        if (!unlocked) {
+                            if (game.anchorThread?.destination?.()?.beat === en.to) {
+                                game.anchorThread.failed?.(`entrance:${en.to}`);
+                            }
+                            game.hud?.toast?.(`${en.label || en.to} is still sealed`, 2200);
+                            return;
+                        }
                         // Remember where we are so the dungeon exit returns here
                         patchOverworld({
                             pos: { world: levelId, screen: sid, x: en.x, z: en.z + 2 },
@@ -156,6 +209,16 @@ export function createOverworld(ctx, screensDef, opts = {}) {
     };
 
     const level = createDungeon(ctx, def, opts);
+    level.addSystem({
+        update() {},
+        dispose() {
+            if (!threadPulse) return;
+            if (threadPulse.parent) threadPulse.parent.remove(threadPulse);
+            threadPulse.geometry.dispose();
+            threadPulse.material.dispose();
+            threadPulse = null;
+        },
+    });
 
     // Restore exact position when returning mid-screen
     if (savedPos && savedPos.screen === startScreen) {
@@ -217,6 +280,7 @@ export function createOverworld(ctx, screensDef, opts = {}) {
                 current: sid === level.currentRoomId(),
                 entrance: !!(s.entrances && s.entrances.length),
                 monolith: !!s.monolith,
+                secret: !!s.secret,
             })),
         };
     };
@@ -226,8 +290,12 @@ export function createOverworld(ctx, screensDef, opts = {}) {
     level.onRoomEnter = (sid, game) => {
         markScreenVisited(sid);
         if (game) {
-            // C7: region motif follows the player across screens
-            game.mood?.setMusicMotif?.(screensDef.screens[sid]?.motif || null);
+            if (game.anchorThread?.destination?.()?.screen === sid) {
+                game.anchorThread.markProgress?.('destination_region', sid);
+            }
+            // The region's composition follows the player across screens, so
+            // walking from the Tombfields into the Pyre changes key and tempo.
+            game.mood?.setMusicTrack?.(screensDef.screens[sid]?.track || null);
             const room = rooms[sid];
             const p = game.player.root.position;
             patchOverworld({
@@ -241,8 +309,27 @@ export function createOverworld(ctx, screensDef, opts = {}) {
         }
     };
 
-    // C7: the starting screen's motif applies at load (index.js reads this)
-    level.initialMotif = screensDef.screens[startScreen]?.motif || null;
+    // The starting screen's region track applies at load (index.js reads this).
+    level.initialTrack = screensDef.screens[startScreen]?.track || null;
 
     return level;
+}
+
+export function nextScreenToward(screens, start, destination) {
+    if (!screens?.[start] || !screens?.[destination] || start === destination) return start;
+    const queue = [start];
+    const previous = new Map([[start, null]]);
+    while (queue.length) {
+        const id = queue.shift();
+        if (id === destination) break;
+        for (const edge of screens[id]?.edges || []) {
+            if (!screens[edge.to] || previous.has(edge.to)) continue;
+            previous.set(edge.to, id);
+            queue.push(edge.to);
+        }
+    }
+    if (!previous.has(destination)) return null;
+    let step = destination;
+    while (previous.get(step) && previous.get(step) !== start) step = previous.get(step);
+    return previous.get(step) === start ? step : null;
 }

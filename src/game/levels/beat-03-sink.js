@@ -24,6 +24,17 @@ export const BEAT03_DEF = {
     floorColor: CRUST_COLORS.clay,
     wallColor: CRUST_COLORS.clayDark,
     banner: 'The Sink hunts vibration. Reach the Spur\'s nest.',
+    // Z6 — this dungeon's one idea, and the four rooms that carry it:
+    // introduce it safely, complicate it, fuse it with combat, then examine it.
+    theme: {
+        id: 'sidestep',
+        name: 'Out of the Lane',
+        hint: "Lancers commit to a line and cannot turn. Do not run back — step aside.",
+        teach: 'dunecross',
+        develop: 'cistern',
+        combine: 'undertow',
+        test: 'spurpit',
+    },
     keys: [
         { room: 'dunecross', type: 'small' },
         { room: 'slipway', type: 'small' },
@@ -57,7 +68,7 @@ export const BEAT03_DEF = {
             },
             enemies: [
                 { x: -5, z: 3, kind: 'scarab', hp: 3, ai: 'charge' },
-                { x: 5, z: -3, kind: 'scarab', hp: 2, ai: 'charge' },
+                { x: 5, z: -3, kind: 'lancer', hp: 2 },
             ],
             doors: [
                 { to: 'sinkmouth', side: 'S', at: 0, type: 'open' },
@@ -78,7 +89,7 @@ export const BEAT03_DEF = {
                 h.fillBox(map, -4, 4, 0, 0, -4, 4, CRUST_COLORS.slateDark); // drained basin
                 h.fillBox(map, -5, -4, 1, 3, -5, -4, CRUST_COLORS.iron);
             },
-            enemies: [{ x: 0, z: -3, kind: 'frost', hp: 2, ai: 'ranged' }],
+            enemies: [{ x: 0, z: -3, kind: 'scarab', hp: 2, ai: 'ranged' }],
             doors: [{ to: 'dunecross', side: 'E', at: 0, type: 'open' }],
             onBake(level, origin) {
                 if (!level.keyStore.mapPickup()) {
@@ -102,7 +113,7 @@ export const BEAT03_DEF = {
                 h.fillBox(map, -3, -2, 1, 2, 4, 5, CRUST_COLORS.limestone);
             },
             enemies: [
-                { x: -3, z: -3, kind: 'scarab', hp: 3, ai: 'charge' },
+                { x: -3, z: -3, kind: 'lancer', hp: 3 },
                 { x: 3, z: -4, kind: 'scarab', hp: 3, ai: 'charge' },
             ],
             doors: [{ to: 'dunecross', side: 'W', at: 0, type: 'open' }],
@@ -119,7 +130,8 @@ export const BEAT03_DEF = {
                         game.hud?.toast?.('Phase Boot — dash-hop low ledges');
                     },
                 });
-                level.addPickup({ x: origin.x, y: 1.2, z: origin.z - 7.5 }, {
+                // z -7.5 sat inside the north wall stack; step it onto open floor.
+                level.addPickup({ x: origin.x, y: 1.2, z: origin.z - 6.5 }, {
                     color: 0x7fe0ff,
                     label: 'Ledge cache',
                     onPickup(game) {
@@ -137,7 +149,7 @@ export const BEAT03_DEF = {
                 h.fillBox(map, -7, -6, 1, 3, -3, 3, CRUST_COLORS.clayDark);
                 h.fillBox(map, 6, 7, 1, 3, -3, 3, CRUST_COLORS.clayDark);
             },
-            enemies: [{ x: 0, z: -4, kind: 'sentinel', hp: 3 }],
+            enemies: [{ x: 0, z: -4, kind: 'lancer', hp: 3 }],
             doors: [
                 { to: 'dunecross', side: 'S', at: 0, type: 'locked' },
                 { to: 'undertow', side: 'N', at: 0, type: 'locked' },
@@ -173,11 +185,13 @@ export const BEAT03_DEF = {
             ],
             onBake(level, origin) {
                 level.addPickup({ x: origin.x + 4, y: 1.2, z: origin.z - 3 }, {
-                    color: 0x7fe0ff,
-                    label: 'Hollow cache',
+                    color: 0xff7a90,
+                    label: 'Scar Suture',
+                    reward: { type: 'suture' },
                     onPickup(game) {
-                        game.player.inventory.addShards(25);
-                        game.hud?.toast?.('Hollow cache — 25 shards');
+                        if (game.collectSuture?.('b03-hollow')) {
+                            game.hud?.toast?.("Scar Suture recovered from the hollow.", 2600);
+                        }
                     },
                 });
             },
@@ -195,8 +209,8 @@ export const BEAT03_DEF = {
             },
             enemies: [
                 { x: -3, z: -3, kind: 'scarab', hp: 3, ai: 'charge' },
-                { x: 3, z: -3, kind: 'scarab', hp: 3, ai: 'charge' },
-                { x: 0, z: 3, kind: 'frost', hp: 3, ai: 'ranged' },
+                { x: 3, z: -3, kind: 'lancer', hp: 3 },
+                { x: 0, z: 3, kind: 'scarab', hp: 3, ai: 'ranged' },
             ],
             doors: [
                 { to: 'slipway', side: 'S', at: 0, type: 'locked' },

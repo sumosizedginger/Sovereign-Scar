@@ -52,7 +52,7 @@ export class SoulMotes {
     }
 
     /** @param onCollect called once per mote that reaches the target */
-    update(dt, target, onCollect) {
+    update(dt, target, onCollect, homeSpeed = 1) {
         for (const m of this.pool) {
             if (!m.active) continue;
             m.t += dt;
@@ -61,7 +61,7 @@ export class SoulMotes {
                 m.mesh.position.addScaledVector(m.vel, dt);
             } else if (target) {
                 if (m.t - dt < SCATTER_TIME) m.from.copy(m.mesh.position);
-                const u = Math.min(1, (m.t - SCATTER_TIME) / HOME_TIME);
+                const u = Math.min(1, ((m.t - SCATTER_TIME) / HOME_TIME) * Math.max(0.1, homeSpeed));
                 const k = u * u; // ease-in — accelerates toward the player
                 m.mesh.position.lerpVectors(m.from, target, k);
                 m.mesh.position.y += Math.sin(u * Math.PI) * 0.7; // slight arc

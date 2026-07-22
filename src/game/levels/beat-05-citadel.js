@@ -25,6 +25,17 @@ export const BEAT05_DEF = {
     start: 'approach',
     prebake: true,
     banner: 'Three memory keys open the Wedge. The Proxy guards the fold.',
+    // Z6 — this dungeon's one idea, and the four rooms that carry it:
+    // introduce it safely, complicate it, fuse it with combat, then examine it.
+    theme: {
+        id: 'guard',
+        name: 'The Plate',
+        hint: "A Bulwark eats anything you swing at its face. Get behind it, or parry and take the opening.",
+        teach: 'greathall',
+        develop: 'westgallery',
+        combine: 'sanctum',
+        test: 'proxythrone',
+    },
     keys: [
         { room: 'greathall', type: 'small' },
         { room: 'eastgallery', type: 'small' },
@@ -59,7 +70,7 @@ export const BEAT05_DEF = {
                 stampMap(map, buildKintsugiPillar(8, 8, 6), 0, 1, 0);
             },
             enemies: [
-                { x: -5, z: 3, kind: 'sentinel', hp: 4 },
+                { x: -5, z: 3, kind: 'bulwark', hp: 4 },
                 { x: 5, z: 3, kind: 'sentinel', hp: 4 },
             ],
             doors: [
@@ -69,8 +80,10 @@ export const BEAT05_DEF = {
                 { to: 'eastgallery', side: 'E', at: 0, type: 'open' },
             ],
             onBake(level, origin) {
+                // Clear of the SW kintsugi pillar (-8±1) so the key is not buried
+                // inside a collision solid.
                 addKeyPickup(level, 'beat-05-citadel', 'hall-key',
-                    { x: origin.x - 9, y: 1.2, z: origin.z - 9 }, 'small');
+                    { x: origin.x - 5, y: 1.2, z: origin.z - 9 }, 'small');
             },
         },
         westgallery: {
@@ -80,7 +93,7 @@ export const BEAT05_DEF = {
             build(map, h) {
                 h.fillBox(map, -5, -4, 1, 4, -5, 4, CRUST_COLORS.iron);
             },
-            enemies: [{ x: 2, z: -2, kind: 'frost', hp: 3, ai: 'ranged' }],
+            enemies: [{ x: 2, z: -2, kind: 'bulwark', hp: 3, ai: 'ranged' }],
             doors: [{ to: 'greathall', side: 'E', at: 0, type: 'open' }],
             onBake(level, origin) {
                 if (!level.keyStore.mapPickup()) {
@@ -100,8 +113,8 @@ export const BEAT05_DEF = {
             half: 7,
             wallH: 5,
             enemies: [
-                { x: -2, z: -2, kind: 'scarab', hp: 3, ai: 'charge' },
-                { x: 3, z: 2, kind: 'scarab', hp: 3, ai: 'charge' },
+                { x: -2, z: -2, kind: 'sentinel', hp: 3, ai: 'charge' },
+                { x: 3, z: 2, kind: 'bulwark', hp: 3 },
             ],
             platforms(map, h) {
                 for (let lvl = 1; lvl <= 3; lvl++) {
@@ -172,11 +185,13 @@ export const BEAT05_DEF = {
             ],
             onBake(level, origin) {
                 level.addPickup({ x: origin.x + 2, y: 1.2, z: origin.z + 2 }, {
-                    color: 0x7fe0ff,
-                    label: 'Reliquary cache',
+                    color: 0xff7a90,
+                    label: 'Scar Suture',
+                    reward: { type: 'suture' },
                     onPickup(game) {
-                        game.player.inventory.addShards(35);
-                        game.hud?.toast?.('Reliquary cache — 35 shards');
+                        if (game.collectSuture?.('b05-reliquary')) {
+                            game.hud?.toast?.("Scar Suture recovered from the reliquary.", 2600);
+                        }
                     },
                 });
             },
@@ -186,9 +201,9 @@ export const BEAT05_DEF = {
             half: 8,
             wallH: 6,
             enemies: [
-                { x: -3, z: -3, kind: 'sentinel', hp: 4 },
+                { x: -3, z: -3, kind: 'bulwark', hp: 4 },
                 { x: 3, z: -3, kind: 'sentinel', hp: 4, ai: 'charge' },
-                { x: 0, z: 3, kind: 'frost', hp: 3, ai: 'ranged' },
+                { x: 0, z: 3, kind: 'bulwark', hp: 3 },
             ],
             doors: [
                 { to: 'monolith', side: 'S', at: 0, type: 'locked' },

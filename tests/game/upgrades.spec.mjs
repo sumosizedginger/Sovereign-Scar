@@ -36,9 +36,9 @@ export function run(t) {
     t.ok('longarm 2 → 14', grappleRange({ longarm: 2 }) === 14);
     t.ok('null upgrades safe', damageMult(null) === 1 && grappleRange(null) === 8);
 
-    // Catalogue sanity: every upgrade has 2 tiers and ascending costs
+    // Catalogue sanity: upgrades have at least one positive, ascending tier.
     for (const [id, u] of Object.entries(UPGRADES)) {
-        t.ok(`${id} has 2 tiers`, u.costs.length === 2);
-        t.ok(`${id} costs ascend`, u.costs[0] < u.costs[1]);
+        t.ok(`${id} has tiers`, u.costs.length >= 1);
+        t.ok(`${id} costs ascend`, u.costs.every((cost, i) => cost > 0 && (!i || cost > u.costs[i - 1])));
     }
 }

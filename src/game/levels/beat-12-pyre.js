@@ -21,11 +21,25 @@ export const BEAT12_DEF = {
     id: 'beat-12-pyre',
     name: '12 Pyre Peak',
     mood: 'abyss',
+    // Per-level luminance trim into the Abyss certification band [35,75]
+    // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
+    lightTune: { ambient: 3.2, key: 1.4 },
     start: 'scoriagate',
     prebake: true,
-    floorColor: 0x2a1810,
-    wallColor: 0x3a2018,
+    floorColor: 0x5c3a26, // certification retune: ember-brown lifted out of the near-black
+    wallColor: 0x6a4434, // reflectance floor that kept pyre frames under lum 12
     banner: 'A dragon of ore and spite rivers through the peak.',
+    // Z6 — this dungeon's one idea, and the four rooms that carry it:
+    // introduce it safely, complicate it, fuse it with combat, then examine it.
+    theme: {
+        id: 'lanes_air',
+        name: 'Lane and Sky',
+        hint: "One threat runs at you in a straight line, one hangs where you cannot swing. Never solve them in the same order twice.",
+        teach: 'pyreterrace',
+        develop: 'slagworks',
+        combine: 'ashgallery',
+        test: 'caldera',
+    },
     keys: [
         { room: 'pyreterrace', type: 'small' },
         { room: 'ventfield', type: 'small' },
@@ -59,8 +73,8 @@ export const BEAT12_DEF = {
                 h.fillBox(map, -2, 2, 1, 2, 6, 8, ABYSS_COLORS.basalt);
             },
             enemies: [
-                { x: -5, z: 4, kind: 'sentinel', hp: 5 },
-                { x: 5, z: -5, kind: 'frost', hp: 4, ai: 'ranged' },
+                { x: -5, z: 4, kind: 'lancer', hp: 5 },
+                { x: 5, z: -5, kind: 'mote', hp: 4 },
             ],
             doors: [
                 { to: 'scoriagate', side: 'S', at: 0, type: 'open' },
@@ -80,11 +94,12 @@ export const BEAT12_DEF = {
             build(map, h) {
                 h.fillBox(map, -5, -4, 1, 3, -5, 4, 0x3a2018);
             },
-            enemies: [{ x: 3, z: 3, kind: 'scarab', hp: 4, ai: 'charge' }],
+            enemies: [{ x: 3, z: 3, kind: 'lancer', hp: 4, ai: 'charge' }],
             doors: [{ to: 'pyreterrace', side: 'E', at: 0, type: 'open' }],
             onBake(level, origin) {
                 if (!level.keyStore.mapPickup()) {
-                    level.addPickup({ x: origin.x - 4, y: 1.2, z: origin.z - 4 }, {
+                    // x -4 sat inside a basalt fan; step it clear onto open floor.
+                    level.addPickup({ x: origin.x - 3, y: 1.2, z: origin.z - 4 }, {
                         color: 0x9ad0ff,
                         label: 'Slag charts',
                         onPickup(game) {
@@ -103,16 +118,27 @@ export const BEAT12_DEF = {
                 stampMap(map, buildMagmaVent(-3, -3), 0, 1, 0);
                 stampMap(map, buildMagmaVent(3, 2), 0, 1, 0);
             },
-            enemies: [{ x: 0, z: -4, kind: 'frost', hp: 4, ai: 'ranged' }],
+            enemies: [{ x: 0, z: -4, kind: 'mote', hp: 4, ai: 'ranged' }],
             doors: [{ to: 'pyreterrace', side: 'W', at: 0, type: 'open' }],
             onBake(level, origin) {
+                level.addPickup({ x: origin.x + 6, y: 1.2, z: origin.z - 6 }, {
+                    color: 0xff7a90,
+                    label: 'Scar Suture',
+                    reward: { type: 'suture' },
+                    onPickup(game) {
+                        if (game.collectSuture?.('b12-emberrun')) {
+                            game.hud?.toast?.('Scar Suture recovered from the ember run.', 2600);
+                        }
+                    },
+                });
                 level.addPickup({ x: origin.x, y: 1.2, z: origin.z + 4 }, {
                     color: 0xffa040,
                     label: 'Vector Staff',
                     onPickup(game) {
                         game.player.inventory.grantItem('vector_staff');
-                        game.player.inventory.grantItem('light_caster');
-                        game.hud?.toast?.('Vector Staff — light lines on cast');
+                        game.player.inventory.grantItem('line_caster');
+                        game.hud?.toast?.('Vector Staff and Line Caster — light lines now hold');
+                        game.anchorThread?.markProgress?.('item_acquired', 'line_caster');
                     },
                 });
             },
@@ -127,8 +153,8 @@ export const BEAT12_DEF = {
                 stampMap(map, buildMagmaVent(0, -5), 0, 1, 0);
             },
             enemies: [
-                { x: -4, z: 4, kind: 'scarab', hp: 4, ai: 'charge' },
-                { x: 4, z: 4, kind: 'sentinel', hp: 5 },
+                { x: -4, z: 4, kind: 'lancer', hp: 4 },
+                { x: 4, z: 4, kind: 'mote', hp: 5 },
             ],
             doors: [
                 { to: 'pyreterrace', side: 'S', at: 0, type: 'locked' },
@@ -160,11 +186,13 @@ export const BEAT12_DEF = {
             ],
             onBake(level, origin) {
                 level.addPickup({ x: origin.x, y: 1.2, z: origin.z }, {
-                    color: 0x7fe0ff,
-                    label: 'Cinder cache',
+                    color: 0x9ad0ff,
+                    label: 'Memory Vial chassis',
+                    reward: { type: 'vial' },
                     onPickup(game) {
-                        game.player.inventory.addShards(30);
-                        game.hud?.toast?.('Cinder cache — 30 shards');
+                        if (game.collectMemoryVial?.('b12-cinder')) {
+                            game.hud?.toast?.("A Memory Vial chassis, annealed in the cinder pocket.", 2600);
+                        }
                     },
                 });
             },
@@ -177,9 +205,9 @@ export const BEAT12_DEF = {
                 stampMap(map, buildMagmaVent(0, 0), 0, 1, 0);
             },
             enemies: [
-                { x: -3, z: -3, kind: 'scarab', hp: 5, ai: 'charge' },
-                { x: 3, z: -3, kind: 'frost', hp: 4, ai: 'ranged' },
-                { x: 0, z: 3, kind: 'sentinel', hp: 5 },
+                { x: -3, z: -3, kind: 'lancer', hp: 5 },
+                { x: 3, z: -3, kind: 'mote', hp: 4 },
+                { x: 0, z: 3, kind: 'lancer', hp: 5 },
             ],
             doors: [
                 { to: 'ventfield', side: 'S', at: 0, type: 'locked' },

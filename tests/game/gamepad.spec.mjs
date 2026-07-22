@@ -49,7 +49,11 @@ export function run(t) {
     t.ok('X → interact', input.consumeInteract() === true);
     t.ok('Y → grapple', input.consumeGrapple() === true);
     t.ok('RB → weapon next', input.consumeWeaponCycle() === 1);
-    t.ok('LT → mute', input.consumeMuteToggle() === true);
+    // Z4 took LT for lock-on (the Ocarina slot). Mute lost the binding rather
+    // than the reverse: it is a settings toggle, and the triggers are the only
+    // pad real estate a player can reach without letting go of a stick.
+    t.ok('LT → lock-on', input.consumeLockToggle() === true);
+    t.ok('LT no longer mutes', input.consumeMuteToggle() === false);
     // The map had no pad binding at all — it was keyboard-only (Tab) and
     // unadvertised, so on a controller it was unreachable.
     t.ok('Select → map', input.consumeMapToggle() === true);

@@ -42,6 +42,8 @@ export async function run(t) {
             timeout: 25000,
         });
         await page.mouse.click(400, 300);
+        await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('Enter');
         await sleep(300);
 
         const rows = await page.evaluate(async () => {
@@ -56,12 +58,28 @@ export async function run(t) {
                     // The boss-intro camera push-in would skew the sample.
                     s.game.bossIntro = null;
                     await new Promise((r) => setTimeout(r, 600));
-                    // Two samples, keep the max: first frames after a load can
-                    // read dark while materials/programs settle.
-                    const lumA = await s.sampleLuminance();
-                    await new Promise((r) => setTimeout(r, 300));
-                    const lumB = await s.sampleLuminance();
-                    const lum = Math.max(lumA, lumB);
+                    // Five samples, keep the MEDIAN.
+                    //
+                    // This was max-of-two, chosen because the first frames after
+                    // a load read dark while materials and programs settle. But
+                    // max is the wrong statistic for a signal that oscillates:
+                    // Beat 13 runs the flicker shader at 0.45 and Beat 14 the
+                    // wrap shader, so their frame brightness swings by design,
+                    // and taking the peak made the gate fail intermittently at
+                    // 96.6 against a ceiling of 75 — a level that sits at ~36
+                    // when you actually look at it. A randomly-failing gate is
+                    // worse than no gate, because it trains you to re-run.
+                    //
+                    // The median discards both the dark settling frame the max
+                    // was guarding against and the bright flicker peak, without
+                    // needing to know which levels flicker.
+                    const lums = [];
+                    for (let i = 0; i < 5; i++) {
+                        lums.push(await s.sampleLuminance());
+                        await new Promise((r) => setTimeout(r, 160));
+                    }
+                    lums.sort((a, b) => a - b);
+                    const lum = lums[Math.floor(lums.length / 2)];
                     const m = s.measure();
                     out.push({
                         id: meta.id,

@@ -49,6 +49,8 @@ export async function run(t) {
 
         // Click to unlock audio / dismiss boot
         await page.mouse.click(400, 300);
+        await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('Enter');
         await sleep(800);
 
         const hook = await page.evaluate(() => {
@@ -70,6 +72,23 @@ export async function run(t) {
         t.ok('player alive', hook.hp > 0, `hp=${hook.hp}`);
         t.ok('16 levels registered', hook.levelCount === 16);
         t.ok('frames drawing', hook.calls > 0 || hook.triangles >= 0, JSON.stringify(hook));
+
+        const progressionGate = await page.evaluate(() => {
+            const s = window.__sovereignScar;
+            const before = { levelId: s.game.levelId, currentBeat: s.progress().currentBeat };
+            const allowed = s.game.loadLevel('beat-06-quarry');
+            return {
+                allowed,
+                before,
+                after: { levelId: s.game.levelId, currentBeat: s.progress().currentBeat },
+            };
+        });
+        t.ok('locked player travel is rejected', progressionGate.allowed === false,
+            JSON.stringify(progressionGate));
+        t.ok('rejected travel preserves level and save',
+            progressionGate.after.levelId === progressionGate.before.levelId
+            && progressionGate.after.currentBeat === progressionGate.before.currentBeat,
+            JSON.stringify(progressionGate));
 
         // Move and attack
         await page.keyboard.down('KeyW');

@@ -15,6 +15,19 @@ export class CameraRig {
         this._look = { x: 0, y: this.lookY, z: 0 };
         this._focus = null; // { t, dur, toH, toB, target } — boss-intro push-in
         this._bounds = null; // W2: room-lock rect for the look-at target
+        this._second = null; // Ticket D: live second subject (boss) for two-subject framing
+        this._secondW = 0; // smoothed engagement weight so framing eases in/out
+    }
+
+    /**
+     * Ticket D: two-subject framing. While a live boss is engaged, the frame
+     * splits its attention between player and boss — the look target slides
+     * toward their midpoint and the rig pulls up/back just enough that both
+     * fit, instead of the boss fighting from off-screen. Pass null to clear
+     * (death, defeat, level change).
+     */
+    setSecondSubject(pos) {
+        this._second = pos || null;
     }
 
     /**
@@ -89,6 +102,24 @@ export class CameraRig {
                 z += (f.target.z - z) * fk * 0.8;
             }
             if (u >= 1) this._focus = null;
+        }
+
+        // Two-subject framing (Ticket D): weight eases toward 1 while a
+        // second subject is set and inside engagement range, toward 0
+        // otherwise, so the frame never snaps when a boss dies or leashes.
+        const s2 = this._second;
+        const engaged = s2 && Math.hypot(s2.x - x, s2.z - z) < 26 ? 1 : 0;
+        this._secondW += (engaged - this._secondW) * Math.min(1, dt * 4);
+        if (this._secondW > 0.01 && s2) {
+            const w = 0.35 * this._secondW;
+            const d = Math.hypot(s2.x - x, s2.z - z);
+            x += (s2.x - x) * w;
+            z += (s2.z - z) * w;
+            // Pull up/back proportionally to separation so both subjects
+            // stay inside the safe frame (capped: never a map view).
+            const widen = Math.min(7, Math.max(0, d - 6) * 0.5) * this._secondW;
+            effH += widen;
+            effB += widen * 0.35;
         }
 
         const c = this._clampToBounds(x, z, effH, effB);

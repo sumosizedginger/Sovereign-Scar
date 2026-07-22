@@ -1,65 +1,37 @@
 // Hostile constructs — chase, charge, and ranged AI variants.
 
 import * as THREE from 'three';
-import { buildTorso, buildHead, buildArm, buildLeg, buildGlowEyes, scaleProfile, TORSO_PROFILE, HEAD_PROFILE } from '../characters/builders.js';
-import { buildVoxelGeo } from '../voxel/core.js';
-import { S } from '../voxel/palette.js';
+import { createActorRig } from './characters/actor-rig.js';
+import { createActorAnimator } from './characters/actor-animator.js';
 import { makeFacing } from '../combat/facing.js';
 import { ENEMY_PALETTES } from './assets/palettes.js';
 import { sfx } from '../audio/synth.js';
-
-function buildFigure(parts, scale) {
-    const group = new THREE.Group();
-    for (const [m, offset] of parts) {
-        const mesh = new THREE.Mesh(
-            buildVoxelGeo(m),
-            new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })
-        );
-        mesh.scale.setScalar(scale);
-        mesh.position.set(offset[0] * scale, offset[1] * scale, offset[2] * scale);
-        mesh.castShadow = true;
-        group.add(mesh);
-    }
-    return group;
-}
+import { getActiveRunMode } from './kernel/run-mode.js';
+import { coach } from './ui/coach.js';
 
 export class Enemy {
     /**
-     * @param {string} kind sentinel | scarab | frost
-     * @param {string} [opts.ai] chase | charge | ranged  (default by kind)
+     * @param {string} kind sentinel | scarab | frost | bulwark | mote | lancer | brood
+     * @param {string} [opts.ai] chase | charge | ranged | lunge | drift  (default by kind)
      */
     constructor(scene, collisionWorld, position, opts = {}) {
+        const mode = getActiveRunMode();
         this.kind = opts.kind || 'sentinel';
         this.ai = opts.ai || defaultAi(this.kind);
         const pal = ENEMY_PALETTES[this.kind] || ENEMY_PALETTES.sentinel;
-        const slim = scaleProfile(TORSO_PROFILE, opts.scaleProfile || 0.65);
-        const parts = [
-            [buildTorso(pal, slim, { clothingMode: 'casual' }), [0, 0, 0]],
-            [buildHead(pal, scaleProfile(HEAD_PROFILE, 0.85), {}), [0, 24, 0]],
-            [buildArm(pal, 1), [12, 15, 0]],
-            [buildArm(pal, -1), [-12, 15, 0]],
-            [buildLeg(pal, 1), [5, 0, 0]],
-            [buildLeg(pal, -1), [-5, 0, 0]],
-        ];
-        const scale = S * (opts.meshScale || 0.33);
-        this.rig = new THREE.Group();
-        const inner = buildFigure(parts, scale);
-        try {
-            const eyes = buildGlowEyes(pal);
-            eyes.left.scale.setScalar(scale);
-            eyes.right.scale.setScalar(scale);
-            // buildGlowEyes bakes unscaled part-unit positions — re-place at
-            // head height (head part offset is [0,24,0] × scale).
-            eyes.left.position.set(-2.5 * scale, (6 + 24) * scale, 5.5 * scale);
-            eyes.right.position.set(2.5 * scale, (6 + 24) * scale, 5.5 * scale);
-            inner.add(eyes.left, eyes.right);
-        } catch (_) {}
-        // Ground the mesh: enemy rig origin sits on the floor (rig.y = 1.0 =
-        // floor top), so shift the mesh up until its local minY is 0.
-        const bbox = new THREE.Box3().setFromObject(inner);
-        inner.position.y = -bbox.min.y;
-        this.rig.add(inner);
-        this._inner = inner;
+        // Ticket F: named-pivot rig + archetype animator — sentinel, scarab,
+        // and frost diverge in rest pose and gait, not just palette.
+        this.actor = createActorRig({
+            palette: pal,
+            torsoProfileScale: opts.scaleProfile || 0.65,
+            headProfileScale: 0.85,
+            meshScale: opts.meshScale || 0.33,
+            clothingMode: 'casual',
+            groundOffset: 0, // enemy rig origin sits on the floor (rig.y = floor top)
+        });
+        this.rig = this.actor.root;
+        this._inner = this.actor.inner;
+        this.animator = createActorAnimator(this.actor, { archetype: this.kind });
         this.rig.position.set(position.x, position.y != null ? position.y : 1.0, position.z);
         scene.add(this.rig);
         this.scene = scene;
@@ -68,7 +40,8 @@ export class Enemy {
         this.state = makeFacing(-1);
         this.state.current = 'IDLE';
         this.hitRadius = opts.hitRadius || 0.5;
-        this.hp = opts.hp != null ? opts.hp : 3;
+        const baseHp = opts.hp != null ? opts.hp : 3;
+        this.hp = Math.max(1, baseHp * mode.enemyHp);
         this.maxHp = this.hp;
         this.speed = opts.speed || (this.ai === 'charge' ? 2.8 : 2.2);
         this.damage = opts.damage || 1;
@@ -87,7 +60,9 @@ export class Enemy {
         // player.health.damage() the instant its cooldown expired and you
         // were in range, so a hit was unavoidable and unreadable: no tell to
         // react to, and no way to step out of it once committed.
-        this.windup = opts.windup != null ? opts.windup : 0.45;
+        this.windup = (opts.windup != null ? opts.windup : 0.45) * mode.telegraphDuration;
+        this.actionFrequency = mode.actionFrequency;
+        this.projectileSpeed = mode.projectileSpeed;
         this._windupT = 0;
         this._pendingStrike = null;
         this._tell = null;
@@ -97,10 +72,71 @@ export class Enemy {
         this.onDeath = opts.onDeath || null;
         this.projectiles = [];
 
+        // Z5 — the traits that make a kind ask a different question.
+        //
+        // frontArmor: melee from inside the front cone is refused outright.
+        //   The answers are to flank it (which is why lock-on strafing exists)
+        //   or to parry its swing, which opens `_openT`.
+        // hover: sits above melee reach entirely, so it must be answered at
+        //   range. `flyHeight` is measured from the floor the enemy spawned on.
+        // split: comes apart on death into `split` weaker copies. The level
+        //   supplies the spawner via attachSplit(), because only the level
+        //   knows how to register a new enemy with the room.
+        this.frontArmor = !!opts.frontArmor || this.kind === 'bulwark';
+        // A plate is only a puzzle if the player can get behind it. Facing used
+        // to snap at the player every frame, which pinned the armoured cone on
+        // whoever was attacking: `inFrontArc` was true for every swing from
+        // every angle, and a bulwark was literally unkillable by melee. The
+        // flank the kind is built around was geometrically unreachable.
+        //
+        // 2.2 rad/s is derived, not picked. The plate spans ±75° (PI/2.4), so
+        // the player must win 1.31 rad of relative bearing. Circling at speed
+        // 5.5 from melee range (~1.5) is 3.7 rad/s of orbit, so the net gain is
+        // ~1.5 rad/s — just under a second of committed strafing to open the
+        // back. Fast enough to feel earned, slow enough that standing still and
+        // swinging never works. Infinity leaves every other kind bit-for-bit
+        // identical to before.
+        this.turnRate = opts.turnRate != null ? opts.turnRate
+            : (this.frontArmor ? 2.2 : Infinity);
+        this.hover = opts.hover != null ? opts.hover : this.kind === 'mote';
+        // 3.4 is not arbitrary: the tallest melee move (heavy_mallet) has
+        // vertical 1.5, plus a 0.5 hit radius, against a player rig sitting at
+        // 1.95. Anything under ~3.2 is still swingable, which would quietly
+        // turn the mote back into an ordinary enemy.
+        this.flyHeight = opts.flyHeight != null ? opts.flyHeight : 3.4;
+        this.split = opts.split || (this.kind === 'brood' ? 2 : 0);
+        this.generation = opts.generation || 0;
+        this._openT = 0;      // armour-down window bought by a parry
+        this._lungeT = 0;
+        this._lungeDir = null;
+        this._driftT = Math.random() * Math.PI * 2;
+        if (this.hover) {
+            this._groundY = this.rig.position.y;
+            this.rig.position.y = this._groundY + this.flyHeight;
+        }
+
         this.onHit = () => {
             this._flash = 0.15;
-            sfx.kick();
+            this.animator?.hit(); // flash PLUS stagger lean (Ticket F)
+            // The impact sound belongs to combat-sweeper, which is the only
+            // place that knows whether the hit wounded or killed.
         };
+        // Z5: a plate that eats a swing has to SOUND like it, or the player
+        // reads "my attack missed" instead of "that side is armoured" and
+        // never learns the counterplay.
+        this.onBlocked = opts.onBlocked || (() => {
+            // The clang itself comes from combat-sweeper, which knows whether
+            // this was a plate or a generic shield; doubling it here made one
+            // impact sound like two.
+            this._flash = 0.1;
+            // The clang says "that did nothing". It does not say WHY, and a
+            // player who never saw this dungeon's theme hint has no way to
+            // infer a rule from a sound. Once, at the exact moment it matters.
+            if (this.frontArmor) {
+                coach('armor-front',
+                    'That plate turns blades. Circle behind it — or parry its swing to drop it.');
+            }
+        });
     }
 
     /**
@@ -123,7 +159,10 @@ export class Enemy {
         // here (as the boss telegraph uses) buries the ring: room floors are
         // at y = 1, so the tell rendered underneath the ground and the player
         // saw no warning at all.
-        ring.position.set(x, this.rig.position.y + 0.06, z);
+        // A hovering enemy's tell still belongs on the FLOOR — painted at
+        // altitude it is invisible from a top-down camera and unreadable
+        // against the thing casting it.
+        ring.position.set(x, (this.hover ? this._groundY : this.rig.position.y) + 0.06, z);
         this.scene.add(ring);
         this._tell = ring;
         this._tellLife = life;
@@ -158,6 +197,12 @@ export class Enemy {
             dur,
             opts.color
         );
+        // Sync rule 1 (Ticket F): the body's windup pose shares the ring's
+        // exact life, so the raise peaks as the ring peaks. Frost aims (point
+        // profile), scarab compresses low, sentinel pulls a slash back.
+        this.animator?.startWindup(dur,
+            this.ai === 'ranged' ? 'light_caster'
+                : this.kind === 'scarab' ? 'bare_strike' : 'anchor_link');
         sfx.whoosh();
     }
 
@@ -173,9 +218,45 @@ export class Enemy {
             sfx.step(); // whiff — the player got out in time
             return false;
         }
-        const res = player.health.damage(damage, 0.9);
+        // Z3: `from` is what makes the guard directional — block the sentinel
+        // in front of you and the scarab behind you still opens your back.
+        const res = player.health.damage(damage, 0.9, 'hostile', {
+            from: this.rig.position, attacker: this,
+        });
         if (res.accepted) sfx.hurt();
         return res.accepted;
+    }
+
+    /**
+     * Z3: interrupted — drop any committed swing and stand open. This is the
+     * reward a parry buys the player, so it must cancel the pending strike
+     * rather than merely delaying it.
+     */
+    stagger(sec = 0.7) {
+        this._windupT = 0;
+        this._pendingStrike = null;
+        this._chargeT = 0;
+        this._lungeT = 0;
+        this.clearTelegraph();
+        this.attackCd = Math.max(this.attackCd, sec);
+        // Z5: one rule, uniformly applied — a parry undoes whatever makes this
+        // enemy hard to hit. The bulwark drops its plate; the mote drops out
+        // of the air. That single sentence is the whole reward structure, and
+        // it means neither kind can ever become unkillable if the player
+        // skipped the item that was "meant" to answer it.
+        this._openT = Math.max(this._openT, sec);
+        if (this.hover) this._groundedT = Math.max(this._groundedT || 0, sec);
+        this.animator?.hit();
+    }
+
+    /** Z5: true while the front plate actually refuses melee. */
+    get armorUp() {
+        return this.frontArmor && this._openT <= 0 && this.state.current !== 'DEAD';
+    }
+
+    /** Z5: true while a hovering enemy is genuinely out of sword reach. */
+    get airborne() {
+        return this.hover && !(this._groundedT > 0) && this.state.current !== 'DEAD';
     }
 
     update(dt, player) {
@@ -183,9 +264,77 @@ export class Enemy {
             this.rig.visible = false;
             this.clearTelegraph();
             this._clearProjectiles();
+            this.animator?.setDead(true);
             return;
         }
+        this._frameMove = 0;
+        this._updateAI(dt, player);
+        this._separateFrom(player);
+        // Ticket F: pose from the same clocks the AI runs on. The animator
+        // writes only local pivot rotations; root position/yaw stay AI-owned,
+        // so hitboxes (root.position + hitRadius) never drift from the body.
+        if (this.animator) {
+            const sp = dt > 0 ? this._frameMove / dt : 0;
+            this.animator.setLocomotion({
+                speed: sp,
+                wishX: sp > 0.2 ? this.state.facingVec.x : 0,
+                wishZ: sp > 0.2 ? this.state.facingVec.z : 0,
+                grounded: true,
+            });
+            this.animator.update(dt);
+        }
+    }
+
+    /**
+     * Keep a body's width between us and the player.
+     *
+     * The AI stops advancing at `attackRange`, but nothing stopped the PLAYER
+     * from walking straight through an enemy, and the two then stand in the
+     * same square metre. That is bad enough to look at — the reported symptom
+     * was a mob standing on the player's head — but it also breaks the maths
+     * that every directional rule is built on: at zero separation there is no
+     * bearing, so `inFrontArc` answers "armoured" by default and a bulwark you
+     * are hugging cannot be flanked at all.
+     *
+     * The enemy is what yields, never the player: shoving the player's rig
+     * fights their input, and being able to body a construct out of your way
+     * is the correct-feeling half of the trade. Movement goes through the
+     * collision world so nobody gets pushed into a wall.
+     */
+    _separateFrom(player) {
+        if (!player?.root || this.hover || this.state.current === 'DEAD') return;
+        if (player.health?.dead) return;
+        const min = (this.hitRadius || 0.5) + 0.5;
+        let dx = this.rig.position.x - player.root.position.x;
+        let dz = this.rig.position.z - player.root.position.z;
+        const d = Math.hypot(dx, dz);
+        if (d >= min) return;
+        let len = d;
+        if (d < 1e-4) {
+            // Exactly co-located: back out along our own facing, which is the
+            // one direction we know the player did not come from.
+            dx = -this.state.facingVec.x; dz = -this.state.facingVec.z; len = 1;
+        }
+        this._move(dx, dz, len, min - d);
+    }
+
+    _updateAI(dt, player) {
         if (this.attackCd > 0) this.attackCd -= dt;
+        if (this._openT > 0) this._openT -= dt;
+        if (this.hover) {
+            // Hold station above melee reach with a slow bob. The bob is
+            // cosmetic; the height is the mechanic, so it is driven off
+            // `flyHeight` and never allowed to dip into sword range — except
+            // while grounded by a parry, which is the melee player's opening.
+            if (this._groundedT > 0) this._groundedT -= dt;
+            this._driftT += dt * 1.6;
+            const target = this._groundedT > 0
+                ? this._groundY
+                : this._groundY + this.flyHeight + Math.sin(this._driftT) * 0.22;
+            // Ease rather than teleport, so the drop reads as being knocked
+            // down and the climb back reads as a closing window.
+            this.rig.position.y += (target - this.rig.position.y) * Math.min(1, dt * 9);
+        }
 
         // Telegraph ring pulses brighter as the strike approaches
         if (this._tell && this._tellLife > 0) {
@@ -228,6 +377,10 @@ export class Enemy {
                 const strike = this._pendingStrike;
                 this._pendingStrike = null;
                 this._windupT = 0;
+                // Sync rules 2-3 (Ticket F): resolve snaps the strike pose
+                // for ≤0.12s then recovers through the cooldown — and a
+                // whiff still plays it, so dodging reads as a dodge.
+                this.animator?.strike(0.12, Math.min(0.6, Math.max(0.2, this.attackCd)));
                 if (strike) strike(player, dist);
             }
             return;
@@ -235,23 +388,115 @@ export class Enemy {
 
         if (dist >= this.aggroRange) return;
 
-        this.state.setFacing(dx, dz);
-        this.rig.rotation.y = Math.atan2(this.state.facingVec.x, this.state.facingVec.z);
+        this._faceToward(dx, dz, dt);
 
         if (this.ai === 'charge') {
             this._aiCharge(dt, player, dx, dz, dist);
         } else if (this.ai === 'ranged') {
             this._aiRanged(dt, player, dx, dz, dist);
+        } else if (this.ai === 'lunge') {
+            this._aiLunge(dt, player, dx, dz, dist);
+        } else if (this.ai === 'drift') {
+            this._aiDrift(dt, player, dx, dz, dist);
         } else {
             this._aiChase(dt, player, dx, dz, dist);
         }
+    }
+
+    /**
+     * Z5 — lancer. A charge closes the gap; a lunge covers it in one committed
+     * thrust down a lane locked at windup time, damaging anything along the
+     * path. The counterplay is lateral, not backwards: you cannot outrun it,
+     * you step out of the lane. That is a different reflex from every other
+     * enemy in the game, which is the entire reason the kind exists.
+     */
+    _aiLunge(dt, player, dx, dz, dist) {
+        if (this._lungeT > 0) {
+            this._lungeT -= dt;
+            this._move(this._lungeDir.x, this._lungeDir.z, 1, this.speed * 4.2 * dt);
+            if (this.attackCd <= 0) {
+                const px = player.root.position.x - this.rig.position.x;
+                const pz = player.root.position.z - this.rig.position.z;
+                if (Math.hypot(px, pz) < 1.5) {
+                    this.attackCd = 0.8 / this.actionFrequency;
+                    player.health.damage(this.damage + 1, 0.6, 'hostile', {
+                        from: this.rig.position, attacker: this,
+                    });
+                    sfx.stomp();
+                    this._lungeT = 0;
+                }
+            }
+            return;
+        }
+        // Stay at lunge distance: too close and the kind loses its identity.
+        if (dist < 3) {
+            this._move(-dx, -dz, dist, this.speed * 0.8 * dt);
+        } else if (dist > 9) {
+            this._move(dx, dz, dist, this.speed * 0.75 * dt);
+        }
+        if (this.attackCd <= 0 && dist <= 9) {
+            this.attackCd = (2.0 / this.actionFrequency) + this.windup;
+            const dir = { x: dx / dist, z: dz / dist };
+            this._beginWindup(() => {
+                this._lungeT = 0.42;
+                this._lungeDir = dir;
+                sfx.whoosh();
+            }, {
+                windup: 0.6 * getActiveRunMode().telegraphDuration,
+                // A long, narrow tell drawn down the lane it will travel.
+                reach: 4.5, radius: 1.5, color: 0xff5533,
+            });
+        }
+    }
+
+    /**
+     * Z5 — mote. Hovers above sword height and never lands, so melee simply
+     * does not apply; it has to be answered at range. It closes patiently and
+     * pulses a short-range burst, which stops "just ignore it" from working.
+     */
+    _aiDrift(dt, player, dx, dz, dist) {
+        if (dist > 2.4) {
+            this._move(dx, dz, dist, this.speed * 0.55 * dt);
+        }
+        if (this.attackCd <= 0 && dist < 3.2) {
+            this.attackCd = (1.8 / this.actionFrequency) + this.windup;
+            this._beginWindup((p, d) => {
+                if (d < 3.2) {
+                    p.health.damage(this.damage, 0.7, 'hostile', {
+                        from: this.rig.position, attacker: this,
+                    });
+                    sfx.hurt();
+                } else sfx.step();
+            }, { windup: 0.5 * getActiveRunMode().telegraphDuration, reach: 0, radius: 3.2, color: 0xc084fc });
+        }
+    }
+
+    /**
+     * Rotate facing toward (dx, dz), capped at `turnRate` radians per second.
+     * An infinite turn rate takes the snap path so the arithmetic below cannot
+     * perturb the kinds that never needed it.
+     */
+    _faceToward(dx, dz, dt) {
+        if (this.turnRate === Infinity) {
+            this.state.setFacing(dx, dz);
+        } else if (Math.hypot(dx, dz) > 1e-6) {
+            const want = Math.atan2(dx, dz);
+            const have = Math.atan2(this.state.facingVec.x, this.state.facingVec.z);
+            let delta = want - have;
+            while (delta > Math.PI) delta -= Math.PI * 2;
+            while (delta < -Math.PI) delta += Math.PI * 2;
+            const step = this.turnRate * dt;
+            const a = Math.abs(delta) <= step ? want : have + Math.sign(delta) * step;
+            this.state.setFacing(Math.sin(a), Math.cos(a));
+        }
+        this.rig.rotation.y = Math.atan2(this.state.facingVec.x, this.state.facingVec.z);
     }
 
     _aiChase(dt, player, dx, dz, dist) {
         if (dist > this.attackRange && dist > 0.2) {
             this._move(dx, dz, dist, this.speed * dt);
         } else if (this.attackCd <= 0) {
-            this.attackCd = 0.9 + this.windup;
+            this.attackCd = (0.9 / this.actionFrequency) + this.windup;
             const reach = this.attackRange + 0.4;
             this._beginWindup((p) => this._resolveMelee(p, this.damage, reach), {
                 reach: 0.9,
@@ -266,8 +511,10 @@ export class Enemy {
             const sp = this.speed * 2.4 * dt;
             this._move(this._chargeDir.x, this._chargeDir.z, 1, sp);
             if (dist < 1.3 && this.attackCd <= 0) {
-                this.attackCd = 0.7;
-                player.health.damage(this.damage + 0.5, 0.5);
+                this.attackCd = 0.7 / this.actionFrequency;
+                player.health.damage(this.damage + 0.5, 0.5, 'hostile', {
+                    from: this.rig.position, attacker: this,
+                });
                 sfx.stomp();
                 this._chargeT = 0;
             }
@@ -277,17 +524,17 @@ export class Enemy {
             // Rear up before charging, marking the lane it will run down, so
             // the charge can be read and stepped out of instead of simply
             // arriving. The direction is locked at windup time.
-            this.attackCd = 2.2 + this.windup;
+            this.attackCd = (2.2 / this.actionFrequency) + this.windup;
             const dir = { x: dx / dist, z: dz / dist };
             this._beginWindup(() => {
                 this._chargeT = 0.55;
                 this._chargeDir = dir;
                 sfx.stomp();
-            }, { windup: 0.5, reach: 2.2, radius: 1.6, color: 0xffaa33 });
+            }, { windup: 0.5 * getActiveRunMode().telegraphDuration, reach: 2.2, radius: 1.6, color: 0xffaa33 });
         } else if (dist > this.attackRange) {
             this._move(dx, dz, dist, this.speed * 0.7 * dt);
         } else if (this.attackCd <= 0) {
-            this.attackCd = 1.0 + this.windup;
+            this.attackCd = (1.0 / this.actionFrequency) + this.windup;
             const reach = this.attackRange + 0.4;
             this._beginWindup((p) => this._resolveMelee(p, this.damage, reach), {
                 reach: 0.9,
@@ -306,10 +553,10 @@ export class Enemy {
         if (this.attackCd <= 0 && dist < this.attackRange) {
             // Take aim first — the shot leads where you were, not where you
             // are, so moving during the windup makes it miss.
-            this.attackCd = 1.6 + this.windup;
+            this.attackCd = (1.6 / this.actionFrequency) + this.windup;
             const dir = { x: dx / dist, z: dz / dist };
             this._beginWindup(() => this._spawnProjectile(dir.x, dir.z), {
-                windup: 0.55, reach: 1.1, radius: 0.9, color: 0x66ccff,
+                windup: 0.55 * getActiveRunMode().telegraphDuration, reach: 1.1, radius: 0.9, color: 0x66ccff,
             });
         }
     }
@@ -327,7 +574,8 @@ export class Enemy {
         mesh.position.y += 1.0;
         this.scene.add(mesh);
         this.projectiles.push({
-            mesh, vx: fx * 9, vz: fz * 9, life: 2.5, damage: this.damage,
+            mesh, vx: fx * 9 * this.projectileSpeed, vz: fz * 9 * this.projectileSpeed,
+            life: 2.5, damage: this.damage,
         });
     }
 
@@ -342,9 +590,23 @@ export class Enemy {
                     player.root.position.z - p.mesh.position.z
                 );
                 if (d < 0.7) {
-                    player.health.damage(p.damage, 0.5);
-                    sfx.hurt();
-                    p.life = 0;
+                    const facing = player.state?.facingVec;
+                    const toward = facing
+                        ? ((p.mesh.position.x - player.root.position.x) * facing.x
+                            + (p.mesh.position.z - player.root.position.z) * facing.z) / (d || 1)
+                        : -1;
+                    if (player.inventory?.hasItem?.('reflector_plate') && toward > 0.45) {
+                        sfx.block();
+                        p.life = 0;
+                    } else {
+                        // A projectile's "from" is the shot itself, not the
+                        // shooter — you guard the incoming bolt's direction.
+                        const r = player.health.damage(p.damage, 0.5, 'hostile', {
+                            from: p.mesh.position, attacker: this, projectile: true,
+                        });
+                        if (r.accepted) sfx.hurt();
+                        p.life = 0;
+                    }
                 }
             }
             if (p.life <= 0) {
@@ -367,31 +629,108 @@ export class Enemy {
     }
 
     _move(dx, dz, dist, sp) {
-        const nx = this.rig.position.x + (dx / dist) * sp;
-        const nz = this.rig.position.z + (dz / dist) * sp;
+        const x0 = this.rig.position.x, z0 = this.rig.position.z;
+        const nx = x0 + (dx / dist) * sp;
+        const nz = z0 + (dz / dist) * sp;
         if (this.collisionWorld) {
-            const r = this.collisionWorld.resolveMove(
-                this.rig.position.x, this.rig.position.z, nx, nz, 0.4
-            );
+            const r = this.collisionWorld.resolveMove(x0, z0, nx, nz, 0.4);
             this.rig.position.x = r.x;
             this.rig.position.z = r.z;
         } else {
             this.rig.position.x = nx;
             this.rig.position.z = nz;
         }
+        // Gait speed comes from distance actually covered, so a wall-pinned
+        // enemy stops stepping instead of moonwalking in place.
+        this._frameMove = (this._frameMove || 0)
+            + Math.hypot(this.rig.position.x - x0, this.rig.position.z - z0);
     }
 
     dispose() {
         this._clearProjectiles();
         this.clearTelegraph();
-        if (this.rig.parent) this.rig.parent.remove(this.rig);
+        if (this.actor) this.actor.dispose();
+        else if (this.rig.parent) this.rig.parent.remove(this.rig);
     }
 }
 
 function defaultAi(kind) {
     if (kind === 'scarab') return 'charge';
     if (kind === 'frost') return 'ranged';
+    if (kind === 'mote') return 'drift';
+    if (kind === 'lancer') return 'lunge';
+    if (kind === 'bulwark') return 'chase'; // slow, armoured, relentless
+    if (kind === 'brood') return 'charge';
     return 'chase';
+}
+
+/**
+ * Z5: wire a splitter's death to the level that owns it. `spawn(pos, opts)`
+ * must register the new enemy with the current room the same way the original
+ * was registered, or the children will be invisible to combat and never freed.
+ */
+/**
+ * Where a split child can actually stand.
+ *
+ * The children used to be placed blind at a fixed 1.1 radius around the parent.
+ * Kill a brood with its back to a wall and half its offspring materialise
+ * INSIDE the masonry: unreachable by any weapon, permanently alive, and every
+ * room-clear gate in that dungeon waits on them forever. A softlock produced by
+ * standing in an ordinary place.
+ *
+ * Walk the preferred bearing inward, then try the ring around it, and if the
+ * room really is that tight fall back to the parent's own footprint — which is
+ * guaranteed free, because something was just standing in it.
+ */
+function freeSpotNear(enemy, angle, half = 0.38) {
+    const ox = enemy.rig.position.x;
+    const oz = enemy.rig.position.z;
+    const cw = enemy.collisionWorld;
+    if (!cw || typeof cw.blocked !== 'function') {
+        return { x: ox + Math.cos(angle) * 1.1, z: oz + Math.sin(angle) * 1.1 };
+    }
+    for (const r of [1.1, 0.8, 0.5]) {
+        for (let k = 0; k < 8; k++) {
+            // Search outward from the requested bearing so the burst still
+            // reads as a burst when there is room for it to.
+            const a = angle + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 4);
+            const x = ox + Math.cos(a) * r;
+            const z = oz + Math.sin(a) * r;
+            if (!cw.blocked(x, z, half)) return { x, z };
+        }
+    }
+    return { x: ox, z: oz };
+}
+
+export function attachSplit(enemy, spawn) {
+    if (!enemy || !enemy.split || typeof spawn !== 'function') return enemy;
+    const prev = enemy.onDeath;
+    enemy.onDeath = () => {
+        prev?.();
+        const n = enemy.split;
+        for (let i = 0; i < n; i++) {
+            const a = (i / n) * Math.PI * 2;
+            const at = freeSpotNear(enemy, a, 0.38);
+            spawn({
+                x: at.x,
+                y: enemy.rig.position.y,
+                z: at.z,
+            }, {
+                kind: enemy.kind,
+                ai: enemy.ai,
+                // Children are weaker and — critically — sterile. Without the
+                // generation cap a brood clears the room by filling it.
+                hp: Math.max(1, Math.round(enemy.maxHp / 2)),
+                damage: Math.max(0.5, enemy.damage - 0.5),
+                speed: enemy.speed * 1.15,
+                meshScale: 0.24,
+                hitRadius: 0.38,
+                split: 0,
+                generation: enemy.generation + 1,
+            });
+        }
+    };
+    return enemy;
 }
 
 /** Simple floating weak-point orb used by some bosses. */

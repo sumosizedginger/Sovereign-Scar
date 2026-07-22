@@ -57,4 +57,55 @@ export function run(t) {
     t.ok('gravity reset -Y', body.gravity.y < 0);
 
     t.ok('voxel size constant', VOXEL_SIZE > 0);
+
+    // ── Step climb onto a 1-cell platform (no XZ solid — like room.platforms) ──
+    // Floor y∈[0,1); step at x∈[2,4) covers y∈[1,2). Body centre rests near y=1.95 on floor.
+    const stepSolid = (x, y, z) => {
+        if (y >= 0 && y < 1) return true; // floor everywhere
+        if (x >= 2 && x < 4 && y >= 1 && y < 2) return true; // one-cell step
+        return false;
+    };
+    const stepPos = { x: 0.5, y: 1.0, z: 0.5 };
+    const stepBody = new VoxelPhysicsBody(
+        stepPos, { x: 0.4, y: 0.95, z: 0.4 }, stepSolid,
+    );
+    stepBody.grounded = true;
+    stepBody.vy = 0;
+    for (let i = 0; i < 10; i++) {
+        stepBody.update(new CollisionWorld(), 1 / 60, {});
+    }
+    const floorY = stepPos.y;
+    t.ok('step test starts on floor', floorY > 1.8 && floorY < 2.1, `y=${floorY}`);
+    let maxY = floorY;
+    let onStep = false;
+    for (let i = 0; i < 50; i++) {
+        stepBody.update(new CollisionWorld(), 1 / 60, {
+            wishX: 1, wishZ: 0, speed: 5.5, half: 0.4,
+        });
+        if (stepPos.y > maxY) maxY = stepPos.y;
+        // Mid-slab: x in (2.3, 3.7) should be up on the step top
+        if (stepPos.x > 2.3 && stepPos.x < 3.7 && stepPos.y > floorY + 0.7) {
+            onStep = true;
+            break;
+        }
+    }
+    t.ok('climbs onto the step (x past riser)', stepPos.x > 2.0 || onStep, `x=${stepPos.x}`);
+    t.ok('standing on step top, not still on floor',
+        onStep && maxY > floorY + 0.7,
+        `onStep=${onStep} y=${stepPos.y} maxY=${maxY} floorY=${floorY}`);
+    t.ok('still grounded after step-up', stepBody.grounded);
+
+    // Tall wall (maxY style): solid column with no standable top within 1 cell
+    // above feet should still block — simulate with XZ solid only + no voxels.
+    const wallPos = { x: 0, y: 1.0, z: 0 };
+    const wallBody = new VoxelPhysicsBody(
+        wallPos, { x: 0.4, y: 0.95, z: 0.4 }, (x, y) => y >= 0 && y < 1,
+    );
+    wallBody.grounded = true;
+    const wallCw = new CollisionWorld();
+    wallCw.addSolid({ minX: 2, maxX: 3, minZ: -2, maxZ: 2 });
+    for (let i = 0; i < 60; i++) {
+        wallBody.update(wallCw, 1 / 60, { wishX: 1, wishZ: 0, speed: 8, half: 0.4 });
+    }
+    t.ok('tall XZ wall still blocks (no phantom climb)', wallPos.x < 2, `x=${wallPos.x}`);
 }

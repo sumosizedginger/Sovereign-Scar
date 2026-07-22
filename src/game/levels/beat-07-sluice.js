@@ -20,11 +20,25 @@ export const BEAT07_DEF = {
     id: 'beat-07-sluice',
     name: '07 Sluice of Tears',
     mood: 'abyss',
+    // Per-level luminance trim into the Abyss certification band [35,75]
+    // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
+    lightTune: { ambient: 3.4, key: 1.4 },
     start: 'floodgate',
     prebake: true,
     floorColor: ABYSS_COLORS.abyssFloor,
     wallColor: ABYSS_COLORS.abyssWall,
     banner: 'Tears fall upward here. Cross on the anchors.',
+    // Z6 — this dungeon's one idea, and the four rooms that carry it:
+    // introduce it safely, complicate it, fuse it with combat, then examine it.
+    theme: {
+        id: 'spacing',
+        name: 'Current and Reach',
+        hint: "Lancers want the long line, casters want the far one. Stand where neither gets it.",
+        teach: 'weepinghall',
+        develop: 'tearwell',
+        combine: 'surgechamber',
+        test: 'cloudcourt',
+    },
     keys: [
         { room: 'weepinghall', type: 'small' },
         { room: 'drownedway', type: 'small' },
@@ -55,16 +69,22 @@ export const BEAT07_DEF = {
                 abyssTint(map);
             },
             enemies: [
-                { x: -6, z: 5, kind: 'frost', hp: 3, ai: 'ranged' },
-                { x: 6, z: 5, kind: 'sentinel', hp: 4 },
+                { x: -6, z: 5, kind: 'lancer', hp: 3 },
+                { x: 6, z: 5, kind: 'frost', hp: 4 },
             ],
-            // The hall is split by a weeping chasm — grapple across
+            // Full-width weeping chasm. Pegs sit on both rims so the gap is
+            // crossable IN (south→north) and OUT (north→south). Hydroid defeat
+            // also clears the blocker and spawns a walkable basalt bridge —
+            // post-boss softlock if return grapple is out of reach from the
+            // north door (~13u vs base grapple ~10).
             blockers: [
                 {
                     type: 'grapple_gap', id: 'b07-hall-gap',
                     rect: { x0: -10, x1: 10, z0: -3, z1: -1 },
-                    anchor: { x: 0, z: 2 },
-                    edge: { x: 0, z: -5 },
+                    // Rims: gap z∈[-3,-1]; posts just outside so landings are solid.
+                    anchor: { x: 0, z: 0 },
+                    reverseAnchor: { x: 0, z: -4 },
+                    edge: { x: 0, z: 0 },
                 },
             ],
             doors: [
@@ -85,7 +105,7 @@ export const BEAT07_DEF = {
             build(map, h) {
                 h.fillBox(map, -3, 3, 0, 0, -3, 3, ABYSS_COLORS.basalt); // the well
             },
-            enemies: [{ x: 3, z: 3, kind: 'frost', hp: 3, ai: 'ranged' }],
+            enemies: [{ x: 3, z: 3, kind: 'lancer', hp: 3, ai: 'ranged' }],
             doors: [{ to: 'weepinghall', side: 'E', at: -6, type: 'open' }],
             onBake(level, origin) {
                 if (!level.keyStore.mapPickup()) {
@@ -107,28 +127,38 @@ export const BEAT07_DEF = {
             build(map, h) {
                 abyssTint(map);
             },
-            enemies: [{ x: 0, z: 4, kind: 'scarab', hp: 4, ai: 'charge' }],
+            enemies: [{ x: 0, z: 4, kind: 'frost', hp: 4, ai: 'charge' }],
             blockers: [
                 {
                     type: 'grapple_gap', id: 'b07-cascade-gap',
                     rect: { x0: -2, x1: 2, z0: -6, z1: -3 },
                     anchor: { x: 0, z: -1 },
-                    edge: { x: 0, z: -7 },
+                    reverseAnchor: { x: 0, z: -7 },
+                    edge: { x: 0, z: -1 },
                 },
             ],
             doors: [{ to: 'weepinghall', side: 'W', at: -6, type: 'open' }],
             onBake(level, origin) {
+                // Spare grapple if the player reached the Sluice without the
+                // Sky Monument drop (or lost inventory mid-run).
                 level.addPickup({ x: origin.x - 5, y: 1.2, z: origin.z + 5 }, {
                     color: 0x40e0ff,
-                    label: 'Magnetic Grapple',
+                    label: 'Deep-Pull Coil',
                     onPickup(game) {
-                        game.player.inventory.grantItem('magnetic_grapple');
-                        game.hud?.toast?.('Magnetic Grapple — press G at the anchors');
+                        if (!game.player.inventory.hasItem('magnetic_grapple')) {
+                            game.player.inventory.grantItem('magnetic_grapple');
+                            game.hud?.toast?.('Magnetic Grapple salvaged — hold G at copper pegs');
+                        }
+                        game.player.inventory.grantItem('deep_pull_coil');
+                        game.player.grappleRange = (game.player.grappleRange || 8) + 4;
+                        game.hud?.toast?.('Deep-Pull Coil — grapple range increased');
+                        game.anchorThread?.markProgress?.('item_acquired', 'deep_pull_coil');
                     },
                 });
                 level.addPickup({ x: origin.x + 5, y: 1.2, z: origin.z - 6 }, {
                     color: 0x7fe0ff,
                     label: 'Cascade cache',
+                    reward: { type: 'currency' },
                     onPickup(game) {
                         game.player.inventory.addShards(25);
                         game.hud?.toast?.('Cascade cache — 25 shards');
@@ -146,8 +176,8 @@ export const BEAT07_DEF = {
                 h.fillBox(map, 6, 7, 1, 3, -3, 3, ABYSS_COLORS.abyssWall);
             },
             enemies: [
-                { x: -4, z: 0, kind: 'frost', hp: 3, ai: 'ranged' },
-                { x: 4, z: 0, kind: 'sentinel', hp: 4 },
+                { x: -4, z: 0, kind: 'lancer', hp: 3 },
+                { x: 4, z: 0, kind: 'frost', hp: 4 },
             ],
             doors: [
                 { to: 'weepinghall', side: 'S', at: 0, type: 'locked' },
@@ -179,11 +209,13 @@ export const BEAT07_DEF = {
             ],
             onBake(level, origin) {
                 level.addPickup({ x: origin.x, y: 1.2, z: origin.z - 3 }, {
-                    color: 0x7fe0ff,
-                    label: 'Brine cache',
+                    color: 0xff7a90,
+                    label: 'Scar Suture',
+                    reward: { type: 'suture' },
                     onPickup(game) {
-                        game.player.inventory.addShards(30);
-                        game.hud?.toast?.('Brine cache — 30 shards');
+                        if (game.collectSuture?.('b07-brine')) {
+                            game.hud?.toast?.("Scar Suture recovered from the brine pocket.", 2600);
+                        }
                     },
                 });
             },
@@ -196,9 +228,9 @@ export const BEAT07_DEF = {
                 abyssTint(map);
             },
             enemies: [
-                { x: -3, z: -3, kind: 'frost', hp: 3, ai: 'ranged' },
+                { x: -3, z: -3, kind: 'lancer', hp: 3 },
                 { x: 3, z: -3, kind: 'frost', hp: 3, ai: 'ranged' },
-                { x: 0, z: 3, kind: 'scarab', hp: 4, ai: 'charge' },
+                { x: 0, z: 3, kind: 'lancer', hp: 4 },
             ],
             doors: [
                 { to: 'drownedway', side: 'S', at: 0, type: 'locked' },
@@ -230,6 +262,12 @@ export const BEAT07_DEF = {
                     defeatStory: [
                         { speaker: 'PREDECESSOR', text: 'The Cloud disperses. The Sluice runs clear for the first time in an age — two of seven free.' },
                     ],
+                    onDefeat(game) {
+                        // Bridge the weeping-hall chasm so the exit is walkable
+                        // without a reverse grapple (post-boss softlock).
+                        game.level?.keyStore?.open?.('blocker:b07-hall-gap');
+                        game.hud?.toast?.('The weeping channel seals — a basalt path home', 2800);
+                    },
                 });
             },
             onEnter(game) {
@@ -250,7 +288,7 @@ export function loadBeat07(ctx) {
     level.musicBed = 'abyss';
     level.story = [
         { speaker: 'PREDECESSOR', text: 'Tears fall upward here. The cloud drinks them.' },
-        { speaker: 'SYSTEM', text: 'Magnetic Grapple (G) crosses the weeping gaps. Avoid pulse rings.' },
+        { speaker: 'SYSTEM', text: 'Magnetic Grapple (G) crosses the weeping gaps. At half-death the Cloud storms — wider pulse, raining orbs.' },
     ];
     return level;
 }

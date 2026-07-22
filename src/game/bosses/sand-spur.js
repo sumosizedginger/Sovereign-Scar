@@ -132,7 +132,7 @@ export class SandSpur extends BossBase {
                 this._surfaceAt(aim.x, aim.z);
                 sfx.stomp();
                 if (this.inBlast(p, aim.x, aim.z, 2.6)) {
-                    p.health.damage(this.phase >= 3 ? 2 : 1, 0.5);
+                    this.hitPlayer(p, this.phase >= 3 ? 2 : 1, 0.5);
                 }
             },
             onRecover: () => {

@@ -40,6 +40,8 @@ export async function run(t) {
             timeout: 25000,
         });
         await page.mouse.click(400, 300);
+        await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('Enter');
         await sleep(300);
 
         // Fresh save must not be in dev mode; F-keys inert until enabled
@@ -79,6 +81,20 @@ export async function run(t) {
             // Drive the leviathan collapse + ending
             for (let i = 0; i < 75; i++) s.game.level.update(0.05, s.game);
             for (let i = 0; i < 30; i++) s.ending.update(0.05);
+            const endingPhaseReached = s.ending.phase;
+            // Advance through the epilogue slides to the stats card and read
+            // the 12.4 ledger reconciliation the final screen must display.
+            let ledgerCheck = null;
+            if (s.ending.isActive) {
+                for (let i = 0; i < 20 && s.ending.phase !== 'stats'; i++) s.ending.advance();
+                const el = document.getElementById('ss-ledger-check');
+                const card = document.getElementById('ss-ending')?.textContent || '';
+                ledgerCheck = el ? {
+                    phase: s.ending.phase,
+                    reconciled: el.dataset.reconciled === 'true',
+                    showsBreakdown: /boss/.test(card) && /Ledger reconciled/.test(card),
+                } : { phase: s.ending.phase, reconciled: false, showsBreakdown: false };
+            }
             let prog = {};
             try {
                 prog = JSON.parse(window.localStorage.getItem('vsbeu.progress') || '{}').sovereignProgress || {};
@@ -86,7 +102,8 @@ export async function run(t) {
             return {
                 kills,
                 anchor,
-                endingPhase: s.ending.phase,
+                endingPhase: endingPhaseReached,
+                ledgerCheck,
                 campaignComplete: prog.campaignComplete === true,
                 devBadgeShown: document.getElementById('ss-dev-badge')?.style.display !== 'none',
             };
@@ -97,6 +114,10 @@ export async function run(t) {
         }
         t.ok('anchor link granted by Warden kill', result.anchor.has);
         t.ok('ending sequence reached', result.endingPhase !== 'idle', `phase=${result.endingPhase}`);
+        t.ok('final screen reconciles the score ledger with the displayed total (12.4)',
+            !!result.ledgerCheck && result.ledgerCheck.phase === 'stats'
+            && result.ledgerCheck.reconciled && result.ledgerCheck.showsBreakdown,
+            JSON.stringify(result.ledgerCheck));
         t.ok('campaignComplete persisted', result.campaignComplete);
         t.ok('dev badge visible during run', result.devBadgeShown);
         t.ok('no fatal pageerrors', errors.filter((e) => !/AudioContext|favicon/i.test(e)).length === 0,

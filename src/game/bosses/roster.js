@@ -77,7 +77,7 @@ export class CryptWarden extends BossBase {
                 }),
                 strike: (p, aim) => {
                     if (this.inBlast(p, aim.x, aim.z, 2.4)) {
-                        p.health.damage(this.phase >= 2 ? 2 : 1, 0.5);
+                        this.hitPlayer(p, this.phase >= 2 ? 2 : 1, 0.5);
                         sfx.stomp();
                     } else sfx.block();
                 },
@@ -226,8 +226,7 @@ export class TriCompiler {
                         0.55
                     )) {
                         if (!this._beamCd || this._beamCd <= 0) {
-                            player.health.damage(1, 0.6);
-                            sfx.hurt();
+                            this.hitPlayer(player, 1, 0.6);
                             this._beamCd = 0.8;
                         }
                     }
@@ -407,7 +406,7 @@ export class ProxyBoss extends BossBase {
                 onWindup: () => { this.ring.material.emissiveIntensity = 3.2; },
                 strike: (p, aim) => {
                     if (this.inBlast(p, aim.x, aim.z, 2.2)) {
-                        p.health.damage(this.phase, 0.5);
+                        this.hitPlayer(p, this.phase, 0.5);
                         sfx.phase();
                     }
                 },
@@ -506,7 +505,7 @@ export class ObsidianArachnid extends BossBase {
                     this.root.position.z = aim.z;
                     this.root.position.y = 0.85;
                     sfx.stomp();
-                    if (this.inBlast(p, aim.x, aim.z, 2.5)) p.health.damage(2, 0.4);
+                    if (this.inBlast(p, aim.x, aim.z, 2.5)) this.hitPlayer(p, 2, 0.4);
                 },
                 onRecover: () => {
                     this.root.position.y = 1.0;
@@ -524,6 +523,7 @@ export class HydroidCloud extends BossBase {
     constructor(scene, position = { x: 0, z: -6 }) {
         const body = new THREE.Group();
         const orbs = [];
+        // Phase 1 starts with 12 orbs; phase 2 grows the swarm (see onPhaseChange).
         for (let i = 0; i < 12; i++) {
             const o = new THREE.Mesh(
                 new THREE.SphereGeometry(0.35 + (i % 3) * 0.08, 8, 8),
@@ -535,57 +535,161 @@ export class HydroidCloud extends BossBase {
         super(scene, {
             id: 'hydroid_cloud', name: 'Hydroid Cloud', hp: 15,
             hitRadius: 1.6, contactRadius: 2.0, contactDamage: 1,
+            // One threshold → maxPhase 2. Crossed at ≤40% HP remaining.
             position, mesh: body, phaseThresholds: [0.4],
         });
         this.orbs = orbs;
         this.pulseCd = 2.5;
+        this._rain = [];
         this.presenceScale(1.35);
+        // Always show true max phases on the HUD (length of thresholds + 1).
+        this.maxPhase = 2;
     }
-    tickAI(dt, player) {
-        const spread = 1.2 + this.phase * 0.5 + Math.sin(this.t) * 0.3;
-        for (let i = 0; i < this.orbs.length; i++) {
-            const a = this.t * 0.8 + i * (Math.PI * 2 / this.orbs.length);
-            const elev = Math.sin(this.t * 2 + i) * 0.5;
-            this.orbs[i].position.set(
-                Math.cos(a) * spread,
-                elev,
-                Math.sin(a) * spread * 0.7
-            );
+
+    /**
+     * Phase 2 must be unmissable: the HUD lists PHASE 1/2 → 2/2, and the
+     * cloud used to only shave a few tenths off cooldowns — players reported
+     * "no phase 2 though it is listed." Grow the swarm, recolour, and unlock
+     * a secondary rain pattern.
+     */
+    onPhaseChange(phase) {
+        if (phase < 2) return;
+        this.contactDamage = 2;
+        this.contactRadius = 2.4;
+        this.hitRadius = 1.85;
+        // Hotter material on existing orbs
+        for (const o of this.orbs) {
+            if (o.material) {
+                o.material.color?.setHex?.(0x50a0d0);
+                o.material.emissive?.setHex?.(0x60ffe8);
+                o.material.emissiveIntensity = 2.0;
+                o.material.opacity = 0.95;
+            }
         }
+        // Grow the swarm (+8 orbs) so the silhouette clearly changes
+        const add = 8;
+        for (let i = 0; i < add; i++) {
+            const o = new THREE.Mesh(
+                new THREE.SphereGeometry(0.28 + (i % 3) * 0.06, 8, 8),
+                mat(0x40a0c0, 0x80fff0, 2.0, { transparent: true, opacity: 0.92 })
+            );
+            this.root.add(o);
+            this.orbs.push(o);
+        }
+        // Base already fires sfx.phase + trauma on threshold cross.
+    }
+
+    tickAI(dt, player) {
+        // Keep phase evaluation hot even if a hit landed between frames
+        // (BossBase also checks; this guards long busy stretches).
+        this._checkPhase?.();
+
+        const p2 = this.phase >= 2;
+        const spread = (p2 ? 2.0 : 1.2) + Math.sin(this.t) * (p2 ? 0.55 : 0.3);
+        const spin = p2 ? 1.35 : 0.8;
+        for (let i = 0; i < this.orbs.length; i++) {
+            const a = this.t * spin + i * (Math.PI * 2 / this.orbs.length);
+            const elev = Math.sin(this.t * (p2 ? 3 : 2) + i) * (p2 ? 0.75 : 0.5);
+            const r = spread * (1 + (i % 4) * 0.04);
+            this.orbs[i].position.set(
+                Math.cos(a) * r,
+                elev,
+                Math.sin(a) * r * 0.7
+            );
+            this.orbs[i].visible = true;
+        }
+
+        // Phase-2 rain droplets
+        for (let i = this._rain.length - 1; i >= 0; i--) {
+            const drop = this._rain[i];
+            drop.life -= dt;
+            drop.mesh.position.y -= 7 * dt;
+            drop.mesh.position.x += drop.vx * dt;
+            drop.mesh.position.z += drop.vz * dt;
+            if (player && !player.health?.dead) {
+                const dx = player.root.position.x - drop.mesh.position.x;
+                const dz = player.root.position.z - drop.mesh.position.z;
+                if (Math.hypot(dx, dz) < 0.85 && Math.abs(player.root.position.y - drop.mesh.position.y) < 2) {
+                    this.hitPlayer(player, 1, 0.45);
+                    drop.life = 0;
+                }
+            }
+            if (drop.life <= 0 || drop.mesh.position.y < 0.5) {
+                if (drop.mesh.parent) drop.mesh.parent.remove(drop.mesh);
+                drop.mesh.geometry?.dispose?.();
+                drop.mesh.material?.dispose?.();
+                this._rain.splice(i, 1);
+            }
+        }
+
         if (!player) return;
         if (this.busy) {
-            // Drawn tight to burst, then scattered and slack while it re-gathers.
             this.root.position.y = this.staggered ? 1.2 : 1.8 + Math.sin(this.t * 6) * 0.15;
             return;
         }
-        // Drift toward player
-        moveToward(this.root.position, player.root.position, 1.4 + this.phase * 0.4, dt);
+        moveToward(this.root.position, player.root.position, 1.4 + this.phase * 0.55, dt);
         this.root.position.y = 1.8 + Math.sin(this.t * 1.5) * 0.4;
         if (this.actionCd <= 0) {
             this.startAction({
-                name: 'pulse',
-                windup: this.phase >= 2 ? 0.6 : 0.75,
-                recover: this.phase >= 2 ? 1.0 : 1.4,
-                cooldown: this.phase >= 2 ? 1.0 : 1.6,
-                // The burst is centred on the cloud, so the dodge is "get out
-                // from under it" rather than "step off a marked tile".
+                name: p2 ? 'storm_pulse' : 'pulse',
+                windup: p2 ? 0.55 : 0.75,
+                recover: p2 ? 0.9 : 1.4,
+                cooldown: p2 ? 0.95 : 1.6,
+                // Burst centred on the cloud — dodge is "get out from under it".
+                // Phase 2: larger ring + rain volley so the phase reads.
                 aim: () => ({
                     x: this.root.position.x, z: this.root.position.z,
-                    radius: 3.4, color: 0x40e0ff,
+                    radius: p2 ? 4.2 : 3.4, color: p2 ? 0x80fff0 : 0x40e0ff,
                 }),
+                onWindup: () => { sfx.whoosh(); },
                 strike: (p) => {
                     const dx = p.root.position.x - this.root.position.x;
                     const dz = p.root.position.z - this.root.position.z;
                     const n = Math.hypot(dx, dz) || 1;
-                    if (n < 3.5) {
-                        p.health.damage(1, 0.5);
-                        p.root.position.x += (dx / n) * 1.5;
-                        p.root.position.z += (dz / n) * 1.5;
+                    const reach = p2 ? 4.3 : 3.5;
+                    if (n < reach) {
+                        this.hitPlayer(p, p2 ? 2 : 1, 0.5);
+                        p.root.position.x += (dx / n) * (p2 ? 2.0 : 1.5);
+                        p.root.position.z += (dz / n) * (p2 ? 2.0 : 1.5);
                         sfx.whoosh();
                     }
+                    if (p2) this._spawnRain(10);
                 },
             });
         }
+    }
+
+    _spawnRain(count) {
+        for (let i = 0; i < count; i++) {
+            const mesh = new THREE.Mesh(
+                new THREE.SphereGeometry(0.18, 6, 6),
+                mat(0x60d0ff, 0xa0ffff, 2.2, { transparent: true, opacity: 0.9 })
+            );
+            const ang = Math.random() * Math.PI * 2;
+            const dist = 1.5 + Math.random() * 4.5;
+            mesh.position.set(
+                this.root.position.x + Math.cos(ang) * dist,
+                this.root.position.y + 3.5 + Math.random() * 1.5,
+                this.root.position.z + Math.sin(ang) * dist
+            );
+            this.scene.add(mesh);
+            this._rain.push({
+                mesh,
+                life: 1.4 + Math.random() * 0.6,
+                vx: (Math.random() - 0.5) * 1.2,
+                vz: (Math.random() - 0.5) * 1.2,
+            });
+        }
+    }
+
+    dispose() {
+        for (const drop of this._rain) {
+            if (drop.mesh.parent) drop.mesh.parent.remove(drop.mesh);
+            drop.mesh.geometry?.dispose?.();
+            drop.mesh.material?.dispose?.();
+        }
+        this._rain.length = 0;
+        super.dispose();
     }
 }
 
@@ -645,7 +749,7 @@ export class SkeletalMantis extends BossBase {
                 }),
                 strike: (p) => {
                     if (this.inCone(p, this.root.position, { x: fx, z: fz }, 4.5, 1.2)) {
-                        p.health.damage(this.phase >= 2 ? 2 : 1, 0.4);
+                        this.hitPlayer(p, this.phase >= 2 ? 2 : 1, 0.4);
                         sfx.slap();
                     }
                 },
@@ -720,7 +824,7 @@ export class PhantasmBoss extends BossBase {
                     }),
                     strike: (p, aim) => {
                         if (this.inBlast(p, aim.x, aim.z, 2.0)) {
-                            p.health.damage(1, 0.6);
+                            this.hitPlayer(p, 1, 0.6);
                             sfx.phase();
                         }
                     },
@@ -775,7 +879,7 @@ export class FrostAndFuel extends BossBase {
                 }),
                 strike: (p, aim) => {
                     if (!this.inBlast(p, aim.x, aim.z, 2.5)) return;
-                    p.health.damage(mode === 'fuel' ? 2 : 1, 0.45);
+                    this.hitPlayer(p, mode === 'fuel' ? 2 : 1, 0.45);
                     if (mode === 'frost') {
                         // Slow: temporary friction ice feel
                         p.setFriction?.('ice');
@@ -825,7 +929,7 @@ export class SludgeGolem extends BossBase {
                 if (d < 2.0) {
                     player.setFriction?.('sludge');
                     if (!pool._dot || pool._dot <= 0) {
-                        player.health.damage(0.5, 0.3);
+                        this.hitPlayer(player, 0.5, 0.3);
                         pool._dot = 0.8;
                     }
                 }
@@ -874,7 +978,7 @@ export class SludgeGolem extends BossBase {
                     m.position.set(aim.x, this.floorY + 0.1, aim.z);
                     this.scene.add(m);
                     this.pools.push({ mesh: m, x: aim.x, z: aim.z, life: 4, _dot: 0 });
-                    if (this.inBlast(p, aim.x, aim.z, 2.2)) p.health.damage(2, 0.4);
+                    if (this.inBlast(p, aim.x, aim.z, 2.2)) this.hitPlayer(p, 2, 0.4);
                 },
                 onRecover: () => { this.root.position.y = 1.4; },
             });
@@ -965,7 +1069,7 @@ export class MagmaWyrm extends BossBase {
                 }),
                 strike: (p) => {
                     if (this.inCone(p, this.root.position, dir, 8, 0.45)) {
-                        p.health.damage(2, 0.45);
+                        this.hitPlayer(p, 2, 0.45);
                         sfx.stomp();
                     }
                     // Lay a burning lane along the breath.
@@ -985,7 +1089,7 @@ export class MagmaWyrm extends BossBase {
             if (player && tr.life > 0) {
                 if (Math.hypot(player.root.position.x - tr.x, player.root.position.z - tr.z) < 1.4) {
                     if (!tr._cd || tr._cd <= 0) {
-                        player.health.damage(1, 0.4);
+                        this.hitPlayer(player, 1, 0.4);
                         tr._cd = 0.6;
                     }
                 }
@@ -1085,7 +1189,7 @@ export class GumoiWitness extends BossBase {
                 }),
                 strike: (p, aim) => {
                     if (this.inBlast(p, aim.x, aim.z, 2.3)) {
-                        p.health.damage(this.phase >= 2 ? 2 : 1, 0.4);
+                        this.hitPlayer(p, this.phase >= 2 ? 2 : 1, 0.4);
                         sfx.phase();
                     }
                 },
@@ -1184,7 +1288,7 @@ export class LeviathanBoss extends BossBase {
                 }),
                 strike: (p, aim) => {
                     if (this.inBlast(p, aim.x, aim.z, 3.0)) {
-                        p.health.damage(2, 0.35);
+                        this.hitPlayer(p, 2, 0.35);
                         sfx.stomp();
                     }
                 },

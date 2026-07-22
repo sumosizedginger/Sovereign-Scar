@@ -55,6 +55,8 @@ export async function run(t) {
             timeout: 25000,
         });
         await page.mouse.click(400, 300);
+        await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('Enter');
         await sleep(500);
 
         // Story panel exists

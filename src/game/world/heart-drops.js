@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { sfx } from '../../audio/synth.js';
+import { getActiveRunMode } from '../kernel/run-mode.js';
 
 const HEART_COLOR = 0xff3b5c;
 
@@ -122,7 +123,7 @@ export class HeartDropManager {
             ? 1 - (player.health.hp / Math.max(1, player.health.max))
             : 0;
         const base = 0.22 + Math.min(0.18, (enemy?.maxHp || 3) * 0.03);
-        const chance = base + hurt * 0.35;
+        const chance = Math.min(1, (base + hurt * 0.35) * getActiveRunMode().heartDropChance);
         if (Math.random() > chance) return null;
         const p = enemy.root.position;
         return this.spawn(p.x, p.y, p.z);

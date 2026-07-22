@@ -28,6 +28,16 @@ function gainFor(channel) {
     return _vols.master * (_vols[channel] != null ? _vols[channel] : 1);
 }
 
+/**
+ * SS-027 (additive): the effective gain for a channel, so a consumer that
+ * builds its own audio graph — the game-side score engine, which needs a
+ * persistent bus rather than one-shot nodes — can honour the same master and
+ * per-channel volumes without reaching into `_vols`.
+ */
+export function channelGain(channel = 'sfx') {
+    return gainFor(channel);
+}
+
 /** An oscillator gliding f0->f1 over dur seconds while gain decays to ~0; optional lowpass at lp Hz. No-ops before initAudio(). */
 export function playTone(type, f0, f1, dur, vol, lp, channel = 'sfx') {
     if (!audioCtx) return;

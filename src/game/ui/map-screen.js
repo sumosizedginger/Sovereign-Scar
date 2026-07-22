@@ -39,7 +39,14 @@ export class MapScreen {
         this.hint = document.createElement('div');
         this.hint.textContent = 'Tab / Esc — close';
         Object.assign(this.hint.style, { marginTop: '10px', color: '#9aa8bc', fontSize: '11px' });
-        this.el.append(this.title, this.canvas, this.hint);
+        this.recall = document.createElement('div');
+        Object.assign(this.recall.style, {
+            marginTop: '12px', maxWidth: '560px', padding: '10px 14px',
+            color: '#f0e8d8', background: 'rgba(18,14,28,0.9)',
+            border: '1px solid #d4a84b', borderRadius: '7px', fontSize: '12px',
+            lineHeight: '1.5',
+        });
+        this.el.append(this.title, this.canvas, this.recall, this.hint);
         document.body.appendChild(this.el);
     }
 
@@ -56,11 +63,19 @@ export class MapScreen {
             return;
         }
         this.isOpen = true;
+        game.witnessScore?.award?.('map_memory', game.levelId || data.name || 'map');
+        if (game.player?.inventory?.hasItem?.('resonance_fork')) game.replayThreadMotif?.();
         this._pausedBefore = game.paused;
         game.paused = true;
         this.title.textContent = (data.name || 'MAP').toUpperCase()
             + (data.state ? ` — ${data.state.toUpperCase()}` : '');
-        this._render(data);
+        const destination = game.anchorThread?.destination?.() || null;
+        this.recall.textContent = `RECALL: ${game.anchorThread?.recall?.() || 'The Link remembers no destination.'}`;
+        this._render({
+            ...data,
+            threadDestination: destination?.screen || null,
+            revealSecrets: game.hasUpgrade?.('echo_lens') || false,
+        });
         this.el.style.display = 'flex';
     }
 
@@ -77,7 +92,10 @@ export class MapScreen {
         ctx.clearRect(0, 0, W, H);
 
         const nodes = data.kind === 'overworld' ? data.screens : data.rooms;
-        const shown = nodes.filter((n) => n.visited || n.current || data.mapAll);
+        const shown = nodes.filter((n) => n.visited || n.current || data.mapAll
+            || (data.kind === 'overworld' && n.id === data.threadDestination)
+            || (data.kind === 'overworld' && data.revealSecrets && n.secret
+                && nearCurrent(n, nodes)));
         if (!shown.length) return;
 
         const xs = nodes.map((n) => n.gx ?? n.sx), ys = nodes.map((n) => n.gy ?? n.sy);
@@ -119,6 +137,21 @@ export class MapScreen {
             ctx.fillRect(c.x - s / 2, c.y - s / 2, s, s);
             ctx.strokeRect(c.x - s / 2, c.y - s / 2, s, s);
 
+            if (data.kind === 'overworld' && n.id === data.threadDestination) {
+                ctx.strokeStyle = '#d4a84b';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 4]);
+                ctx.strokeRect(c.x - s * 0.62, c.y - s * 0.62, s * 1.24, s * 1.24);
+                ctx.setLineDash([]);
+            }
+
+            if (data.revealSecrets && n.secret) {
+                ctx.fillStyle = '#7fe0ff';
+                ctx.beginPath();
+                ctx.arc(c.x + s * 0.28, c.y - s * 0.28, Math.max(2, s * 0.07), 0, Math.PI * 2);
+                ctx.fill();
+            }
+
             ctx.fillStyle = '#d8e4f0';
             ctx.font = `${Math.max(12, cell * 0.3)}px ui-monospace, monospace`;
             ctx.textAlign = 'center';
@@ -139,4 +172,11 @@ export class MapScreen {
     dispose() {
         this.el.remove();
     }
+}
+
+function nearCurrent(node, nodes) {
+    const current = nodes.find((candidate) => candidate.current);
+    if (!current) return false;
+    return Math.abs((node.sx ?? node.gx) - (current.sx ?? current.gx))
+        + Math.abs((node.sy ?? node.gy) - (current.sy ?? current.gy)) <= 1;
 }

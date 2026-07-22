@@ -133,6 +133,31 @@ export class EndingSequence {
             const row = (k, v) =>
                 `<div style="display:flex;justify-content:space-between;gap:40px;padding:6px 0">` +
                 `<span style="color:#9aa8bc">${k}</span><span style="color:#ffd060">${v}</span></div>`;
+            // 12.4: reconcile the score ledger against the displayed total.
+            // Every award writes both `total` and `ledger[type]`, so their
+            // sums must agree; showing the check (and failing it loudly)
+            // keeps the number the player sees honest.
+            const ledger = st.ledger || {};
+            const ledgerRows = Object.entries(ledger)
+                .sort((a, b) => b[1] - a[1])
+                .map(([type, pts]) =>
+                    `<div style="display:flex;justify-content:space-between;gap:40px;padding:3px 0;font-size:12px">` +
+                    `<span style="color:#6a7690">· ${type.replace(/_/g, ' ')}</span>` +
+                    `<span style="color:#c9b896">${pts}</span></div>`)
+                .join('');
+            const ledgerTotal = Object.values(ledger).reduce((a, b) => a + (b || 0), 0);
+            const reconciled = ledgerTotal === (st.score || 0);
+            const reconcileRow =
+                `<div id="ss-ledger-check" data-reconciled="${reconciled}" ` +
+                `style="display:flex;justify-content:space-between;gap:40px;padding:8px 0;` +
+                `border-top:1px solid #3a4058;margin-top:6px;font-size:12px">` +
+                `<span style="color:${reconciled ? '#7fe0ff' : '#ff5060'}">` +
+                (reconciled
+                    ? `Ledger reconciled — ${st.events || 0} events`
+                    : `LEDGER MISMATCH`) +
+                `</span><span style="color:${reconciled ? '#7fe0ff' : '#ff5060'}">` +
+                (reconciled ? `${ledgerTotal} ✓` : `${ledgerTotal} ≠ ${st.score || 0}`) +
+                `</span></div>`;
             this.el.innerHTML =
                 `<div style="font-size:24px;letter-spacing:0.22em;color:#7fe0ff;margin-bottom:30px">RUN COMPLETE</div>` +
                 `<div style="min-width:320px;background:rgba(8,10,18,0.9);border:1px solid #3a4058;border-radius:10px;padding:22px 30px;font-size:14px">` +
@@ -141,6 +166,10 @@ export class EndingSequence {
                 row('Bosses', `${st.bosses || 0} / 14`) +
                 row('Scar Shards', st.shards || 0) +
                 row('Memory Keys', `${st.keys || 0} / 3`) +
+                row('Run Mode', String(st.runMode || 'medium').toUpperCase()) +
+                row('Witness Score', st.score || 0) +
+                ledgerRows +
+                reconcileRow +
                 `</div>` +
                 `<div style="color:#5a647a;font-size:11px;margin-top:28px">Enter — credits</div>`;
         } else if (this.phase === 'credits') {

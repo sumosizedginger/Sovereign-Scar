@@ -4,6 +4,13 @@ import {
     insideRect, grappleAimOk, ledgeHopTarget, applyBlockerToMap,
 } from '../../src/game/world/blockers.js';
 
+/** Mirror of blockers.js reverse-anchor fallback (keep in sync). */
+function mirrorAnchor(anchor, rect) {
+    const rx = (rect.x0 + rect.x1) / 2;
+    const rz = (rect.z0 + rect.z1) / 2;
+    return { x: rx - (anchor.x - rx), z: rz - (anchor.z - rz) };
+}
+
 export function run(t) {
     const r = { x0: 0, x1: 4, z0: 0, z1: 2 };
     t.ok('insideRect in', insideRect({ x: 2, z: 1 }, r));
@@ -44,4 +51,13 @@ export function run(t) {
         applyBlockerToMap(m, { type: 'caster_dark', rect: { x0: 0, x1: 1, z0: 0, z1: 1 } });
         return m.size === 1;
     })());
+
+    // Auto reverse peg: single south anchor mirrors north of a Z-chasm so
+    // return trips (post-boss exit) stay in grapple range.
+    const chasm = { x0: -10, x1: 10, z0: -3, z1: -1 };
+    const south = { x: 0, z: 0 };
+    const north = mirrorAnchor(south, chasm);
+    t.ok('mirror places reverse peg north of gap', north.z < chasm.z0, JSON.stringify(north));
+    t.ok('mirror span is short enough for base grapple',
+        Math.abs(north.z - south.z) <= 8, `span=${Math.abs(north.z - south.z)}`);
 }

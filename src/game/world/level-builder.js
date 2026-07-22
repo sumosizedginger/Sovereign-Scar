@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import { vkey, buildVoxelGeo } from '../../voxel/core.js';
 import { fillBox } from '../../voxel/helpers.js';
 import { CRUST_COLORS, ABYSS_COLORS, VOXEL_SCALE } from '../assets/palettes.js';
+import { makeLevelMaterial } from '../render/materials.js';
+import { mottleColors } from '../render/surface-detail.js';
 
 export const VS = VOXEL_SCALE;
 
@@ -45,10 +47,13 @@ export function buildPerimeter(map, x0, x1, z0, z1, wallH = 3, color = CRUST_COL
 export function meshAndCollide(map, scene, collisionWorld, opts = {}) {
     const origin = opts.origin || { x: 0, y: 0, z: 0 };
     const solidPrefix = opts.solidPrefix || 'lvl';
-    const mat = opts.material || new THREE.MeshStandardMaterial({
-        vertexColors: true, roughness: 0.88, metalness: 0.04,
-    });
+    // Ticket G: material families (roughness/metalness response by vertex-color
+    // class) unless the caller supplies its own material.
+    const mat = opts.material || makeLevelMaterial();
     const geo = buildVoxelGeo(map, opts.jitter != null ? opts.jitter : 0.05);
+    // Ticket G: mean-preserving vertex-colour mottling for tactile surfaces —
+    // deterministic per vertex, so it never shifts a room's average luminance.
+    if (opts.mottle !== false) mottleColors(geo, opts.mottle || 0.06);
     geo.scale(VS, VS, VS);
     geo.translate(VS * 0.5, VS * 0.5, VS * 0.5);
     const mesh = new THREE.Mesh(geo, mat);
@@ -59,20 +64,31 @@ export function meshAndCollide(map, scene, collisionWorld, opts = {}) {
 
     const solidIds = [];
     if (collisionWorld) {
-        // Walls: any column with maxY >= 1 becomes an XZ solid
+        // Walls: only columns that rise above a single step (maxY >= 2) become
+        // infinite XZ solids. Pure floor (maxY < 1) is ignored; one-cell-high
+        // blocks (maxY === 1) stay standable — VoxelPhysicsBody climbs them
+        // via getVoxelAt step-up instead of treating them as full walls.
         const columns = new Map();
         for (const k of map.keys()) {
             const [x, y, z] = k.split(',').map(Number);
             const ck = x + ',' + z;
             const c = columns.get(ck);
-            if (!c) columns.set(ck, { minY: y, maxY: y });
+            if (!c) columns.set(ck, { minY: y, maxY: y, body: y === 1 || y === 2 });
             else {
                 c.minY = Math.min(c.minY, y);
                 c.maxY = Math.max(c.maxY, y);
+                if (y === 1 || y === 2) c.body = true;
             }
         }
         for (const [ck, c] of columns) {
-            if (c.maxY < 1) continue; // pure floor
+            if (c.maxY < 2) continue; // floor or 1-high step — not an XZ wall
+            // A column only walls off the XZ plane if it is solid where the body
+            // actually is. Standing on a floor whose top is y=1, the hero spans
+            // roughly y=1..2.9 — cells 1 and 2. A column occupied ONLY overhead
+            // (an arch lintel, a bone canopy, a suspended index bar, a
+            // cantilevered shelf) leaves that band clear, so it must be walked
+            // under, not treated as a full-height wall.
+            if (!c.body) continue;
             const [x, z] = ck.split(',').map(Number);
             const id = `${solidPrefix}:${x},${z}`;
             collisionWorld.addSolid({

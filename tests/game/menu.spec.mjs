@@ -2,6 +2,7 @@
 // Pure-node spec for the MenuState machine (ui/menu-state.js).
 
 import { MenuState } from '../../src/game/ui/menu-state.js';
+import { buildScreens } from '../../src/game/ui/menu.js';
 
 function makeState(overrides = {}) {
     const ctx = {
@@ -97,4 +98,51 @@ export function run(t) {
     state.open('opts');
     state.sel = 0;
     t.ok('slider enter is no-op', state.activate() === null);
+
+    // A corrupted currentBeat must not turn itself into an unlocked fast-travel
+    // destination. Only unlockedBeats is authoritative.
+    const beatScreen = buildScreens().beats({
+        progress: () => ({
+            currentBeat: 'beat-13-gumoi',
+            unlockedBeats: ['overworld', 'beat-01-crypt'],
+            bossesDefeated: [],
+        }),
+        levels: () => [
+            { id: 'overworld', name: 'Overworld' },
+            { id: 'beat-01-crypt', name: 'Crypt' },
+            { id: 'beat-13-gumoi', name: 'GUMOI' },
+        ],
+    });
+    const currentButLocked = beatScreen.items.find((item) => item.arg === 'beat-13-gumoi');
+    t.ok('Beat Select ignores locked currentBeat', currentButLocked?.disabled === true);
+
+    const modes = buildScreens().runMode({});
+    const modeRows = modes.items.filter((item) => item.id === 'startMode');
+    t.ok('new campaign exposes four run modes', modeRows.length === 4);
+    t.ok('mode selection includes infinite Easy and one-life Survival rules',
+        modeRows.find((item) => item.arg === 'easy')?.note.includes('Infinite')
+        && modeRows.find((item) => item.arg === 'survival')?.note.includes('One life'));
+
+    // 12.4/gap-6: the Witness board isolates score versions. An entry written
+    // under a different scoring formula must not rank on this board, and the
+    // heading must state the live version rather than a hardcoded "1".
+    const scoreScreen = buildScreens().scores({
+        scores: () => [
+            { runMode: 'medium', score: 9000, scoreVersion: 1, eligible: true, playTime: 60 },
+            { runMode: 'medium', score: 99999, scoreVersion: 2, eligible: true, playTime: 60 },
+            { runMode: 'medium', score: 8000, eligible: true, playTime: 60 }, // legacy = v1
+            { runMode: 'medium', score: 7000, scoreVersion: 1, eligible: false, playTime: 60 },
+        ],
+    });
+    const labels = scoreScreen.items.map((item) => item.label || '');
+    t.ok('board heading states the live score version',
+        labels.some((l) => l.includes('MEDIUM · SCORE VERSION 1')));
+    t.ok('other-version entries are excluded from the board',
+        !labels.some((l) => l.includes('99999')));
+    t.ok('current-version entries rank',
+        labels.some((l) => l.startsWith('1. 9000')));
+    t.ok('legacy entries without a version field rank as version 1',
+        labels.some((l) => l.includes('8000')));
+    t.ok('ineligible entries stay excluded',
+        !labels.some((l) => l.includes('7000')));
 }

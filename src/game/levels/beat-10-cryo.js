@@ -42,12 +42,26 @@ export const BEAT10_DEF = {
     id: 'beat-10-cryo',
     name: '10 Cryo Vault',
     mood: 'abyss',
+    // Per-level luminance trim into the Abyss certification band [35,75]
+    // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
+    lightTune: { ambient: 1.3 },
     start: 'ventgate',
     prebake: true,
     friction: 'ice',
     floorColor: ABYSS_COLORS.iceDark,
-    wallColor: 0x2a4058,
+    wallColor: 0x4a6a88, // certification retune: brighter ice-slate, same hue
     banner: 'Two hearts share one cage: freeze and feed.',
+    // Z6 — this dungeon's one idea, and the four rooms that carry it:
+    // introduce it safely, complicate it, fuse it with combat, then examine it.
+    theme: {
+        id: 'attrition',
+        name: 'Cold Numbers',
+        hint: "Nothing here is fast. Everything here is patient. Guard breaks if you only ever hold it.",
+        teach: 'vaultfloor',
+        develop: 'frostbite',
+        combine: 'coldstore',
+        test: 'twincage',
+    },
     keys: [
         { room: 'vaultfloor', type: 'small' },
         { room: 'glacierhall', type: 'small' },
@@ -81,8 +95,8 @@ export const BEAT10_DEF = {
                 h.fillBox(map, -2, 2, 1, 2, 6, 8, ABYSS_COLORS.ice);
             },
             enemies: [
-                { x: -5, z: 4, kind: 'frost', hp: 4, ai: 'ranged' },
-                { x: 5, z: -5, kind: 'sentinel', hp: 4 },
+                { x: -5, z: 4, kind: 'brood', hp: 4 },
+                { x: 5, z: -5, kind: 'frost', hp: 4 },
             ],
             doors: [
                 { to: 'ventgate', side: 'S', at: 0, type: 'open' },
@@ -102,7 +116,7 @@ export const BEAT10_DEF = {
             build(map, h) {
                 stampMap(map, buildIceCrystal(0, 0), 0, 1, 0);
             },
-            enemies: [{ x: 3, z: 3, kind: 'frost', hp: 4, ai: 'ranged' }],
+            enemies: [{ x: 3, z: 3, kind: 'brood', hp: 4, ai: 'ranged' }],
             doors: [{ to: 'vaultfloor', side: 'E', at: 0, type: 'open' }],
             onBake(level, origin) {
                 if (!level.keyStore.mapPickup()) {
@@ -126,12 +140,13 @@ export const BEAT10_DEF = {
                 stampMap(map, buildIceCrystal(3, 0), 0, 1, 0);
                 stampMap(map, buildIceCrystal(0, 4), 0, 1, 0);
             },
-            enemies: [{ x: 0, z: -4, kind: 'scarab', hp: 4, ai: 'charge' }],
+            enemies: [{ x: 0, z: -4, kind: 'frost', hp: 4, ai: 'charge' }],
             doors: [{ to: 'vaultfloor', side: 'W', at: 0, type: 'open' }],
             onBake(level, origin) {
                 level.addPickup({ x: origin.x + 5, y: 1.2, z: origin.z - 5 }, {
                     color: 0x7fe0ff,
                     label: 'Crystal cache',
+                    reward: { type: 'currency' },
                     onPickup(game) {
                         game.player.inventory.addShards(25);
                         game.hud?.toast?.('Crystal cache — 25 shards');
@@ -148,8 +163,8 @@ export const BEAT10_DEF = {
                 h.fillBox(map, 6, 7, 1, 3, -3, 3, ABYSS_COLORS.ice);
             },
             enemies: [
-                { x: -4, z: 0, kind: 'frost', hp: 4, ai: 'ranged' },
-                { x: 4, z: 0, kind: 'sentinel', hp: 4 },
+                { x: -4, z: 0, kind: 'brood', hp: 4 },
+                { x: 4, z: 0, kind: 'frost', hp: 4 },
             ],
             doors: [
                 { to: 'vaultfloor', side: 'S', at: 0, type: 'locked' },
@@ -181,11 +196,13 @@ export const BEAT10_DEF = {
             ],
             onBake(level, origin) {
                 level.addPickup({ x: origin.x, y: 1.2, z: origin.z - 3 }, {
-                    color: 0x7fe0ff,
-                    label: 'Ice-comb cache',
+                    color: 0xff7a90,
+                    label: 'Scar Suture',
+                    reward: { type: 'suture' },
                     onPickup(game) {
-                        game.player.inventory.addShards(30);
-                        game.hud?.toast?.('Ice-comb cache — 30 shards');
+                        if (game.collectSuture?.('b10-icecomb')) {
+                            game.hud?.toast?.("Scar Suture recovered from the ice comb.", 2600);
+                        }
                     },
                 });
             },
@@ -195,19 +212,24 @@ export const BEAT10_DEF = {
             half: 8,
             wallH: 4,
             enemies: [
-                { x: -3, z: -3, kind: 'frost', hp: 4, ai: 'ranged' },
+                { x: -3, z: -3, kind: 'brood', hp: 4 },
                 { x: 3, z: -3, kind: 'frost', hp: 4, ai: 'ranged' },
-                { x: 0, z: 3, kind: 'scarab', hp: 4, ai: 'charge' },
+                { x: 0, z: 3, kind: 'brood', hp: 4 },
             ],
             doors: [
                 { to: 'glacierhall', side: 'S', at: 0, type: 'locked' },
                 { to: 'twincage', side: 'N', at: 0, type: 'boss' },
             ],
             onBake(level, origin, ctx) {
-                // The boss key waits behind a meltable ice wall
-                addIceWall(level, ctx, origin, { x: -2, z: -6 }, { w: 4, h: 3, d: 1 }, 'b10-store-ice');
+                // The boss key waits behind a meltable ice wall. Keep it clear of
+                // BOTH the ice AABB (z -5..-4) and the north wall row: this room
+                // is half 8, so z -7.5 lands in cell -8 — the wall — and side N
+                // at 0 is the boss door, so the key spawned INSIDE the locked
+                // boss-door plug. You needed the key to open the door holding
+                // the key. Sit it on open floor just past the ice instead.
+                addIceWall(level, ctx, origin, { x: -2, z: -5 }, { w: 4, h: 3, d: 1 }, 'b10-store-ice');
                 addKeyPickup(level, 'beat-10-cryo', 'store-boss-key',
-                    { x: origin.x, y: 1.4, z: origin.z - 7 }, 'boss');
+                    { x: origin.x - 1, y: 1.4, z: origin.z - 6 }, 'boss');
             },
         },
         twincage: {

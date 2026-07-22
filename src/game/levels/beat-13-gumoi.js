@@ -32,6 +32,17 @@ export const BEAT13_DEF = {
     wallColor: ABYSS_COLORS.violet,
     flicker: 0.45,
     banner: 'The Tower indexes every wrong turn. Climb anyway.',
+    // Z6 — this dungeon's one idea, and the four rooms that carry it:
+    // introduce it safely, complicate it, fuse it with combat, then examine it.
+    theme: {
+        id: 'mastery',
+        name: 'The Index of Wrong Turns',
+        hint: "The Tower has nothing new to teach you. It only asks whether you learned it.",
+        teach: 'towerfoot',
+        develop: 'stairworks',
+        combine: 'indexspire',
+        test: 'witnesscrown',
+    },
     keys: [
         { room: 'towerfoot', type: 'small' },
         { room: 'archivegaunt', type: 'small' },
@@ -65,8 +76,8 @@ export const BEAT13_DEF = {
                 h.fillBox(map, -3, 3, 1, 1, 3, 6, CRUST_COLORS.slate);
             },
             enemies: [
-                { x: -4, z: 2, kind: 'sentinel', hp: 5 },
-                { x: 4, z: -4, kind: 'scarab', hp: 5, ai: 'charge' },
+                { x: -4, z: 2, kind: 'bulwark', hp: 5 },
+                { x: 4, z: -4, kind: 'lancer', hp: 5 },
             ],
             doors: [
                 { to: 'towergate', side: 'S', at: 0, type: 'open' },
@@ -83,7 +94,7 @@ export const BEAT13_DEF = {
             grid: [-1, -1],
             half: 7,
             wallH: 5,
-            enemies: [{ x: 3, z: 3, kind: 'frost', hp: 4, ai: 'ranged' }],
+            enemies: [{ x: 3, z: 3, kind: 'mote', hp: 4, ai: 'ranged' }],
             doors: [{ to: 'towerfoot', side: 'E', at: 0, type: 'open' }],
             onBake(level, origin) {
                 if (!level.keyStore.mapPickup()) {
@@ -102,7 +113,7 @@ export const BEAT13_DEF = {
             grid: [1, -1],
             half: 8,
             wallH: 5,
-            enemies: [{ x: -3, z: 3, kind: 'scarab', hp: 5, ai: 'charge' }],
+            enemies: [{ x: -3, z: 3, kind: 'bulwark', hp: 5, ai: 'charge' }],
             platforms(map, h) {
                 spiral(map, h, -4, -4, 4, CRUST_COLORS.slate);
                 spiral(map, h, 4, 2, 3, ABYSS_COLORS.violet);
@@ -128,9 +139,9 @@ export const BEAT13_DEF = {
                 h.fillBox(map, 6, 7, 1, 4, -3, 3, ABYSS_COLORS.violet);
             },
             enemies: [
-                { x: -4, z: 0, kind: 'sentinel', hp: 5 },
-                { x: 4, z: 0, kind: 'scarab', hp: 5, ai: 'charge' },
-                { x: 0, z: -4, kind: 'frost', hp: 5, ai: 'ranged' },
+                { x: -4, z: 0, kind: 'lancer', hp: 5 },
+                { x: 4, z: 0, kind: 'mote', hp: 5 },
+                { x: 0, z: -4, kind: 'bulwark', hp: 5 },
             ],
             doors: [
                 { to: 'towerfoot', side: 'S', at: 0, type: 'locked' },
@@ -163,11 +174,13 @@ export const BEAT13_DEF = {
             ],
             onBake(level, origin) {
                 level.addPickup({ x: origin.x, y: 1.2, z: origin.z - 3 }, {
-                    color: 0x7fe0ff,
-                    label: 'Null cache',
+                    color: 0x9ad0ff,
+                    label: 'Memory Vial chassis',
+                    reward: { type: 'vial' },
                     onPickup(game) {
-                        game.player.inventory.addShards(35);
-                        game.hud?.toast?.('Null cache — 35 shards');
+                        if (game.collectMemoryVial?.('b13-null')) {
+                            game.hud?.toast?.("A Memory Vial chassis, filed under nothing.", 2600);
+                        }
                     },
                 });
             },
@@ -177,8 +190,8 @@ export const BEAT13_DEF = {
             half: 8,
             wallH: 6,
             enemies: [
-                { x: -3, z: -3, kind: 'frost', hp: 5, ai: 'ranged' },
-                { x: 3, z: -3, kind: 'frost', hp: 5, ai: 'ranged' },
+                { x: -3, z: -3, kind: 'lancer', hp: 5 },
+                { x: 3, z: -3, kind: 'mote', hp: 5 },
             ],
             platforms(map, h) {
                 spiral(map, h, 0, -3, 5, ABYSS_COLORS.violet);
@@ -197,12 +210,36 @@ export const BEAT13_DEF = {
             half: 10,
             wallH: 6,
             build(map, h) {
-                // The original tower-top terraces, climbable to the Witness
-                h.fillBox(map, -3, 3, 1, 1, 3, 6, CRUST_COLORS.slate);
-                h.fillBox(map, -6, -2, 3, 3, -2, 2, CRUST_COLORS.slate);
-                h.fillBox(map, 2, 6, 5, 5, -4, 0, CRUST_COLORS.slate);
-                h.fillBox(map, -2, 2, 7, 7, -7, -3, ABYSS_COLORS.violet);
-                h.fillBox(map, -1, 1, 9, 9, -2, 2, ABYSS_COLORS.goldVein);
+                // The crown sampled 32.6 — below the Abyss band floor (35). Lift
+                // it with PALE ACCENT GEOMETRY rather than lighting: an index
+                // lattice burnt into the arena floor, which also reads as the
+                // beat's kit motif (index rails / scan lines). Floor-level only
+                // (y=0), so it adds no collision and no climbable step.
+                for (let x = -9; x <= 9; x++) {
+                    for (let z = -9; z <= 9; z++) {
+                        if (x % 4 === 0 || z % 4 === 0) {
+                            h.fillBox(map, x, x, 0, 0, z, z, 0x6e7488);
+                        }
+                    }
+                }
+            },
+            platforms(map, h) {
+                // Multi-Y arena geometry belongs in the platform map. Putting
+                // it in build() turns every occupied XZ column into a wall of
+                // infinite effective height for planar collision.
+                //
+                // This arena stays FLAT. Two earlier passes got it wrong in
+                // opposite directions: first five slabs stacked two cells apart
+                // (the 1-cell step could never climb them, so they were scenery),
+                // then a climbable spiral ten cells tall — which fought the
+                // camera. The rig sits at height 17.5 looking down, so any mass
+                // that far off the floor lands between the lens and the fight
+                // and eclipses the combat space. The Witness descends to the
+                // floor to fight, so altitude buys nothing here: a low index
+                // dais gives the crown its shape and keeps the whole arena, the
+                // boss, and its telegraphs readable from above.
+                h.fillBox(map, -5, 5, 1, 1, -5, 5, CRUST_COLORS.slate);
+                h.fillBox(map, -2, 2, 1, 1, -2, 2, ABYSS_COLORS.goldVein);
             },
             doors: [{ to: 'indexspire', side: 'S', at: 0, type: 'boss' }],
             boss(ctx, level, origin) {

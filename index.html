@@ -62,15 +62,55 @@
         <p style="margin-top:1.2rem;opacity:0.7">Click or press any key · loading…</p>
     </div>
     <script type="module">
-        import './src/game/index.js';
-        // Fade boot overlay once first frame likely painted
         const boot = document.getElementById('boot');
-        setTimeout(() => {
-            if (boot) {
-                boot.style.opacity = '0';
-                setTimeout(() => boot.remove(), 700);
+
+        function showFatal(title, detail) {
+            if (!boot) return;
+            boot.style.pointerEvents = 'auto';
+            boot.style.padding = '2rem';
+            boot.style.boxSizing = 'border-box';
+            boot.innerHTML = '';
+            const heading = document.createElement('h1');
+            heading.textContent = title;
+            const message = document.createElement('p');
+            message.textContent = detail;
+            message.style.maxWidth = '42rem';
+            message.style.textAlign = 'center';
+            message.style.lineHeight = '1.6';
+            boot.append(heading, message);
+        }
+
+        function supportsWebGL2() {
+            try {
+                const canvas = document.createElement('canvas');
+                return !!window.WebGL2RenderingContext && !!canvas.getContext('webgl2');
+            } catch (_) {
+                return false;
             }
-        }, 900);
+        }
+
+        if (!supportsWebGL2()) {
+            showFatal(
+                'WEBGL2 REQUIRED',
+                'Sovereign Scar needs WebGL2. Enable hardware acceleration or open the game in a current Chrome, Edge, Firefox, or Safari browser.'
+            );
+        } else {
+            import('./src/game/index.js').then(() => {
+                // Fade the boot overlay once the first frame has likely painted.
+                setTimeout(() => {
+                    if (boot) {
+                        boot.style.opacity = '0';
+                        setTimeout(() => boot.remove(), 700);
+                    }
+                }, 900);
+            }).catch((error) => {
+                console.error(error);
+                showFatal(
+                    'THE SCAR FAILED TO OPEN',
+                    'The game could not start. Reload once. If it fails again, check the browser console for the exact error.'
+                );
+            });
+        }
     </script>
 </body>
 </html>

@@ -16,8 +16,8 @@
   "author": "sumosizedginger + Sovereign Scar team",
   "license": "MIT",
   "devDependencies": {
-    "three": "^0.185.0",
-    "puppeteer-core": "^25.3.0"
+    "puppeteer-core": "^25.3.0",
+    "three": "0.185.1"
   },
   "engines": {
     "node": ">=18"

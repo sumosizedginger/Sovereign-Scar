@@ -4,6 +4,8 @@
 
 import { MenuState } from './menu-state.js';
 import { UPGRADES, nextCost } from '../kernel/upgrades.js';
+import { RUN_MODES, runModeSummary } from '../kernel/run-mode.js';
+import { SCORE_VERSION } from '../kernel/score.js';
 
 const PANEL_BG = 'rgba(8,10,18,0.92)';
 const BORDER = '1px solid #3a4058';
@@ -42,8 +44,11 @@ export function buildScreens() {
         const prog = ctx.progress();
         const unlocked = new Set(prog.unlockedBeats || []);
         const defeated = new Set(prog.bossesDefeated || []);
+        const forkOwned = ctx.hasItem ? ctx.hasItem('resonance_fork') : true;
+        const flags = prog.inventory?.flags || {};
         const items = ctx.levels().map((meta) => {
-            const isOpenBeat = unlocked.has(meta.id) || meta.id === 'sandbox-combat' || meta.id === prog.currentBeat;
+            const altarKnown = !ctx.hasItem || meta.id === 'overworld' || !!flags[`altar:${meta.id}`];
+            const isOpenBeat = unlocked.has(meta.id) && forkOwned && altarKnown;
             const done = meta.bossId && defeated.has(meta.bossId);
             return {
                 type: 'action',
@@ -69,6 +74,27 @@ export function buildScreens() {
         { type: 'action', id: 'back', label: 'Back' },
     ]);
 
+    const scoreItems = (ctx) => {
+        const scores = ctx.scores?.() || [];
+        const rows = [];
+        for (const mode of ['medium', 'hard', 'survival', 'easy']) {
+            // Boards isolate score versions: entries written under an older
+            // or future scoring formula must never rank against this one.
+            // (Entries predating the version field are version 1.)
+            const board = scores.filter((entry) => entry.runMode === mode
+                && entry.eligible !== false
+                && (entry.scoreVersion ?? 1) === SCORE_VERSION).slice(0, 10);
+            rows.push({ type: 'text', label: `${mode.toUpperCase()} · SCORE VERSION ${SCORE_VERSION}` });
+            if (!board.length) rows.push({ type: 'text', label: 'No witnessed runs.' });
+            board.forEach((entry, i) => rows.push({
+                type: 'text',
+                label: `${i + 1}. ${entry.score} · ${entry.completed ? 'COMPLETE' : entry.beatReached || 'FALLEN'} · ${Math.floor((entry.playTime || 0) / 60)}m`,
+            }));
+        }
+        rows.push({ type: 'action', id: 'back', label: 'Back' });
+        return rows;
+    };
+
     return {
         title: (ctx) => {
             const prog = ctx.progress();
@@ -76,27 +102,34 @@ export function buildScreens() {
             const bosses = (prog.bossesDefeated || []).length;
             const mins = Math.floor((prog.playTime || 0) / 60);
             const beatName = ctx.beatName(prog.currentBeat);
+            const sealed = prog.runMode === 'survival' && prog.runStatus === 'dead';
+            const modeName = RUN_MODES[prog.runMode]?.name || 'Medium';
             return {
                 title: 'SOVEREIGN SCAR',
                 subtitle: 'The Wound That Remembers',
                 items: [
                     {
-                        type: 'action', id: 'continue', label: has ? 'Continue' : 'Begin',
-                        note: has ? `${beatName} · ${bosses}/14 · ${mins}m` : '',
+                        type: 'action', id: has ? 'continue' : 'newgame', label: has ? 'Continue' : 'Begin',
+                        disabled: sealed,
+                        note: sealed ? `SURVIVAL SEALED · ${bosses}/14`
+                            : (has ? `${modeName} · ${beatName} · ${bosses}/14 · ${mins}m` : ''),
                     },
                     { type: 'action', id: 'newgame', label: 'New Game', disabled: !has },
-                    { type: 'submenu', id: 'beats', label: 'Beat Select', screen: 'beats' },
+                    { type: 'submenu', id: 'beats', label: 'Altar Travel', screen: 'beats', disabled: prog.runMode === 'survival' || (ctx.hasItem && !ctx.hasItem('resonance_fork')) },
                     { type: 'submenu', id: 'settings', label: 'Settings', screen: 'settings' },
+                    { type: 'submenu', id: 'scores', label: 'Witness Scores', screen: 'scores' },
                     { type: 'submenu', id: 'controls', label: 'Controls', screen: 'controls' },
                 ],
             };
         },
-        pause: () => ({
+        pause: (ctx) => ({
             title: 'PAUSED',
             items: [
+                { type: 'text', label: `Run mode: ${(RUN_MODES[ctx.progress().runMode]?.name || 'Medium').toUpperCase()}` },
                 { type: 'action', id: 'resume', label: 'Resume' },
-                { type: 'submenu', id: 'beats', label: 'Beat Select', screen: 'beats' },
+                { type: 'submenu', id: 'beats', label: 'Altar Travel', screen: 'beats', disabled: ctx.progress().runMode === 'survival' || (ctx.hasItem && !ctx.hasItem('resonance_fork')) },
                 { type: 'submenu', id: 'settings', label: 'Settings', screen: 'settings' },
+                { type: 'submenu', id: 'scores', label: 'Witness Scores', screen: 'scores' },
                 { type: 'submenu', id: 'controls', label: 'Controls', screen: 'controls' },
                 { type: 'action', id: 'quitTitle', label: 'Quit to Title' },
             ],
@@ -104,6 +137,7 @@ export function buildScreens() {
         settings: (ctx) => ({ title: 'SETTINGS', items: settingsItems(ctx) }),
         beats: (ctx) => ({ title: 'BEAT SELECT', items: beatItems(ctx) }),
         controls: () => ({ title: 'CONTROLS', items: controlsItems() }),
+        scores: (ctx) => ({ title: 'WITNESS SCORES', items: scoreItems(ctx) }),
         altar: (ctx) => {
             const shards = ctx.shards ? ctx.shards() : 0;
             const ups = ctx.upgrades ? ctx.upgrades() : {};
@@ -124,16 +158,24 @@ export function buildScreens() {
                 items: [
                     { type: 'text', label: `Scar Shards: ${shards}` },
                     ...rows,
+                    { type: 'action', id: 'service', arg: 'repair', label: 'Full repair', note: '20 shards', disabled: shards < 20 || ctx.healthFull?.() },
+                    { type: 'action', id: 'service', arg: 'vial', label: 'Memory Vial refill', note: '25 shards', disabled: shards < 25 || !ctx.hasVialSlot?.() },
+                    { type: 'action', id: 'service', arg: 'charge', label: 'Reconstitution Charge', note: `${ctx.chargeCost?.() || 0} shards`, disabled: !ctx.canBuyCharge?.() || shards < (ctx.chargeCost?.() || Infinity) },
+                    { type: 'action', id: 'buyItem', arg: 'buoyancy_mesh', label: 'Buoyancy Mesh', note: 'Deep-fluid traversal · 180 shards', disabled: !ctx.canBuyBuoyancy?.() || shards < 180 },
                     { type: 'action', id: 'back', label: 'Leave' },
                 ],
             };
         },
-        confirmNew: () => ({
-            title: 'NEW GAME',
+        runMode: () => ({
+            title: 'CHOOSE THE LINK\'S MEMORY',
             items: [
-                { type: 'text', label: 'Erase the current run? Your settings are kept.' },
-                { type: 'action', id: 'confirmNewYes', label: 'Yes — start over' },
-                { type: 'action', id: 'back', label: 'No — keep my run' },
+                { type: 'text', label: 'Starting a mode erases the current campaign. Settings remain.' },
+                ...Object.values(RUN_MODES).map((mode) => ({
+                    type: 'action', id: 'startMode', arg: mode.id,
+                    label: mode.name, note: runModeSummary(mode.id),
+                })),
+                { type: 'text', label: 'Survival is one life. Death seals the save. No second draft.' },
+                { type: 'action', id: 'back', label: 'Keep the current run' },
             ],
         }),
     };

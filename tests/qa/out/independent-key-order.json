@@ -1,0 +1,2764 @@
+{
+  "startedAt": "2026-07-20T16:50:30.597Z",
+  "dungeons": [
+    {
+      "id": "beat-01-crypt",
+      "start": "tomb",
+      "freeComp": [
+        "tomb",
+        "corridor"
+      ],
+      "freeSmallKeys": 1,
+      "freeBossKeys": 0,
+      "lockedExits": [
+        {
+          "from": "corridor",
+          "to": "predecessor"
+        }
+      ],
+      "lockEdges": [
+        "corridor|predecessor"
+      ],
+      "bossEdges": [
+        "antechamber|warden"
+      ],
+      "reached": [
+        "tomb",
+        "corridor",
+        "predecessor",
+        "antechamber",
+        "secret",
+        "warden"
+      ],
+      "opened": [
+        "corridor|predecessor",
+        "antechamber|warden"
+      ],
+      "keyPhys": [
+        {
+          "rid": "corridor",
+          "label": "Small key",
+          "type": "small",
+          "x": 8,
+          "z": -60.5,
+          "y": 1.29,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "secret",
+          "label": "Boss key",
+          "type": "boss",
+          "x": -64,
+          "z": -128,
+          "y": 1.49,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        }
+      ],
+      "keysByRoom": {
+        "corridor": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": 8,
+            "z": -60.5
+          }
+        ],
+        "secret": [
+          {
+            "label": "Boss key",
+            "type": "boss",
+            "x": -64,
+            "z": -128
+          }
+        ]
+      },
+      "events": [
+        {
+          "kind": "start",
+          "room": "tomb"
+        },
+        {
+          "kind": "enter",
+          "room": "corridor",
+          "via": "tomb",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "corridor",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "unlock",
+          "from": "corridor",
+          "to": "predecessor",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "predecessor",
+          "via": "corridor",
+          "free": true
+        },
+        {
+          "kind": "enter",
+          "room": "antechamber",
+          "via": "predecessor",
+          "free": true
+        },
+        {
+          "kind": "enter",
+          "room": "secret",
+          "via": "predecessor",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "secret",
+          "label": "Boss key",
+          "type": "boss",
+          "small": 0,
+          "boss": true
+        },
+        {
+          "kind": "unlock",
+          "from": "antechamber",
+          "to": "warden",
+          "cost": "boss"
+        },
+        {
+          "kind": "enter",
+          "room": "warden",
+          "via": "antechamber",
+          "free": true
+        }
+      ],
+      "issues": []
+    },
+    {
+      "id": "beat-02-spindle",
+      "start": "gatehouse",
+      "freeComp": [
+        "gatehouse",
+        "gearworks",
+        "archive",
+        "coilhall"
+      ],
+      "freeSmallKeys": 1,
+      "freeBossKeys": 0,
+      "lockedExits": [
+        {
+          "from": "gearworks",
+          "to": "vaultrow"
+        }
+      ],
+      "lockEdges": [
+        "gearworks|vaultrow",
+        "prebosscourt|vaultrow"
+      ],
+      "bossEdges": [
+        "prebosscourt|spindlecrown"
+      ],
+      "reached": [
+        "gatehouse",
+        "gearworks",
+        "archive",
+        "coilhall",
+        "vaultrow",
+        "capacitor",
+        "prebosscourt",
+        "spindlecrown"
+      ],
+      "opened": [
+        "gearworks|vaultrow",
+        "prebosscourt|vaultrow",
+        "prebosscourt|spindlecrown"
+      ],
+      "keyPhys": [
+        {
+          "rid": "gearworks",
+          "label": "Small key",
+          "type": "small",
+          "x": -9,
+          "z": -56,
+          "y": 1.21,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "vaultrow",
+          "label": "Small key",
+          "type": "small",
+          "x": -6,
+          "z": -134,
+          "y": 1.21,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "prebosscourt",
+          "label": "Boss key",
+          "type": "boss",
+          "x": 0,
+          "z": -197,
+          "y": 1.41,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        }
+      ],
+      "keysByRoom": {
+        "gearworks": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": -9,
+            "z": -56
+          }
+        ],
+        "vaultrow": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": -6,
+            "z": -134
+          }
+        ],
+        "prebosscourt": [
+          {
+            "label": "Boss key",
+            "type": "boss",
+            "x": 0,
+            "z": -197
+          }
+        ]
+      },
+      "events": [
+        {
+          "kind": "start",
+          "room": "gatehouse"
+        },
+        {
+          "kind": "enter",
+          "room": "gearworks",
+          "via": "gatehouse",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "gearworks",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "archive",
+          "via": "gearworks",
+          "free": true
+        },
+        {
+          "kind": "enter",
+          "room": "coilhall",
+          "via": "gearworks",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "gearworks",
+          "to": "vaultrow",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "vaultrow",
+          "via": "gearworks",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "vaultrow",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "capacitor",
+          "via": "vaultrow",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "vaultrow",
+          "to": "prebosscourt",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "prebosscourt",
+          "via": "vaultrow",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "prebosscourt",
+          "label": "Boss key",
+          "type": "boss",
+          "small": 0,
+          "boss": true
+        },
+        {
+          "kind": "unlock",
+          "from": "prebosscourt",
+          "to": "spindlecrown",
+          "cost": "boss"
+        },
+        {
+          "kind": "enter",
+          "room": "spindlecrown",
+          "via": "prebosscourt",
+          "free": true
+        }
+      ],
+      "issues": []
+    },
+    {
+      "id": "beat-03-sink",
+      "start": "sinkmouth",
+      "freeComp": [
+        "sinkmouth",
+        "dunecross",
+        "cistern",
+        "boneyard"
+      ],
+      "freeSmallKeys": 1,
+      "freeBossKeys": 0,
+      "lockedExits": [
+        {
+          "from": "dunecross",
+          "to": "slipway"
+        }
+      ],
+      "lockEdges": [
+        "dunecross|slipway",
+        "slipway|undertow"
+      ],
+      "bossEdges": [
+        "spurpit|undertow"
+      ],
+      "reached": [
+        "sinkmouth",
+        "dunecross",
+        "cistern",
+        "boneyard",
+        "slipway",
+        "hollow",
+        "undertow",
+        "spurpit"
+      ],
+      "opened": [
+        "dunecross|slipway",
+        "slipway|undertow",
+        "spurpit|undertow"
+      ],
+      "keyPhys": [
+        {
+          "rid": "dunecross",
+          "label": "Small key",
+          "type": "small",
+          "x": 8,
+          "z": -57,
+          "y": 1.12,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "slipway",
+          "label": "Small key",
+          "type": "small",
+          "x": 5,
+          "z": -122,
+          "y": 1.12,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "undertow",
+          "label": "Boss key",
+          "type": "boss",
+          "x": 0,
+          "z": -197,
+          "y": 1.32,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        }
+      ],
+      "keysByRoom": {
+        "dunecross": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": 8,
+            "z": -57
+          }
+        ],
+        "slipway": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": 5,
+            "z": -122
+          }
+        ],
+        "undertow": [
+          {
+            "label": "Boss key",
+            "type": "boss",
+            "x": 0,
+            "z": -197
+          }
+        ]
+      },
+      "events": [
+        {
+          "kind": "start",
+          "room": "sinkmouth"
+        },
+        {
+          "kind": "enter",
+          "room": "dunecross",
+          "via": "sinkmouth",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "dunecross",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "cistern",
+          "via": "dunecross",
+          "free": true
+        },
+        {
+          "kind": "enter",
+          "room": "boneyard",
+          "via": "dunecross",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "dunecross",
+          "to": "slipway",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "slipway",
+          "via": "dunecross",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "slipway",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "hollow",
+          "via": "slipway",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "slipway",
+          "to": "undertow",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "undertow",
+          "via": "slipway",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "undertow",
+          "label": "Boss key",
+          "type": "boss",
+          "small": 0,
+          "boss": true
+        },
+        {
+          "kind": "unlock",
+          "from": "undertow",
+          "to": "spurpit",
+          "cost": "boss"
+        },
+        {
+          "kind": "enter",
+          "room": "spurpit",
+          "via": "undertow",
+          "free": true
+        }
+      ],
+      "issues": []
+    },
+    {
+      "id": "beat-04-sky",
+      "start": "plaza",
+      "freeComp": [
+        "plaza",
+        "terrace",
+        "observatory",
+        "windworks"
+      ],
+      "freeSmallKeys": 1,
+      "freeBossKeys": 0,
+      "lockedExits": [
+        {
+          "from": "terrace",
+          "to": "ascent"
+        }
+      ],
+      "lockEdges": [
+        "ascent|terrace",
+        "ascent|galleria"
+      ],
+      "bossEdges": [
+        "corona|galleria"
+      ],
+      "reached": [
+        "plaza",
+        "terrace",
+        "observatory",
+        "windworks",
+        "ascent",
+        "aerie",
+        "galleria",
+        "corona"
+      ],
+      "opened": [
+        "ascent|terrace",
+        "ascent|galleria",
+        "corona|galleria"
+      ],
+      "keyPhys": [
+        {
+          "rid": "terrace",
+          "label": "Small key",
+          "type": "small",
+          "x": 7,
+          "z": -57,
+          "y": 4.26,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "ascent",
+          "label": "Small key",
+          "type": "small",
+          "x": -6,
+          "z": -134,
+          "y": 5.26,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "galleria",
+          "label": "Boss key",
+          "type": "boss",
+          "x": 0,
+          "z": -196,
+          "y": 4.26,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        }
+      ],
+      "keysByRoom": {
+        "terrace": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": 7,
+            "z": -57
+          }
+        ],
+        "ascent": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": -6,
+            "z": -134
+          }
+        ],
+        "galleria": [
+          {
+            "label": "Boss key",
+            "type": "boss",
+            "x": 0,
+            "z": -196
+          }
+        ]
+      },
+      "events": [
+        {
+          "kind": "start",
+          "room": "plaza"
+        },
+        {
+          "kind": "enter",
+          "room": "terrace",
+          "via": "plaza",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "terrace",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "observatory",
+          "via": "terrace",
+          "free": true
+        },
+        {
+          "kind": "enter",
+          "room": "windworks",
+          "via": "terrace",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "terrace",
+          "to": "ascent",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "ascent",
+          "via": "terrace",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "ascent",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "aerie",
+          "via": "ascent",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "ascent",
+          "to": "galleria",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "galleria",
+          "via": "ascent",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "galleria",
+          "label": "Boss key",
+          "type": "boss",
+          "small": 0,
+          "boss": true
+        },
+        {
+          "kind": "unlock",
+          "from": "galleria",
+          "to": "corona",
+          "cost": "boss"
+        },
+        {
+          "kind": "enter",
+          "room": "corona",
+          "via": "galleria",
+          "free": true
+        }
+      ],
+      "issues": []
+    },
+    {
+      "id": "beat-05-citadel",
+      "start": "approach",
+      "freeComp": [
+        "approach",
+        "greathall",
+        "westgallery",
+        "eastgallery"
+      ],
+      "freeSmallKeys": 2,
+      "freeBossKeys": 0,
+      "lockedExits": [
+        {
+          "from": "greathall",
+          "to": "monolith"
+        }
+      ],
+      "lockEdges": [
+        "greathall|monolith",
+        "monolith|sanctum"
+      ],
+      "bossEdges": [
+        "proxythrone|sanctum"
+      ],
+      "reached": [
+        "approach",
+        "greathall",
+        "westgallery",
+        "eastgallery",
+        "monolith",
+        "reliquary",
+        "sanctum",
+        "proxythrone"
+      ],
+      "opened": [
+        "greathall|monolith",
+        "monolith|sanctum",
+        "proxythrone|sanctum"
+      ],
+      "keyPhys": [
+        {
+          "rid": "greathall",
+          "label": "Small key",
+          "type": "small",
+          "x": -5,
+          "z": -73,
+          "y": 1.05,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "eastgallery",
+          "label": "Small key",
+          "type": "small",
+          "x": 68,
+          "z": -68,
+          "y": 4.25,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "sanctum",
+          "label": "Boss key",
+          "type": "boss",
+          "x": 0,
+          "z": -197,
+          "y": 1.25,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        }
+      ],
+      "keysByRoom": {
+        "greathall": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": -5,
+            "z": -73
+          }
+        ],
+        "eastgallery": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": 68,
+            "z": -68
+          }
+        ],
+        "sanctum": [
+          {
+            "label": "Boss key",
+            "type": "boss",
+            "x": 0,
+            "z": -197
+          }
+        ]
+      },
+      "events": [
+        {
+          "kind": "start",
+          "room": "approach"
+        },
+        {
+          "kind": "enter",
+          "room": "greathall",
+          "via": "approach",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "greathall",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "westgallery",
+          "via": "greathall",
+          "free": true
+        },
+        {
+          "kind": "enter",
+          "room": "eastgallery",
+          "via": "greathall",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "eastgallery",
+          "label": "Small key",
+          "type": "small",
+          "small": 2,
+          "boss": false
+        },
+        {
+          "kind": "unlock",
+          "from": "greathall",
+          "to": "monolith",
+          "cost": "small",
+          "smallLeft": 1
+        },
+        {
+          "kind": "enter",
+          "room": "monolith",
+          "via": "greathall",
+          "free": true
+        },
+        {
+          "kind": "enter",
+          "room": "reliquary",
+          "via": "monolith",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "monolith",
+          "to": "sanctum",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "sanctum",
+          "via": "monolith",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "sanctum",
+          "label": "Boss key",
+          "type": "boss",
+          "small": 0,
+          "boss": true
+        },
+        {
+          "kind": "unlock",
+          "from": "sanctum",
+          "to": "proxythrone",
+          "cost": "boss"
+        },
+        {
+          "kind": "enter",
+          "room": "proxythrone",
+          "via": "sanctum",
+          "free": true
+        }
+      ],
+      "issues": []
+    },
+    {
+      "id": "beat-06-quarry",
+      "start": "pitgate",
+      "freeComp": [
+        "pitgate",
+        "quarryfloor",
+        "orecrush",
+        "siftery"
+      ],
+      "freeSmallKeys": 1,
+      "freeBossKeys": 0,
+      "lockedExits": [
+        {
+          "from": "quarryfloor",
+          "to": "deepcut"
+        }
+      ],
+      "lockEdges": [
+        "deepcut|quarryfloor",
+        "deepcut|veinworks"
+      ],
+      "bossEdges": [
+        "molthall|veinworks"
+      ],
+      "reached": [
+        "pitgate",
+        "quarryfloor",
+        "orecrush",
+        "siftery",
+        "deepcut",
+        "goldgash",
+        "veinworks",
+        "molthall"
+      ],
+      "opened": [
+        "deepcut|quarryfloor",
+        "deepcut|veinworks",
+        "molthall|veinworks"
+      ],
+      "keyPhys": [
+        {
+          "rid": "quarryfloor",
+          "label": "Small key",
+          "type": "small",
+          "x": -9,
+          "z": -55,
+          "y": 1.08,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "deepcut",
+          "label": "Small key",
+          "type": "small",
+          "x": -6,
+          "z": -134,
+          "y": 1.08,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "veinworks",
+          "label": "Boss key",
+          "type": "boss",
+          "x": 4,
+          "z": -198,
+          "y": 1.28,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        }
+      ],
+      "keysByRoom": {
+        "quarryfloor": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": -9,
+            "z": -55
+          }
+        ],
+        "deepcut": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": -6,
+            "z": -134
+          }
+        ],
+        "veinworks": [
+          {
+            "label": "Boss key",
+            "type": "boss",
+            "x": 4,
+            "z": -198
+          }
+        ]
+      },
+      "events": [
+        {
+          "kind": "start",
+          "room": "pitgate"
+        },
+        {
+          "kind": "enter",
+          "room": "quarryfloor",
+          "via": "pitgate",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "quarryfloor",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "orecrush",
+          "via": "quarryfloor",
+          "free": true
+        },
+        {
+          "kind": "enter",
+          "room": "siftery",
+          "via": "quarryfloor",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "quarryfloor",
+          "to": "deepcut",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "deepcut",
+          "via": "quarryfloor",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "deepcut",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "goldgash",
+          "via": "deepcut",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "deepcut",
+          "to": "veinworks",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "veinworks",
+          "via": "deepcut",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "veinworks",
+          "label": "Boss key",
+          "type": "boss",
+          "small": 0,
+          "boss": true
+        },
+        {
+          "kind": "unlock",
+          "from": "veinworks",
+          "to": "molthall",
+          "cost": "boss"
+        },
+        {
+          "kind": "enter",
+          "room": "molthall",
+          "via": "veinworks",
+          "free": true
+        }
+      ],
+      "issues": []
+    },
+    {
+      "id": "beat-07-sluice",
+      "start": "floodgate",
+      "freeComp": [
+        "floodgate",
+        "weepinghall",
+        "tearwell",
+        "cascades"
+      ],
+      "freeSmallKeys": 1,
+      "freeBossKeys": 0,
+      "lockedExits": [
+        {
+          "from": "weepinghall",
+          "to": "drownedway"
+        }
+      ],
+      "lockEdges": [
+        "drownedway|weepinghall",
+        "drownedway|surgechamber"
+      ],
+      "bossEdges": [
+        "cloudcourt|surgechamber"
+      ],
+      "reached": [
+        "floodgate",
+        "weepinghall",
+        "tearwell",
+        "cascades",
+        "drownedway",
+        "brinepocket",
+        "surgechamber",
+        "cloudcourt"
+      ],
+      "opened": [
+        "drownedway|weepinghall",
+        "drownedway|surgechamber",
+        "cloudcourt|surgechamber"
+      ],
+      "keyPhys": [
+        {
+          "rid": "weepinghall",
+          "label": "Small key",
+          "type": "small",
+          "x": 9,
+          "z": -73,
+          "y": 1.13,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "drownedway",
+          "label": "Small key",
+          "type": "small",
+          "x": 6,
+          "z": -122,
+          "y": 1.13,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "surgechamber",
+          "label": "Boss key",
+          "type": "boss",
+          "x": 0,
+          "z": -197,
+          "y": 1.33,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        }
+      ],
+      "keysByRoom": {
+        "weepinghall": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": 9,
+            "z": -73
+          }
+        ],
+        "drownedway": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": 6,
+            "z": -122
+          }
+        ],
+        "surgechamber": [
+          {
+            "label": "Boss key",
+            "type": "boss",
+            "x": 0,
+            "z": -197
+          }
+        ]
+      },
+      "events": [
+        {
+          "kind": "start",
+          "room": "floodgate"
+        },
+        {
+          "kind": "enter",
+          "room": "weepinghall",
+          "via": "floodgate",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "weepinghall",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "tearwell",
+          "via": "weepinghall",
+          "free": true
+        },
+        {
+          "kind": "enter",
+          "room": "cascades",
+          "via": "weepinghall",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "weepinghall",
+          "to": "drownedway",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "drownedway",
+          "via": "weepinghall",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "drownedway",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "brinepocket",
+          "via": "drownedway",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "drownedway",
+          "to": "surgechamber",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "surgechamber",
+          "via": "drownedway",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "surgechamber",
+          "label": "Boss key",
+          "type": "boss",
+          "small": 0,
+          "boss": true
+        },
+        {
+          "kind": "unlock",
+          "from": "surgechamber",
+          "to": "cloudcourt",
+          "cost": "boss"
+        },
+        {
+          "kind": "enter",
+          "room": "cloudcourt",
+          "via": "surgechamber",
+          "free": true
+        }
+      ],
+      "issues": []
+    },
+    {
+      "id": "beat-08-bone",
+      "start": "rootgate",
+      "freeComp": [
+        "rootgate",
+        "bonegrove",
+        "gravecanopy",
+        "femurstand"
+      ],
+      "freeSmallKeys": 1,
+      "freeBossKeys": 0,
+      "lockedExits": [
+        {
+          "from": "bonegrove",
+          "to": "ossuary"
+        }
+      ],
+      "lockEdges": [
+        "bonegrove|ossuary",
+        "ossuary|ribvault"
+      ],
+      "bossEdges": [
+        "prayerhollow|ribvault"
+      ],
+      "reached": [
+        "rootgate",
+        "bonegrove",
+        "gravecanopy",
+        "femurstand",
+        "ossuary",
+        "marrowcyst",
+        "ribvault",
+        "prayerhollow"
+      ],
+      "opened": [
+        "bonegrove|ossuary",
+        "ossuary|ribvault",
+        "prayerhollow|ribvault"
+      ],
+      "keyPhys": [
+        {
+          "rid": "bonegrove",
+          "label": "Small key",
+          "type": "small",
+          "x": 9,
+          "z": -55,
+          "y": 1.22,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "S:rootgate:open",
+          "ok": true
+        },
+        {
+          "rid": "ossuary",
+          "label": "Small key",
+          "type": "small",
+          "x": -6,
+          "z": -134,
+          "y": 1.22,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "ribvault",
+          "label": "Boss key",
+          "type": "boss",
+          "x": 0,
+          "z": -196,
+          "y": 4.42,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        }
+      ],
+      "keysByRoom": {
+        "bonegrove": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": 9,
+            "z": -55
+          }
+        ],
+        "ossuary": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": -6,
+            "z": -134
+          }
+        ],
+        "ribvault": [
+          {
+            "label": "Boss key",
+            "type": "boss",
+            "x": 0,
+            "z": -196
+          }
+        ]
+      },
+      "events": [
+        {
+          "kind": "start",
+          "room": "rootgate"
+        },
+        {
+          "kind": "enter",
+          "room": "bonegrove",
+          "via": "rootgate",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "bonegrove",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "gravecanopy",
+          "via": "bonegrove",
+          "free": true
+        },
+        {
+          "kind": "enter",
+          "room": "femurstand",
+          "via": "bonegrove",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "bonegrove",
+          "to": "ossuary",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "ossuary",
+          "via": "bonegrove",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "ossuary",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "marrowcyst",
+          "via": "ossuary",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "ossuary",
+          "to": "ribvault",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "ribvault",
+          "via": "ossuary",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "ribvault",
+          "label": "Boss key",
+          "type": "boss",
+          "small": 0,
+          "boss": true
+        },
+        {
+          "kind": "unlock",
+          "from": "ribvault",
+          "to": "prayerhollow",
+          "cost": "boss"
+        },
+        {
+          "kind": "enter",
+          "room": "prayerhollow",
+          "via": "ribvault",
+          "free": true
+        }
+      ],
+      "issues": []
+    },
+    {
+      "id": "beat-09-town",
+      "start": "towngate",
+      "freeComp": [
+        "towngate",
+        "townsquare",
+        "chapel",
+        "market"
+      ],
+      "freeSmallKeys": 1,
+      "freeBossKeys": 0,
+      "lockedExits": [
+        {
+          "from": "townsquare",
+          "to": "highstreet"
+        }
+      ],
+      "lockEdges": [
+        "highstreet|townsquare",
+        "belltower|highstreet"
+      ],
+      "bossEdges": [
+        "belltower|moothall"
+      ],
+      "reached": [
+        "towngate",
+        "townsquare",
+        "chapel",
+        "market",
+        "highstreet",
+        "cellar",
+        "belltower",
+        "moothall"
+      ],
+      "opened": [
+        "highstreet|townsquare",
+        "belltower|highstreet",
+        "belltower|moothall"
+      ],
+      "keyPhys": [
+        {
+          "rid": "townsquare",
+          "label": "Small key",
+          "type": "small",
+          "x": 9,
+          "z": -55,
+          "y": 1.33,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "S:towngate:open",
+          "ok": true
+        },
+        {
+          "rid": "highstreet",
+          "label": "Small key",
+          "type": "small",
+          "x": -5,
+          "z": -135,
+          "y": 1.33,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "belltower",
+          "label": "Boss key",
+          "type": "boss",
+          "x": 0,
+          "z": -196,
+          "y": 5.53,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        }
+      ],
+      "keysByRoom": {
+        "townsquare": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": 9,
+            "z": -55
+          }
+        ],
+        "highstreet": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": -5,
+            "z": -135
+          }
+        ],
+        "belltower": [
+          {
+            "label": "Boss key",
+            "type": "boss",
+            "x": 0,
+            "z": -196
+          }
+        ]
+      },
+      "events": [
+        {
+          "kind": "start",
+          "room": "towngate"
+        },
+        {
+          "kind": "enter",
+          "room": "townsquare",
+          "via": "towngate",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "townsquare",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "chapel",
+          "via": "townsquare",
+          "free": true
+        },
+        {
+          "kind": "enter",
+          "room": "market",
+          "via": "townsquare",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "townsquare",
+          "to": "highstreet",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "highstreet",
+          "via": "townsquare",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "highstreet",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "cellar",
+          "via": "highstreet",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "highstreet",
+          "to": "belltower",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "belltower",
+          "via": "highstreet",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "belltower",
+          "label": "Boss key",
+          "type": "boss",
+          "small": 0,
+          "boss": true
+        },
+        {
+          "kind": "unlock",
+          "from": "belltower",
+          "to": "moothall",
+          "cost": "boss"
+        },
+        {
+          "kind": "enter",
+          "room": "moothall",
+          "via": "belltower",
+          "free": true
+        }
+      ],
+      "issues": []
+    },
+    {
+      "id": "beat-10-cryo",
+      "start": "ventgate",
+      "freeComp": [
+        "ventgate",
+        "vaultfloor",
+        "frostbite",
+        "crystalgarden"
+      ],
+      "freeSmallKeys": 1,
+      "freeBossKeys": 0,
+      "lockedExits": [
+        {
+          "from": "vaultfloor",
+          "to": "glacierhall"
+        }
+      ],
+      "lockEdges": [
+        "glacierhall|vaultfloor",
+        "coldstore|glacierhall"
+      ],
+      "bossEdges": [
+        "coldstore|twincage"
+      ],
+      "reached": [
+        "ventgate",
+        "vaultfloor",
+        "frostbite",
+        "crystalgarden",
+        "glacierhall",
+        "icecomb",
+        "coldstore",
+        "twincage"
+      ],
+      "opened": [
+        "glacierhall|vaultfloor",
+        "coldstore|glacierhall",
+        "coldstore|twincage"
+      ],
+      "keyPhys": [
+        {
+          "rid": "vaultfloor",
+          "label": "Small key",
+          "type": "small",
+          "x": 9,
+          "z": -73,
+          "y": 1.35,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "glacierhall",
+          "label": "Small key",
+          "type": "small",
+          "x": -6,
+          "z": -134,
+          "y": 1.35,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "coldstore",
+          "label": "Boss key",
+          "type": "boss",
+          "x": 0,
+          "z": -199.5,
+          "y": 1.55,
+          "bfsOk": true,
+          "approach": 1,
+          "from": "spawn",
+          "ok": true
+        }
+      ],
+      "keysByRoom": {
+        "vaultfloor": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": 9,
+            "z": -73
+          }
+        ],
+        "glacierhall": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": -6,
+            "z": -134
+          }
+        ],
+        "coldstore": [
+          {
+            "label": "Boss key",
+            "type": "boss",
+            "x": 0,
+            "z": -199.5
+          }
+        ]
+      },
+      "events": [
+        {
+          "kind": "start",
+          "room": "ventgate"
+        },
+        {
+          "kind": "enter",
+          "room": "vaultfloor",
+          "via": "ventgate",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "vaultfloor",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "frostbite",
+          "via": "vaultfloor",
+          "free": true
+        },
+        {
+          "kind": "enter",
+          "room": "crystalgarden",
+          "via": "vaultfloor",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "vaultfloor",
+          "to": "glacierhall",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "glacierhall",
+          "via": "vaultfloor",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "glacierhall",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "icecomb",
+          "via": "glacierhall",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "glacierhall",
+          "to": "coldstore",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "coldstore",
+          "via": "glacierhall",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "coldstore",
+          "label": "Boss key",
+          "type": "boss",
+          "small": 0,
+          "boss": true
+        },
+        {
+          "kind": "unlock",
+          "from": "coldstore",
+          "to": "twincage",
+          "cost": "boss"
+        },
+        {
+          "kind": "enter",
+          "room": "twincage",
+          "via": "coldstore",
+          "free": true
+        }
+      ],
+      "issues": []
+    },
+    {
+      "id": "beat-11-mire",
+      "start": "lichgate",
+      "freeComp": [
+        "lichgate",
+        "mirefloor",
+        "cardfile",
+        "shelfrow"
+      ],
+      "freeSmallKeys": 1,
+      "freeBossKeys": 0,
+      "lockedExits": [
+        {
+          "from": "mirefloor",
+          "to": "readingroom"
+        }
+      ],
+      "lockEdges": [
+        "mirefloor|readingroom",
+        "readingroom|stacksump"
+      ],
+      "bossEdges": [
+        "golemwallow|stacksump"
+      ],
+      "reached": [
+        "lichgate",
+        "mirefloor",
+        "cardfile",
+        "shelfrow",
+        "readingroom",
+        "inkwell",
+        "stacksump",
+        "golemwallow"
+      ],
+      "opened": [
+        "mirefloor|readingroom",
+        "readingroom|stacksump",
+        "golemwallow|stacksump"
+      ],
+      "keyPhys": [
+        {
+          "rid": "mirefloor",
+          "label": "Small key",
+          "type": "small",
+          "x": 7,
+          "z": -70,
+          "y": 2.54,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "readingroom",
+          "label": "Small key",
+          "type": "small",
+          "x": -6,
+          "z": -134,
+          "y": 1.34,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "stacksump",
+          "label": "Boss key",
+          "type": "boss",
+          "x": 0,
+          "z": -197,
+          "y": 2.54,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        }
+      ],
+      "keysByRoom": {
+        "mirefloor": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": 7,
+            "z": -70
+          }
+        ],
+        "readingroom": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": -6,
+            "z": -134
+          }
+        ],
+        "stacksump": [
+          {
+            "label": "Boss key",
+            "type": "boss",
+            "x": 0,
+            "z": -197
+          }
+        ]
+      },
+      "events": [
+        {
+          "kind": "start",
+          "room": "lichgate"
+        },
+        {
+          "kind": "enter",
+          "room": "mirefloor",
+          "via": "lichgate",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "mirefloor",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "cardfile",
+          "via": "mirefloor",
+          "free": true
+        },
+        {
+          "kind": "enter",
+          "room": "shelfrow",
+          "via": "mirefloor",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "mirefloor",
+          "to": "readingroom",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "readingroom",
+          "via": "mirefloor",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "readingroom",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "inkwell",
+          "via": "readingroom",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "readingroom",
+          "to": "stacksump",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "stacksump",
+          "via": "readingroom",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "stacksump",
+          "label": "Boss key",
+          "type": "boss",
+          "small": 0,
+          "boss": true
+        },
+        {
+          "kind": "unlock",
+          "from": "stacksump",
+          "to": "golemwallow",
+          "cost": "boss"
+        },
+        {
+          "kind": "enter",
+          "room": "golemwallow",
+          "via": "stacksump",
+          "free": true
+        }
+      ],
+      "issues": []
+    },
+    {
+      "id": "beat-12-pyre",
+      "start": "scoriagate",
+      "freeComp": [
+        "scoriagate",
+        "pyreterrace",
+        "slagworks",
+        "emberrun"
+      ],
+      "freeSmallKeys": 1,
+      "freeBossKeys": 0,
+      "lockedExits": [
+        {
+          "from": "pyreterrace",
+          "to": "ventfield"
+        }
+      ],
+      "lockEdges": [
+        "pyreterrace|ventfield",
+        "ashgallery|ventfield"
+      ],
+      "bossEdges": [
+        "ashgallery|caldera"
+      ],
+      "reached": [
+        "scoriagate",
+        "pyreterrace",
+        "slagworks",
+        "emberrun",
+        "ventfield",
+        "cinderpocket",
+        "ashgallery",
+        "caldera"
+      ],
+      "opened": [
+        "pyreterrace|ventfield",
+        "ashgallery|ventfield",
+        "ashgallery|caldera"
+      ],
+      "keyPhys": [
+        {
+          "rid": "pyreterrace",
+          "label": "Small key",
+          "type": "small",
+          "x": 9,
+          "z": -55,
+          "y": 1.3,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "ventfield",
+          "label": "Small key",
+          "type": "small",
+          "x": -6,
+          "z": -122,
+          "y": 1.3,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "ashgallery",
+          "label": "Boss key",
+          "type": "boss",
+          "x": 0,
+          "z": -197,
+          "y": 1.5,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "S:ventfield:locked",
+          "ok": true
+        }
+      ],
+      "keysByRoom": {
+        "pyreterrace": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": 9,
+            "z": -55
+          }
+        ],
+        "ventfield": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": -6,
+            "z": -122
+          }
+        ],
+        "ashgallery": [
+          {
+            "label": "Boss key",
+            "type": "boss",
+            "x": 0,
+            "z": -197
+          }
+        ]
+      },
+      "events": [
+        {
+          "kind": "start",
+          "room": "scoriagate"
+        },
+        {
+          "kind": "enter",
+          "room": "pyreterrace",
+          "via": "scoriagate",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "pyreterrace",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "slagworks",
+          "via": "pyreterrace",
+          "free": true
+        },
+        {
+          "kind": "enter",
+          "room": "emberrun",
+          "via": "pyreterrace",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "pyreterrace",
+          "to": "ventfield",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "ventfield",
+          "via": "pyreterrace",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "ventfield",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "cinderpocket",
+          "via": "ventfield",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "ventfield",
+          "to": "ashgallery",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "ashgallery",
+          "via": "ventfield",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "ashgallery",
+          "label": "Boss key",
+          "type": "boss",
+          "small": 0,
+          "boss": true
+        },
+        {
+          "kind": "unlock",
+          "from": "ashgallery",
+          "to": "caldera",
+          "cost": "boss"
+        },
+        {
+          "kind": "enter",
+          "room": "caldera",
+          "via": "ashgallery",
+          "free": true
+        }
+      ],
+      "issues": []
+    },
+    {
+      "id": "beat-13-gumoi",
+      "start": "towergate",
+      "freeComp": [
+        "towergate",
+        "towerfoot",
+        "flickerhall",
+        "stairworks"
+      ],
+      "freeSmallKeys": 1,
+      "freeBossKeys": 0,
+      "lockedExits": [
+        {
+          "from": "towerfoot",
+          "to": "archivegaunt"
+        }
+      ],
+      "lockEdges": [
+        "archivegaunt|towerfoot",
+        "archivegaunt|indexspire"
+      ],
+      "bossEdges": [
+        "indexspire|witnesscrown"
+      ],
+      "reached": [
+        "towergate",
+        "towerfoot",
+        "flickerhall",
+        "stairworks",
+        "archivegaunt",
+        "nullcell",
+        "indexspire",
+        "witnesscrown"
+      ],
+      "opened": [
+        "archivegaunt|towerfoot",
+        "archivegaunt|indexspire",
+        "indexspire|witnesscrown"
+      ],
+      "keyPhys": [
+        {
+          "rid": "towerfoot",
+          "label": "Small key",
+          "type": "small",
+          "x": -8,
+          "z": -72,
+          "y": 1.24,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "archivegaunt",
+          "label": "Small key",
+          "type": "small",
+          "x": -6,
+          "z": -134,
+          "y": 1.24,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "indexspire",
+          "label": "Boss key",
+          "type": "boss",
+          "x": 0,
+          "z": -195,
+          "y": 6.44,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        }
+      ],
+      "keysByRoom": {
+        "towerfoot": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": -8,
+            "z": -72
+          }
+        ],
+        "archivegaunt": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": -6,
+            "z": -134
+          }
+        ],
+        "indexspire": [
+          {
+            "label": "Boss key",
+            "type": "boss",
+            "x": 0,
+            "z": -195
+          }
+        ]
+      },
+      "events": [
+        {
+          "kind": "start",
+          "room": "towergate"
+        },
+        {
+          "kind": "enter",
+          "room": "towerfoot",
+          "via": "towergate",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "towerfoot",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "flickerhall",
+          "via": "towerfoot",
+          "free": true
+        },
+        {
+          "kind": "enter",
+          "room": "stairworks",
+          "via": "towerfoot",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "towerfoot",
+          "to": "archivegaunt",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "archivegaunt",
+          "via": "towerfoot",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "archivegaunt",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "enter",
+          "room": "nullcell",
+          "via": "archivegaunt",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "archivegaunt",
+          "to": "indexspire",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "indexspire",
+          "via": "archivegaunt",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "indexspire",
+          "label": "Boss key",
+          "type": "boss",
+          "small": 0,
+          "boss": true
+        },
+        {
+          "kind": "unlock",
+          "from": "indexspire",
+          "to": "witnesscrown",
+          "cost": "boss"
+        },
+        {
+          "kind": "enter",
+          "room": "witnesscrown",
+          "via": "indexspire",
+          "free": true
+        }
+      ],
+      "issues": []
+    },
+    {
+      "id": "beat-14-leviathan",
+      "start": "threshold",
+      "freeComp": [
+        "threshold",
+        "wraithway"
+      ],
+      "freeSmallKeys": 1,
+      "freeBossKeys": 0,
+      "lockedExits": [
+        {
+          "from": "wraithway",
+          "to": "recursion"
+        }
+      ],
+      "lockEdges": [
+        "recursion|wraithway"
+      ],
+      "bossEdges": [
+        "corechamber|coregate"
+      ],
+      "reached": [
+        "threshold",
+        "wraithway",
+        "recursion",
+        "coregate",
+        "foldpocket",
+        "corechamber"
+      ],
+      "opened": [
+        "recursion|wraithway",
+        "corechamber|coregate"
+      ],
+      "keyPhys": [
+        {
+          "rid": "wraithway",
+          "label": "Small key",
+          "type": "small",
+          "x": 8,
+          "z": -72,
+          "y": 1.11,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        },
+        {
+          "rid": "coregate",
+          "label": "Boss key",
+          "type": "boss",
+          "x": 0,
+          "z": -197,
+          "y": 1.31,
+          "bfsOk": true,
+          "approach": 0,
+          "from": "spawn",
+          "ok": true
+        }
+      ],
+      "keysByRoom": {
+        "wraithway": [
+          {
+            "label": "Small key",
+            "type": "small",
+            "x": 8,
+            "z": -72
+          }
+        ],
+        "coregate": [
+          {
+            "label": "Boss key",
+            "type": "boss",
+            "x": 0,
+            "z": -197
+          }
+        ]
+      },
+      "events": [
+        {
+          "kind": "start",
+          "room": "threshold"
+        },
+        {
+          "kind": "enter",
+          "room": "wraithway",
+          "via": "threshold",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "wraithway",
+          "label": "Small key",
+          "type": "small",
+          "small": 1,
+          "boss": false
+        },
+        {
+          "kind": "unlock",
+          "from": "wraithway",
+          "to": "recursion",
+          "cost": "small",
+          "smallLeft": 0
+        },
+        {
+          "kind": "enter",
+          "room": "recursion",
+          "via": "wraithway",
+          "free": true
+        },
+        {
+          "kind": "enter",
+          "room": "coregate",
+          "via": "recursion",
+          "free": true
+        },
+        {
+          "kind": "key",
+          "room": "coregate",
+          "label": "Boss key",
+          "type": "boss",
+          "small": 0,
+          "boss": true
+        },
+        {
+          "kind": "enter",
+          "room": "foldpocket",
+          "via": "recursion",
+          "free": true
+        },
+        {
+          "kind": "unlock",
+          "from": "coregate",
+          "to": "corechamber",
+          "cost": "boss"
+        },
+        {
+          "kind": "enter",
+          "room": "corechamber",
+          "via": "coregate",
+          "free": true
+        }
+      ],
+      "issues": []
+    }
+  ],
+  "issues": [],
+  "beat01Walk": {
+    "smallKeysAfter": 0,
+    "smallTaken": true,
+    "hasBoss": true,
+    "bossTaken": true,
+    "doorOpen": false,
+    "keyPicks": [
+      {
+        "label": "Small key",
+        "taken": true,
+        "x": 8,
+        "y": 1.07,
+        "z": -60.5
+      },
+      {
+        "label": "Boss key",
+        "taken": true,
+        "x": -64,
+        "y": 1.27,
+        "z": -128
+      }
+    ],
+    "log": [
+      {
+        "step": "tomb-spawn",
+        "x": 0,
+        "z": -4,
+        "dist": 4
+      },
+      {
+        "step": "seek-0,-56",
+        "x": 0,
+        "z": -56,
+        "dist": 0
+      },
+      {
+        "step": "seek-6,-56",
+        "x": 5.78,
+        "z": -56,
+        "dist": 0.22
+      },
+      {
+        "step": "seek-8,-58",
+        "x": 7.82,
+        "z": -57.84,
+        "dist": 0.24
+      },
+      {
+        "step": "seek-8,-60.5",
+        "x": 7.99,
+        "z": -60.31,
+        "dist": 0.19
+      },
+      {
+        "step": "after-small",
+        "smallKeys": 1,
+        "smallTaken": true,
+        "pos": {
+          "x": 7.99,
+          "z": -60.31
+        }
+      },
+      {
+        "step": "predecessor",
+        "smallLeft": 0
+      },
+      {
+        "step": "secret-entry",
+        "x": -63.75,
+        "z": -128,
+        "dist": 0.25
+      },
+      {
+        "step": "after-boss",
+        "hasBoss": true,
+        "bossTaken": true,
+        "pos": {
+          "x": -63.75,
+          "z": -128
+        }
+      }
+    ],
+    "ok": true
+  },
+  "beat01Natural": {
+    "start": {
+      "x": 0,
+      "z": 3
+    },
+    "key": {
+      "x": 8,
+      "z": -60.5
+    },
+    "bfsReachedKey": false,
+    "bfsExpanded": 1,
+    "walkPos": {
+      "x": 7.85,
+      "z": -60.19
+    },
+    "distToKey": 0.35,
+    "smallTaken": true,
+    "smallKeys": 0,
+    "naturalOk": true
+  },
+  "finishedAt": "2026-07-20T16:50:57.400Z",
+  "pass": true
+}

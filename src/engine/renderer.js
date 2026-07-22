@@ -42,7 +42,8 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 // main.js resets it manually once per frame instead (see animate()).
 renderer.info.autoReset = false;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// r182 folded the soft kernel into PCFShadowMap and deprecated the old name.
+renderer.shadowMap.type = THREE.PCFShadowMap;
 // r152+ renamed outputEncoding/sRGBEncoding to outputColorSpace/SRGBColorSpace.
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;

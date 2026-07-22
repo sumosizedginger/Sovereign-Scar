@@ -6,8 +6,8 @@
 //
 // Layout (6 rooms):            [warden]        boss door (boss key)
 //                              [antechamber]
-//              [secret] —open— [predecessor]   ← altar, story
-//                              [corridor]      locked door N (small key here)
+//              [secret] —open— [predecessor]   ← altar, story; secret has boss key
+//                              [corridor]      small key in first east gap; locked N
 //                              [tomb]          start; S exit → overworld
 
 import { createDungeon } from '../world/room-graph.js';
@@ -25,6 +25,17 @@ export const BEAT01_DEF = {
     start: 'tomb',
     prebake: true, // 6 small rooms bake in milliseconds; boss exists at load
     banner: 'Escape the Crypt. Salvage the Anchor Link from the Warden.',
+    // Z6 — this dungeon's one idea, and the four rooms that carry it:
+    // introduce it safely, complicate it, fuse it with combat, then examine it.
+    theme: {
+        id: 'telegraph',
+        name: 'Read the Wind-Up',
+        hint: "Everything here tells you before it hits. Watch the ring — hold RMB to guard, tap it to parry.",
+        teach: 'corridor',
+        develop: 'predecessor',
+        combine: 'antechamber',
+        test: 'warden',
+    },
     keys: [
         { room: 'corridor', type: 'small' },
         { room: 'secret', type: 'boss' },
@@ -42,6 +53,15 @@ export const BEAT01_DEF = {
                 // The awakening slab + a flared console (bible: the event)
                 h.fillBox(map, -1, 1, 1, 1, 2, 4, CRUST_COLORS.slateDark);
                 stampMap(map, buildDeadConsole(4, -3), 0, 1, 0);
+                // Gold-leaf seams on the north wall, matching the predecessor
+                // chamber and the Warden's arena. Fiction aside, this room sat
+                // ~0.2 above the crust luminance floor, which made the
+                // certification gate flake under software GL — pale accent
+                // geometry is the documented remedy, because lighting changes
+                // would fight the mood preset instead.
+                h.fillBox(map, -5, -5, 1, 3, -7, -7, CRUST_COLORS.goldLeaf);
+                h.fillBox(map, 5, 5, 1, 3, -7, -7, CRUST_COLORS.goldLeaf);
+                h.fillBox(map, -2, 2, 1, 1, -6, -6, CRUST_COLORS.goldLeaf);
             },
             doors: [
                 { to: 'corridor', side: 'N', at: 0, type: 'open' },
@@ -55,11 +75,11 @@ export const BEAT01_DEF = {
             spawn: { x: 0, z: 8 },
             build(map, h) {
                 // Debris corridor: a snaking passage — the swept-AABB tutorial.
-                // Walls force S→N slaloming; a nook on the east holds the key.
+                // Walls force S→N slaloming; the small key sits in the first
+                // east gap so it is found before the locked north door.
                 h.fillBox(map, -10, 4, 1, 3, 5, 6, CRUST_COLORS.slate);      // wall, gap E
                 h.fillBox(map, -4, 10, 1, 3, 0, 1, CRUST_COLORS.slate);      // wall, gap W
                 h.fillBox(map, -10, 4, 1, 3, -5, -4, CRUST_COLORS.slate);    // wall, gap E
-                h.fillBox(map, 7, 8, 1, 2, -8, -7, CRUST_COLORS.iron);       // key nook rubble
                 h.fillBox(map, -2, -1, 1, 2, 3, 3, CRUST_COLORS.rust);       // debris
                 h.fillBox(map, 2, 3, 1, 1, -2, -2, CRUST_COLORS.rust);
             },
@@ -71,8 +91,9 @@ export const BEAT01_DEF = {
                 { to: 'predecessor', side: 'N', at: 0, type: 'locked' },
             ],
             onBake(level, origin) {
+                // Clear floor in the first east gap (south of the locked door).
                 addKeyPickup(level, 'beat-01-crypt', 'corridor-key',
-                    { x: origin.x + 8, y: 1.2, z: origin.z - 8.5 }, 'small');
+                    { x: origin.x + 8, y: 1.2, z: origin.z + 3.5 }, 'small');
             },
         },
         predecessor: {
@@ -99,6 +120,20 @@ export const BEAT01_DEF = {
             ],
             onBake(level, origin, ctx) {
                 addAltar(level, ctx, { x: origin.x + 6, z: origin.z + 6 });
+                // Z7: the campaign's first Scar Suture, tucked behind the dead
+                // console in the very first dungeon. A player who never learns
+                // in Beat 01 that looking around pays will not start looking in
+                // Beat 09 — the exploration loop has to be baited early.
+                level.addPickup({ x: origin.x - 7, y: 1.2, z: origin.z - 7 }, {
+                    color: 0xff7a90,
+                    label: 'Scar Suture',
+                    reward: { type: 'suture' },
+                    onPickup(game) {
+                        if (game.collectSuture?.('b01-console')) {
+                            game.hud?.toast?.('Scar Suture recovered. Four will bind a heart.', 2800);
+                        }
+                    },
+                });
             },
             onEnter(game) {
                 if (!this._storyShown) {
@@ -115,19 +150,28 @@ export const BEAT01_DEF = {
             half: 5,
             wallH: 4,
             spawn: { x: 0, z: 0 },
-            build(map, h) {
+            // Pedestal is climbable platform geometry (no XZ solids). Putting it
+            // in build() made an infinite wall and the boss key was uncollectable.
+            platforms(map, h) {
                 h.fillBox(map, -1, 1, 1, 1, -1, 1, CRUST_COLORS.goldLeaf);
             },
             doors: [{ to: 'predecessor', side: 'E', at: 0, type: 'open' }],
             onBake(level, origin) {
+                // Sit ON the pedestal (its top is y=2), not inside it — at y=1.4
+                // the key was embedded in the gold block and invisible.
                 addKeyPickup(level, 'beat-01-crypt', 'secret-boss-key',
-                    { x: origin.x, y: 1.4, z: origin.z }, 'boss');
+                    { x: origin.x, y: 2.4, z: origin.z }, 'boss');
                 level.addPickup({ x: origin.x - 2, y: 1.2, z: origin.z - 2 }, {
-                    color: 0x7fe0ff,
-                    label: 'Cache shards',
+                    color: 0xd4a84b,
+                    label: 'Predecessor\u2019s record',
+                    reward: { type: 'lore' },
                     onPickup(game) {
-                        game.player.inventory.addShards(15);
-                        game.hud?.toast?.('Hidden cache — 15 shards');
+                        if (!game.player.inventory.getFlag('lore:crypt-record')) {
+                            game.player.inventory.setFlag('lore:crypt-record', true);
+                            game.hud?.story?.queue?.([
+                                { speaker: 'PREDECESSOR', text: "I left this where I fell, not where I meant to. Everything after here is the same mistake at a larger scale." },
+                            ]);
+                        }
                     },
                 });
             },

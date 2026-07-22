@@ -47,6 +47,8 @@ export async function run(t) {
             { timeout: 30000 }
         );
         await page.mouse.click(400, 300);
+        await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('Enter');
         await sleep(1000);
 
         const dungeons = await page.evaluate(

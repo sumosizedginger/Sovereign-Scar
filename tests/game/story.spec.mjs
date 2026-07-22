@@ -43,6 +43,16 @@ export function run(t) {
     t.ok('replace clears prior', panel.current?.text === 'new' && panel.queue_.length === 0, JSON.stringify(panel.current));
     panel.clear();
     t.ok('clear empties', panel.current == null && panel.queue_.length === 0);
+    panel.queue({ id: 'flavor-1', speaker: 'GUMOI', text: 'flavor', hold: 5, priority: 'flavor' });
+    panel.queue({ id: 'critical-1', speaker: 'SYSTEM', text: 'critical', hold: 5, priority: 'critical' });
+    t.ok('critical guidance preempts flavor', panel.current?.text === 'critical');
+    panel.queue({ id: 'critical-1', speaker: 'SYSTEM', text: 'duplicate', priority: 'critical' });
+    t.ok('stable story IDs do not repeat', !panel.queue_.some((line) => line.text === 'duplicate'));
+    panel.queue({ id: 'flavor-1', speaker: 'GUMOI', text: 'flavor', hold: 5, priority: 'flavor' });
+    panel.queue({ id: 'critical-1', speaker: 'SYSTEM', text: 'critical', hold: 5, priority: 'critical' });
+    t.ok('critical guidance preempts flavor', panel.current?.text === 'critical');
+    panel.queue({ id: 'critical-1', speaker: 'SYSTEM', text: 'duplicate', priority: 'critical' });
+    t.ok('stable story IDs do not repeat', !panel.queue_.some((line) => line.text === 'duplicate'));
     panel.dispose();
     t.ok('dispose ok', true);
 }

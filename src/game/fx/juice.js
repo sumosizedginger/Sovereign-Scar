@@ -118,7 +118,9 @@ class Juice {
                 if (u && this._vignetteBase != null) u.value = this._vignetteBase;
                 this._vignetteBase = null;
             } else if (u && this._vignetteBase != null) {
-                const depth = this.reduceFlash ? 0.27 : 0.55;
+                // Keep the damage pulse subtle — a heavy vignette dips made
+                // mid-combat scenes hard to read (especially on Abyss floors).
+                const depth = this.reduceFlash ? 0.12 : 0.22;
                 u.value = this._vignetteBase - this.damageFlash * depth;
             }
         }

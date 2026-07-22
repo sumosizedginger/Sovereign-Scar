@@ -2,6 +2,7 @@
 
 import { WORLD7 } from '../../src/game/overworld/world7.js';
 import { LEVELS } from '../../src/game/levels/registry.js';
+import { nextScreenToward } from '../../src/game/overworld/overworld.js';
 
 const OPPOSITE = { N: 'S', S: 'N', E: 'W', W: 'E' };
 
@@ -10,6 +11,16 @@ export function run(t) {
     const ids = Object.keys(screens);
     t.ok('49 screens', ids.length === 49, String(ids.length));
     t.ok('start exists', !!screens[WORLD7.start]);
+    for (const destination of ['r2c2', 'r1c1', 'r3c1', 'r0c3', 'r4c3', 'r4c0',
+        'r5c0', 'r6c2', 'r6c4', 'r4c5', 'r5c6', 'r2c6', 'r0c5', 'r0c6']) {
+        const next = nextScreenToward(screens, WORLD7.start, destination);
+        t.ok(`Thread route reaches ${destination}`, destination === WORLD7.start || !!next, String(next));
+    }
+    const destinations = ['r2c2', 'r1c1', 'r3c1', 'r0c3', 'r4c3', 'r4c0',
+        'r5c0', 'r6c2', 'r6c4', 'r4c5', 'r5c6', 'r2c6', 'r0c5', 'r0c6'];
+    t.ok('every overworld screen routes to every Thread destination',
+        ids.every((start) => destinations.every((destination) =>
+            start === destination || !!nextScreenToward(screens, start, destination))));
 
     // Grid occupancy: every cell of the 7×7 filled exactly once
     const cells = new Set(ids.map((id) => screens[id].grid.join(',')));

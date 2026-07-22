@@ -32,6 +32,7 @@ export class StoryPanel {
         this.timer = 0;
         this.defaultHold = 3.2;
         this.visible = false;
+        this.shownIds_ = new Set();
     }
 
     /** Drop current + pending lines (used on level load). */
@@ -45,20 +46,32 @@ export class StoryPanel {
     }
 
     /**
-     * @param {Array<{speaker?:string, text:string, hold?:number}>|string[]} lines
-     * @param {{replace?:boolean}} [opts] replace=true clears prior queue first
+     * @param {Array<{speaker?:string, text:string, hold?:number,id?:string,priority?:string}>|string[]} lines
+     * @param {{replace?:boolean,priority?:string}} [opts]
      */
     queue(lines, opts = {}) {
         if (!lines) return;
         if (opts.replace) this.clear();
         const arr = Array.isArray(lines) ? lines : [lines];
         for (const line of arr) {
-            if (typeof line === 'string') this.queue_.push({ speaker: '', text: line, hold: this.defaultHold });
-            else this.queue_.push({
+            const item = typeof line === 'string'
+                ? { speaker: '', text: line, hold: this.defaultHold }
+                : {
                 speaker: line.speaker || '',
                 text: line.text || '',
                 hold: line.hold != null ? line.hold : this.defaultHold,
-            });
+                id: line.id || null,
+                priority: line.priority || opts.priority || 'context',
+            };
+            if (item.id && this.shownIds_.has(item.id)) continue;
+            if (item.id) this.shownIds_.add(item.id);
+            this.queue_.push(item);
+        }
+        this.queue_.sort((a, b) => priorityValue(b.priority) - priorityValue(a.priority));
+        if (this.current && priorityValue(this.queue_[0]?.priority) > priorityValue(this.current.priority)) {
+            this.queue_.push(this.current);
+            this.current = null;
+            this.queue_.sort((a, b) => priorityValue(b.priority) - priorityValue(a.priority));
         }
         if (!this.current) this._next();
     }
@@ -97,6 +110,12 @@ export class StoryPanel {
     dispose() {
         this.el.remove();
     }
+}
+
+function priorityValue(priority) {
+    if (priority === 'critical') return 3;
+    if (priority === 'context') return 2;
+    return 1;
 }
 
 function escapeHtml(s) {

@@ -2,6 +2,7 @@
 
 import { hitboxCheck } from '../../combat/hitbox.js';
 import { juice } from '../fx/juice.js';
+import { gsfx } from '../audio/sfx-bank.js';
 
 /**
  * Sweep a move against many defenders; returns hit list.
@@ -27,11 +28,36 @@ export function combatSweep(attacker, defenders, move) {
  * Apply damage + optional knockback to a defender in place.
  * @returns {{ killed: boolean, damage: number }}
  */
+/**
+ * Z5: is `attacker` standing inside `defender`'s frontal plate arc?
+ * Exported so the bestiary spec can pin the geometry without a live scene.
+ */
+export function inFrontArc(defender, attacker, halfAngle = Math.PI / 2.4) {
+    const fv = defender?.state?.facingVec;
+    if (!fv || !attacker?.root) return false;
+    const ox = attacker.root.position.x - defender.root.position.x;
+    const oz = attacker.root.position.z - defender.root.position.z;
+    const len = Math.hypot(ox, oz);
+    if (len < 1e-6) return true;
+    return ((ox / len) * fv.x + (oz / len) * fv.z) >= Math.cos(halfAngle);
+}
+
 export function applyHit(defender, move, attacker) {
     if (!defender) return { killed: false, damage: 0 };
     if (defender.canHit === false || defender.shielded) {
         if (defender.onBlocked) defender.onBlocked(attacker, move);
         return { killed: false, damage: 0, blocked: true };
+    }
+    // Z5 — directional armour. A plate on the front is not a plate on the
+    // back, and no amount of damage gets through it: the answers are to flank
+    // (which is what lock-on strafing is FOR) or to parry the swing, which
+    // drops the plate for the length of the stagger. Ray weapons are melee's
+    // equal here on purpose — the lesson is positioning, not loadout.
+    if (defender.armorUp && inFrontArc(defender, attacker)) {
+        if (defender.onBlocked) defender.onBlocked(attacker, move);
+        gsfx.hitArmor();
+        juice.addTrauma(0.08);
+        return { killed: false, damage: 0, blocked: true, armored: true };
     }
     // C3: Edge upgrade — attacker-side damage multiplier.
     // `vulnerableMult` is the defender side: a boss recovering from a committed
@@ -47,6 +73,10 @@ export function applyHit(defender, move, attacker) {
         return { killed: false, damage: 0, blocked: true };
     }
     defender.hp -= dmg;
+    if (defender.hp > 0) attacker?.onCombatHit?.(defender, dmg);
+    // Four outcomes, four sounds: blocked, armoured, wounded, killed. The
+    // player should be able to tell which one happened with their eyes shut.
+    if (defender.hp > 0) gsfx.hitFlesh(); else gsfx.enemyDie();
 
     // Juice: connect crunch + white flash on the struck target
     juice.hitstop(0.05);

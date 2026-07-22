@@ -13,13 +13,14 @@ Built on **[My-Engine](https://github.com/sumosizedginger/My-Engine) 0.2.0** (pi
 
 ```bash
 npm run serve          # http://127.0.0.1:8799/
-npm test               # unit + browser E2E (1006 assertions)
+npm test               # unit + browser E2E (2478 assertions)
 npm run test:unit      # unit only
 ```
 
-Open the URL, click once to unlock audio, then explore with WASD. Press
-**Enter** to advance story lines, **Tab** for the map. A new game begins on
-the Scarred Crust — the Crypt Breach lies north.
+Open the URL, click once to unlock audio, then explore with WASD. **Right mouse**
+guards (tap it to parry), **T** locks on. Press **Enter** to advance story lines,
+**Tab** for the map. A new game begins on the Scarred Crust — the Crypt Breach
+lies north.
 
 ## What's in this build
 
@@ -31,6 +32,18 @@ the Scarred Crust — the Crypt Breach lies north.
   Reconstitution Altars, and per-dungeon signature systems (gears, sand,
   multi-Y towers, grapple chasms, phantom walls, meltable ice, sludge pools,
   magma vents, flicker gauntlets)
+- **A full combat verb set** — telegraphed enemy attacks answered by a **guard
+  and a 0.18 s parry**, plus **lock-on** so you can circle what you are
+  fighting instead of only backing away from it
+- **Seven enemy kinds that ask different questions** — the bulwark's front
+  plate must be flanked or parried, the mote must be answered at range, the
+  lancer's lunge must be dodged sideways, the brood splits when it dies. No two
+  dungeons share a roster
+- **A measured difficulty curve** — enemy and boss HP scale with the beat they
+  spawn in, so an enemy still lives long enough for its behaviour to happen
+  after your weapon damage has tripled
+- **A stated idea per dungeon** — each of the fourteen declares a theme and
+  lays out rooms that introduce → develop → combine → test it
 - **Item-gated traversal** — Magnetic Grapple, Phase Boot, Tectonic Wedge,
   and Light Caster each open blockers across the overworld and dungeons
 - **14 unique multi-phase bosses** (bible roster): Warden, Tri-Compiler,
@@ -42,8 +55,17 @@ the Scarred Crust — the Crypt Breach lies north.
   migration
 - **Dev mode** (`?dev=1` / Ctrl+Shift+D) — god mode, boss controls, teleport
   panel, perf/luminance overlays, hitbox geometry
-- **Crust / Abyss** mood post stack + **layered music beds**
-  (crust/abyss/boss/leviathan)
+- **A generated score** — four composed pieces (real keys, modes, chord
+  progressions and melodies) with twenty-two per-dungeon and per-region
+  variations, scheduled sample-accurately on the audio clock and layered
+  adaptively so the music thickens when a fight starts rather than switching.
+  **Nothing drones underneath it** — chords are struck on a rhythm rather than
+  held, and a browser spec renders the score offline and fails if the signal
+  does not fall to near-silence between the notes
+- **A sound bank that says what happened** — per-weapon swings, four distinct
+  combat outcomes, a parry that sounds nothing like a failed block, and audio
+  on doors, locks, the grapple, lock-on, menus and low health
+- **Crust / Abyss** mood post stack
 
 Design sources (parent folder):
 
@@ -51,20 +73,24 @@ Design sources (parent folder):
 - `../Sovereign-Scar-Completion-Plan.md`
 - `../Sovereign-Scar-Builder-Guide.md`
 
-Implementation log: [BUILD_LOG.md](BUILD_LOG.md) · Controls: [docs/CONTROLS.md](docs/CONTROLS.md) · Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+Implementation log: [BUILD_LOG.md](BUILD_LOG.md) · Controls: [docs/CONTROLS.md](docs/CONTROLS.md) · Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Design audit: [ZeldaLevel.md](ZeldaLevel.md) · Rendering roadmap: [docs/VISUAL_PLAN.md](docs/VISUAL_PLAN.md)
 
 ## Project layout
 
 ```
 src/game/           product code
-  world/            room graph, keys, blockers, level builder
+  world/            room graph, keys, blockers, level builder, threat curve
   overworld/        7×7 world + screens
+  audio/            score engine (theory, instruments, tracks) + sfx bank
+  combat/           sweeper, weapons, grapple, guard/parry, lock-on
+  characters/       actor rigs, animator, pose library, archetypes
   bosses/           framework + 14 bosses
-  levels/           overworld + sandbox + 14 dungeon defs
+  levels/           overworld + sandbox + 14 dungeon defs + dungeon kits
   dev/              dev mode (gate, panel, overlays, geometry)
-  ui/               HUD, story, menus, map screen, ending
-src/audio/          synth, drones, music beds
-tests/              unit + browser E2E (world, bosses, campaign, visual sanity)
+  ui/               HUD, story, menus, map screen, ending, coach hints
+src/audio/          frozen kit synth primitives (the game drives no drones)
+tests/              unit + browser E2E (world, bosses, campaign, visual sanity, audio render)
+tests/qa/           measurement probes (time-to-kill, difficulty curve, luminance, audio envelope)
 docs/media/         gate screenshots + certification captures
 ```
 
