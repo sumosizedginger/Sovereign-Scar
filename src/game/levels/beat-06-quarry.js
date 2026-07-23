@@ -44,7 +44,7 @@ export const BEAT06_DEF = {
     mood: 'abyss',
     // Per-level luminance trim into the Abyss certification band [35,75]
     // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
-    lightTune: { ambient: 2.4 },
+    lightTune: { ambient: 1.8, key: 1.45 },
     start: 'pitgate',
     prebake: true,
     banner: 'The quarry bleeds gold. Something larger molts in the dark.',

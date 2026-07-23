@@ -29,6 +29,9 @@ import { refreshScoreVolume, setIntensity as setMusicIntensity } from './audio/s
 import { gsfx } from './audio/sfx-bank.js';
 import { createFlickerPass, updateFlickerPass } from './fx/flicker-shader-pass.js';
 import { createWrapPass, updateWrapPass } from './render/wrap-shader-pass.js';
+import { frameLuminanceStats } from './render/luminance.js';
+import { ContactShadows } from './fx/contact-shadow.js';
+import { isGlowing, isSeeThrough } from './render/shadow-roles.js';
 import { LEVELS, DEV_LEVELS, getLevel, nextLevelId, prevLevelId } from './levels/registry.js';
 import {
     loadSovereignProgress,
@@ -179,6 +182,7 @@ applyVolumes();
 const player = new Player(scene, collisionWorld, () => false);
 const soulMotes = new SoulMotes(scene);
 const heartDrops = new HeartDropManager(scene);
+const contactShadows = new ContactShadows(scene);
 let deathEcho = null;
 let anchorThread = null;
 let witnessScore = null;
@@ -350,6 +354,7 @@ function unloadLevel() {
         game.level = null;
     }
     heartDrops.clear(); // loose hearts must not survive into the next level
+    contactShadows.clear(); // ditto — a disc outlives its actor by a frame otherwise
     collisionWorld.clear();
     // Keep border-safe empty world
 }
@@ -1172,6 +1177,27 @@ function frame() {
         // Hearts from slain enemies — the only in-run way to recover HP
         heartDrops.update(sdt, enemies, player);
 
+        // Aim the sun at the room the player is standing in. Prefer the room
+        // origin — it is stable, so the frustum does not move at all while you
+        // walk around inside one room. Levels without a room graph (the
+        // overworld, the sandbox) fall back to the player, snapped to the same
+        // grid so it still cannot crawl.
+        {
+            const ro = game.level?.currentRoomOrigin?.();
+            const p = player.root.position;
+            mood.aimKeyLight(ro ? ro.x : p.x, ro ? ro.z : p.z);
+        }
+
+        // Contact shadows are reconciled from the live entity lists rather than
+        // attached at each spawn site, so a new enemy kind cannot ship without
+        // one by forgetting a call.
+        contactShadows.sync(sdt, {
+            player,
+            enemies,
+            pickups: game.level?.pickups || [],
+            boss: game.activeBoss || game.level?.boss || null,
+        });
+
         for (const [i, enemy] of enemies.entries()) {
             if (!enemy || enemy._witnessScored || enemy.state?.current !== 'DEAD') continue;
             enemy._witnessScored = true;
@@ -1487,17 +1513,25 @@ function frame() {
 
     // S6: luminance sampler — must run in the same task as the render (no
     // preserveDrawingBuffer, so readPixels elsewhere returns black).
+    //
+    // This returns a DISTRIBUTION, not just a mean. The mean alone cannot tell
+    // a well-lit room from a flat one — a strong key with deep shadows meters
+    // *lower* than the same room under a flat ambient wash, so for as long as
+    // the certification gate banded the mean, the cheapest way to pass it was
+    // to flatten the art. That is how ambient reached 1.7 against a key of 1.9.
+    // p90 − p10 is the statistic that can tell them apart: it is large when the
+    // frame has both lit and shadowed surfaces and collapses toward zero when
+    // everything sits at one value.
+    //
+    // Returns a DISTRIBUTION, not just a mean — see render/luminance.js for why
+    // the mean alone let the build get flat, and why the contrast is measured on
+    // a centre crop rather than the whole frame.
     if (window.__ssLumRequest) {
         const gl = renderer.getContext();
         const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
         const px = new Uint8Array(w * h * 4);
         gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
-        let sum = 0, n = 0;
-        for (let i = 0; i < px.length; i += 64) { // every 16th pixel
-            sum += 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
-            n++;
-        }
-        window.__ssLumRequest(sum / n);
+        window.__ssLumRequest(frameLuminanceStats(px, w, h, 16));
         window.__ssLumRequest = null;
     }
 }
@@ -1524,6 +1558,100 @@ window.__sovereignScar = {
     dev,
     mapScreen,
     heartDrops,
+    contactShadows,
+    /**
+     * Is world point (x, z) inside the key light's shadow frustum?
+     *
+     * The whole of ticket 4. The frustum is a ±30-unit box; rooms sit 64 apart.
+     * Before the sun started following the active room, this answered false for
+     * five of Beat 01's six rooms — and for the equivalent rooms in all
+     * fourteen dungeons. Returns null if there is no key light bound.
+     */
+    keyLightCovers(x, z, y = 1) {
+        const sun = mood._lights?.keySun;
+        if (!sun) return null;
+        sun.updateMatrixWorld();
+        sun.target.updateMatrixWorld();
+        const cam = sun.shadow.camera;
+        cam.updateMatrixWorld();
+        cam.updateProjectionMatrix();
+        const f = new THREE.Frustum().setFromProjectionMatrix(
+            new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse)
+        );
+        return f.containsPoint(new THREE.Vector3(x, y, z));
+    },
+    /** Where the key light is currently aimed, for diagnostics. */
+    keyLightAim() {
+        const sun = mood._lights?.keySun;
+        if (!sun) return null;
+        return {
+            target: { x: sun.target.position.x, z: sun.target.position.z },
+            light: { x: sun.position.x, y: sun.position.y, z: sun.position.z },
+            offset: {
+                x: +(sun.position.x - sun.target.position.x).toFixed(3),
+                y: +(sun.position.y - sun.target.position.y).toFixed(3),
+                z: +(sun.position.z - sun.target.position.z).toFixed(3),
+            },
+        };
+    },
+    /** Shadow participation of the live scene — what ticket 2 is measured on. */
+    shadowCensus() {
+        let meshes = 0, cast = 0, recv = 0, discs = 0;
+        // Meshes that opt out of shadows entirely, grouped by why. Most of the
+        // scene is not solid geometry — telegraph rings, smears, motes and
+        // glows are light, and light does not receive shadows.
+        const inert = {};
+        scene.traverse((o) => {
+            if (!o.isMesh) return;
+            if (o.name === 'contact-shadow') { discs++; return; }
+            meshes++;
+            if (o.castShadow) cast++;
+            if (o.receiveShadow) recv++;
+            if (!o.castShadow && !o.receiveShadow) {
+                const m = o.material;
+                const key = o.name || [
+                    o.geometry?.type || '?',
+                    m?.type || '?',
+                    m?.transparent ? 'transparent' : 'opaque',
+                    m?.emissiveIntensity > 0.5 ? 'emissive' : '',
+                    o.parent?.name ? `in:${o.parent.name}` : '',
+                ].filter(Boolean).join(' ');
+                inert[key] = (inert[key] || 0) + 1;
+            }
+        });
+        return { meshes, cast, recv, discs, inert };
+    },
+    /**
+     * The population ticket 2 is actually about: meshes that are opaque AND not
+     * emissive. Everything else in the scene is legitimately exempt —
+     * transparent meshes are motes, smears and telegraph rings, and emissive
+     * ones are glows, eyes and energy cores. Shading a light source with the
+     * room's shadows makes it read as a painted highlight, not as something lit
+     * from inside. Counting those in the denominator is how "151 meshes, 7
+     * receive" became the headline number: most of that 151 was never solid.
+     */
+    solidShadowCensus() {
+        let solid = 0, recv = 0;
+        const missing = [];
+        scene.traverse((o) => {
+            if (!o.isMesh) return;
+            // Exempt by intent, not by omission — each of these is named at its
+            // construction site precisely so it can be excluded here.
+            if (o.name === 'contact-shadow' || o.name === 'void-plane') return;
+            if (o.userData?.shadowExempt) return; // reason is stored on the mesh
+            const m = o.material;
+            if (isSeeThrough(m) || isGlowing(m)) return;
+            solid++;
+            if (o.receiveShadow) recv++;
+            else {
+                const p = o.getWorldPosition(new THREE.Vector3());
+                missing.push(o.name || `${o.geometry?.type} `
+                    + `#${o.material.color?.getHexString?.() || '?'} `
+                    + `y=${p.y.toFixed(1)} in:${o.parent?.name || o.parent?.type || '?'}`);
+            }
+        });
+        return { solid, recv, missing };
+    },
     save() {
         return saveSovereignProgress({
             currentBeat: game.levelId,
@@ -1547,8 +1675,13 @@ window.__sovereignScar = {
         if (b?.root) out.boss = box(b.root);
         return out;
     },
-    sampleLuminance() {
+    /** Full frame-luminance distribution: { mean, p10, p50, p90, spread }. */
+    sampleLuminanceStats() {
         return new Promise((resolve) => { window.__ssLumRequest = resolve; });
+    },
+    /** Mean frame luminance. Kept because probes and older specs call it. */
+    sampleLuminance() {
+        return this.sampleLuminanceStats().then((s) => s.mean);
     },
 };
 

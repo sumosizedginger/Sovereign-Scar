@@ -746,6 +746,7 @@ export class DummyTarget {
         );
         this.mesh.position.set(position.x, position.y != null ? position.y : 1, position.z);
         this.mesh.castShadow = true;
+        this.mesh.receiveShadow = true;
         scene.add(this.mesh);
         this.root = this.mesh;
         this.hitRadius = opts.radius || 0.55;

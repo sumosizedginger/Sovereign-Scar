@@ -22,6 +22,7 @@ import { DestructibleVoxelMesh } from '../world/destructible-voxel-mesh.js';
 import { fillBox } from '../../voxel/helpers.js';
 import { CRUST_COLORS } from '../assets/palettes.js';
 import { sfx } from '../../audio/synth.js';
+import { markShadowRoles } from '../render/shadow-roles.js';
 
 export class SandSpur extends BossBase {
     constructor(scene, collisionWorld, particles, path = [], opts = {}) {
@@ -62,6 +63,7 @@ export class SandSpur extends BossBase {
             mesh.scale.setScalar(3.1);
             mesh.position.set(pts[0].x, 0.6, pts[0].z);
             mesh.castShadow = true;
+            mesh.receiveShadow = true;
             scene.add(mesh);
             this.segments.push(mesh);
         }
@@ -80,6 +82,10 @@ export class SandSpur extends BossBase {
         weak.position.set(0, 0.42, 0);
         this.segments[0].add(weak);
         this.weak = weak;
+        // Segments past the head are added straight to the scene rather than
+        // under `root`, so BossBase's traverse never reaches them.
+        for (const seg of this.segments) markShadowRoles(seg);
+        markShadowRoles(this.mound);
 
         // The sand mound: the whole read while the Spur is underground.
         const mound = new THREE.Mesh(
@@ -87,6 +93,8 @@ export class SandSpur extends BossBase {
             new THREE.MeshStandardMaterial({ color: 0xc9b183, roughness: 1 })
         );
         mound.visible = false;
+        mound.castShadow = true;
+        mound.receiveShadow = true;
         scene.add(mound);
         this.mound = mound;
 

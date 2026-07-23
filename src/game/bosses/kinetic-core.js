@@ -19,6 +19,7 @@ export class KineticCore extends BossBase {
             })
         );
         mesh.castShadow = true;
+        mesh.receiveShadow = true;
         const weak = new THREE.Mesh(
             new THREE.SphereGeometry(0.32, 10, 10),
             new THREE.MeshStandardMaterial({

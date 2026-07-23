@@ -482,6 +482,56 @@ New specs `music` (309 assertions) and `game-feel-visuals`; probes
 `synth.channelGain(channel)`, so game-side persistent buses honour the same
 volume settings.
 
+### Session 13 — the renderer pass, all six tickets (suite 2575 → 2787)
+
+All six tickets of `docs/VISUAL_PLAN.md` implemented in order. The plan had been
+written for another agent to pick up cold; the owner asked for it to be built
+here instead. Three of its stated assumptions turned out to be wrong when
+measured, and each is recorded rather than quietly worked around.
+
+- **T1 — contrast floor.** `src/game/render/luminance.js` extracts the frame
+  statistic out of the render loop so it can be unit-tested; the gate now bands
+  centre-crop `p90 − p10` beside the mean. **The plan called for a full-frame
+  spread; the probe killed that before implementation** — full-frame `p10` is 0
+  in nearly every level because of the vignette, giving 58–160 across the
+  campaign and passing any floor. Centre crop gives 14–166 and discriminates.
+  Floor set at 12 as a ratchet, tightened to 13 after T5.
+  `tests/game/luminance.spec.mjs`: a flat grey frame passes the mean band and
+  fails the floor.
+- **T2 — shadow participation.** One rule in `render/shadow-roles.js`; anything
+  not receiving must record why in `userData.shadowExempt`. **7 of 151 receiving
+  → 100% of solid meshes, all 16 levels.** Held weapons cast again; pickups cast
+  for the first time; eleven bosses gained both via `BossBase`. Contact discs
+  (`fx/contact-shadow.js`) under every actor, boss and pickup, reconciled from
+  the live entity lists each frame. Draw calls unchanged.
+- **T3 — procedural PMREM.** 64×32 canvas gradient per mood, no new asset files.
+  Metalness ceiling 0.12 → 0.65 metal / 0.35 polished. **The plan predicted this
+  would move specular without moving albedo. It does not** — `scene.environment`
+  supplies diffuse irradiance too, so at 0.85 it acted as ambient: overworld
+  79 → 96 (out of band) and contrast fell campaign-wide. Landed conservative;
+  the rest of the budget went to T5.
+- **T4 — the sun follows the room.** `MoodController.aimKeyLight`, snapped to a
+  16-unit grid, moving light and target together so the direction is preserved.
+  **The plan recorded "5 of 6 rooms". The counterfactual found the overworld at
+  0 of 49 screens** — it sits at world x/z 512–896 and had never been counted.
+  `tests/shadow-frustum-e2e.spec.mjs` sweeps every room of every beat; reverting
+  the fix fails **31 of its 50** assertions.
+- **T5 — ambient/key rebalance.** Crust 1.70/1.90 → 0.78/2.55; Abyss 3.40/2.10 →
+  1.55/3.35; rim driven by mood for the first time (0.80 / 1.05). Per-level
+  `lightTune`s rebalanced from ambient toward key. Contrast up on **14 of 16**
+  levels, Abyss dungeons roughly doubling (Bone 34 → 78, Town 43 → 82).
+- **T6 — bake-time trim.** `world/room-trim.js`: parapets, pilasters, corner
+  posts, for all 15 levels from existing room definitions. **+728 triangles, +0
+  draw calls.** Safe because it only adds above the wall top and only on the
+  perimeter; `tests/game/room-trim.spec.mjs` proves the `y <= 2` cell set is
+  byte-identical with trim on and off. Shaded darker first — the gate rejected
+  it in one run (seven Abyss levels out of band), because trim stands against a
+  dark violet sky. Vertical interest, plinths and decals remain open and are
+  documented as needing per-level work rather than a global pass.
+
+New probes: `contrast-probe`, `shadow-census`, `env-probe`, `trim-cost`.
+New specs: `luminance`, `shadow-roles`, `room-trim`, `shadow-frustum-e2e`.
+
 ### Session 12 — the hero was swinging backwards
 
 **Reported from a screenshot:** the sword did not arc out in front, did not

@@ -5,6 +5,180 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### The gate that rewarded flattening the art
+
+The certification gate banded each level's **mean** frame luminance and nothing
+else. A mean cannot tell a well-lit room from a flat one — a room with a strong
+key and deep shadows meters *lower* than the same room under a flat ambient
+wash. So every time a room failed the band on the low side, the cheapest legal
+fix was to raise ambient or add pale geometry, and the gate went green for it.
+That is how ambient reached **1.7** against a key of **1.9**, and why Beat 01's
+tomb grew decorative gold-leaf seams — the level file says so out loud.
+
+- **The gate now also bands contrast**: centre-crop `p90 − p10`, floor 12.
+- **It is measured on a centre crop, and that turned out to be the whole
+  ticket.** Measured across the full frame the spread reads **58–160** and would
+  pass any floor worth setting — because `p10` comes out at **0** in nearly
+  every level, and that zero is the **vignette** crushing the corners, not a
+  shadow. Vignette strength does not move when the lighting does, so a
+  full-frame spread is mostly a constant with the answer buried inside it.
+  Cropping to the middle half of each axis turns the same statistic into one
+  that ranges **14 to 166** across the campaign and actually separates the flat
+  levels from the lit ones. The plan called for a full-frame spread; the probe
+  said otherwise before a line of it was written.
+- **The floor is a ratchet, not a cliff** — 12, set just under the worst room
+  measured (the overworld, at 14) so nothing can regress, rather than a number
+  that fails on the day it lands. The two flattest levels are the open outdoor
+  screens, which is the honest reading: one light, one ground plane.
+- **The statistic is proven to discriminate.** `tests/game/luminance.spec.mjs`
+  feeds it synthetic frames whose answer is known by construction, and the
+  load-bearing case is that a flat grey frame **passes the mean band and fails
+  the contrast floor**. It also pins the vignette case, so nobody can quietly
+  move the measurement back to the full frame. A floor nobody has proven
+  discriminates is decorative.
+- The statistic moved out of the frame loop into `src/game/render/luminance.js`
+  so it can be tested at all, and the dev overlay now prints spread beside the
+  mean — the two disagree in exactly the direction that matters.
+
+### Five of six rooms had no sun
+
+The key light's shadow frustum is a ±30-unit box. It was aimed at the world
+origin and it never moved. Rooms sit on a **64-unit** grid, so exactly one room
+per dungeon was ever inside it.
+
+It survived the whole project because **every dungeon starts at grid (0,0)**:
+the first room you see in any level is the one room that works, so nothing ever
+looked wrong until you walked somewhere. Measured against Beat 01 —
+`corridor`, `predecessor`, `secret`, `antechamber` and `warden` all had no sun
+shadows at all.
+
+- **The sun now follows the active room.** The light and its target move
+  together, so the *direction* never changes — moving only the light would have
+  re-angled the sun per room, which looks like the world spinning around you.
+  The aim is **snapped to a 16-unit grid** rather than following continuously,
+  because sliding a directional shadow map a fraction of a unit per frame makes
+  every shadow edge crawl.
+- **The sweep is the assertion.** `tests/shadow-frustum-e2e.spec.mjs` walks
+  every room of every beat — a spot check of one room would have passed against
+  the broken build. It also asserts the sun keeps a single direction across
+  rooms, and that room *corners* are covered, not just centres.
+- **Reverting the fix fails 31 of its 50 assertions**, which is how we know the
+  spec is load-bearing rather than decorative.
+- **The overworld was worse than the plan recorded.** The plan documented "5 of
+  6 rooms". The counterfactual run showed the overworld at **0 of 49 screens** —
+  it sits at world coordinates 512–896, so the entire surface world was outside
+  the frustum. Nobody had counted it.
+- `src/engine/lights.js: updateShadowFollow` looks exactly like the fix for this
+  and is not — it takes a single `cameraX` and pins the target's Z to zero, a
+  leftover from the engine's 2.5D origins, so it would fix one axis and silently
+  break the other. Locked Decision **D5** forbids editing engine code, so it
+  cannot be deleted; instead the spec now fails if game code ever imports it.
+
+### Ambient was doing 47% of the lighting
+
+**1.70 ambient against a key of 1.90** in the Crust, and **3.40** in the Abyss —
+twice as much flat light in the mood that is supposed to be the oppressive one.
+Roughly half the illumination arrived from every direction at once, which by
+definition cannot describe a surface: the same value on the top of a block, the
+side of a block, and the inside of a corner. The voxel mesher already bakes
+ambient occlusion into vertex colours, so the game computed good contact
+darkening and then flooded it.
+
+It got there honestly. The gate banded mean luminance, and raising ambient is
+the cheapest way to lift a mean. That is also what every per-level `lightTune`
+was doing — Beat 07 carried an ambient multiplier of **3.4×** on top of an
+already-flat preset.
+
+| | before | after |
+|---|---|---|
+| Crust ambient / key | 1.70 / 1.90 | **0.78 / 2.55** |
+| Abyss ambient / key | 3.40 / 2.10 | **1.55 / 3.35** |
+| environment | none | **0.55 / 0.60** |
+
+- **The rim light was bound but never driven**, so it sat on the engine default
+  in both moods. The Abyss needs *more* rim than the Crust, not the same: its
+  key is dimmer against its background, so a silhouette separates from the fog
+  on the rim or not at all.
+- **Per-level trims were rebalanced from ambient toward key**, so a level that
+  needs more light gets more *directional* light.
+- **Contrast rose on 14 of 16 levels**, and the Abyss dungeons roughly doubled:
+  Bone Forest 34 → 78, Town 43 → 82, Pyre 43 → 79, Sluice 44 → 77. Two levels
+  went down and are recorded in `tests/game/luminance.spec.mjs` rather than
+  hidden. The contrast floor was tightened 12 → 13 to lock the gain in.
+
+### The world was under-detailed on purpose by nobody
+
+79,572 triangles and 43 draw calls, on a budget with room for an order of
+magnitude more. Rooms were a floor rectangle and four walls of uniform height,
+and a wall whose top edge is a straight line at a constant height reads as a
+box, not as a place.
+
+- **Bake-time trim**: parapets with broken heights, pilasters every seventh
+  cell, and taller corner posts, generated from the existing room definitions
+  for all fourteen dungeons and the overworld at once.
+- **It provably cannot change the game.** It only adds voxels *above* the wall
+  top — never at `y <= 2`, the band the hero's body occupies — and only on the
+  room perimeter, never on interior structures where platforms and grapple
+  routes live. `tests/game/room-trim.spec.mjs` bakes each room with and without
+  trim and requires the occupied cell set at `y <= 2` to be **byte-identical**;
+  asserting "trim stays above y=2" from the outside would only restate the
+  implementation.
+- Doorways stay open: a door gap has no wall cap to build from, so nothing can
+  bridge one with a floating lintel.
+- **Cost: +728 triangles and +0 draw calls** in a dungeon room (~2%). It merges
+  into the same voxel map the room is meshed from, which is the whole reason it
+  is done at bake time rather than as props.
+- The trim was shaded *darker* than the wall cap first, and the gate rejected it
+  within one run: seven Abyss levels lost ~4 points of mean and fell out of
+  their band. Trim stands against the **sky**, and the Abyss sky is dark violet —
+  dark trim on a dark background is not moody, it is invisible. It lifts now.
+- Taller walls also cast more real shadow into rooms (which only works at all
+  because of the two tickets above), so the light was raised to hold the mean
+  while keeping the contrast. That trade is what the contrast floor exists to
+  arbitrate, and this is the first time it did.
+
+### Nothing in the world could be shadowed
+
+151 meshes in a room. **37 cast. 7 received.** Props did not darken under an
+overhang, enemies did not sit in a doorway's shade, nothing cast onto anything
+else — which is most of the reason objects read as pasted on top of the world
+rather than standing in it. It happened because the decision was made
+independently at every construction site, so **eleven of the fourteen bosses**
+simply never had the line, no pickup cast anything at all, and the hero's weapon
+explicitly opted out of both.
+
+- **One rule, in one place** (`src/game/render/shadow-roles.js`): everything
+  solid casts; everything solid receives unless it is glowing or transparent;
+  and **anything that does not receive has to say why**, in
+  `userData.shadowExempt`. The census counts an unexplained non-receiver as a
+  failure, so opting out means writing the case for it rather than forgetting.
+  Setting the flag in more places would have been the same bug waiting to happen.
+- That rule replaced an emissive-intensity cutoff, which was the wrong shape:
+  two boss parts and the grapple claw sat at exactly `0.4` and `0.5` against a
+  `> 0.5` test and showed up as defects. Any emissive colour at all is a glow.
+- **Every solid mesh in all 16 levels now receives** — 100%, measured, with
+  `tests/qa/shadow-census.mjs` printing the breakdown. The gate asserts equality
+  rather than a threshold, because a threshold invites the next person to add an
+  unshadowed mesh and stay under it.
+- **Held weapons cast again.** The blade sweeping its own shadow across the
+  floor mid-strike is the best grounding cue the swing has and it was switched
+  off. It still does not *receive*: 0.10 units wide against a camera 17.5 up is
+  one or two shadow texels, which reads as edge flicker. The shield overrides
+  that — a plate is broad enough for a shadow to resolve on.
+- **Contact shadow discs** under every actor, boss and pickup. A cast shadow
+  needs caster, receiver and light to line up; a disc is always directly beneath
+  the thing it belongs to, so it reads when the sun is behind a wall or the
+  shadow falls off-screen — including in the five-of-six rooms the key light's
+  frustum never reached. It also encodes height: the disc spreads and thins as
+  an actor rises, so a dash and a hovering mote both tell you how far up they
+  are. Ground height is inferred from the actor's own Y, since the collision
+  world is XZ-only — falling is adopted immediately, rising only once the new
+  height holds still, which is what tells a jump from a step onto a platform.
+- Discs are reconciled from the live entity lists each frame rather than
+  attached at spawn sites, so a new enemy kind cannot ship without one.
+- Cost: **draw calls unchanged** (41 → 41 in a dungeon room). Receiving is a
+  fragment-shader tap on a shadow map that was already being rendered.
+
 ### The shield is a thing you find
 
 Asked by the owner: *"is there a point at which you collect a shield you can

@@ -6,7 +6,8 @@
 // mood/quality fight (especially Abyss bloom) coinciding with progression.
 
 import * as THREE from 'three';
-import { scene, bloomPass, filmPass, vignettePass } from '../../engine/renderer.js';
+import { scene, renderer, bloomPass, filmPass, vignettePass } from '../../engine/renderer.js';
+import { applyMoodEnvironment } from '../render/mood-environment.js';
 import { stopAllDrones, playNoise, initAudio } from '../../audio/synth.js';
 import {
     startScore, stopScore, updateScore, setIntensity, currentScore,
@@ -14,6 +15,16 @@ import {
 import { MOOD_PRESETS } from '../assets/palettes.js';
 import { getSetting } from '../../engine/settings.js';
 import { getQuality, TIERS } from '../../engine/quality.js';
+
+/**
+ * Grid the key light's aim snaps to, in world units.
+ *
+ * Small enough that the ±30 frustum always covers the room the player is in
+ * (rooms are 64 apart, so a 16-unit snap keeps the aim within 8 units of the
+ * true centre); large enough that walking around a room does not re-aim the
+ * sun every frame and set every shadow edge crawling.
+ */
+const AIM_SNAP = 16;
 
 /** Cap mood post values so quality tiers stay the presentation ceiling. */
 function presentationPost(preset) {
@@ -55,6 +66,50 @@ export class MoodController {
     /** S4: bind engine light objects so presets can drive ambient/key. */
     bindLights({ keySun, fillNeon, rimWarm, ambient } = {}) {
         this._lights = { keySun, fillNeon, rimWarm, ambient };
+        this._aim = null;
+    }
+
+    /**
+     * Point the key light's shadow frustum at (x, z).
+     *
+     * The frustum is a ±30-unit box and it never moved: it sat on the world
+     * origin for the life of the project. Rooms live on a 64-unit grid
+     * (`ROOM_STRIDE`), so only the room at grid (0,0) was ever inside it —
+     * measured against Beat 01, five of six rooms had no sun shadows at all.
+     * Nobody caught it because every dungeon starts at grid (0,0), so the first
+     * room you see in any level is the one room that works.
+     *
+     * Two things this must not do:
+     *
+     *  - change the sun's DIRECTION. The light is moved together with its
+     *    target, preserving the offset, so the shadows keep falling the same
+     *    way. Move only the light and you have re-angled the sun per room.
+     *  - follow continuously. A directional shadow map is projected from the
+     *    frustum, so sliding it a fraction of a unit per frame makes every
+     *    shadow edge crawl and shimmer. The aim is SNAPPED to a coarse grid,
+     *    which also makes this a no-op on nearly every frame.
+     */
+    aimKeyLight(x, z) {
+        const L = this._lights;
+        if (!L?.keySun) return;
+        const gx = Math.round(x / AIM_SNAP) * AIM_SNAP;
+        const gz = Math.round(z / AIM_SNAP) * AIM_SNAP;
+        if (this._aim && this._aim.x === gx && this._aim.z === gz) return;
+        this._aim = { x: gx, z: gz };
+
+        const sun = L.keySun;
+        const t = sun.target;
+        const offX = sun.position.x - t.position.x;
+        const offY = sun.position.y - t.position.y;
+        const offZ = sun.position.z - t.position.z;
+        t.position.set(gx, 0, gz);
+        sun.position.set(gx + offX, offY, gz + offZ);
+        t.updateMatrixWorld();
+        sun.updateMatrixWorld();
+        // The shadow camera is derived from the light's world matrix, so it has
+        // to be told the matrix changed or the frustum stays where it was —
+        // which looks exactly like this fix not working.
+        sun.shadow.needsUpdate = true;
     }
 
     get current() {
@@ -105,6 +160,14 @@ export class MoodController {
         const tune = this.tune || {};
 
         scene.background = new THREE.Color(preset.background);
+
+        // Image-based lighting. This was null for the entire life of the
+        // project, which is why materials.js capped metalness at 0.12 — a
+        // metal with nothing to reflect just reads dark. Rebuilt here rather
+        // than at level load so a Crust↔Abyss flip takes the reflection with
+        // it; the maps are cached per mood, so the flip is a lookup.
+        applyMoodEnvironment(scene, renderer, this.mood);
+
         if (scene.fog) {
             scene.fog.color.setHex(preset.fog);
             scene.fog.density = preset.fogDensity;
@@ -124,6 +187,13 @@ export class MoodController {
             }
             if (L.fillNeon && preset.fillIntensity != null) {
                 L.fillNeon.intensity = preset.fillIntensity * (tune.fill ?? 1);
+            }
+            // Rim was bound but never driven, so it sat on the engine default
+            // (0.65) in both moods. It is the light that separates a silhouette
+            // from the fog behind it, and the Abyss needs more of it than the
+            // Crust — leaving it fixed is part of why Abyss rooms read as flat.
+            if (L.rimWarm && preset.rimIntensity != null) {
+                L.rimWarm.intensity = preset.rimIntensity * (tune.rim ?? 1);
             }
         }
     }
@@ -147,6 +217,9 @@ export class MoodController {
             ambient: L.ambient ? { color: L.ambient.color.getHexString(), intensity: +L.ambient.intensity.toFixed(4) } : null,
             key: L.keySun ? { color: L.keySun.color.getHexString(), intensity: +L.keySun.intensity.toFixed(4) } : null,
             fill: L.fillNeon ? +L.fillNeon.intensity.toFixed(4) : null,
+            rim: L.rimWarm ? +L.rimWarm.intensity.toFixed(4) : null,
+            environment: scene.environment ? 'set' : null,
+            environmentIntensity: scene.environmentIntensity ?? null,
         };
     }
 

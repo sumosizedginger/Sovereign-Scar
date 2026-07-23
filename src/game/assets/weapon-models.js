@@ -15,6 +15,7 @@
 // smooth sword in a blocky world reads as a bug.
 
 import * as THREE from 'three';
+import { markShadowRoles } from '../render/shadow-roles.js';
 
 /** Assemble a group from box specs, in the same units the actor rig uses. */
 function boxes(specs) {
@@ -31,8 +32,17 @@ function boxes(specs) {
         m.position.set(s.x || 0, s.y || 0, s.z || 0);
         if (s.rx) m.rotation.x = s.rx;
         if (s.rz) m.rotation.z = s.rz;
-        m.castShadow = false;
+        // A held weapon CASTS. The blade sweeping its own shadow across the
+        // floor during a strike is the single best grounding cue the swing has,
+        // and it comes free — the shadow map is already being rendered.
+        //
+        // It does not RECEIVE. The blade is 0.10 units wide against a camera
+        // 17.5 units up, so it covers one or two shadow-map texels; shading it
+        // produces flicker along the edge, not shading. The shield overrides
+        // this below, because a plate is broad enough for the shadow to read.
+        m.castShadow = true;
         m.receiveShadow = false;
+        m.userData.shadowExempt = 'held blade — too thin to receive legibly';
         g.add(m);
     }
     return g;
@@ -114,6 +124,11 @@ export function buildShieldModel() {
         { z: -0.09, w: 0.10, h: 0.30, d: 0.06, color: 0x3a2f1c, rough: 0.95 },    // grip strap
     ]);
     g.name = 'shield:bulwark_shield';
+    // Unlike a blade, the shield is a broad flat plate held out in front of the
+    // hero — wide enough that a shadow falling across it resolves into shading
+    // rather than into edge flicker. It is also the one held object the player
+    // deliberately points at things, so it is worth the fragment tap.
+    markShadowRoles(g);
     return g;
 }
 

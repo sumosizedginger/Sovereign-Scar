@@ -14,6 +14,7 @@
 // floors without needing a light.
 
 import * as THREE from 'three';
+import { markShadowRoles } from '../render/shadow-roles.js';
 
 const ROPE_COLOR = 0x9ad0ff;
 const ANCHOR_COLOR = 0x7fe0ff;
@@ -53,6 +54,14 @@ export class GrappleRope {
         }
         this.hook.visible = false;
         this.hook.renderOrder = 891;
+        // The claw is an FX object: hidden except for the ~0.3s it is in
+        // flight, drawn on top of the world with depthTest off so it is never
+        // lost behind a wall. Shadowing something that deliberately ignores
+        // depth would contradict the reason it exists.
+        markShadowRoles(this.hook, {
+            exempt: 'grapple claw — depth-ignoring FX, visible only in flight',
+            cast: false,
+        });
         scene.add(this.hook);
 
         this._t = 0;

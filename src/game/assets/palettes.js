@@ -238,10 +238,22 @@ export const MOOD_PRESETS = {
         film: 0.08,
         vignette: 1.05,
         ambient: 0x9a8f78,
-        ambientIntensity: 1.7,
+        // Ambient was 1.7 against a key of 1.9 — roughly 47% of the light
+        // arriving from every direction at once, which by definition cannot
+        // describe a surface. It put the same value on the top of a block, the
+        // side of a block, and the inside of a corner, and the voxel mesher
+        // bakes ambient occlusion into vertex colours (voxel/core.js,
+        // AO_LEVELS), so the game computed good contact darkening and then
+        // flooded it.
+        //
+        // It got that high honestly: the certification gate banded MEAN frame
+        // luminance, and raising ambient is the cheapest way to lift a mean.
+        // The gate now also bands contrast, so that route is closed.
+        ambientIntensity: 0.78,
         key: 0xffe8c0,
-        keyIntensity: 1.9,
-        fillIntensity: 0.7, // engine default — stated so mood switches can't leak the other preset's fill
+        keyIntensity: 2.55,
+        fillIntensity: 0.85,
+        rimIntensity: 0.80,
     },
     abyss: {
         // Certification band for Abyss frames is [35,75] mean luminance.
@@ -255,10 +267,19 @@ export const MOOD_PRESETS = {
         film: 0.1,
         vignette: 1.08,
         ambient: 0x9078c0,
-        ambientIntensity: 3.4,
+        // The Abyss had drifted to 3.4 — TWICE the Crust's ambient, in the mood
+        // that is supposed to be the oppressive one. Same cause: it failed the
+        // band low at 9–26, and flat ambient was the fix that made the number
+        // go up. It reads as fog with the lights on.
+        ambientIntensity: 1.55,
         key: 0xd8b0ff,
-        keyIntensity: 2.1,
-        fillIntensity: 1.1,
+        keyIntensity: 3.35,
+        fillIntensity: 1.25,
+        // The Abyss needs MORE rim than the Crust, not less. Its key is dimmer
+        // relative to its background, so a silhouette separates from the fog on
+        // the rim or not at all — that is the failure mode that produced the
+        // unreadable 9–26 rooms in the first place.
+        rimIntensity: 1.05,
         noisePulse: true,
     },
 };

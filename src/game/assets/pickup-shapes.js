@@ -13,6 +13,7 @@
 // things, and this is what makes the difference visible before you walk over.
 
 import * as THREE from 'three';
+import { markShadowRoles } from '../render/shadow-roles.js';
 
 function mat(color, emissiveIntensity = 2, extra = {}) {
     return new THREE.MeshStandardMaterial({
@@ -153,6 +154,16 @@ export function buildPickupMesh(data = {}) {
     const g = build(color);
     g.name = `pickup:${kind}`;
     g.userData.pickupKind = kind;
+    // A pickup is a solid object sitting in a room, so it casts and receives
+    // like one. It used to do neither, which is why an item on the floor read
+    // as a decal painted on the tile rather than a thing lying on it — nothing
+    // under it darkened, and it did not darken under anything.
+    //
+    // Emissive parts are the exception and stay out of the receive pass: a
+    // glowing core is a light source, and shading it with the room's shadows
+    // makes it look like a painted highlight instead of something lit from
+    // inside. They still cast, because the object as a whole has a silhouette.
+    markShadowRoles(g);
     return g;
 }
 

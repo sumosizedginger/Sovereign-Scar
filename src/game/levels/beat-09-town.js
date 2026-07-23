@@ -50,7 +50,7 @@ export const BEAT09_DEF = {
     mood: 'abyss',
     // Per-level luminance trim into the Abyss certification band [35,75]
     // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
-    lightTune: { ambient: 3.2, key: 1.4 },
+    lightTune: { ambient: 2.25, key: 2.0 },
     start: 'towngate',
     prebake: true,
     floorColor: ABYSS_COLORS.abyssFloor,

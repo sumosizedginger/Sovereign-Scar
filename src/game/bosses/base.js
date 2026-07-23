@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { sfx } from '../../audio/synth.js';
 import { juice } from '../fx/juice.js';
 import { getActiveRunMode } from '../kernel/run-mode.js';
+import { markShadowRoles } from '../render/shadow-roles.js';
 
 /**
  * Base class for every Sovereign Scar arena boss.
@@ -86,6 +87,11 @@ export class BossBase {
             );
             scene.add(this.root);
         }
+
+        // Done here rather than in fourteen constructors because it WAS in
+        // fourteen constructors — three set it and eleven did not, so most of
+        // the roster was a silhouette standing on a floor it never touched.
+        markShadowRoles(this.root);
 
         // Arena home: bosses that orbit/patrol do it around where they were
         // placed, not the world origin (rooms live at offset origins now).

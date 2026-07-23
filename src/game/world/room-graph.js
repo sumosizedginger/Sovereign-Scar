@@ -18,6 +18,7 @@ import { Enemy, DummyTarget, attachSplit } from '../enemy.js';
 import { sfx } from '../../audio/synth.js';
 import { makeKeyStore } from './keys.js';
 import { applyBlockerToMap, createBlockerRuntime } from './blockers.js';
+import { applyRoomTrim } from './room-trim.js';
 import { scaleEnemyHp, beatNumberOf, applyBossCurve } from './threat-curve.js';
 import { gsfx } from '../audio/sfx-bank.js';
 import { buildPickupMesh, disposePickupMesh } from '../assets/pickup-shapes.js';
@@ -203,6 +204,10 @@ export function createDungeon(ctx, def, opts = {}) {
     );
     voidPlane.rotation.x = -Math.PI / 2;
     voidPlane.position.y = -0.5;
+    // Named so the shadow census can exempt it by intent rather than by
+    // accident: this is the fog backdrop under the whole dungeon, not a
+    // surface anything stands on, and shadowing it would be meaningless.
+    voidPlane.name = 'void-plane';
     scene.add(voidPlane);
 
     function buildHelpers(room) {
@@ -236,6 +241,16 @@ export function createDungeon(ctx, def, opts = {}) {
         // room reads as one authored place. Data-driven per beat; no-op for the
         // overworld and any level without a kit.
         applyKit(map, DUNGEON_KITS[def.id], room);
+        // Silhouette trim — parapets, pilasters, corner posts. Runs AFTER the
+        // kit so it shades from the final cap colour, and only ever adds voxels
+        // above the wall top, so it cannot change collision or traversal.
+        // `__trimOff` is a QA escape hatch (tests/qa/trim-cost.mjs) so the cost
+        // of the trim can be measured with it on and off in one session,
+        // instead of against a remembered number from a different build.
+        applyRoomTrim(map, room, roomId, {
+            enabled: def.trim !== false
+                && !(typeof window !== 'undefined' && window.__sovereignScar?.__trimOff),
+        });
         for (const b of room.blockers || []) applyBlockerToMap(map, b); // W7
 
         // Multi-Y platforms (G5): meshed WITHOUT XZ solids so their tops are
@@ -810,6 +825,19 @@ export function createDungeon(ctx, def, opts = {}) {
         // Dungeon-specific surface
         keyStore,
         currentRoomId: () => currentRoomId,
+        /**
+         * World origin of the room the player is standing in.
+         *
+         * Rooms sit on a 64-unit grid, and the key light's shadow frustum is a
+         * ±30 box that never moved off the world origin — so only the room at
+         * grid (0,0) was ever inside it, and every dungeon starts at (0,0).
+         * The one room you always see first was the one room that worked.
+         * The frame loop aims the sun with this.
+         */
+        currentRoomOrigin() {
+            const room = def.rooms[currentRoomId];
+            return room ? roomOrigin(room) : null;
+        },
         isTransitioning: () => !!transition,
         enterRoom,
         bakedRooms: () => [...baked.keys()],

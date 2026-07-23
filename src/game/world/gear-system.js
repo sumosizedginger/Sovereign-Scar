@@ -26,6 +26,7 @@ export class GearSystem {
         );
         mesh.position.set(x, y, z);
         mesh.castShadow = true;
+        mesh.receiveShadow = true;
         if (this.scene) this.scene.add(mesh);
 
         const gear = {

@@ -59,6 +59,9 @@ import { run as runCoach } from './game/coach.spec.mjs';
 import { run as runThreatCurve } from './game/threat-curve.spec.mjs';
 import { run as runMusic } from './game/music.spec.mjs';
 import { run as runFeelVisuals } from './game/game-feel-visuals.spec.mjs';
+import { run as runLuminance } from './game/luminance.spec.mjs';
+import { run as runShadowRoles } from './game/shadow-roles.spec.mjs';
+import { run as runRoomTrim } from './game/room-trim.spec.mjs';
 
 const unitOnly = process.argv.includes('--unit-only');
 
@@ -132,6 +135,9 @@ async function main() {
     runNamed('threat-curve', runThreatCurve);
     runNamed('music', runMusic);
     runNamed('game-feel-visuals', runFeelVisuals);
+    runNamed('luminance', runLuminance);
+    runNamed('shadow-roles', runShadowRoles);
+    runNamed('room-trim', runRoomTrim);
 
     if (!unitOnly) {
         const { run: runSmoke } = await import('./smoke.spec.mjs');
@@ -158,6 +164,11 @@ async function main() {
         const visualSanity = createSink('visual-sanity');
         await runVisualSanity(visualSanity);
         sinks.push(visualSanity);
+
+        const { run: runShadowFrustum } = await import('./shadow-frustum-e2e.spec.mjs');
+        const shadowFrustum = createSink('shadow-frustum-e2e');
+        await runShadowFrustum(shadowFrustum);
+        sinks.push(shadowFrustum);
 
         const { run: runCampaignE2E } = await import('./campaign-e2e.spec.mjs');
         const campaignE2E = createSink('campaign-e2e');

@@ -143,6 +143,14 @@ export function createOverworld(ctx, screensDef, opts = {}) {
         id: levelId,
         name: screensDef.name || 'The Scarred Crust',
         mood,
+        // The overworld is the one place with no ceiling and no walls, so it
+        // takes the key light across its whole floor plane and reads much
+        // brighter than any dungeon under the same preset. When the key rose
+        // from 1.9 to 2.55 in the ambient rebalance it went to 97 against a
+        // ceiling of 90 while every dungeon sat at 55–79. This trims the key
+        // back for the open screens only, rather than dragging the preset down
+        // and re-darkening fourteen interiors to fix one exterior.
+        lightTune: { key: 0.7, ambient: 0.9 },
         start: startScreen,
         banner: screensDef.banner || 'The Scarred Crust — find the wounds',
         rooms,

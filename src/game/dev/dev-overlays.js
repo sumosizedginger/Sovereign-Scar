@@ -49,7 +49,11 @@ export class DevOverlays {
         this._lumAcc += dt;
         if (this._lumAcc > 1 && !window.__ssLumRequest) {
             this._lumAcc = 0;
-            window.__ssLumRequest = (v) => { this._lum = v; };
+            // Spread is shown next to the mean because the two disagree in the
+            // direction that matters: flattening a room raises the mean and
+            // collapses the spread. Tuning lights against the mean alone is
+            // what produced the flat build.
+            window.__ssLumRequest = (v) => { this._lum = v.mean; this._spread = v.spread; };
         }
 
         this._acc += dt;
@@ -64,7 +68,7 @@ export class DevOverlays {
         const b = game.level?.boss;
         const lines = [
             `FPS ${fps.toFixed(0)} · calls ${info.calls ?? '?'} · tris ${info.triangles ?? '?'}`,
-            `lum ${this._lum != null ? this._lum.toFixed(1) : '…'}`,
+            `lum ${this._lum != null ? this._lum.toFixed(1) : '…'} · spread ${this._spread != null ? this._spread : '…'}`,
             p ? `player ${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}` : '',
             b ? `boss ${b.hp?.toFixed?.(1) ?? b.hp}/${b.maxHp} ph ${b.phase || 1}/${b.maxPhase || '?'}` : 'boss —',
             `${game.levelId} · ${game.mood?.mood || '?'}`,

@@ -10,6 +10,7 @@ import {
 import { mottleColors } from '../../src/game/render/surface-detail.js';
 import { selectActive, LocalLightPool } from '../../src/game/fx/local-light-pool.js';
 import { CRUST_COLORS, ABYSS_COLORS } from '../../src/game/assets/palettes.js';
+import { MOOD_SKIES } from '../../src/game/render/mood-environment.js';
 
 export function run(t) {
     // --- classifier: palette classes land in the right family ---
@@ -38,7 +39,49 @@ export function run(t) {
     t.ok('all roughness within bounds',
         [stone, gold, ice].every((r) => r.roughness >= 0.2 && r.roughness <= 1));
     t.ok('all metalness within bounds',
-        [stone, gold, ice].every((r) => r.metalness >= 0 && r.metalness <= 0.6));
+        [stone, gold, ice].every((r) => r.metalness >= 0 && r.metalness <= 0.7));
+
+    // --- metalness is allowed to be real now ---
+    //
+    // This used to be capped at 0.12 with the note "this engine has little
+    // environment light, so a strongly metallic surface would read dark". That
+    // was true and it was the correct workaround: `scene.environment` was null,
+    // so a metal had nothing to reflect and resolved to a dark patch. The
+    // family system classified gold, iron and ice correctly and then flattened
+    // all three back to painted plaster.
+    //
+    // The cap comes off ONLY because render/mood-environment.js now supplies a
+    // real PMREM environment. The two are a pair: the assertions below fail if
+    // someone raises metalness without an environment to reflect, or removes
+    // the environment while leaving metalness raised.
+    const iron = response(CRUST_COLORS.iron);
+    const limestone = response(CRUST_COLORS.limestone);
+    const charcoal = response(CRUST_COLORS.charcoal);
+    t.ok('iron is genuinely metallic', iron.metalness > 0.5, `metal=${iron.metalness.toFixed(3)}`);
+    t.ok('polished sits between metal and matte',
+        limestone.metalness > 0.25 && limestone.metalness < iron.metalness,
+        `limestone=${limestone.metalness.toFixed(3)} iron=${iron.metalness.toFixed(3)}`);
+    t.ok('matte stays essentially non-metallic', charcoal.metalness < 0.1,
+        `charcoal=${charcoal.metalness.toFixed(3)}`);
+    t.ok('the families are actually separated now',
+        iron.metalness - charcoal.metalness > 0.4,
+        `spread=${(iron.metalness - charcoal.metalness).toFixed(3)} — was 0.12 at most, whole-palette`);
+
+    // The environment that justifies the above must exist, per mood, at a
+    // non-zero strength. Without it the cap has to go back on.
+    for (const mood of ['crust', 'abyss']) {
+        const sky = MOOD_SKIES[mood];
+        t.ok(`${mood} declares a sky`, !!sky);
+        t.ok(`${mood} sky has a non-zero intensity`, sky.intensity > 0, `${sky.intensity}`);
+        t.ok(`${mood} sky is vertically graded`, sky.zenith !== sky.nadir,
+            'a uniform environment is just ambient with extra steps');
+    }
+    // Crust reads warm from below and cool from above; Abyss is the inverse.
+    const warmth = (hex) => ((hex >> 16) & 255) - (hex & 255);
+    t.ok('the Crust ground is warmer than its sky',
+        warmth(MOOD_SKIES.crust.nadir) > warmth(MOOD_SKIES.crust.zenith));
+    t.ok('the Abyss sky is more violet than its floor',
+        ((MOOD_SKIES.abyss.zenith >> 16) & 255) > ((MOOD_SKIES.abyss.nadir >> 16) & 255));
 
     // --- material factory: same base look, hook installed, shared program key ---
     const mat = makeLevelMaterial();
@@ -46,7 +89,11 @@ export function run(t) {
     t.ok('base roughness preserved (0.88)', Math.abs(mat.roughness - 0.88) < 1e-6);
     t.ok('base metalness preserved (0.04)', Math.abs(mat.metalness - 0.04) < 1e-6);
     t.ok('family hook installed', typeof mat.onBeforeCompile === 'function');
-    t.ok('shared program cache key', mat.customProgramCacheKey() === 'ss-level-family-v1');
+    // Bumped with the metalness rebalance — the old key would have served a
+    // cached program compiled from the previous GLSL.
+    t.ok('shared program cache key', mat.customProgramCacheKey() === 'ss-level-family-v2');
+    t.ok('no per-material envMapIntensity override', mat.envMapIntensity === 1,
+        'it multiplies with scene.environmentIntensity; one knob, in mood-environment.js');
     // The hook rewrites the standard includes without throwing.
     const shader = {
         fragmentShader: 'a\n#include <roughnessmap_fragment>\nb\n#include <metalnessmap_fragment>\nc',

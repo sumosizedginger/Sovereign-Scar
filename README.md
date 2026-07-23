@@ -13,7 +13,7 @@ Built on **[My-Engine](https://github.com/sumosizedginger/My-Engine) 0.2.0** (pi
 
 ```bash
 npm run serve          # http://127.0.0.1:8799/
-npm test               # unit + browser E2E (2575 assertions)
+npm test               # unit + browser E2E (2787 assertions)
 npm run test:unit      # unit only
 ```
 
@@ -67,6 +67,19 @@ lies north.
 - **A sound bank that says what happened** — per-weapon swings, four distinct
   combat outcomes, a parry that sounds nothing like a failed block, and audio
   on doors, locks, the grapple, lock-on, menus and low health
+- **Lighting that describes a surface** — the key light's shadow frustum now
+  follows the room you are standing in (it used to sit on the world origin, so
+  one room per dungeon and **none of the 49 overworld screens** had sun shadows
+  at all); every solid mesh receives shadow, or records in the source why it
+  does not; contact discs ground every actor, boss and pickup; a procedural
+  environment map per mood lets metal finally read as metal; and ambient came
+  down from **47% of the total light** so the baked ambient occlusion is no
+  longer washed out by it
+- **A certification gate that cannot be gamed by flattening the art** — it used
+  to band mean frame luminance alone, and a flat room meters *higher* than a
+  well-lit one, so raising ambient was always the cheapest way to pass. It now
+  bands centre-crop contrast too, with a unit spec proving a flat grey frame
+  passes the mean band and fails the floor
 - **Crust / Abyss** mood post stack
 
 Design sources (parent folder):

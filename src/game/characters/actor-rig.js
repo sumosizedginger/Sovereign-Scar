@@ -33,6 +33,12 @@ function partMesh(map, scale, offset) {
     mesh.scale.setScalar(scale);
     mesh.position.set(offset[0] * scale, offset[1] * scale, offset[2] * scale);
     mesh.castShadow = true;
+    // Receiving matters as much as casting and costs almost nothing on top of
+    // it — the shadow map is already being rendered for the casters, so this is
+    // a fragment-shader tap. Without it a character is lit identically standing
+    // in a doorway's shadow and standing in open light, which is most of why
+    // actors read as pasted on top of the world rather than standing in it.
+    mesh.receiveShadow = true;
     mesh.geometry.computeBoundingBox();
     return mesh;
 }

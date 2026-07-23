@@ -12,6 +12,10 @@ export function addAltar(level, ctx, { x, z, y = 0.5 } = {}) {
         new THREE.MeshStandardMaterial({ color: 0x2a2436, roughness: 0.6, metalness: 0.3 })
     );
     base.position.y = 0.45;
+    // The plinth is stone standing on a floor: it casts and it receives. The
+    // crystal above it does neither — it is the light source in this group.
+    base.castShadow = true;
+    base.receiveShadow = true;
     group.add(base);
 
     const crystal = new THREE.Mesh(

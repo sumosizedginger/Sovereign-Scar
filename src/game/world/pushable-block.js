@@ -31,6 +31,7 @@ export class PushableBlock {
         );
         this.mesh.position.set(this.position.x, this.position.y, this.position.z);
         this.mesh.castShadow = true;
+        this.mesh.receiveShadow = true;
         if (scene) scene.add(this.mesh);
 
         this._registerSolid();

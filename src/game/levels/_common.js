@@ -55,6 +55,7 @@ export function createLevelShell(ctx, opts = {}) {
         );
         voidPlane.rotation.x = -Math.PI / 2;
         voidPlane.position.y = -0.5;
+        voidPlane.name = 'void-plane'; // exempt from the shadow census by intent
         scene.add(voidPlane);
         disposers.push(() => {
             if (voidPlane.parent) voidPlane.parent.remove(voidPlane);

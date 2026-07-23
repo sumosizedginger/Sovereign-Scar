@@ -1,258 +1,285 @@
 # Making the world look like a place
 
-Six tickets, ordered, each self-contained enough to pick up cold. Every number
-came from a probe against the running game, not from reading the code and
-guessing — re-run them with `tests/qa/lum-probe.mjs` and the snippets below.
+Six tickets, all **implemented**. This was a plan; it is now a record, kept in
+ticket order so each change can be found, understood and reversed on its own.
 
-**Status: none of these are implemented.** Tickets 1–3 are safe and additive.
-Tickets 4–5 change how every existing room looks and will invalidate the 44
-binary certification captures; that is the owner's call, not the implementer's.
+Every number here came from a probe against the running game, not from reading
+the code and guessing. Re-run them:
+
+```bash
+node tests/qa/contrast-probe.mjs   # mean + centre-crop contrast, all 16 levels
+node tests/qa/shadow-census.mjs    # who casts, who receives, and who is exempt
+node tests/qa/env-probe.mjs        # is there actually an environment map
+node tests/qa/trim-cost.mjs        # triangles and draw calls, trim on vs off
+```
 
 ---
 
-## Measured baseline
+## Baseline, and where it ended up
 
-Beat 01, game booted, level loaded, `beat-01-crypt`:
+Beat 01, game booted, level loaded:
 
-| | measured | |
+| | before | after |
 |---|---|---|
-| `scene.environment` | **null** | no image-based lighting anywhere |
-| `scene.background` | flat `#353028` | no sky, no gradient, no horizon |
-| ambient | **1.7** | |
-| key (directional, casts) | **1.9** | frustum ±30, target fixed at world origin |
-| fill / rim | 0.7 / 0.65 | |
-| player point light | 6.0 | rides the hero |
-| meshes | **151** | |
-| …casting shadows | 37 | |
-| …**receiving** shadows | **7** | |
-| triangles | **79,572** | |
-| draw calls | **43** | |
-| tone mapping | ACESFilmic, exposure 1.25 | |
-| shadow map | PCF (`type 1`) | |
-
-Two of those are the whole problem (`recv 7`, `environment null`) and two are
-the whole opportunity (`79k tris`, `43 calls`).
+| `scene.environment` | **null** | procedural PMREM, per mood |
+| ambient / key (Crust) | **1.70 / 1.90** | **0.78 / 2.55** |
+| ambient / key (Abyss) | **3.40 / 2.10** | **1.55 / 3.35** |
+| rim | 0.65, never driven by mood | 0.80 Crust / 1.05 Abyss |
+| meshes receiving shadow | **7 of 151** | **100% of solid meshes** |
+| rooms inside the sun's frustum | **1 per dungeon, 0 of 49 overworld screens** | **all of them** |
+| metalness ceiling | **0.12** | 0.65 metal / 0.35 polished |
+| contact shadows | none | one per actor, boss and pickup |
+| triangles / draw calls | 79,572 / 43 | +2% / **unchanged** |
+| gate | mean luminance only | mean **and** contrast floor |
 
 ---
 
-## Ticket 1 — Contrast floor on the luminance gate
+## Ticket 1 — Contrast floor on the luminance gate ✅
 
-**Must land first.** It currently makes tickets 4 and 5 illegal.
+**Landed first, because it made tickets 4 and 5 legal.**
 
-`tests/visual-sanity.spec.mjs` bands each room's **mean** frame luminance
-(Crust `[45,90]`, Abyss `[35,75]`). Mean cannot tell a well-lit room from a flat
-one: a room with a strong key and deep shadows has a *lower* mean than the same
-room under a flat ambient wash. So every time a room failed low, the cheapest
-legal fix was to raise ambient or add pale geometry — both of which flatten it.
-That is how ambient reached 1.7, and the Beat 01 tomb's gold-leaf seams were
-added for exactly this reason (it says so in the level file).
+`tests/visual-sanity.spec.mjs` banded each room's **mean** frame luminance. A
+mean cannot tell a well-lit room from a flat one: a room with a strong key and
+deep shadows meters *lower* than the same room under a flat ambient wash. So
+every time a room failed low, the cheapest legal fix was to raise ambient or add
+pale geometry — both of which flatten it. That is how ambient reached 1.7 against
+a key of 1.9, and why Beat 01's tomb has decorative gold-leaf seams.
 
-The gate is doing real work — it caught Abyss rooms metering 9–26 — so it is
-joined, not replaced.
+**Done:** the sampler returns a distribution, not a number
+(`src/game/render/luminance.js`), and the gate also bands `p90 − p10`.
 
-**Do:** sample the framebuffer as now, but also compute the p10 and p90
-luminance percentiles and assert `p90 − p10 >= CONTRAST_FLOOR`.
+**The plan said full-frame spread. The probe said otherwise, before a line of it
+was written.** Measured across the whole frame the spread reads **58–160** and
+would pass any floor worth setting — because `p10` comes out at **0** in nearly
+every level, and that zero is the **vignette** crushing the corners, not a
+shadow. Vignette strength does not move when lighting does. Cropping to the
+middle half of each axis turns the same statistic into one that ranges **14 to
+166** and actually separates flat levels from lit ones.
 
-**Target:** start at `CONTRAST_FLOOR = 28` (0–255 scale). Measure all 14 beats
-first with the probe and set it just under the current worst room, so it is a
-ratchet that cannot regress rather than a cliff that fails on day one.
+**Floor: 12, then tightened to 13** after the rebalance. It is a ratchet — set
+just under the worst level so nothing can regress — and it is meant to be
+tightened every time the worst level improves.
 
-**Acceptance:** a synthetic flat-grey frame fails the new assertion while
-passing the old mean band. Add that as a unit case so the gate is proven to
-discriminate.
+**Proven to discriminate:** `tests/game/luminance.spec.mjs` feeds synthetic
+frames whose answer is known by construction. The load-bearing case is that a
+flat grey frame **passes the mean band and fails the contrast floor**. It also
+pins the vignette case so the measurement cannot quietly move back to full-frame.
 
-**Rollback:** delete the assertion; nothing else depends on it.
+**Rollback:** delete the `contrast` assertion in `visual-sanity.spec.mjs`.
 
 ---
 
-## Ticket 2 — `receiveShadow` on the other 144 meshes
+## Ticket 2 — `receiveShadow`, and contact discs ✅
 
-151 meshes, **7 receive**. So even in the one room whose shadows work, almost
-nothing can be shadowed. Props do not darken under an overhang, enemies do not
-sit in a doorway's shadow, nothing casts onto anything else — which is the
-single biggest reason objects read as pasted on top of the world rather than
-standing in it.
+151 meshes, **7 receiving**. Props did not darken under an overhang, enemies did
+not sit in a doorway's shade, nothing cast onto anything else. Eleven of the
+fourteen bosses never had the line; no pickup cast anything; the hero's weapon
+opted out of both.
 
-**Do:** set `receiveShadow = true` alongside the existing `castShadow = true` at
-each construction site:
+**Done:** one rule in `src/game/render/shadow-roles.js` — everything solid casts;
+everything solid receives unless glowing or transparent; **anything that does not
+receive must say why**, in `userData.shadowExempt`. Setting the flag in more
+places would have been the same bug waiting to happen.
 
-- `src/game/characters/actor-rig.js` → `partMesh()` (covers hero + every enemy)
-- `src/game/assets/props.js` → prop/destructible/pushable builders
-- `src/game/world/level-builder.js` → gears, platforms, doors
-- `src/game/bosses/*.js` → boss body meshes
-- `src/game/assets/weapon-models.js` → currently explicitly `false`; leave the
-  weapon a caster only, it is too small to receive usefully
+That rule replaced an emissive-intensity cutoff, which was the wrong shape: two
+boss parts and the grapple claw sat at exactly 0.4 and 0.5 against a `> 0.5` test
+and looked like defects. Any emissive colour at all is a glow.
 
-**Cost:** near zero. Shadow-map rendering is already paying for the casters;
-receiving is a fragment-shader tap.
+**Held weapons cast again** — the blade sweeping its own shadow across the floor
+mid-strike is the best grounding cue the swing has. They still do not *receive*:
+0.10 units wide against a camera 17.5 up is one or two shadow texels, which reads
+as edge flicker. The shield overrides that; a plate is broad enough.
 
-**Pair with contact shadows.** A small dark disc under each character and
-pickup: one shared `MeshBasicMaterial`, radial-gradient alpha texture generated
-at runtime, `depthWrite: false`, `renderOrder` below the actor. It is the
-cheapest grounding cue there is and it works even when the real shadow is soft
-or off-screen. ~10 lines and one shared material.
+**Contact discs** (`src/game/fx/contact-shadow.js`) under every actor, boss and
+pickup. A cast shadow needs caster, receiver and light to line up; a disc is
+always directly beneath its owner, so it reads when the sun is behind a wall or
+the shadow is off-screen. It also encodes height — spreading and thinning as an
+actor rises. Ground height comes from the actor's own Y, since the collision
+world is XZ-only: falling is adopted immediately, rising only once the new height
+holds still, which is what tells a jump from a step onto a platform.
 
-**Acceptance:** a spec asserting `receiveShadow` count > 120 of the scene's
-meshes after a level load. Contact discs: assert one exists per actor and that
-it tracks the actor's XZ within a frame.
+Discs are reconciled from the live entity lists each frame rather than attached
+at spawn sites, so a new enemy kind cannot ship without one.
+
+**Gate:** `solidRecv === solid` per level — equality, not a threshold, because a
+threshold invites the next person to add an unshadowed mesh and stay under it.
 
 **Rollback:** per-site, independently.
 
 ---
 
-## Ticket 3 — A procedural environment map, so metal can be metal
+## Ticket 3 — A procedural environment map ✅
 
-`scene.environment` is null. `src/engine/environment.js` builds PMREM maps and
-**nothing ever calls it**; `src/engine/skybox.js` is likewise unused.
+`scene.environment` was null. `src/engine/environment.js` builds PMREM maps and
+nothing ever called it; `src/engine/skybox.js` likewise. So every PBR material
+in the game did its specular maths against no environment, and `materials.js`
+capped metalness at **0.12** with the note *"this engine has little environment
+light, so a strongly metallic surface would read dark"* — a correct workaround
+for a missing input that stayed long enough to look like an art decision.
 
-The consequence is already written down in the code. From
-`src/game/render/materials.js`:
+**Done:** `src/game/render/mood-environment.js` generates a 64×32 equirectangular
+gradient per mood on a canvas (zenith → horizon → nadir), PMREMs it, caches per
+mood and rebuilds on mood flip. No new asset files — the zero-build,
+offline-first promise holds. At this scale IBL is about the *direction* of the
+reflection, not its detail.
 
-> Metalness is kept small: this engine has little environment light, so a
-> strongly metallic surface would read dark
+Metalness ceiling raised: **metal 0.65, polished 0.35, energy 0.24, matte 0.04**,
+via soft bands mirroring `classifyFamily`'s thresholds (bands not steps, or a
+hard cut at a luminance boundary shows as a seam across a gradient wall).
 
-So the material-family system correctly classifies every voxel colour as matte,
-polished, metal or energy — and then caps metalness at **0.12** because there is
-nothing to reflect. Gold seams, iron, ice and the whole Cryo Vault are doing an
-impression of painted plaster.
+**Finding, recorded rather than papered over:** the plan predicted this would
+move specular response without moving albedo. **It did not.** `scene.environment`
+feeds MeshStandardMaterial a diffuse irradiance term as well as a specular one —
+it is ambient light by another name. At 0.85 it behaved exactly like raising
+ambient: the overworld went 79 → 96 and broke its band, and contrast *fell*
+across the board. So the ticket landed conservative on its own and the rest of
+the budget was spent in ticket 5, where trading flat ambient for directional
+environment is a strict improvement.
 
-**Do:**
-1. Generate a 64×32 equirectangular gradient on a canvas per mood (Crust: warm
-   floor → cool zenith; Abyss: cold floor → violet zenith). No new asset files —
-   this keeps the zero-build / offline-first promise.
-2. `PMREMGenerator.fromEquirectangular(...)`, assign `scene.environment`,
-   rebuild on mood change, dispose the old one.
-3. Raise the metalness ceiling in `materials.js`: metal family `0.65`, polished
-   `0.35`, matte unchanged, energy unchanged. Add `envMapIntensity` ~`0.8`.
+No per-material `envMapIntensity`: it multiplies with `scene.environmentIntensity`
+and would make walls reflect less than the props standing against them, for a
+reason nobody could later reconstruct. One knob, in one file.
 
-IBL at this scale is about the *direction* of the reflection, not its detail;
-64×32 is plenty.
-
-**Acceptance:** `scene.environment !== null` after load; a metal-family material
-reports `metalness > 0.5`; the luminance gate still passes (this changes
-specular response, not albedo, so it should not move the mean much — if it
-does, that is a finding worth writing down).
-
-**Rollback:** set `scene.environment = null` and restore the 0.12 cap. Safe:
-nothing else reads it.
-
----
-
-## Ticket 4 — The sun follows the active room
-
-**Changes how 5 of 6 rooms look. Owner sign-off required.**
-
-The key light's shadow frustum is a ±30-unit box aimed at the world origin, and
-it never moves. Rooms sit on a **64-unit** grid (`room-graph.js: ROOM_STRIDE`),
-so only the room at grid `[0,0]` is inside it. Measured live against Beat 01:
-
-```
-tomb           (0,    0)   LIT
-corridor       (0,  -64)   NO SUN SHADOWS
-predecessor    (0, -128)   NO SUN SHADOWS
-secret       (-64, -128)   NO SUN SHADOWS
-antechamber    (0, -192)   NO SUN SHADOWS
-warden         (0, -256)   NO SUN SHADOWS
-```
-
-**5 of 6.** It was never noticed because every dungeon starts in the room at the
-grid origin — the first room you ever see in any level is the one room that
-works.
-
-There is a function in the engine that exists to fix this — `updateShadowFollow`
-in `src/engine/lights.js` — and it is **never called by anything**. It also
-could not fix it: it takes a single `cameraX` and pins the target's Z to zero, a
-leftover from the engine's 2.5D side-scroller origins. This game is top-down on
-a two-dimensional room grid. Do not try to use it; fix this in game code.
-
-**Do:** `mood.bindLights` already hands `keySun` to
-`src/game/fx/mood-controller.js`. On room load, move both the light and its
-target by the active room's origin, preserving the light's offset from its
-target (the direction of the sun must not change, only where it is aimed).
-Roughly fifteen lines. Snap to the room origin rather than following the camera
-continuously, or shadow texels will crawl as the player walks.
-
-**Acceptance:** for every room of every beat, assert the room origin is inside
-the key light's shadow frustum after `loadLevel` + room transition. That is a
-14-beat × ~7-room sweep and it is the assertion that would have caught this.
-
-**Rollback:** stop moving the target. Note that **the 44 certification captures
-must be regenerated** after this lands — 5 of 6 rooms gain shadows, so nearly
-every capture's mean luminance moves.
+**Rollback:** `scene.environment = null` and restore the 0.12 cap. The two are a
+pair, and `material-hierarchy.spec.mjs` fails if one moves without the other.
 
 ---
 
-## Ticket 5 — Rebalance ambient against the key
+## Ticket 4 — The sun follows the active room ✅
 
-**Changes how every room looks. Owner sign-off required. Do ticket 1 first.**
+The shadow frustum is a ±30 box aimed at the world origin that never moved.
+Rooms sit on a **64-unit** grid, so only grid (0,0) was ever inside it. Every
+dungeon starts at (0,0) — **the first room you see in any level is the one room
+that works**, which is why this survived for the life of the project.
 
-Ambient **1.7** against a key of **1.9**: roughly 47% of the illumination
-arrives from every direction at once, which by definition cannot describe a
-surface. It puts the same value on the top of a block, the side of a block, and
-the inside of a corner. Worse, the voxel mesher already bakes ambient occlusion
-into vertex colours (`voxel/core.js`, `AO_LEVELS`) — a high flat ambient is
-precisely what washes that work out. The game computes good contact darkening
-and then floods it.
+The plan recorded "5 of 6 rooms". The counterfactual run found the overworld at
+**0 of 49 screens**: it sits at world coordinates 512–896, so the entire surface
+world was outside the frustum, and nobody had counted it.
 
-**Do:** shift the balance toward the key and the two fills, holding total energy
-roughly constant so the luminance band still passes.
+**Done:** `MoodController.aimKeyLight(x, z)`, driven from the frame loop with
+`level.currentRoomOrigin()` (falling back to the player for the overworld and
+sandbox). The light and its target move **together**, preserving the offset, so
+the sun's direction never changes — moving only the light would re-angle the sun
+per room, which looks like the world spinning around the player. The aim is
+**snapped to a 16-unit grid**, because sliding a directional shadow map a
+fraction of a unit per frame makes every shadow edge crawl.
 
-| light | now | target |
+**Gate:** `tests/shadow-frustum-e2e.spec.mjs` walks every room of every beat,
+checks corners as well as centres, and asserts the sun keeps one direction
+across rooms. **Reverting the fix fails 31 of its 50 assertions.**
+
+`src/engine/lights.js: updateShadowFollow` looks exactly like the fix for this
+and is not — single-axis, pins target Z to zero, a 2.5D leftover. Locked Decision
+**D5** forbids editing engine code, so it cannot be deleted; the spec fails if
+game code ever imports it.
+
+**Rollback:** stop calling `aimKeyLight`. **Certification captures must be
+regenerated** — nearly every room gains shadows.
+
+---
+
+## Ticket 5 — Rebalance ambient against the key ✅
+
+**Do ticket 1 first** — this was illegal against the old gate, which would have
+scored the flat version higher.
+
+Ambient 1.70 against a key of 1.90 in the Crust; **3.40** in the Abyss, twice the
+Crust's flat light in the mood that is meant to be oppressive. Every per-level
+`lightTune` was an ambient multiplier too — Beat 07 carried **3.4×** on top of an
+already-flat preset. All of it arrived honestly: the gate banded means, and
+ambient is the cheapest way to lift a mean.
+
+| light | Crust before → after | Abyss before → after |
 |---|---|---|
-| ambient | 1.70 | **0.75** |
-| key | 1.90 | **2.60** |
-| fill | 0.70 | **0.85** |
-| rim | 0.65 | **0.80** |
+| ambient | 1.70 → **0.78** | 3.40 → **1.55** |
+| key | 1.90 → **2.55** | 2.10 → **3.35** |
+| fill | 0.70 → **0.85** | 1.10 → **1.25** |
+| rim | 0.65 (never driven) → **0.80** | 0.65 → **1.05** |
+| environment | — → **0.55** | — → **0.60** |
 
-Per mood, tuned with `tests/qa/lum-probe.mjs` open. Abyss wants a lower ambient
-than Crust (it is meant to be oppressive) but needs its rim raised further or
-silhouettes vanish — that is the failure that produced the 9–26 rooms the gate
-originally caught.
+The **rim was bound but never driven** by either preset, so it sat on the engine
+default in both moods. The Abyss needs more of it, not the same: its key is
+dimmer against its background, so a silhouette separates on the rim or not at
+all — the failure that produced the unreadable 9–26 rooms originally.
 
-**Acceptance:** every room passes both the mean band **and** the new contrast
-floor. Contrast should rise materially; if it does not, the rebalance is not
-doing what it claims.
+Per-level trims were rebalanced from ambient toward key. The overworld got a
+`lightTune` of its own: it is the one place with no ceiling and no walls, so it
+takes the key across its whole floor plane and hit 97 against a ceiling of 90
+while every dungeon sat at 55–79. Trimming one exterior beats re-darkening
+fourteen interiors.
+
+**Result: contrast rose on 14 of 16 levels**, Abyss dungeons roughly doubling
+(Bone 34 → 78, Town 43 → 82, Pyre 43 → 79, Sluice 44 → 77). The two that fell are
+recorded in `tests/game/luminance.spec.mjs`, not hidden.
 
 **Rollback:** restore the table above. Regenerate certification captures.
 
 ---
 
-## Ticket 6 — Spend the budget
+## Ticket 6 — Spend the budget ✅ (partly — see below)
 
-**79,572 triangles. 43 draw calls.** There is room for roughly an order of
-magnitude more geometry before anything hurts. The world is not under-detailed
-because of a technical constraint; it is under-detailed because nothing has
-asked it for more. All of these are bake-time work — free at runtime:
+**79,572 triangles. 43 draw calls.** Room for roughly an order of magnitude more
+before anything hurts. The world was not under-detailed for a technical reason;
+nothing had asked it for more.
 
-- **Trim and edge geometry.** A wall meeting a floor with a visible plinth reads
-  as built; a clean 90° reads as a box. Generate from the existing room
-  definitions; no hand authoring.
-- **Silhouette breakers** along wall tops, so the roomline is not a ruler edge.
-- **Vertical interest.** Rooms are 4–5 voxels tall with flat ceilings. Height
-  variation is the main thing separating "a room" from "a place".
-- **Decals** — scorch, water staining, moss in the Mire, frost in the Cryo — as
-  vertex-colour work at bake time.
+**Done — silhouette:** `src/game/world/room-trim.js` adds parapets with broken
+heights, pilasters every seventh cell, and taller corner posts, generated from
+the existing room definitions for all fourteen dungeons and the overworld.
 
-**Acceptance:** triangle count rises substantially with draw calls roughly flat
-(if calls scale with detail, the batching is wrong). Frame time in the perf
-overlay must not regress.
+Two rules make it safe to apply everywhere at once without re-auditing a single
+level: it only adds voxels **above the wall top** (never `y <= 2`, the band the
+hero's body occupies), and only on the **room perimeter** (never interior
+structures, where platforms and grapple routes live).
+`tests/game/room-trim.spec.mjs` bakes each room with and without trim and
+requires the occupied cell set at `y <= 2` to be **byte-identical** — asserting
+"trim stays above y=2" from the outside would only restate the implementation.
+
+**Cost: +728 triangles, +0 draw calls** in a dungeon room. It merges into the
+same voxel map the room is meshed from, which is the whole reason it is done at
+bake time rather than as props.
+
+Two things worth knowing:
+
+- The trim was shaded **darker** than the wall cap first. The gate rejected it in
+  one run: seven Abyss levels lost ~4 points of mean and fell out of band. Trim
+  stands against the **sky**, and the Abyss sky is dark violet — dark trim on a
+  dark background is invisible, not moody. It lifts now.
+- Taller walls cast more real shadow into rooms, which only works because of
+  tickets 2 and 4. The light was raised to hold the mean while keeping the
+  contrast. That trade is exactly what the contrast floor exists to arbitrate,
+  and this was the first time it did.
+
+**Still open, and deliberately so.** The plan listed four items and this delivered
+one and a half. Remaining, in value order:
+
+1. **Vertical interest inside rooms.** Floors are flat. Height variation is the
+   main thing separating "a room" from "a place", and it is also the item that
+   *cannot* follow the two safety rules above — it changes where the player can
+   walk, so it needs per-level design work and a traversal re-audit, not a
+   global pass.
+2. **Trim and edge geometry at the floor/wall junction** — a visible plinth. Same
+   caveat, smaller: it eats a cell of floor around the perimeter, so door
+   triggers and pickup reachability need checking.
+3. **Decals** — scorch, water staining, moss in the Mire, frost in the Cryo — as
+   vertex-colour work at bake time. Free at runtime and gameplay-neutral by
+   construction, so this is the cheapest of the three.
+
+The headroom is still there: the campaign runs at ~37k triangles per dungeon
+against a budget that will take several hundred thousand.
 
 ---
 
-## Order
+## Order, and what each one costs to undo
 
 | # | ticket | risk | changes existing rooms? |
 |---|---|---|---|
 | 1 | Contrast floor on the gate | low | no — a new assertion |
-| 2 | `receiveShadow` + contact discs | low | slightly |
+| 2 | `receiveShadow` + contact discs | low | yes, subtly — everything is shaded now |
 | 3 | Procedural PMREM + real metalness | low | specular only |
-| 4 | Sun follows the active room | medium | **yes — 5 of 6 rooms gain shadows** |
+| 4 | Sun follows the active room | medium | **yes — nearly every room gains shadows** |
 | 5 | Ambient/key rebalance | medium | **yes, everywhere** |
-| 6 | Bake-time trim / silhouette / decals | low | additive |
+| 6 | Bake-time trim | low | additive, above the wall line |
 
-1–3 can be done in one pass. 4 and 5 are the ones that make it look like a
-different game.
-
-**After 4 and 5: regenerate the 44 certification captures.** That was already
-outstanding before this plan existed. Procedure is in `CERTIFICATION.md`; use
-`H` to hide HUD chrome for clean frames.
+**The 44 certification captures are stale and must be regenerated.** They were
+stale before this work started; tickets 4 and 5 guarantee it. Procedure is in
+`CERTIFICATION.md`; press `H` to hide HUD chrome for clean frames.

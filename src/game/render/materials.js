@@ -53,15 +53,30 @@ export function response(hex) {
     const brightNeutral = smoothstep(0.5, 0.9, lum) * (1 - smoothstep(0.1, 0.5, sat));
     const saturated = smoothstep(0.35, 0.8, sat);
     const polish = Math.min(1, brightNeutral + saturated);
-    // Metalness is kept small: this engine has little environment light, so a
-    // strongly metallic surface would read dark and pull low-ambient (Abyss)
-    // rooms below the luminance band. A hint of metal is enough to differentiate
-    // iron/machinery without darkening the frame.
-    const metal = 0.12 * smoothstep(0.0, 0.3, sat) * (lum >= 0.4 ? 1 : 0.4)
-        + 0.10 * (lum >= 0.28 && sat < 0.12 ? 1 : 0);
+    // Metalness used to be capped at 0.12 with this note:
+    //
+    //     this engine has little environment light, so a strongly metallic
+    //     surface would read dark
+    //
+    // Which was true, and the correct workaround for a missing input:
+    // `scene.environment` was null, so a metal had nothing to reflect and
+    // resolved to a dark surface. The family system classified gold, iron and
+    // ice correctly and then flattened all three back to painted plaster.
+    //
+    // render/mood-environment.js supplies a real PMREM environment now, so the
+    // cap comes off and the families separate by soft bands that mirror
+    // classifyFamily's thresholds. Bands rather than steps because a hard cut
+    // at a luminance boundary shows up as a seam across a gradient wall.
+    const metalBand = smoothstep(0.24, 0.32, lum)
+        * (1 - smoothstep(0.46, 0.56, lum))
+        * (1 - smoothstep(0.14, 0.24, sat));
+    const polishedBand = smoothstep(0.46, 0.56, lum)
+        * (1 - smoothstep(0.40, 0.52, sat));
+    const energyBand = smoothstep(0.38, 0.52, sat);
+    const metal = 0.61 * metalBand + 0.31 * polishedBand + 0.20 * energyBand;
     return {
         roughness: clamp(0.88 - 0.45 * polish, 0.2, 1),
-        metalness: clamp(0.04 + metal, 0, 0.6),
+        metalness: clamp(0.04 + metal, 0, 0.7),
     };
 }
 
@@ -93,9 +108,14 @@ const METAL_CHUNK = /* glsl */`
     float _mx2 = max(max(vColor.r, vColor.g), vColor.b);
     float _mn2 = min(min(vColor.r, vColor.g), vColor.b);
     float _sat2 = _mx2 - _mn2;
-    float _m = 0.12 * smoothstep(0.0, 0.3, _sat2) * (_lum2 >= 0.4 ? 1.0 : 0.4)
-             + 0.10 * ((_lum2 >= 0.28 && _sat2 < 0.12) ? 1.0 : 0.0);
-    metalnessFactor = clamp(metalnessFactor + _m, 0.0, 0.6);
+    float _metalBand = smoothstep(0.24, 0.32, _lum2)
+                     * (1.0 - smoothstep(0.46, 0.56, _lum2))
+                     * (1.0 - smoothstep(0.14, 0.24, _sat2));
+    float _polishedBand = smoothstep(0.46, 0.56, _lum2)
+                        * (1.0 - smoothstep(0.40, 0.52, _sat2));
+    float _energyBand = smoothstep(0.38, 0.52, _sat2);
+    float _m = 0.61 * _metalBand + 0.31 * _polishedBand + 0.20 * _energyBand;
+    metalnessFactor = clamp(metalnessFactor + _m, 0.0, 0.7);
 }
 `;
 
@@ -116,7 +136,15 @@ export function makeLevelMaterial(opts = {}) {
             .replace('#include <roughnessmap_fragment>', ROUGH_CHUNK)
             .replace('#include <metalnessmap_fragment>', METAL_CHUNK);
     };
+    // Deliberately NOT setting envMapIntensity here. It multiplies with
+    // `scene.environmentIntensity`, so setting both gives two knobs for one
+    // quantity — and since only level geometry goes through this factory, the
+    // effect would be walls reflecting less than the props standing against
+    // them, for no reason anybody could later reconstruct. The environment is
+    // tuned in one place: render/mood-environment.js.
     // All level materials share this hook → share one compiled program.
-    mat.customProgramCacheKey = () => 'ss-level-family-v1';
+    // Bumped to v2 with the metalness rebalance: the old key would have served
+    // a cached program compiled from the previous GLSL.
+    mat.customProgramCacheKey = () => 'ss-level-family-v2';
     return mat;
 }

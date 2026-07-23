@@ -108,6 +108,7 @@ export class TriCompiler {
             mesh.position.set(c.x, c.y != null ? c.y : 1.4, c.z);
             mesh.scale.setScalar(1.35); // S6 (P1-5): silhouette ≥ 2.4 units
             mesh.castShadow = true;
+            mesh.receiveShadow = true;
             scene.add(mesh);
             const core = {
                 root: mesh, mesh, hitRadius: 1.15,
