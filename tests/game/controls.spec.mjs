@@ -40,6 +40,14 @@ function boundPadButtons(source) {
     return found;
 }
 
+/** Stick axes the handler genuinely reads: `gp.axes?.[N]`. */
+function boundPadAxes(source) {
+    const body = source.slice(source.indexOf('pollGamepad('));
+    const found = new Set();
+    for (const m of body.matchAll(/gp\.axes\?\.\[(\d+)\]/g)) found.add(+m[1]);
+    return found;
+}
+
 /** Codes the handler genuinely reacts to: `e.code === 'X'` and `keys.has('X')`. */
 function boundCodes(source) {
     // Only scan the class body, so the CONTROLS table above it is not counted
@@ -119,6 +127,20 @@ export function run(t) {
     const padPhantom = [...padTabled].filter((i) => !padBound.has(i));
     t.ok('the CONTROLS table does not list buttons the handler ignores',
         padPhantom.length === 0, `phantom buttons: ${padPhantom.join(', ')}`);
+
+    // Sticks, held to the same standard as buttons. `padAxes` exists to be
+    // checked here — a field the table carries and nothing verifies is exactly
+    // the decorative data this project has been bitten by before.
+    const axesBound = boundPadAxes(source);
+    const axesTabled = new Set(CONTROLS.flatMap((c) => c.padAxes || []));
+    t.ok('the handler reads both sticks', axesBound.size === 4,
+        `axes read: ${[...axesBound].sort().join(',')}`);
+    t.ok('every stick axis the game reads is in the CONTROLS table',
+        [...axesBound].every((i) => axesTabled.has(i)),
+        `table has ${[...axesTabled].sort().join(',')}`);
+    t.ok('the table does not list axes the handler ignores',
+        [...axesTabled].every((i) => axesBound.has(i)),
+        `phantom axes: ${[...axesTabled].filter((i) => !axesBound.has(i)).join(',')}`);
 
     const pad = padSheet();
     for (const c of CONTROLS.filter((x) => !x.dev && x.pad)) {

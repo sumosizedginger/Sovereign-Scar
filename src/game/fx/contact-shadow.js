@@ -206,10 +206,9 @@ export class ContactShadows {
     }
 }
 
-/** Release the module-level shared resources (test teardown). */
-export function disposeContactShadowResources() {
-    sharedGeo?.dispose();
-    sharedMat?.dispose();
-    sharedTex?.dispose();
-    sharedGeo = sharedMat = sharedTex = null;
-}
+// No module-level disposer, deliberately. The shared geometry, material and
+// falloff texture are created once and live for the page — one circle, one
+// basic material, one 64×64 canvas. `clear()` on level unload removes the disc
+// meshes; the shared resources are meant to survive that, because rebuilding
+// them per level is the only thing that would make them cost anything. An
+// exported teardown nothing calls reads as a leak somebody forgot to plug.

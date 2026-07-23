@@ -13,7 +13,7 @@ Built on **[My-Engine](https://github.com/sumosizedginger/My-Engine) 0.2.0** (pi
 
 ```bash
 npm run serve          # http://127.0.0.1:8799/
-npm test               # unit + browser E2E (2895 assertions)
+npm test               # unit + browser E2E (2898 assertions)
 npm run test:unit      # unit only
 ```
 

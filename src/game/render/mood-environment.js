@@ -88,7 +88,7 @@ function lerpHex(a, b, t) {
 }
 
 /** Build the equirectangular gradient for a mood as a CanvasTexture. */
-export function buildSkyTexture(mood = 'crust') {
+function buildSkyTexture(mood = 'crust') {
     if (typeof document === 'undefined') return null; // headless unit runs
     const sky = MOOD_SKIES[mood] || MOOD_SKIES.crust;
     const c = document.createElement('canvas');
@@ -162,17 +162,16 @@ export function applyMoodEnvironment(scene, renderer, mood = 'crust') {
     return true;
 }
 
-/** Tear down the cache (level teardown / tests). */
-export function disposeMoodEnvironments(scene = null) {
-    for (const k of Object.keys(cache)) {
-        cache[k].texture?.dispose?.();
-        cache[k].source?.dispose?.();
-        delete cache[k];
-    }
-    pmrem?.dispose?.();
-    pmrem = null;
-    if (scene) scene.environment = null;
-}
+// There is deliberately NO disposer here, and that is not an oversight.
+//
+// The cache holds exactly two PMREM targets — one per mood — for the life of
+// the page, which is the point: a Crust↔Abyss flip is a lookup rather than a
+// regeneration. Nothing in the game tears the scene down wholesale, and the
+// quality-tier path (`applyQualitySetting` → `reapplyVisual`) re-enters through
+// the cache rather than rebuilding. A `disposeMoodEnvironments()` was written
+// and then removed because nothing called it: an exported teardown with no
+// caller reads as a contract somebody forgot to honour, and the next person to
+// notice would go looking for the leak it implies. There isn't one.
 
 /** Exposed for the spec — the intent, without needing a GL context. */
 export { MOOD_SKIES };

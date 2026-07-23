@@ -21,7 +21,7 @@ assertion before changing it.
 
 ## State
 
-Everything below is committed and green. Suite: **2133 unit / 2895 total**.
+Everything below is committed and green. Suite: **2136 unit / 2898 total**.
 
 | area | state |
 |---|---|

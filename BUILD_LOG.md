@@ -482,7 +482,7 @@ New specs `music` (309 assertions) and `game-feel-visuals`; probes
 `synth.channelGain(channel)`, so game-side persistent buses honour the same
 volume settings.
 
-### Session 13 — the renderer pass, all six tickets (suite 2575 → 2895)
+### Session 13 — the renderer pass, all six tickets (suite 2575 → 2898)
 
 All six tickets of `docs/VISUAL_PLAN.md` implemented in order. The plan had been
 written for another agent to pick up cold; the owner asked for it to be built
@@ -571,6 +571,15 @@ New probes: `contrast-probe`, `shadow-census`, `env-probe`, `trim-cost`,
   `pollGamepad` itself and checks button coverage BOTH ways. Keyboard-only
   verbs (vial, dust, beat cycle, mute) are asserted to stay unmapped rather
   than have a button invented for them.
+
+- **Self-audit against Trap 4.** Ran the project's own "remove the data
+  too" rule over what this session added and found three violations of it:
+  `padAxes` was carried by the table and checked by nothing (the spec reads
+  `gp.axes?.[N]` from `pollGamepad` and cross-checks both ways now);
+  `disposeMoodEnvironments()` and `disposeContactShadowResources()` had no
+  callers (deleted — both caches are page-lifetime on purpose, and the
+  comments say so rather than implying a leak); `buildSkyTexture` was
+  needlessly exported. A sweep confirms no exported symbol is unreferenced.
 
 New specs: `luminance`, `shadow-roles`, `room-trim`, `room-decals`,
 `albedo-trim`, `shadow-frustum-e2e`.

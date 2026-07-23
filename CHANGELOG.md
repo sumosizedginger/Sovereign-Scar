@@ -137,6 +137,27 @@ box, not as a place.
   while keeping the contrast. That trade is what the contrast floor exists to
   arbitrate, and this is the first time it did.
 
+### Auditing this session's own work against its own rule
+
+Trap 4 in `HANDOFF.md` says: deleting the call is not deleting the feature —
+remove the data too, or the next reader will conclude it was meant to be wired
+up. Running that rule over the code *this session* added found three violations
+of it, all mine:
+
+- **`padAxes` was decorative.** The gamepad table carried the stick axis
+  indices and nothing checked them. It is load-bearing now: the spec reads
+  `gp.axes?.[N]` out of `pollGamepad` and requires the table and the handler to
+  agree in both directions, exactly as it already did for buttons.
+- **`disposeMoodEnvironments()` and `disposeContactShadowResources()` had no
+  callers.** Both deleted. An exported teardown nothing calls reads as a
+  contract somebody forgot to honour, and sends the next reader looking for a
+  leak that is not there — in both cases the resources (two PMREM targets; one
+  geometry, one material, one 64×64 canvas) are cached for the life of the page
+  on purpose, and the comments now say so.
+- `buildSkyTexture` was exported and used only internally; it is private now.
+
+A sweep of every symbol the session exported confirms none is unreferenced.
+
 ### The one list left un-generated was wrong
 
 The keyboard cheat sheet was unified into `CONTROLS` last session. The **gamepad**
