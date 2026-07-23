@@ -39,6 +39,10 @@ Everything below is committed and green. Suite: **2171 unit / 2966 total**.
 
 ## What to do next
 
+**The four open items are written up as a self-contained brief in
+[docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md)** — hand that to whoever
+is deciding. Summarised:
+
 **Two open questions that need a person, not an implementer:**
 
 1. **Should boss rooms be held to the entry-room band?** Boss rooms have never
