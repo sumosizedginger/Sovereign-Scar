@@ -132,7 +132,8 @@ try {
     console.log('-'.repeat(68));
     for (const r of rows) {
         if (r.err || r.bossMean == null) continue;
-        const band = r.mood === 'abyss' ? [35, 75] : [45, 90];
+        // One shared band for both moods — see tests/visual-sanity.spec.mjs.
+        const band = [45, 90];
         const flag = r.bossMean < band[0] || r.bossMean > band[1] ? '  <-- OUT' : '';
         console.log(
             `${r.id.padEnd(21)} ${String(r.bossId).padEnd(16)}`

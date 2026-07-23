@@ -20,10 +20,28 @@
 
 /** Half-angle of the guarded cone, in radians. 60° each way = 120° frontal. */
 export const GUARD_ARC = Math.PI / 3;
-/** Fraction of damage that still gets through a successful (non-parry) block. */
-export const GUARD_CHIP = 0.25;
-/** Press-to-parry window. Generous enough to be learnable, tight enough to feel earned. */
-export const PARRY_WINDOW = 0.18;
+/**
+ * Fraction of damage that still gets through a successful (non-parry) block.
+ *
+ * Zero, and deliberately so. This was 0.25, and the owner played it and said
+ * plainly: "holding block still causes you to take damage." That is not what a
+ * shield does in the game this one is modelled on — you hold it up, the hit
+ * stops, and holding it up is not itself a slow way of dying.
+ *
+ * Blocking is still not free, because the cost was never supposed to be the
+ * chip: it is POISE. Every blocked hit spends poise from a three-point pool
+ * that refills four times slower while the shield is up, and emptying it is a
+ * guard break — 0.9s of total helplessness, the worst position in the game.
+ * Turtling through a combo still loses; it just loses to the mechanic that was
+ * built for it instead of to a damage leak the player could not see coming.
+ */
+export const GUARD_CHIP = 0;
+/**
+ * Press-to-parry window. Was 0.18s — the owner played it and called it too
+ * strict ("requires PERFECT timing"). Widened to give a real reaction window
+ * rather than requiring a frame-perfect read.
+ */
+export const PARRY_WINDOW = 0.3;
 /** Poise pool; each blocked hit costs its damage in poise. */
 export const POISE_MAX = 3;
 /** Poise regenerated per second while not guarding. */

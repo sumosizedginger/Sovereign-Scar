@@ -47,6 +47,23 @@ function buildHeartMesh() {
     return group;
 }
 
+/**
+ * Where a slain enemy's drops belong: its own square metre, on the FLOOR.
+ *
+ * Exported because it is the one rule every drop site has to share. Drops were
+ * spawned at `enemy.root.position`, which for a hovering enemy is 3.4 units in
+ * the air — and `HeartDrop.update` only collects within 2.0 units of vertical,
+ * so a mote's heart was not merely floating, it was uncollectable. Enemies that
+ * know they fly expose `dropY`; anything else (dummies, bosses) has its rig on
+ * the ground already and falls through unchanged.
+ *
+ * @returns {[number, number, number]} spawn args, x/y/z
+ */
+export function dropSite(enemy) {
+    const p = enemy.root.position;
+    return [p.x, enemy.dropY != null ? enemy.dropY : p.y, p.z];
+}
+
 export class HeartDrop {
     constructor(scene, x, y, z, amount = 1) {
         this.scene = scene;
@@ -125,17 +142,33 @@ export class HeartDropManager {
         const base = 0.22 + Math.min(0.18, (enemy?.maxHp || 3) * 0.03);
         const chance = Math.min(1, (base + hurt * 0.35) * getActiveRunMode().heartDropChance);
         if (Math.random() > chance) return null;
-        const p = enemy.root.position;
-        return this.spawn(p.x, p.y, p.z);
+        return this.spawn(...dropSite(enemy));
+    }
+
+    /**
+     * Declared loot, dropped where the body fell.
+     *
+     * `Enemy.loot` has existed since the class was written and nothing ever
+     * read it — an enemy carrying an item simply took it with it. This is the
+     * one place in the game that already knows a kill just happened, so it is
+     * where the field finally gets honoured. The level owns pickups, so it has
+     * to supply `addPickup`; without a level (unit tests, the sandbox) the
+     * hearts still roll and loot is skipped rather than throwing.
+     */
+    dropLoot(enemy, level) {
+        if (!enemy.loot || !level?.addPickup) return null;
+        const [x, y, z] = dropSite(enemy);
+        return level.addPickup({ x, y: y + 0.2, z }, enemy.loot);
     }
 
     /** Poll enemies for fresh kills, then advance every loose heart. */
-    update(dt, enemies, player) {
+    update(dt, enemies, player, level) {
         for (const e of enemies || []) {
             if (!e || e._heartRolled) continue;
             if (e.state?.current !== 'DEAD') continue;
             e._heartRolled = true;
             this.rollForKill(e, player);
+            this.dropLoot(e, level);
         }
         this.drops = this.drops.filter((d) => {
             const keep = d.update(dt, player);

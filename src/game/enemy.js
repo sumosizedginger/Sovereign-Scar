@@ -8,6 +8,42 @@ import { ENEMY_PALETTES } from './assets/palettes.js';
 import { sfx } from '../audio/synth.js';
 import { getActiveRunMode } from './kernel/run-mode.js';
 import { coach } from './ui/coach.js';
+import { inGuardArc } from './combat/guard.js';
+import { applyHit } from './combat/combat-sweeper.js';
+
+/**
+ * What a bolt is worth once you have sent it back. Double, because the point
+ * of a deflection is that the shooter's own attack is the punish — a bolt that
+ * came back for the same 1 damage a sword swing does would make facing the
+ * shot strictly worse than closing the distance.
+ */
+const REFLECT_DAMAGE_MULT = 2;
+
+/**
+ * The mote's burst, as three numbers that MUST agree.
+ *
+ * They are named because they were three separate literals — the distance the
+ * mote parks at, the radius it draws, and the radius it resolves against — and
+ * a burst whose drawn ring does not match the range it damages is a telegraph
+ * that lies. This is the kind that the owner reported as having "no way to
+ * avoid their hit or defend against it", so the tell had better be honest.
+ *
+ * What you have to do to escape is `MOTE_BURST - MOTE_HOLD` = 0.6 units, and
+ * how long you have to do it in is `MOTE_WINDUP` seconds. It used to be 0.8
+ * units in 0.5s while the ring was drawn wider than the mote ever came — the
+ * numbers were survivable on paper and unreadable in play. Now the mote comes
+ * visibly INSIDE the circle it paints, and stepping off it is a short walk
+ * with most of a second to make it.
+ *
+ * The other half of the answer is the shield: a mote's burst carries a real
+ * origin, so it lands in the guarded cone if you turn and face it. That was
+ * always true and always useless, because a blocked hit still chipped you and
+ * a mote cannot be answered with a sword. With chip damage now zero, standing
+ * your ground and facing it is a genuine second answer.
+ */
+const MOTE_HOLD = 2.0;
+const MOTE_BURST = 2.6;
+const MOTE_WINDUP = 0.85;
 
 export class Enemy {
     /**
@@ -254,6 +290,19 @@ export class Enemy {
         return this.frontArmor && this._openT <= 0 && this.state.current !== 'DEAD';
     }
 
+    /**
+     * The floor under this enemy — where anything it drops belongs.
+     *
+     * A hovering enemy's `root.position.y` is `_groundY + flyHeight`, i.e. 3.4
+     * units up, and every drop was being spawned there: hearts from a slain
+     * mote hung in mid-air, and `HeartDrop.update` only collects within 2.0
+     * units of vertical, so they were not merely ugly — they were
+     * unreachable. Killing a mote paid you nothing at all.
+     */
+    get dropY() {
+        return this.hover ? this._groundY : this.rig.position.y;
+    }
+
     /** Z5: true while a hovering enemy is genuinely out of sword reach. */
     get airborne() {
         return this.hover && !(this._groundedT > 0) && this.state.current !== 'DEAD';
@@ -455,19 +504,22 @@ export class Enemy {
      * pulses a short-range burst, which stops "just ignore it" from working.
      */
     _aiDrift(dt, player, dx, dz, dist) {
-        if (dist > 2.4) {
+        if (dist > MOTE_HOLD) {
             this._move(dx, dz, dist, this.speed * 0.55 * dt);
         }
-        if (this.attackCd <= 0 && dist < 3.2) {
+        if (this.attackCd <= 0 && dist < MOTE_BURST) {
             this.attackCd = (1.8 / this.actionFrequency) + this.windup;
             this._beginWindup((p, d) => {
-                if (d < 3.2) {
+                if (d < MOTE_BURST) {
                     p.health.damage(this.damage, 0.7, 'hostile', {
                         from: this.rig.position, attacker: this,
                     });
                     sfx.hurt();
                 } else sfx.step();
-            }, { windup: 0.5 * getActiveRunMode().telegraphDuration, reach: 0, radius: 3.2, color: 0xc084fc });
+            }, {
+                windup: MOTE_WINDUP * getActiveRunMode().telegraphDuration,
+                reach: 0, radius: MOTE_BURST, color: 0xc084fc,
+            });
         }
     }
 
@@ -584,20 +636,47 @@ export class Enemy {
             p.life -= dt;
             p.mesh.position.x += p.vx * dt;
             p.mesh.position.z += p.vz * dt;
-            if (player && !player.health?.dead) {
+
+            if (p.reflected) {
+                // The bolt belongs to the player now. It no longer threatens
+                // them; it threatens the thing that fired it.
+                if (this.state.current !== 'DEAD') {
+                    const d = Math.hypot(
+                        this.rig.position.x - p.mesh.position.x,
+                        this.rig.position.z - p.mesh.position.z
+                    );
+                    if (d < (this.hitRadius || 0.5) + 0.45) {
+                        applyHit(this, { damage: p.damage }, player);
+                        p.life = 0;
+                    }
+                }
+            } else if (player && !player.health?.dead) {
                 const d = Math.hypot(
                     player.root.position.x - p.mesh.position.x,
                     player.root.position.z - p.mesh.position.z
                 );
                 if (d < 0.7) {
-                    const facing = player.state?.facingVec;
-                    const toward = facing
-                        ? ((p.mesh.position.x - player.root.position.x) * facing.x
-                            + (p.mesh.position.z - player.root.position.z) * facing.z) / (d || 1)
-                        : -1;
-                    if (player.inventory?.hasItem?.('reflector_plate') && toward > 0.45) {
-                        sfx.block();
-                        p.life = 0;
+                    // A shooter must be answerable by HOLDING the shield, not
+                    // by parrying it. A parry is a timed read of a wind-up you
+                    // can see; a bolt already in flight gives you the travel
+                    // time and nothing else, so demanding frame-accuracy for
+                    // something you cannot walk out of is asking for a read
+                    // the game never showed you. Facing it is the whole skill.
+                    //
+                    // `inGuardArc` rather than a second hand-rolled dot product:
+                    // the cone the shield covers has exactly one definition, and
+                    // the copy that used to live here (`toward > 0.45`, ~63°)
+                    // silently disagreed with the 60° the guard actually uses.
+                    const covered = inGuardArc(
+                        player.root.position, player.state?.facingVec, p.mesh.position);
+                    const guarding = !!player.guard?.raised;
+                    // The Reflector Plate is now the PASSIVE version of a verb
+                    // everyone has: it bounces frontal shots with no shield up
+                    // and no button held. Before, it was the only way to bounce
+                    // anything at all, and all it did was delete the bolt.
+                    const plate = !!player.inventory?.hasItem?.('reflector_plate');
+                    if (covered && (guarding || plate)) {
+                        this._reflect(p, player);
                     } else {
                         // A projectile's "from" is the shot itself, not the
                         // shooter — you guard the incoming bolt's direction.
@@ -617,6 +696,39 @@ export class Enemy {
             }
             return true;
         });
+    }
+
+    /**
+     * Send a bolt back at whoever fired it.
+     *
+     * Aimed at the shooter rather than simply negated, because "the shot came
+     * back" is the feedback that teaches the verb. A bolt that merely vanished
+     * (which is all the Reflector Plate used to do) reads as "my shield ate it"
+     * — true, but it never tells the player that facing a shooter is an
+     * offensive option.
+     */
+    _reflect(p, player) {
+        const dx = this.rig.position.x - p.mesh.position.x;
+        const dz = this.rig.position.z - p.mesh.position.z;
+        const len = Math.hypot(dx, dz) || 1;
+        // Homed at the shooter's CURRENT position, not simply negated: a bolt
+        // fired while the shooter was strafing would otherwise come back to
+        // where it was standing a second ago and miss for reasons the player
+        // cannot see.
+        const speed = Math.hypot(p.vx, p.vz) * 1.25;
+        p.vx = (dx / len) * speed;
+        p.vz = (dz / len) * speed;
+        p.reflected = true;
+        // A clean read hits harder, but is never REQUIRED — holding the shield
+        // is the answer, and the parry window is only ever a bonus on top.
+        p.damage *= REFLECT_DAMAGE_MULT * (player.guard?.parryReady ? 2 : 1);
+        p.life = Math.max(p.life, 2.5);
+        // Recoloured to the player's gold so a bolt in flight always says whose
+        // it is. At this camera distance the direction of travel alone is not
+        // readable fast enough to matter.
+        p.mesh.material.color.setHex(0xffd060);
+        p.mesh.material.emissive.setHex(0xffa020);
+        sfx.block();
     }
 
     _clearProjectiles() {

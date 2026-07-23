@@ -22,6 +22,9 @@ import { hitboxCheck } from '../../src/combat/hitbox.js';
 import { ENEMY_PALETTES } from '../../src/game/assets/palettes.js';
 import { ARCHETYPES } from '../../src/game/characters/archetypes.js';
 import { WEAPONS, getWeapon } from '../../src/game/combat/weapons.js';
+import { HealthPool } from '../../src/game/kernel/health.js';
+import { GuardController, PARRY_WINDOW, POISE_MAX } from '../../src/game/combat/guard.js';
+import { HeartDropManager, dropSite } from '../../src/game/world/heart-drops.js';
 import { BEAT_DEFS } from './_beat-defs.mjs';
 
 const NEW_KINDS = ['bulwark', 'mote', 'lancer', 'brood'];
@@ -304,6 +307,214 @@ export function run(t) {
         t.ok('the mote returns to altitude when the window expires',
             m.airborne === true && hitboxCheck(hero, m, WEAPONS.anchor_link) === false,
             `y=${m.rig.position.y.toFixed(2)}`);
+    }
+
+    // --- mote: the burst has to be answerable -----------------------------
+    //
+    // Reported from play: "the purple guys who are flying, you don't really
+    // have a way to avoid their hit or defend against it." Both halves were
+    // true. The tell was drawn at a radius the mote never actually closed to,
+    // so the ring said "this whole circle" while the mote parked well inside
+    // it; and the only defence — the shield — still leaked 25% chip on a kind
+    // that cannot be answered with a sword at all.
+    {
+        const m = spawn('mote', { x: 0, y: 1, z: 0 });
+        const hero = {
+            root: { position: { x: 0, y: 1.95, z: -6 } },
+            health: { dead: false, damage: () => ({ accepted: true }) },
+            state: { facingVec: { x: 0, z: 1 } },
+        };
+        // Let it close and commit to a burst.
+        let guardRail = 0;
+        while (!m._pendingStrike && guardRail++ < 2000) m.update(0.016, hero);
+        t.ok('a mote commits to a burst on its own', !!m._pendingStrike);
+
+        const parkedAt = Math.hypot(
+            m.rig.position.x - hero.root.position.x,
+            m.rig.position.z - hero.root.position.z);
+        const drawn = m._tell?.geometry?.parameters?.outerRadius;
+        t.ok('the burst paints a ring', drawn > 0, `r=${drawn}`);
+
+        // The ring must mean what it says. Probe the pending strike either
+        // side of the drawn radius: a telegraph that damages beyond its own
+        // circle is not a telegraph, it is an ambush with decoration.
+        let hitInside = false, hitOutside = false;
+        const probe = { ...hero, health: { dead: false, damage() { probe._hit = true; return { accepted: true }; } } };
+        probe._hit = false; m._pendingStrike(probe, drawn - 0.05); hitInside = probe._hit;
+        probe._hit = false; m._pendingStrike(probe, drawn + 0.05); hitOutside = probe._hit;
+        t.ok('the burst damages inside the ring it drew', hitInside === true);
+        t.ok('the burst does NOT damage outside it', hitOutside === false,
+            `drawn=${drawn} — the ring used to be a different number from the one that resolved`);
+
+        // And it has to be walkable. The mote commits from INSIDE its own
+        // circle, so the escape is a short step, and the wind-up is long
+        // enough to take it at walking pace with room to spare.
+        const escape = drawn - parkedAt;
+        t.ok('the mote commits from inside the circle it paints', escape > 0,
+            `parked=${parkedAt.toFixed(2)} ring=${drawn}`);
+        const PLAYER_SPEED = 5.5; // src/game/player.js
+        const needed = escape / PLAYER_SPEED;
+        t.ok('there is time to walk out of the burst before it lands',
+            m._tellMax > needed * 2,
+            `windup=${m._tellMax.toFixed(2)}s, walking out takes ${needed.toFixed(2)}s`);
+    }
+    {
+        // The second answer: stand and face it. A mote's burst carries a real
+        // origin, so it lands in the guarded cone — and with chip damage now
+        // zero, holding the shield is a genuine defence rather than a slower
+        // way of taking the same hit.
+        const m = spawn('mote', { x: 0, y: 1, z: 0 });
+        const health = new HealthPool(10);
+        const guard = new GuardController();
+        const at = { x: 0, z: -2 };
+        health.damageFilter = (hit) => guard.resolve(hit, at, { x: 0, z: 1 });
+        guard.update(0.016, true);
+        guard.update(PARRY_WINDOW + 0.05, true); // past the parry — a plain hold
+        const hero = { root: { position: { x: at.x, y: 1.95, z: at.z } }, health,
+            state: { facingVec: { x: 0, z: 1 } } };
+        m.rig.position.set(0, m.rig.position.y, 0);
+        let guardRail = 0;
+        while (!m._pendingStrike && guardRail++ < 2000) m.update(0.016, hero);
+        m._pendingStrike(hero, 0.5); // resolve it right on top of them
+        t.ok('a mote burst is stopped by a raised shield', health.hp === 10, `hp=${health.hp}`);
+        t.ok('...and blocking it still costs poise', guard.poise < POISE_MAX,
+            `poise=${guard.poise}`);
+    }
+
+    // --- what a slain enemy leaves behind ---------------------------------
+    //
+    // `Enemy.loot` was assigned in the constructor and read by NOTHING, and
+    // every drop was spawned at `root.position` — which for a hovering enemy
+    // is 3.4 units in the air, above the 2.0-unit vertical pickup range. A
+    // mote's reward was not merely floating, it was uncollectable.
+    {
+        const m = spawn('mote', { x: 3, y: 1, z: -4 });
+        t.ok('a mote really is airborne', m.root.position.y > 3, `y=${m.root.position.y}`);
+        const [x, y, z] = dropSite(m);
+        t.ok('its drops land on the floor, not at flight altitude',
+            y === 1, `dropY=${y} rigY=${m.root.position.y}`);
+        t.ok('...directly under the body', x === 3 && z === -4, `${x},${z}`);
+        // A HeartDrop sits 0.5 above whatever y it is given, and collects
+        // within 2.0 vertical of a player rig at 1.95. Prove the drop is
+        // actually reachable rather than merely lower than it was.
+        t.ok('and is inside the collection window a standing player has',
+            Math.abs(1.95 - (y + 0.5)) < 2.0, `dy=${Math.abs(1.95 - (y + 0.5)).toFixed(2)}`);
+    }
+    {
+        const s = spawn('sentinel', { x: 2, y: 1, z: 2 });
+        const [, y] = dropSite(s);
+        t.ok('a walking enemy drops exactly where it always did',
+            y === s.root.position.y, `${y}`);
+    }
+    {
+        // The loot field finally does something.
+        const mgr = new HeartDropManager(new THREE.Scene());
+        const added = [];
+        const level = { addPickup: (pos, data) => { added.push({ pos, data }); return data; } };
+        const e = spawn('sentinel', { x: 5, y: 1, z: 5 }, { loot: { label: 'Shard cache' } });
+        e.state.current = 'DEAD';
+        mgr.update(0.016, [e], null, level);
+        t.ok('a slain enemy drops its declared loot', added.length === 1,
+            `${added.length} pickups`);
+        t.ok('...on the ground where it died',
+            added[0]?.pos.x === 5 && added[0]?.pos.z === 5, JSON.stringify(added[0]?.pos));
+        t.ok('...carrying the level\'s own pickup data',
+            added[0]?.data.label === 'Shard cache');
+    }
+    {
+        // No level (unit harness, sandbox) must not throw.
+        const mgr = new HeartDropManager(new THREE.Scene());
+        const e = spawn('sentinel', {}, { loot: { label: 'x' } });
+        e.state.current = 'DEAD';
+        let threw = false;
+        try { mgr.update(0.016, [e], null, null); } catch (_) { threw = true; }
+        t.ok('a level with no pickup support is skipped, not fatal', threw === false);
+    }
+
+    // --- a shooter is answered by FACING it, not by parrying it -----------
+    //
+    // Reported from play: "a shooter should never have to be parried, if
+    // anything you should have to hold your shield and shoot the projectile
+    // back." A wind-up is a read you can see; a bolt already in flight gives
+    // you its travel time and nothing else. Holding the shield is the answer,
+    // and the bolt goes home.
+    {
+        const shooter = spawn('frost', { x: 0, y: 1, z: 0 }, { ai: 'ranged' });
+        const health = new HealthPool(10);
+        const hero = {
+            root: { position: { x: 0, y: 1.95, z: 6 } },
+            state: { facingVec: { x: 0, z: -1 } },   // facing the shooter
+            health,
+            guard: { raised: true, parryReady: false },
+            inventory: { hasItem: () => false },     // no Reflector Plate
+        };
+        const hp0 = shooter.hp;
+        shooter._spawnProjectile(0, 1); // fired straight at them
+        for (let i = 0; i < 400 && shooter.projectiles.length; i++) {
+            shooter._updateProjectiles(0.016, hero);
+        }
+        t.ok('a held shield takes no damage from a bolt', health.hp === 10, `hp=${health.hp}`);
+        t.ok('the bolt goes back and wounds the shooter', shooter.hp < hp0,
+            `${hp0} -> ${shooter.hp}`);
+    }
+    {
+        // Same shot, shield DOWN: it must still hurt, or the fix has quietly
+        // deleted the ranged threat instead of answering it.
+        const shooter = spawn('frost', { x: 0, y: 1, z: 0 }, { ai: 'ranged' });
+        const health = new HealthPool(10);
+        const hero = {
+            root: { position: { x: 0, y: 1.95, z: 6 } },
+            state: { facingVec: { x: 0, z: -1 } },
+            health,
+            guard: { raised: false, parryReady: false },
+            inventory: { hasItem: () => false },
+        };
+        const hp0 = shooter.hp;
+        shooter._spawnProjectile(0, 1);
+        for (let i = 0; i < 400 && shooter.projectiles.length; i++) {
+            shooter._updateProjectiles(0.016, hero);
+        }
+        t.ok('an unguarded bolt still lands', health.hp < 10, `hp=${health.hp}`);
+        t.ok('...and the shooter is untouched', shooter.hp === hp0);
+    }
+    {
+        // Facing AWAY with the shield up is not a block — the cone is the
+        // whole point, exactly as it is for melee.
+        const shooter = spawn('frost', { x: 0, y: 1, z: 0 }, { ai: 'ranged' });
+        const health = new HealthPool(10);
+        const hero = {
+            root: { position: { x: 0, y: 1.95, z: 6 } },
+            state: { facingVec: { x: 0, z: 1 } },    // running away
+            health,
+            guard: { raised: true, parryReady: false },
+            inventory: { hasItem: () => false },
+        };
+        shooter._spawnProjectile(0, 1);
+        for (let i = 0; i < 400 && shooter.projectiles.length; i++) {
+            shooter._updateProjectiles(0.016, hero);
+        }
+        t.ok('a shield facing the wrong way blocks nothing', health.hp < 10, `hp=${health.hp}`);
+    }
+    {
+        // The Reflector Plate keeps a reason to exist: it is the PASSIVE
+        // version of the same verb — frontal bolts bounce with no shield up
+        // and no button held.
+        const shooter = spawn('frost', { x: 0, y: 1, z: 0 }, { ai: 'ranged' });
+        const health = new HealthPool(10);
+        const hero = {
+            root: { position: { x: 0, y: 1.95, z: 6 } },
+            state: { facingVec: { x: 0, z: -1 } },
+            health,
+            guard: { raised: false, parryReady: false },
+            inventory: { hasItem: (id) => id === 'reflector_plate' },
+        };
+        const hp0 = shooter.hp;
+        shooter._spawnProjectile(0, 1);
+        for (let i = 0; i < 400 && shooter.projectiles.length; i++) {
+            shooter._updateProjectiles(0.016, hero);
+        }
+        t.ok('the Reflector Plate bounces bolts with no guard held',
+            health.hp === 10 && shooter.hp < hp0, `hp=${health.hp} enemy=${shooter.hp}`);
     }
 
     // --- lancer: a lane, not a circle -------------------------------------

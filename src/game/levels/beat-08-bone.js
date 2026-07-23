@@ -23,9 +23,12 @@ export const BEAT08_DEF = {
     id: 'beat-08-bone',
     name: '08 Bone Forest',
     mood: 'abyss',
-    // Per-level luminance trim into the Abyss certification band [35,75]
-    // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
-    lightTune: { ambient: 1.85, key: 1.65 },
+    // This dungeon's own boost, set when the shared Abyss preset was much
+    // dimmer. That preset was later raised on its own (2026-07-23, to match
+    // the Crust's brightness) — this boost is now compounding on top of an
+    // already-brighter base and needs to come back down. Re-tune from here,
+    // not from feel: node tests/qa/contrast-probe.mjs.
+    lightTune: { ambient: 1.25, key: 1.2 },
     start: 'rootgate',
     prebake: true,
     floorColor: 0x544c34, // certification retune: old 0x2a2618 sat under 2% linear reflectance
@@ -236,6 +239,9 @@ export const BEAT08_DEF = {
             grid: [0, -4],
             half: 13,
             wallH: 5,
+            // See beat-02-spindle's spindlecrown for why boss rooms need
+            // their own trim: measured via tests/qa/contrast-probe.mjs.
+            lightTune: { key: 0.7, ambient: 0.7, fill: 0.7, rim: 0.7 },
             build(map, h) {
                 stampMap(map, buildBoneArch(0, 0, 5, 6), 0, 1, 0);
                 stampMap(map, buildBoneArch(-6, 4, 3, 4), 0, 1, 0);

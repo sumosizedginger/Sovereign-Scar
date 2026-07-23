@@ -242,6 +242,12 @@ export const BEAT09_DEF = {
             grid: [0, -4],
             half: 12,
             wallH: 5,
+            // See beat-02-spindle's spindlecrown for why boss rooms need
+            // their own trim: measured via tests/qa/contrast-probe.mjs. This
+            // one sits on a knife's edge — 1.0 measures 91, 0.9 measures 47 —
+            // so 0.98 is the closest a light trim alone can land it near this
+            // dungeon's normal-room mean rather than a perfect match.
+            lightTune: { key: 0.98, ambient: 0.98, fill: 0.98, rim: 0.98 },
             // V: the hall read 11/255 — lift the floor and give the moot its
             // bone-flagstone plaza (the town gathered here once). The plaza is a
             // WEATHERED bone, not raw bone (0xefe6d0 ≈ 230/255): at full value it

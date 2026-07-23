@@ -49,10 +49,31 @@ export function run(t) {
         guard.update(0.016, true);
         guard.update(PARRY_WINDOW + 0.05, true);
         const res = health.damage(2, 0.9, 'hostile', inFront);
-        t.ok('a held guard chips a frontal hit instead of eating it',
-            health.hp === 10 - 2 * GUARD_CHIP, `hp=${health.hp}`);
+        // Holding the shield STOPS the hit. It used to leak 25% through, which
+        // the owner reported as "holding block still causes you to take
+        // damage" — correct, and not what a shield does.
+        t.ok('a held guard stops a frontal hit outright',
+            health.hp === 10, `hp=${health.hp}`);
         t.ok('the block is reported to the caller', res.blocked === true && res.parried === false);
         t.ok('blocking costs poise', guard.poise < POISE_MAX, `poise=${guard.poise}`);
+        t.ok('chip damage is genuinely zero, not merely small', GUARD_CHIP === 0);
+    }
+    {
+        // The cost of turtling is POISE, not a hp leak. Blocking forever still
+        // loses — it loses to the guard break, which is the mechanic built for
+        // it and which the player can see coming on the HUD pips.
+        const { health, guard } = rig();
+        guard.update(0.016, true);
+        guard.update(PARRY_WINDOW + 0.05, true);
+        for (let i = 0; i < 8 && !guard.broken; i++) {
+            health.iFrames = 0;
+            health.damage(1, 0, 'hostile', inFront);
+            guard.update(0.016, true);
+        }
+        t.ok('holding block through a combo still breaks the guard',
+            guard.broken === true, `poise=${guard.poise}`);
+        t.ok('...without having taken a point of chip to get there',
+            health.hp === 10, `hp=${health.hp}`);
     }
 
     // --- the parry --------------------------------------------------------
@@ -74,8 +95,14 @@ export function run(t) {
         guard.update(0.016, true);
         guard.update(PARRY_WINDOW + 0.05, true);
         health.damage(3, 0.9, 'hostile', inFront);
+        // This used to read `health.hp < 10` — using chip damage as a proxy for
+        // "that was a block, not a parry". The proxy died with the chip. The
+        // real difference was never the hp: a parry refunds poise IN FULL and
+        // staggers the attacker; a block spends poise and does neither. Assert
+        // that, and the test stops depending on a number it never cared about.
         t.ok('the parry window closes while the button stays held',
-            guard.parries === 0 && health.hp < 10, `hp=${health.hp}`);
+            guard.parries === 0 && guard.poise < POISE_MAX,
+            `parries=${guard.parries} poise=${guard.poise}`);
     }
     {
         // Mashing must not re-open the window mid-flight either: the edge has

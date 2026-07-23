@@ -5,9 +5,17 @@
 
 import { startServer, findChromeVerbose, sleep, disableGamepads } from './harness.mjs';
 
+// One shared band for both moods. Abyss used to run its own darker band
+// ([35,75] against Crust's [45,90]) as a deliberate "oppressive shadow world"
+// contrast — but the owner played it and called that a bug: the Abyss should
+// read at the same brightness as the Crust, not measurably darker. The
+// Abyss's identity now lives entirely in hue (violet/charcoal) and contrast
+// shape, never in a lower exposure floor. `assets/palettes.js`'s
+// `MOOD_PRESETS.abyss` was raised to land here on its own; this band is what
+// makes that the enforced target rather than a one-off tuning pass.
 const LUM_BANDS = {
     crust: [45, 90],
-    abyss: [35, 75],
+    abyss: [45, 90],
 };
 
 // Minimum centre-crop p90 − p10. The mean band above cannot tell a well-lit

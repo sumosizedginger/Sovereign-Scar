@@ -9,7 +9,7 @@
 //   docs/CONTROLS.md    no Memory Vial, no Entropy Dust
 //
 // Guard and parry are the deepest mechanic in the combat system, gated behind
-// a real item, with a 0.18s window and a poise economy — and the cheat sheet
+// a real item, with a timing window and a poise economy — and the cheat sheet
 // in the corner of the screen did not mention that the button existed.
 //
 // So this spec does not check that the lists agree with each other. It reads

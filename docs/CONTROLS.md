@@ -12,7 +12,7 @@ or lock-on, and this file never mentioned the Vial or the Dust.
 | **W A S D** / Arrows | Move + face (8-way) — you face the way you walk unless locked on |
 | **Space** / **J** | Attack (active weapon) |
 | **Shift** / **K** | Dash — grants ~0.3s of invulnerability (full distance with the Phase Boot) |
-| **Right mouse** / **L** | **Guard** — hold to block, tap to parry. Needs the Bulwark Shield |
+| **Right mouse** / **B** | **Guard** — hold to block, tap to parry. Needs the Bulwark Shield |
 | **T** | **Lock on** — toggle the nearest target |
 | **Y** | Switch target while locked on |
 | **Q** / **R** | Cycle weapon |
@@ -48,15 +48,19 @@ telegraph by holding a button and never learns to read one. The two rooms before
 the shield hold one enemy each and are meant to be dodged.
 
 Holding guard raises a **120° frontal** block and slows you to 45% speed. A
-blocked hit costs 25% of its damage instead of all of it. It does not protect
-against anything with no direction to it — a pit does not care that you have a
-shield up.
+blocked hit is **stopped outright** — holding the shield up is not a slower way
+of dying. It does not protect against anything with no direction to it: a pit
+does not care that you have a shield up, and neither does a hit to your back.
 
-**Tapping** guard opens a **0.18 s parry window** on the way up. A parry inside
-that window negates the hit entirely and staggers the attacker. Poise is the
-budget: three points, spent by blocking, refilled quickly when you are not
-guarding and slowly when you are. Run out and your guard breaks, which stuns you
-for ~0.9 s and is the worst thing that can happen to you in a fight.
+What blocking costs is **poise**, not health. Three points, spent by each
+blocked hit, refilled quickly when you are not guarding and slowly when you
+are. Run out and your guard breaks, which stuns you for ~0.9 s and is the worst
+thing that can happen to you in a fight. Turtling through a long combo still
+loses — it loses to the guard break, which you can watch coming on the pips.
+
+**Tapping** guard opens a **0.3 s parry window** on the way up. A parry inside
+that window negates the hit, refunds your poise in full, and staggers the
+attacker. Parrying is never *required*; it is the greedy option.
 
 One rule covers every hard-to-hit enemy:
 
@@ -65,6 +69,20 @@ One rule covers every hard-to-hit enemy:
 A bulwark drops its front plate; a hovering mote drops out of the air. That is
 one thing to learn rather than seven, and it means no enemy can become
 unkillable because you skipped the item that was "meant" to answer it.
+
+### Shooters
+
+**A shooter is answered by facing it, not by out-timing it.** A wind-up is a
+read you can see coming; a bolt already in flight gives you its travel time and
+nothing else, so nothing in the game asks you to parry one. Hold the shield so
+the bolt arrives in your frontal cone and it is **sent back at whoever fired
+it**, for double damage — their own shot is the punish. Time it inside the
+parry window and it comes back twice as hard again, but that is a bonus, never
+the price of entry.
+
+Turn your back and the bolt lands as it always did. The **Reflector Plate** is
+the passive version of the same verb: frontal shots bounce with no shield up
+and no button held.
 
 ### Lock-on
 
@@ -132,7 +150,7 @@ shut:
 
 | you hear | it means |
 |---|---|
-| a dull wooden thud | you guarded, and took chip damage |
+| a dull wooden thud | you guarded — the hit stopped, your poise paid for it |
 | a bright metal ring resolving upward | **you parried** — the attacker is staggered |
 | a hard double clang | you hit a plate; that side is armoured |
 | a low crunch | you wounded something |

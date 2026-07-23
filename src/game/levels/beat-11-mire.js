@@ -246,6 +246,11 @@ export const BEAT11_DEF = {
             wallH: 5,
             // V: arena read 30/255 — paler wet-rot floor + more dry islets
             floorColor: ABYSS_COLORS.rotPale,
+            // See beat-02-spindle's spindlecrown for why boss rooms need
+            // their own trim: measured via tests/qa/contrast-probe.mjs.
+            // This one needed a much deeper cut than most — its boss fills
+            // more of the frame with bright surfaces than any other.
+            lightTune: { key: 0.3, ambient: 0.3, fill: 0.3, rim: 0.3 },
             build(map, h) {
                 // Drowned shelf rows — bone-pale ruins of the library
                 h.fillBox(map, -11, -10, 1, 2, -9, 0, ABYSS_COLORS.bone);

@@ -209,6 +209,9 @@ export const BEAT13_DEF = {
             grid: [0, -4],
             half: 10,
             wallH: 6,
+            // See beat-02-spindle's spindlecrown for why boss rooms need
+            // their own trim: measured via tests/qa/contrast-probe.mjs.
+            lightTune: { key: 0.4, ambient: 0.4, fill: 0.4, rim: 0.4 },
             build(map, h) {
                 // The crown sampled 32.6 — below the Abyss band floor (35). Lift
                 // it with PALE ACCENT GEOMETRY rather than lighting: an index

@@ -27,7 +27,7 @@ export const CONTROLS = [
         pad: 'A', padButtons: [0] },
     { codes: ['ShiftLeft', 'ShiftRight', 'KeyK'], label: 'Shift / K', action: 'Dash', group: 'move',
         pad: 'B', padButtons: [1] },
-    { codes: ['KeyL'], mouse: 'right', label: 'RMB / L', action: 'Guard (tap = parry)', group: 'fight',
+    { codes: ['KeyB'], mouse: 'right', label: 'RMB / B', action: 'Guard (tap = parry)', group: 'fight',
         pad: 'RT', padButtons: [7] },
     { codes: ['KeyT'], label: 'T', action: 'Lock on', group: 'fight',
         pad: 'LT', padButtons: [6] },
@@ -222,11 +222,11 @@ export class Input {
 
     /**
      * Z3: guard button state THIS frame. Held, not consumed — right mouse is
-     * the natural home for a shield, KeyL the keyboard-only fallback, RT the
-     * pad binding.
+     * the natural home for a shield, KeyB the keyboard-only fallback (right
+     * next to Space/J, the strike keys), RT the pad binding.
      */
     guardHeld() {
-        return this.mouse.right || this.keys.has('KeyL') || this._padGuard;
+        return this.mouse.right || this.keys.has('KeyB') || this._padGuard;
     }
 
     /** WASD / arrows as XZ wish vector (unnormalized); falls back to pad stick. */

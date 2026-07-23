@@ -227,6 +227,13 @@ export const BEAT03_DEF = {
             wallH: 5,
             // V: churned nest dust — the open clay pit read 91/255 (band ≤90)
             floorColor: CRUST_COLORS.clayDark,
+            // Boss rooms measure much brighter than an empty room under the
+            // same lights — the boss's own bright surfaces push the frame
+            // deep enough into the tonemap curve that even a modest light
+            // cut pulls it back out disproportionately. Tuned by direct
+            // measurement (tests/qa/contrast-probe.mjs) to land close to
+            // this dungeon's own normal-room mean, not by feel.
+            lightTune: { key: 0.7, ambient: 0.7, fill: 0.7, rim: 0.7 },
             build(map, h) {
                 h.fillBox(map, -3, 3, 1, 1, -9, -8, CRUST_COLORS.slate);
                 h.fillBox(map, -9, -8, 1, 2, 6, 8, CRUST_COLORS.iron);

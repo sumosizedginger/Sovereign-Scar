@@ -236,6 +236,11 @@ export const BEAT10_DEF = {
             grid: [0, -4],
             half: 12,
             wallH: 5,
+            // See beat-02-spindle's spindlecrown for why boss rooms need
+            // their own trim: measured via tests/qa/contrast-probe.mjs. This
+            // one needed a much deeper cut than most — the ice geometry adds
+            // its own bright surfaces on top of the boss.
+            lightTune: { key: 0.15, ambient: 0.15, fill: 0.15, rim: 0.15 },
             build(map, h) {
                 stampMap(map, buildIceCrystal(-5, -3), 0, 1, 0);
                 stampMap(map, buildIceCrystal(5, 2), 0, 1, 0);

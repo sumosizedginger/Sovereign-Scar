@@ -27,11 +27,15 @@ import { tuneForFloor } from '../render/albedo-trim.js';
  */
 const OVERWORLD_BASE_TUNE = {
     crust: { key: 0.70, ambient: 0.90 },
-    // Trimmed from 1.85/2.05: at that level the Cryomire's ice put the screen
-    // at 82 against a ceiling of 75. Every Abyss screen shares one floor, so
-    // albedo compensation cannot separate them — the difference is the ice
-    // itself, and the base has to clear the brightest region.
-    abyss: { key: 1.60, ambient: 1.78 },
+    // This multiplier is tuned against MOOD_PRESETS.abyss, not an absolute —
+    // every time that shared preset moves, this needs re-checking against the
+    // brightest Abyss region (Cryomire, its ice pushes hardest). It was 1.60/
+    // 1.78 for a dimmer preset; when that preset was raised 2026-07-23 to
+    // match the Crust's brightness, the same multiplier compounded on top of
+    // an already-brighter base and pushed Cryomire and Tombfields both over
+    // the ceiling (95–99 against 90). Re-measured down from here, not by feel:
+    // node tests/qa/certification-captures.mjs prints every region's figure.
+    abyss: { key: 1.36, ambient: 1.44 },
 };
 
 /** The floor each base trim was tuned against; compensation is relative to it. */

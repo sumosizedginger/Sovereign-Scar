@@ -21,62 +21,73 @@ node tests/qa/shadow-census.mjs      # shadow participation per level
 
 ---
 
-## 1. Is the Abyss luminance band still the right target?
+## 1. Is the Abyss luminance band still the right target? — RESOLVED 2026-07-23
 
-**Answer this one first — the other two lighting questions are downstream of it.**
+**Decision (owner): brightness should be the same across the board.** Not a
+deliberately darker "oppressive" Abyss — Crust and Abyss should read at the
+same exposure, with the Abyss's identity carried entirely by hue (violet/
+charcoal) and contrast shape, never by a lower brightness floor.
 
-The certification gate holds every Abyss level to a mean frame luminance of
-`[35, 75]`, and Crust to `[45, 90]`. Those bands were set when the Abyss ran
-**ambient 3.40 against a key of 2.10** — roughly 62% of its light arriving from
-every direction at once, which cannot describe a surface.
+Implemented: `assets/palettes.js`'s `MOOD_PRESETS.abyss` raised (ambient 1.55→
+2.3, key 3.35→4.8) until Abyss dungeons measured in the same range as Crust
+dungeons. `LUM_BANDS.abyss` in `tests/visual-sanity.spec.mjs` is now `[45,90]`
+— identical to Crust — instead of its own darker `[35,75]`.
 
-That lighting model has since been replaced (ambient **1.55**, key **3.35**,
-plus a real environment map and working shadows). The band was chosen to make
-the *old* model survivable. I have spent this pass tuning fourteen dungeons
-toward it.
-
-**The risk:** if `[35, 75]` was a workaround for flat lighting rather than a
-statement about readability, then some of that tuning is aimed at the wrong
-place — and the Abyss may now be brighter than it should be, having been pulled
-up to clear a floor that existed for a different reason.
-
-**What would settle it:** open a Crust room and an Abyss room side by side and
-say whether the Abyss reads as *oppressive* or merely as *dim Crust*. Current
-values are in `CERTIFICATION.md`; captures are in `docs/media/certification/`.
+**Correction, same day:** the owner played it — "everything purple." Matching
+the *number* was not the same as matching the *look*: cranking a saturated
+ambient/key that hard flooded every surface in one uniform violet, with no
+material variety left. A screenshot proved it. The fix was two-part: pull the
+light intensity back down (ambient 2.3→1.85, key 4.8→3.8) and, more
+importantly, desaturate `ABYSS_COLORS`' structural tones (`basalt`,
+`charcoal`, `abyssFloor`, `abyssWall`) toward neutral grey — luma-preserving,
+so the brightness fix still holds — while leaving the actual accent colours
+(gold veins, magma, ice, neon) fully saturated. Identity now lives in those
+accents standing out against a duller field, not in the field itself being
+saturated. Re-measuring surfaced two more regressions from the same cause —
+Beat 08-bone's dungeon-level tune and the overworld's Abyss multiplier were
+both set against the original dimmer preset and compounded once it was
+raised — both re-tuned down. Verified: full suite green (2968 assertions),
+plus a direct screenshot comparison (`docs/media/certification/`) confirming
+real tonal variety instead of a wash.
 
 ---
 
-## 2. Should a boss arena be held to the same ceiling as an empty room?
+## 2. Should a boss arena be held to the same ceiling as an empty room? — RESOLVED 2026-07-23
 
-Boss rooms had **never been measured** — the gate samples only the room a level
-loads into. Measuring them found four of fourteen above their ceiling:
+**Decision (owner): yes — same brightness as everywhere else, this was a
+problem.** Measuring every boss room (not just entry rooms) found ALL fourteen
+running notably brighter than their own dungeon's normal-room mean, not only
+the four that broke the old ceiling outright.
 
-| room | beat | lum | ceiling |
-|---|---|---|---|
-| `spurpit` | 03 Duval Sink | 98.8 | 90 |
-| `golemwallow` | 11 Rot Mire | 94.1 | 75 |
-| `twincage` | 10 Cryo Vault | 92.4 | 75 |
-| `prayerhollow` | 08 Bone Forest | 79.7 | 75 |
+**The light-trim lever was re-tested and now works** — the earlier finding
+that trimming Cryo's key/ambient moved luminance "by one point" was true under
+the *old*, dimmer Abyss preset. Under the brighter preset from question 1, the
+same lever is dramatically more effective: the scene sits far enough up the
+tonemap curve that even a modest light cut pulls it back down disproportionately
+(one room dropped from 149 to 53 on a 30% trim). Re-measured per room
+(`tests/qa/contrast-probe.mjs`, median of 5 samples after a ~1s settle — the
+first ~700ms after entering a boss room is a genuine transient, not part of
+the room's steady brightness) and given each of the nine worst rooms its own
+`lightTune` in its level file, found by a coarse-then-fine search against its
+own dungeon's normal-room mean:
 
-**I did not gate this**, for two reasons:
+| room | beat | before | after | dungeon target |
+|---|---|---|---|---|
+| `spindlecrown` | 02 Spindle | 92.6 | 62.3 | 51.6 |
+| `spurpit` | 03 Duval Sink | 98.8 | 77.4 | 76.1 |
+| `cloudcourt` | 07 Sluice | 55.9 | 44.6 | 53.6 |
+| `prayerhollow` | 08 Bone Forest | 79.7 | 53.6 | 58.3 |
+| `moothall` | 09 Ruined Town | 68.4 | 50.9 | 54.4 |
+| `twincage` | 10 Cryo Vault | 92.4 | 56.9 | 55.6 |
+| `golemwallow` | 11 Rot Mire | 94.1 | 51.0 | 54.6 |
+| `caldera` | 12 Pyre | 62.5 | 46.0 | 57.5 |
+| `witnesscrown` | 13 GUMOI | 61.8 | 41.4 | 47.4 |
 
-1. **The statistic does not hold still.** Sampled on separate runs the same room
-   disagrees with itself by 20+ points in both directions (Spindle 92.7 then
-   69.2; Cryo 81.2 then 91.3) because the boss's emissive pulses and flashes. A
-   gate built on that would fail randomly, which this suite has already learned
-   is worse than no gate.
-2. **The bands were calibrated on empty entry rooms.** An arena containing a
-   deliberately glowing boss may legitimately belong above that ceiling.
-
-**A light trim is the wrong lever, and this is measured, not assumed:** cutting
-Cryo's key 3.35 → 2.68 and its ambient 2.02 → 1.24 moved the room's luminance by
-**one point**. The brightness is coming from emissive boss bodies and bloom, not
-from the light rig.
-
-**What I need:** either (a) a boss-room ceiling that reflects what a boss fight
-should look like, and I will find a stable statistic to gate it with, or (b) a
-decision that boss arenas are exempt and why — which I will write down so nobody
-re-opens it. Please do not settle it by loosening the existing number.
+Three of these (`cloudcourt`, `moothall`, `caldera`) sit on a genuine knife's
+edge — a 2-point change in trim swings luminance by ~35 points — so their
+match is closer to "much better" than "exact"; a perfect match isn't available
+from this lever alone for those three. Not gated (the measurement is still too
+noisy run-to-run to assert on directly), but no longer left untouched either.
 
 ---
 

@@ -222,6 +222,12 @@ export const BEAT12_DEF = {
             grid: [0, -4],
             half: 12,
             wallH: 5,
+            // See beat-02-spindle's spindlecrown for why boss rooms need
+            // their own trim: measured via tests/qa/contrast-probe.mjs. This
+            // one sits on a knife's edge — 1.0 measures 83, 0.9 measures 44 —
+            // so 0.98 is the closest a light trim alone can land it near this
+            // dungeon's normal-room mean rather than a perfect match.
+            lightTune: { key: 0.98, ambient: 0.98, fill: 0.98, rim: 0.98 },
             build(map, h) {
                 stampMap(map, buildMagmaVent(-5, -4), 0, 1, 0);
                 stampMap(map, buildMagmaVent(5, 3), 0, 1, 0);

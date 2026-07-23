@@ -69,9 +69,16 @@ export class CollisionWorld {
             } else if (nx < px && px - half >= s.maxX && x - half < s.maxX) {
                 x = Math.max(x, s.maxX + half);                // crossed the right face
             } else if (this._overlap(x, pz, half, s)) {
-                // Started already touching on X; resolve to the nearer face.
-                if (px + half <= s.minX) x = s.minX - half;
-                else if (px - half >= s.maxX) x = s.maxX + half;
+                // Started already touching (or, for a solid thinner than
+                // `half`*2, already straddling) on X: neither clean-crossing
+                // branch above requires full clearance, so a mover whose OWN
+                // half-extent already reaches past the face on entry falls
+                // through both — `px+half<=minX` and `px-half>=maxX` are both
+                // false — and used to pass through with no resolution at all.
+                // Resolve by which side of the solid's centre `px` sits on,
+                // not by demanding full clearance from it.
+                const midX = (s.minX + s.maxX) / 2;
+                x = px <= midX ? Math.min(x, s.minX - half) : Math.max(x, s.maxX + half);
             }
         }
 
@@ -85,8 +92,8 @@ export class CollisionWorld {
             } else if (nz < pz && pz - half >= s.maxZ && z - half < s.maxZ) {
                 z = Math.max(z, s.maxZ + half);                // crossed the back face
             } else if (this._overlap(x, z, half, s)) {
-                if (pz + half <= s.minZ) z = s.minZ - half;
-                else if (pz - half >= s.maxZ) z = s.maxZ + half;
+                const midZ = (s.minZ + s.maxZ) / 2;
+                z = pz <= midZ ? Math.min(z, s.minZ - half) : Math.max(z, s.maxZ + half);
             }
         }
 

@@ -5,6 +5,187 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Guard, shooters, motes, and drops — four things play found
+
+All four came from the owner actually playing the game, and three of them
+were mechanics that were *implemented* and did not *work*. Every fix below
+has a spec proven to fail on the previous code.
+
+**Holding block still hurt you.** `GUARD_CHIP` was 0.25, so the shield leaked
+a quarter of every blow it stopped. That is not what a shield does, and worse,
+it made the shield useless exactly where it was the only answer (see motes,
+below). Now `0`: a held guard stops the hit outright. Blocking is still not
+free — the cost was always meant to be **poise**, a three-point pool that
+refills four times slower with the shield up and ends in a 0.9 s guard break.
+Turtling through a combo still loses; it now loses to the mechanic built for
+it rather than to an invisible damage leak.
+
+**A shooter demanded a parry.** A wind-up is a read you can see; a bolt in
+flight gives you its travel time and nothing else, so requiring frame accuracy
+against one asks for a read the game never showed. Holding the shield so a
+bolt lands in the frontal cone now **sends it back at whoever fired it** for
+double damage, homed at the shooter's current position rather than merely
+negated — "the shot came back" is the feedback that teaches the verb, and a
+bolt that just vanished never told the player facing a shooter was offence.
+A parry-timed deflection doubles again, as a bonus and never a requirement.
+Turn your back and it lands as before. `reflector_plate` — which previously
+was the only way to bounce anything, and only deleted the bolt — is now the
+*passive* version of the same verb.
+
+**Motes could not be avoided or defended against.** Both halves were true.
+The burst drew a ring at radius 3.2 while the mote parked at 2.4, so the tell
+described a circle the mote never committed from, and the wind-up was 0.5 s.
+And the only defence was a shield that still chipped you, on the one kind a
+sword cannot reach at all. The three numbers that must agree are now named
+constants (`MOTE_HOLD` / `MOTE_BURST` / `MOTE_WINDUP`) instead of three loose
+literals: the mote commits from **inside** the circle it paints, the escape is
+0.6 units, and the wind-up is 0.85 s. A spec now asserts the ring damages
+inside its own radius and *not* outside it — a telegraph that lies is not a
+telegraph.
+
+**Drops landed in the air.** `dropSite()` is new and is the one rule every
+drop site shares. Drops spawned at `enemy.root.position`, which for a hovering
+enemy is `flyHeight` (3.4) above the floor; `HeartDrop.update` collects within
+2.0 units of vertical, so a slain mote's heart was not merely floating, it was
+**uncollectable** — killing one paid nothing. Measured in the counterfactual at
+`dy=2.95` against a 2.0 window. Fixed at both drop sites (the kill roll and the
+Entropy Dust conversion), not just the one that was reported.
+
+**`Enemy.loot` was dead code.** Assigned in the constructor since the class was
+written; read by nothing. Now honoured in `HeartDropManager.update`, the one
+place that already detects a fresh kill, dropping to the floor via the same
+`dropSite`. A level that supplies no `addPickup` is skipped rather than
+throwing.
+
+Also: one existing guard spec was using chip damage as a proxy for "that was a
+block, not a parry". The proxy died with the chip. It now asserts the thing it
+actually cared about — a parry refunds poise in full and staggers; a block
+spends poise and does neither.
+
+### Parry window widened, guard moved to B
+
+Played and reported too strict: the parry press had to land inside 0.18s,
+which read as requiring frame-perfect timing. Widened `PARRY_WINDOW` in
+`combat/guard.js` to 0.3s — real reaction room instead of a twitch check.
+
+Guard's keyboard binding moved from `L` to `B` — the requested spot, right
+next to Space/J (attack) — in `src/game/input.js`'s single `CONTROLS` table,
+which `docs/CONTROLS.md` and the in-game cheat sheet both generate from, so
+nothing else needed a separate edit. Right mouse and the RT pad trigger are
+unchanged.
+
+### Correction: "similar brightness" is not "everything purple"
+
+The Abyss brightness fix above hit its luminance target by raising the
+Abyss's ambient/key light intensity — and the owner played it and said so
+plainly: "everything purple." A screenshot proved it: floor, wall and shadow
+all read as one solid violet with no material variety, against the Crust's
+real tonal range in the same shot. Neutralizing the light's own colour
+(`MOOD_PRESETS.abyss`'s `ambient`/`key` hex, pulled toward white) barely
+moved it — the wash was coming from `ABYSS_COLORS`' own structural tones
+(`basalt`, `charcoal`, `abyssFloor`, `abyssWall`), which were already
+saturated violet before this pass and simply got hit with much more light.
+
+Fixed by desaturating those four structural colours toward a neutral grey,
+luma-preserving so the brightness work still holds, while leaving the actual
+accent colours (gold veins, magma, ice, neon) fully saturated — those are
+supposed to stand out against a duller field, not blend into a uniformly
+saturated one. Dungeons with a `wallColor` override (GUMOI's `violet`,
+Leviathan's own accent) keep their pre-existing, more saturated character —
+that's deliberate per-dungeon design predating this session, not the wash
+being fixed here.
+
+Re-measuring afterward turned up two further, unrelated regressions from the
+same root cause: Beat 08-bone's own dungeon-level light boost and the
+overworld's Abyss multiplier were both tuned against the *original*, dimmer
+Abyss preset from before this session's brightness work. Once that shared
+preset was raised, both of these per-level/per-region boosts compounded on
+top of an already-brighter base and pushed their rooms over the certification
+ceiling (Beat 08 to 96 mean; two overworld regions to 95–99). Both re-tuned
+down to land back in band. Full suite green (2968/2968) after all three
+fixes; certification captures and `CERTIFICATION.md` regenerated again.
+
+### Investigated: overworld fog-of-war reported resetting after a dungeon exit
+
+Reported by the owner, reproduced 3/3 times on their end: previously-explored
+overworld screens show as unexplored again on the map after leaving a
+dungeon. Could not reproduce it directly: a real dungeon entry/exit round
+trip through `loadLevel`, and a full page reload, both left the `visited`
+screen list intact in `sovereignProgress.overworld` every time. The Browser
+tooling used to test this session's synthetic key events arrive with an
+empty `.code`, so `input.js`'s `e.code === 'KeyW'`-style checks never match —
+real walking couldn't be exercised through it either, only the same
+functions the owner's own play calls.
+
+Hardened `engine/settings.js`'s `getProgress`/`setProgress` anyway:
+`setProgress` now re-reads disk before merging a patch. Previously it merged
+straight into the in-memory `progress` object, which is normally never stale
+because every write goes through here — except a tab restored from the
+back/forward cache resumes with whatever `progress` held at the moment it was
+frozen, not what's on disk now. The next `setProgress` call from that tab
+would silently overwrite anything saved in the meantime, including recently
+explored screens. This is a plausible cause, not a confirmed one — the
+report may still recur, in which case the next session needs a repro that
+survives an actual playthrough rather than the direct-call tests used here.
+
+### Brightness unified: no more deliberately-darker Abyss, no more exempt boss rooms
+
+The owner played the game and reported two things directly: the Abyss and the
+Crust should read at the same brightness (not the Abyss being measurably
+darker as a mood choice), and boss rooms running brighter than everything
+else "is a problem" — both resolve `docs/OPEN_QUESTIONS.md` questions 1 and 2
+by explicit decision rather than guesswork.
+
+**Abyss brought up to match Crust.** `MOOD_PRESETS.abyss` in
+`assets/palettes.js` raised (ambient 1.55→2.3, key 3.35→4.8) until Abyss
+dungeons measured in Crust's range (was 37–43, now 44–58 against Crust's
+50–76) and the overworld's Abyss screens did too (citadel 27→78, cryomire
+18→89). `LUM_BANDS.abyss` in `tests/visual-sanity.spec.mjs` collapsed into
+Crust's `[45,90]` — one shared band for both moods, where there used to be
+two.
+
+**Boss rooms brought down to match their own dungeon.** Every boss room ran
+notably brighter than its dungeon's normal-room mean, not only the four that
+broke the old ceiling. The earlier finding that light-trimming a boss room
+barely moves its luminance was re-tested and no longer held: under the
+brighter Abyss preset above, the same lever is now dramatically effective —
+the scene sits far enough up the tonemap curve that a modest cut pulls it back
+disproportionately (one room dropped 149→53 on a 30% trim). Measured each of
+the nine worst rooms against its own dungeon's mean (median of 5 samples,
+after confirming the first ~700ms after entering a boss room is a genuine
+transient and not the room's steady brightness) and gave each a `lightTune` in
+its level file. See `docs/OPEN_QUESTIONS.md` question 2 for the full
+before/after table.
+
+### Collision: a body already touching a thin wall passed straight through it
+
+Reported as "enemies clipping through walls as they try to move away from me."
+`CollisionWorld.resolveMove` (`src/engine/collision.js`) resolves each axis by
+checking whether the mover crossed a solid's face *cleanly*, from a position
+with full clearance (`px + half <= s.minX`, etc.). The fallback for a mover
+that starts already touching only handled the case where `px` itself was
+cleanly on one side. It never handled a mover whose own half-extent already
+straddles the face — which is the ordinary case here, since walls are baked
+as single 1-voxel-wide columns (`level-builder.js`) barely wider than an
+actor's 0.4 half-extent. Once an enemy's centre so much as touched a wall
+face, neither branch matched, no clamp applied, and every subsequent small
+step walked straight through with zero resistance until it emerged the other
+side.
+
+Chasing/charging AI rarely showed it, since that AI beelines for the player
+and stops at attack range, away from walls. Retreating (`_aiRanged`'s
+keep-distance behaviour) is the one AI mode that deliberately drives an enemy
+toward whatever wall is behind it, so it was the one place the bug reliably
+surfaced — but the defect is in the shared resolver, not the AI, and applies
+to any push (knockback, separation) that starts a mover flush against a thin
+solid.
+
+Fixed by resolving the ambiguous case against which side of the **solid's own
+centre** `px` sits on, instead of demanding full clearance from it. Verified
+with a counterfactual: reverting the fix reproduces the tunnel (mover ends up
+completely on the far side of the wall) and two new specs in
+`tests/collision.spec.mjs` catch it from both approach directions.
+
 ### The gate that rewarded flattening the art
 
 The certification gate banded each level's **mean** frame luminance and nothing

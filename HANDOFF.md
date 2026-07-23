@@ -47,7 +47,7 @@ assertion before changing it.
 
 ## State
 
-Everything below is committed and green. Suite: **2171 unit / 2966 total**.
+Everything below is committed and green. Suite: **2199 unit / 2994 total**.
 
 | area | state |
 |---|---|
@@ -61,29 +61,82 @@ Everything below is committed and green. Suite: **2171 unit / 2966 total**.
 | **Renderer / lighting: all six VISUAL_PLAN tickets** | **implemented** |
 | Ticket 6's vertical interest inside rooms | **not done — needs design, see below** |
 | 44 binary certification captures | **regenerated** (`tests/qa/certification-captures.mjs`) |
-| Boss-room luminance | **measured, not gated** — see below |
+| Abyss vs Crust brightness | **unified — owner decision, see `docs/OPEN_QUESTIONS.md` Q1** |
+| Boss-room luminance | **tuned to match each dungeon — see Q2** |
+| Enemy AI colliding with a wall it's already touching | **fixed** (`src/engine/collision.js`) |
+| Overworld fog-of-war reset on dungeon exit (reported 3×) | **not yet reproduced — see below** |
+| Parry window (was frame-perfect at 0.18 s) | **0.3 s — owner call from play** |
+| Guard on the keyboard | **moved `L` → `B`, next to attack — owner call** |
+| Holding block leaking 25% chip | **fixed — `GUARD_CHIP` is 0; poise is the cost** |
+| Shooters requiring a parry | **fixed — hold the shield and the bolt goes back** |
+| Mote burst: ring wider than the mote ever came | **fixed — named constants, honest tell** |
+| Drops spawning at flight altitude (uncollectable) | **fixed — `dropSite()`, both sites** |
+| `Enemy.loot` — assigned since day one, read by nothing | **wired up** |
 
 ## What to do next
 
-**The four open items are written up as a self-contained brief in
-[docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md)** — hand that to whoever
-is deciding. Summarised:
+**Questions 1 and 2 of `docs/OPEN_QUESTIONS.md` are resolved (2026-07-23) by
+owner decision: brightness should be the same across the board.** The Abyss
+no longer runs a deliberately darker band than the Crust, and every boss room
+was measured and brought down toward its own dungeon's normal-room mean (nine
+of fourteen needed a `lightTune`; three of those sit on a genuine brightness
+cliff and are much closer rather than exact — see the doc for the full
+table). `node tests/qa/contrast-probe.mjs` still prints live figures if you
+want to check current numbers.
+>
+> **Read this before touching `MOOD_PRESETS.abyss` again.** The first pass at
+> the above hit the brightness number by cranking a saturated ambient/key —
+> and it made every Abyss surface read as one flat purple wash, no material
+> variety at all. The owner caught it from a screenshot, not a number; nothing
+> automated did. It's fixed (structural `ABYSS_COLORS` desaturated toward
+> neutral, light pulled back down), but if you raise that preset's intensity
+> again for any reason, take an actual screenshot and look for real tonal
+> variety before trusting the luminance mean — see `docs/OPEN_QUESTIONS.md`
+> question 1's correction note and `CERTIFICATION.md` for the fuller account.
+> This is the same lesson as Trap 3 below, from the other direction: a
+> passing number is not proof the picture is right.
 
-**Two open questions that need a person, not an implementer:**
+**Two things still open:**
 
-1. **Should boss rooms be held to the entry-room band?** Boss rooms have never
-   been measured by the gate, and sampling them found four of fourteen outside
-   their band (`spurpit` 98.8 vs a ceiling of 90; `prayerhollow` 79.7,
-   `twincage` 92.4, `golemwallow` 94.1 vs 75). It is not gated because the
-   numbers move 20+ points between runs — the boss's emissive pulses — and
-   because the bands were calibrated on *empty* entry rooms. An arena containing
-   a deliberately glowing boss may legitimately belong above that ceiling. Do
-   not settle it by loosening the number. `node tests/qa/contrast-probe.mjs`
-   prints the figures.
-2. **Is the Abyss band still right?** `[35,75]` was set when the mood was flat
-   (ambient 3.4 against a key of 2.1). The lighting has changed underneath it,
-   so the target was chosen by the model that has since been replaced. Look at a
-   Crust and an Abyss room side by side.
+- **Overworld fog-of-war reported resetting after a dungeon exit (3/3
+  reproductions by the owner).** Direct testing of the save-persistence code
+  (a real dungeon round-trip through `loadLevel`, and a full page reload)
+  could NOT reproduce it — visited screens stayed marked correctly both
+  times. Hardened `engine/settings.js`'s `setProgress` to re-read disk before
+  merging (a bfcache-restored or second tab could otherwise write back a
+  stale in-memory snapshot and silently erase newer progress) as a plausible
+  but *unconfirmed* fix. Needs either a repro that survives a real walking
+  playtest (not the API-level shortcuts used so far), or the owner noticing
+  it again post-fix.
+- **Enemies clipping through walls while retreating — fixed.** The shared
+  collision resolver (`engine/collision.js`) failed to stop a mover that
+  started already touching a thin wall (routine here, since walls are baked
+  one voxel wide); it let movement through with zero resistance for the rest
+  of the crossing. Retreating AI was the one behavior that reliably drove an
+  enemy into a wall from a standing start, which is why it looked
+  retreat-specific — the defect was general. Two new specs in
+  `tests/collision.spec.mjs` pin the case; reverting the fix reproduces it.
+
+**A note on the combat pass of 2026-07-23.** Four things the owner found by
+playing, three of which were mechanics that existed and did not work. The
+pattern is worth internalising, because it is the same one three times:
+
+- The shield leaked 25% chip, so on the one enemy a sword cannot reach (the
+  mote) the only available defence was a slower way of dying. Two systems each
+  looked defensible alone; the gap only existed where they met.
+- The mote's burst drew a ring at radius 3.2 and parked at 2.4, so the tell
+  described a circle it never committed from. **A telegraph that does not match
+  what it resolves is not a telegraph.** The three numbers are now named
+  constants and a spec asserts the ring damages inside its own radius and not
+  outside it.
+- Drops spawned at `enemy.root.position` — 3.4 units up for a hovering enemy,
+  against a 2.0-unit collection window. Killing a mote paid *nothing*, and no
+  test noticed because no test asked whether the reward could be picked up.
+  `dropSite()` is now the single rule, applied at both drop sites.
+
+None of these would have been caught by a passing suite, and each has a spec
+proven to fail on the previous code. Same family as Trap 3: a green number is
+not evidence the thing works.
 
 Then, if you want to keep going on looks, **ticket 6 of `docs/VISUAL_PLAN.md` is
 the only one not finished**. It delivered bake-time silhouette trim and per-kit

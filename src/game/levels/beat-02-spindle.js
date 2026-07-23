@@ -218,6 +218,13 @@ export const BEAT02_DEF = {
             grid: [0, -4],
             half: 12,
             wallH: 5,
+            // Boss rooms measure much brighter than an empty room under the
+            // same lights — the boss's own bright/emissive surfaces push the
+            // frame deep enough into the tonemap curve that even a modest
+            // light cut pulls it back out disproportionately. Tuned by direct
+            // measurement (tests/qa/contrast-probe.mjs) to land close to this
+            // dungeon's own normal-room mean, not by feel.
+            lightTune: { key: 0.7, ambient: 0.7, fill: 0.7, rim: 0.7 },
             build(map, h) {
                 h.fillBox(map, -8, -6, 1, 3, -2, 2, CRUST_COLORS.iron);
                 h.fillBox(map, 6, 8, 1, 3, -2, 2, CRUST_COLORS.iron);

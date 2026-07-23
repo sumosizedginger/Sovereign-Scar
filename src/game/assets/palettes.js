@@ -28,16 +28,27 @@ export const CRUST_COLORS = {
 // so no sane light level could pull Abyss frames into the [35,75] band —
 // beats 07/09/12 metered under 14 even at 4× ambient. Hue identity is kept;
 // only reflectance rose (~2× sRGB ≈ 4× linear).
+//
+// Desaturated again 2026-07-23: raising the light intensity (see
+// MOOD_PRESETS.abyss) to match the Crust's brightness made these structural
+// tones read as a solid purple wash — floor, wall and shadow all the same
+// hue at different values, no material variety at all. A screenshot proved
+// it; a neutral light did NOT fix it, because the wash was coming from the
+// materials themselves, not the light. These four are now closer to a
+// neutral dark grey with only a whisper of violet; the identity now lives in
+// the ACCENT colours below (gold veins, magma, ice, neon), which stayed
+// saturated on purpose — they are meant to stand out against a duller field,
+// not blend into one with it.
 export const ABYSS_COLORS = {
-    basalt: 0x544060,
-    charcoal: 0x3c3048,
+    basalt: 0x4a404e,
+    charcoal: 0x363038,
     violet: 0x8b5cf6,
     violetHot: 0xc084fc,
     goldVein: 0xffd060,
     goldHot: 0xffe8a0,
     neon: 0xff40c8,
-    abyssFloor: 0x4c3c60,
-    abyssWall: 0x5c4878,
+    abyssFloor: 0x443c46,
+    abyssWall: 0x524855,
     magma: 0xff5520,
     ice: 0xa0e8ff,
     iceDark: 0x3a6a8a,
@@ -266,14 +277,14 @@ export const MOOD_PRESETS = {
         bloom: 0.7,
         film: 0.1,
         vignette: 1.08,
-        ambient: 0x9078c0,
+        ambient: 0xa8a0b8,
         // The Abyss had drifted to 3.4 — TWICE the Crust's ambient, in the mood
         // that is supposed to be the oppressive one. Same cause: it failed the
         // band low at 9–26, and flat ambient was the fix that made the number
         // go up. It reads as fog with the lights on.
-        ambientIntensity: 1.55,
-        key: 0xd8b0ff,
-        keyIntensity: 3.35,
+        ambientIntensity: 1.85,
+        key: 0xe8ddf5,
+        keyIntensity: 3.8,
         fillIntensity: 1.25,
         // The Abyss needs MORE rim than the Crust, not less. Its key is dimmer
         // relative to its background, so a silhouette separates from the fog on

@@ -40,6 +40,39 @@ export function run(t) {
         t.ok('swept motion cannot tunnel', r.x <= 4.6 + 1e-9, JSON.stringify(r));
     }
 
+    // Already-straddling start: a mover whose OWN half-extent already
+    // reaches past a thin wall's face (common for a 1-voxel-wide wall against
+    // a 0.4 half-extent body) used to satisfy neither "clean crossing" branch
+    // — px+half<=minX and px-half>=maxX were both false — so the fallback
+    // overlap branch resolved nothing and let repeated small steps walk
+    // straight through with zero resistance. This is what let a retreating
+    // enemy (backing away from the player, toward a room wall) pass clean
+    // through it.
+    {
+        const cw = new CollisionWorld();
+        cw.addSolid({ minX: 2, maxX: 3, minZ: -5, maxZ: 5 });
+        let px = 1.9, pz = 0;
+        for (let i = 0; i < 40; i++) {
+            const r = cw.resolveMove(px, pz, px + 0.05, pz, 0.4);
+            px = r.x; pz = r.z;
+        }
+        t.ok('already-straddling start still stops at the face',
+            Math.abs(px - 1.6) < 1e-9, 'ended at x=' + px);
+    }
+
+    // Same case, approaching from the other side.
+    {
+        const cw = new CollisionWorld();
+        cw.addSolid({ minX: 2, maxX: 3, minZ: -5, maxZ: 5 });
+        let px = 3.1, pz = 0;
+        for (let i = 0; i < 40; i++) {
+            const r = cw.resolveMove(px, pz, px - 0.05, pz, 0.4);
+            px = r.x; pz = r.z;
+        }
+        t.ok('already-straddling start (from the right) still stops at the face',
+            Math.abs(px - 3.4) < 1e-9, 'ended at x=' + px);
+    }
+
     // removeSolid restores passage.
     {
         const cw = new CollisionWorld();

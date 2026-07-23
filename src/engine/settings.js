@@ -95,9 +95,24 @@ export function getProgress() {
     return progress;
 }
 
-/** Merge a partial progress update and persist. */
+/**
+ * Merge a partial progress update and persist.
+ *
+ * Re-reads disk before merging. `progress` normally never drifts from disk —
+ * every call here writes both together — but a tab restored from the
+ * back/forward cache (or a second tab open on the same save) resumes with
+ * whatever `progress` held at the moment it was frozen, not what is on disk
+ * now. Merging the patch straight into that stale in-memory copy would write
+ * it back and silently erase anything a fresher tab saved in between: a
+ * player who explored screens, then briefly left and returned to a
+ * bfcache-restored tab, would see that exploration vanish the next time
+ * anything else here calls setProgress. Reading disk first means only a
+ * genuinely concurrent write in the same instant can still race.
+ */
 export function setProgress(patch) {
-    Object.assign(progress, patch);
+    const onDisk = readJSON(KEYS.progress);
+    if (onDisk) Object.assign(progress, onDisk, patch);
+    else Object.assign(progress, patch);
     writeJSON(KEYS.progress, progress);
 }
 

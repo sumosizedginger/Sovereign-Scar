@@ -54,7 +54,7 @@ import {
 import { getWeapon } from './combat/weapons.js';
 import { POISE_MAX } from './combat/guard.js';
 import { dev } from './dev/dev-mode.js';
-import { HeartDropManager } from './world/heart-drops.js';
+import { HeartDropManager, dropSite } from './world/heart-drops.js';
 import { patchOverworld } from './world/keys.js';
 import { DeathEcho } from './world/death-echo.js';
 import { AnchorThread } from './narrative/anchor-thread.js';
@@ -1147,8 +1147,9 @@ function frame() {
                     target.hp = 0;
                     if (target.state) target.state.current = 'DEAD';
                     target.onDeath?.();
-                    const pos = target.root.position;
-                    heartDrops.spawn(pos.x, pos.y, pos.z);
+                    // Same floor rule as a normal kill — converting a MOTE put
+                    // its heart 3.4 units up, out of collection range.
+                    heartDrops.spawn(...dropSite(target));
                     saveSovereignProgress({ inventory: player.inventory.toJSON() });
                     hud.toast('Entropy converted into repair mass', 1600);
                 }
@@ -1180,7 +1181,7 @@ function frame() {
         updateWrapPass(wrapPass, sdt, game.level?.wrap || 0);
 
         // Hearts from slain enemies — the only in-run way to recover HP
-        heartDrops.update(sdt, enemies, player);
+        heartDrops.update(sdt, enemies, player, game.level);
 
         // Aim the sun at the room the player is standing in. Prefer the room
         // origin — it is stable, so the frustum does not move at all while you
