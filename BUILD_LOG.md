@@ -482,7 +482,7 @@ New specs `music` (309 assertions) and `game-feel-visuals`; probes
 `synth.channelGain(channel)`, so game-side persistent buses honour the same
 volume settings.
 
-### Session 13 — the renderer pass, all six tickets (suite 2575 → 2898)
+### Session 13 — the renderer pass, all six tickets (suite 2575 → 2932)
 
 All six tickets of `docs/VISUAL_PLAN.md` implemented in order. The plan had been
 written for another agent to pick up cold; the owner asked for it to be built
@@ -572,6 +572,14 @@ New probes: `contrast-probe`, `shadow-census`, `env-probe`, `trim-cost`,
   verbs (vial, dust, beat cycle, mute) are asserted to stay unmapped rather
   than have a button invented for them.
 
+- **The gate sweeps the overworld now** (8 regions x 2 mirror states, the
+  same screens the captures shoot) instead of sampling one start screen —
+  the hole that hid both findings above. That sweep also showed the
+  contrast floor was the wrong shape: dungeons measure **70-172**, open
+  outdoor screens **12-16**, so a single floor of 13 did nothing for the
+  fourteen dungeons and sat inside the overworld's sample noise. Two
+  ratchets now: **60** for dungeons (worst: Cryo 70), **10** for open
+  levels (worst: Bonetown 12).
 - **Self-audit against Trap 4.** Ran the project's own "remove the data
   too" rule over what this session added and found three violations of it:
   `padAxes` was carried by the table and checked by nothing (the spec reads

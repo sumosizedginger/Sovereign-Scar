@@ -40,7 +40,15 @@ const stats = (px) => frameLuminanceStats(px, W, H, 1);
 // The band the certification gate applies to a Crust level, and the floor
 // visual-sanity.spec.mjs applies to the centre crop.
 const CRUST_BAND = [45, 90];
-const FLOOR = 13;
+// The gate uses TWO floors: 60 for walled dungeon rooms (they measure
+// 70-172) and 10 for open outdoor levels (12-16, which is what an open field
+// with one ground plane and no walls simply IS). One number could not serve
+// both — at 13 it did nothing for the fourteen dungeons and sat inside the
+// overworld's own sample noise. The synthetic cases below use the OPEN floor,
+// the harder of the two to fail against, so a flat frame failing it is the
+// strongest form of the claim.
+const FLOOR = 10;
+const DUNGEON_FLOOR = 60;
 const inBand = (m) => m >= CRUST_BAND[0] && m <= CRUST_BAND[1];
 
 export function run(t) {
@@ -156,9 +164,14 @@ export function run(t) {
         // The floor was 12 and is now 13: it tracks just under the worst level
         // so nothing can regress, and it gets tightened every time the worst
         // level improves. A ratchet that is never tightened is just a number.
-        t.ok('floor sits under the measured worst level', FLOOR < 15, `floor=${FLOOR}`);
-        t.ok('floor has been tightened at least once', FLOOR > 12,
-            'it started at 12; leaving it there would waste the rebalance');
+        t.ok('the open floor sits under the measured worst open level',
+            FLOOR < 12, `floor=${FLOOR} vs Bonetown at 12`);
+        t.ok('the dungeon floor sits under the measured worst dungeon',
+            DUNGEON_FLOOR < 70, `floor=${DUNGEON_FLOOR} vs Cryo Vault at 70`);
+        t.ok('the dungeon floor actually bites',
+            DUNGEON_FLOOR > FLOOR * 4,
+            `a single floor of 13 would have let a dungeon fall from 95 to 14 `
+            + `and still pass; ${DUNGEON_FLOOR} would not`);
         t.ok('floor is high enough to reject a flat frame',
             stats(frame(() => 62)).contrast < FLOOR, 'flat frame must fail');
     }

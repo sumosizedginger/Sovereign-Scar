@@ -137,6 +137,32 @@ box, not as a place.
   while keeping the contrast. That trade is what the contrast floor exists to
   arbitrate, and this is the first time it did.
 
+### The gate now sweeps the overworld, and has two contrast floors
+
+Having just proved the overworld's eight regions differ by 2.4×, the gate was
+still sampling **one** of them — the start screen, in whichever mirror state the
+save happened to hold. `visual-sanity.spec.mjs` now sweeps all eight regions in
+both states, sixteen samples, using the same screens the certification captures
+shoot so a failure has a picture next to it.
+
+That sweep immediately showed the contrast floor was the wrong shape:
+
+| | measured contrast |
+|---|---|
+| walled dungeon rooms | **70 – 172** |
+| open outdoor screens | **12 – 16** |
+
+A single floor of 13 was doing almost nothing for the fourteen dungeons — one
+could regress from 95 to 14 and still pass — and it sat *inside* the overworld's
+own sample noise, which is the randomly-failing gate this suite already learned
+to avoid once. An open field with one ground plane, no walls to shadow it and no
+ceiling to occlude it cannot have a walled room's contrast; that is what open
+space **is**, not a defect to tune away.
+
+So there are two floors now, each a ratchet under the measured worst of its
+kind: **60 for dungeons** (worst: Cryo Vault at 70) and **10 for open levels**
+(worst: Bonetown at 12). The dungeon floor finally bites.
+
 ### Auditing this session's own work against its own rule
 
 Trap 4 in `HANDOFF.md` says: deleting the call is not deleting the feature —
