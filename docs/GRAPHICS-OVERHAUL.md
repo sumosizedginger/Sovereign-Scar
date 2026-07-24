@@ -29,16 +29,49 @@ It still looks flat, and there are four reasons, in order of how much they cost:
    baked into vertex colour, which means the lights wash it out *and* it
    corrupts the material classifier downstream. Measured: **10 of 11 palette
    swatches change material family purely from sitting in a corner.**
-2. **The camera is roughly 2.5× too far away.** Measured: the hero occupies
-   **5.5% of frame height — about 40 pixels at 720p.** Every piece of character,
-   weapon, and animation work in this project is invisible at that size.
-3. **There is no surface texture of any kind.** Not a stylistic choice — the
+2. **There is no surface texture of any kind.** Not a stylistic choice — the
    texture loader is dead code. Large flat areas read as untextured primitives.
+3. **The shadows are the hard-edged variant**, and they land on those flat
+   areas as aliased black staircases.
 4. **Several rooms are one hue at one value.** Beat 07 is the clearest case and
    the one the player complained about.
 
-Fixing 1 and 2 will change the look of this game more than everything in
-`VISUAL_PLAN.md` did combined, and 1 is a bug fix, not a taste change.
+Ticket 1 will change the look of this game more than everything in
+`VISUAL_PLAN.md` did combined, and it is a bug fix, not a taste change.
+
+### The camera is correct — and that decides where the effort goes
+
+An earlier draft of this document claimed the camera was "2.5× too far away"
+and wanted it pulled in. **That was wrong and the recommendation is withdrawn.**
+
+The measurement was real — the hero is **5.5% of frame height, ~40px at 720p** —
+but it was benchmarked against the wrong genre. 12–18% is what a character-scale
+action game (Hades, Death's Door) uses. A top-down Zelda deliberately frames the
+**room**: you must read the whole space, every enemy in it, and the puzzle, in
+one glance. A Link to the Past puts Link at roughly 10% of frame height. This
+game's framing is right, and the owner has confirmed it plays correctly.
+
+Keep the camera. But take the consequence seriously, because it redirects the
+whole plan:
+
+**The room is the subject of every frame, not the hero.** At this distance the
+player is reading silhouette, colour, and motion — not faces, not blade geometry,
+not surface finish on a pauldron. Two things follow:
+
+- **Room-scale quality is nearly the entire visual budget.** Ticket 1 (contact
+  shading on architecture), Ticket 3 (soft shadows across large floors), Ticket 4
+  (surface detail on big flat planes), and Ticket 7 (rooms that aren't empty) all
+  act at exactly the scale the camera is pointed at. They matter more here than
+  they would in a close-framed game, not less. **Ticket 7 in particular is
+  promoted** — an empty floor is most of the picture.
+- **Character work must be spent on legibility, not fidelity.** Detail below
+  roughly 40px of hero is invisible by construction and always will be. The
+  return is in silhouette separation (Ticket 6), colour-coded factions (already
+  done, and correct), telegraph clarity, and animation arcs large enough to read
+  at a glance. `palettes.js:146` already states this constraint — "which of these
+  is the armoured one" must be answerable from a distant camera mid-fight. That
+  is the right standard. Judge future character work against it rather than
+  against how it looks in a close-up.
 
 ---
 
@@ -47,17 +80,18 @@ Fixing 1 and 2 will change the look of this game more than everything in
 | # | Ticket | What it buys | Evidence | Risk |
 |---|---|---|---|---|
 | 1 | AO out of albedo | Solidity, correct materials | **Measured** | Medium — touches the mesher |
-| 2 | Camera framing | Everything already built becomes visible | **Measured** | Medium — gameplay-affecting |
-| 3 | Soft shadows | Removes the biggest "cheap" tell | Read from code | Low |
-| 4 | Real surface detail | Kills the flat-plastic read | Read from code | Low |
+| 2 | Soft shadows | Removes the biggest "cheap" tell | Read from code | Low |
+| 3 | Real surface detail | Kills the flat-plastic read | Read from code | Low |
+| 4 | Fill the empty rooms | Scale, depth, somewhere for light to fall | Judgement | High effort |
 | 5 | Colour grade + palette fix | Art direction, per-region identity | Judgement | Low |
 | 6 | Rim light on actors | Hero never lost against the floor | Judgement | Low |
-| 7 | Fill the empty rooms | Scale, depth, somewhere for light to fall | Judgement | High effort |
-| 8 | Atmosphere | Showpiece | Judgement | Low |
+| 7 | Atmosphere | Showpiece | Judgement | Low |
 
-Do 1 → 2 → 3 → 4 in order. They compound: solid geometry seen up close under
-soft light with real surface detail is a different game. 5–8 are polish on top
-and can be reordered freely.
+Do 1 → 2 → 3 in order. They compound, and all three act on architecture, which
+is what a room-framed camera actually shows: solid geometry under soft light
+with real surface detail is a different game. Ticket 4 is the one with real
+authoring cost, and it is where the remaining ceiling lives. 5–7 are polish and
+can be reordered freely.
 
 ---
 
@@ -169,58 +203,7 @@ hook as a detail term.
 
 ---
 
-## Ticket 2 — Pull the camera in
-
-### What is happening
-
-`src/engine/renderer.js:28` fixes the camera at `(0, 14, 22)` looking at
-`(x, 8, 0)`, FOV 65°. Measured:
-
-```
-camera distance to hero: 25.6u   visible frame height there: 32.6u
-hero 1.8u tall -> 5.5% of frame height = 40px at 720p
-```
-
-For reference, in the games this one is aiming at, the hero is typically
-**12–18%** of frame height. This game is at a third of that.
-
-Look at `docs/media/certification/beat-07-sluice-entry.png`: the hero is a
-thumbnail in the middle of an enormous empty floor. Every detail this project
-has spent sessions on — the corrected swing arc, the shield, the four weapon
-models, the per-enemy silhouettes, the eye-glow palettes — resolves to a handful
-of pixels. The animation work is real and nobody can see it.
-
-### The fix
-
-This is a gameplay change as much as a visual one, so it needs care, not just a
-smaller number:
-
-- Bring the rig to roughly `(0, 10, 15)` — hero lands near 9–10% — or
-  `(0, 8.5, 12.5)` for ~12%. Tune by measurement, not by eye.
-- **Check the arena maths.** `visibleHalfWidthAt` and `lockedTraverseBoundsX`
-  derive the reachable play area *from the projection*, so they will follow
-  automatically — that is good design and it means this change is safer than it
-  looks. But scroll-locked wave arenas will get physically smaller. Verify every
-  locked encounter still has room to dodge.
-- **Check enemy sightlines.** Off-screen enemies shooting at the player is
-  survivable at 32 units of visible height and unfair at 20. Ranged aggro radius
-  may need to come down with the camera.
-- The bestiary comment at `palettes.js:146` says silhouettes must be readable
-  "from a camera 17.5 units up" — that constraint gets *easier*, not harder.
-- Consider a small dynamic pull-back during boss fights so big arenas still
-  frame, rather than one fixed distance for every situation.
-
-### How to prove it
-
-- Unit: assert the hero's projected screen height falls in a target band, so
-  this cannot silently drift again.
-- Unit: assert `lockedTraverseBoundsX` still gives every scroll-locked arena at
-  least *N* units of dodge room.
-- Play beats 01, 07, and a boss. This one genuinely needs hands on it.
-
----
-
-## Ticket 3 — Soft shadows
+## Ticket 2 — Soft shadows
 
 `src/engine/renderer.js:46` uses `THREE.PCFShadowMap` — the hard variant. In
 `ow-quarry-crust.png` the shadows are aliased black staircases with a visible
@@ -240,7 +223,7 @@ stair-stepped border.
 
 ---
 
-## Ticket 4 — Give surfaces something to look at
+## Ticket 3 — Give surfaces something to look at
 
 `src/engine/textures.js` is **dead code** — zero importers, and its URLs point
 at `ground-asphalt-wet.png`, `wall-lab-panel.png`, `ground-alen-flesh.png`:
@@ -265,6 +248,30 @@ Generate detail in the shader, in the hook `materials.js` already owns:
   Ticket 1 it will finally be reliable enough to drive this.
 - Keep it mean-preserving so the certification band survives, the same
   discipline `mottleColors` already documents.
+
+---
+
+## Ticket 4 — Fill the rooms
+
+**Promoted, because the camera frames the room.** At this distance an empty
+floor is not background — it is most of the picture. Every capture shows a large
+flat expanse with a few boxes pushed to the edges. That is why the rooms read as
+big and cheap rather than big and impressive: there is nothing for light to fall
+across, nothing to occlude anything, and nothing to give scale.
+
+It is also what makes the other tickets pay off. Soft shadows need something to
+cast them; contact darkening needs surfaces that meet; a colour grade needs more
+than one surface to separate. An empty room defeats all three.
+
+This is already tracked as pending task #18, "prototype vertical interest in one
+safe room." Do it as one room first, capture before/after, and only roll it out
+if the frame genuinely improves.
+
+`VISUAL_PLAN.md` measured the budget at **38,456 triangles / 28 draw calls**,
+which is enormous headroom on any hardware from the last decade. The geometry
+budget is not the constraint. Authoring time is — this is the one ticket here
+that costs days rather than hours, and it is also the one with the highest
+remaining ceiling.
 
 ---
 
@@ -321,24 +328,7 @@ doubles as a readability win in combat, not just a beauty pass.
 
 ---
 
-## Ticket 7 — Fill the rooms
-
-Every capture shows a large flat floor with a few boxes at the edges. Empty
-floor is the reason the rooms read as big and cheap rather than big and
-impressive — there is nothing for light to fall across, nothing to occlude
-anything, and nothing to give scale.
-
-This is already tracked as pending task #18, "prototype vertical interest in one
-safe room." Do it as one room first, capture before/after, and only roll it out
-if the frame genuinely improves.
-
-`VISUAL_PLAN.md` measured the budget at **38,456 triangles / 28 draw calls**,
-which is enormous headroom on any hardware from the last decade. The geometry
-budget is not the constraint. Authoring time is.
-
----
-
-## Ticket 8 — Atmosphere
+## Ticket 7 — Atmosphere
 
 Once the above lands:
 
@@ -359,11 +349,14 @@ Once the above lands:
 
 1. **Ticket 1** — AO split. Bug fix, unlocks the material system, changes every frame.
 2. **Retrim lighting + recapture the 44 frames.** Ticket 1 will break the gate. Expect it.
-3. **Ticket 2** — camera. Needs real play testing; do it while the lighting is fresh.
-4. **Ticket 3** — soft shadows. One line plus tuning.
-5. **Ticket 4** — triplanar detail. Now that the classifier is trustworthy.
+3. **Ticket 2** — soft shadows. One line plus tuning, and the retrim is still fresh.
+4. **Ticket 3** — triplanar detail. Now that the classifier is trustworthy.
+5. **Ticket 4** — fill one room as a prototype. Capture before/after before committing to more.
 6. **Ticket 5** — grade and the Beat 07 palette sweep.
-7. **Tickets 6, 7, 8** — in whatever order appetite allows.
+7. **Tickets 6, 7** — in whatever order appetite allows.
+
+Steps 1–4 are all architecture, which is what the camera is pointed at. Do them
+before touching anything character-scale.
 
 Stop after any ticket and the game is still shippable. That is deliberate.
 
@@ -376,12 +369,18 @@ Stop after any ticket and the game is still shippable. That is deliberate.
   certification captures or from reading the code. The captures are 1280×720
   stills at fixed camera positions; they cannot show motion, shimmer, shadow
   crawl, or how any of this reads at 60 fps.
-- **Frame cost is unmeasured.** Tickets 4 and 8 add per-pixel work. The triangle
+- **Frame cost is unmeasured.** Tickets 3 and 7 add per-pixel work. The triangle
   budget has room; the *shading* budget has not been profiled.
 - **Ticket 1's downstream reach is the biggest unknown.** Vertex colour is read
   in more places than `materials.js` — `render/luminance.js`,
   `render/albedo-trim.js`, and `world/room-trim.js` all touch colour, and this
   project's most expensive recurring bug is fixing one site out of several.
   **Sweep every consumer of the colour attribute before changing it.**
-- Tickets 5 through 8 are taste. They are informed by what the captures show,
+- Tickets 4 through 7 are taste. They are informed by what the captures show,
   but they are not measurements and should not be treated as such.
+- **One recommendation in this document has already been withdrawn.** The first
+  draft called the camera "2.5× too far away" on the strength of a real
+  measurement compared against the wrong genre — character-scale action games
+  rather than top-down Zelda. The number was right and the conclusion was wrong,
+  which is the more dangerous combination, because a measurement makes a
+  judgement look like a fact. Treat the taste calls here accordingly.

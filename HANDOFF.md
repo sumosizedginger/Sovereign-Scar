@@ -105,14 +105,18 @@ Everything below is committed and green. Suite: **2218 unit / 3013 total**.
 > ## Graphics: `docs/GRAPHICS-OVERHAUL.md`
 >
 > Separate from the playtest doc and separate from `VISUAL_PLAN.md` (whose six
-> tickets are all done). Eight tickets, ordered, on why the game still reads
+> tickets are all done). Seven tickets, ordered, on why the game still reads
 > flat. The first is a **bug**, not a taste call: the voxel mesher bakes ambient
 > occlusion into the vertex *colour* attribute, so the lights wash it out and it
 > corrupts the material classifier that reads the same attribute — **measured,
 > 10 of 11 palette swatches change material family purely from sitting in a
-> corner.** The second is that the hero renders at **5.5% of frame height, ~40px
-> at 720p**, which is roughly a third of what this genre uses; every animation
-> and silhouette fix this project has landed is invisible at that size.
+> corner.**
+>
+> The camera framing is **correct** and deliberately not on the list — a
+> top-down Zelda frames the room, not the hero. That decides the priorities:
+> tickets 1–4 all act on architecture, because architecture is what the camera
+> is pointed at, and character work should be judged on legibility at distance
+> rather than on fidelity up close.
 
 ## What to do next
 
