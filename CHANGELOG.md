@@ -5,6 +5,47 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### The Arachnid could only be hit from inside itself
+
+Reported from play: "the arachnid boss I had to stand inside in order to
+hit." Measured before touching anything, and reach was never the cause —
+`anchor_link` connects out to **3.6 m** against a **2.24 m** visual edge, so
+there was over a metre of legal swing outside the body the whole time.
+
+The cause was `shielded = true`. That flag is an **absolute** gate: `applyHit`
+refuses a shielded defender from every bearing, at every range. In phase 1 the
+Arachnid set it whenever it was not mid-action, so the only frames that could
+damage it at all were its own leap — and the leap lands the spider **on the
+player**. Those two facts compose into precisely the reported experience: the
+one place in space and time where damage ever registered was inside the model.
+The fight taught "stand in it and stab", because nothing else worked.
+
+Replaced with **directional** armour, via the same `armorUp` + `inFrontArc`
+path the bulwark already uses. Head-on is a clang; the flank and the back are
+open; the leap is still a full opening from any angle; a parry drops the plate,
+the same single rule the rest of the bestiary follows. `applyHit` now reads an
+optional `defender.armorArc`, so the spider can declare a ±60° face where the
+bulwark keeps its default ±75° — a boss you must circle needs a shorter walk to
+the flank than a trash mob does. Verified by bearing sweep: 0–60° refused,
+90–180° wound it, all from 3.0 m — outside the body.
+
+**And bosses could not turn.** `state.facingVec` has been on `BossBase` since it
+was written, fixed at `{x:0,z:-1}`, never once updated — dead data nothing read.
+Directional armour is meaningless against a plate welded to due south, so
+`faceToward()` is new: capped turn rate, mesh yaw kept in step, deliberately
+**slower than the player can orbit** so circling to the flank is a race the
+player wins in about a second and a half. (The bulwark was once unkillable by
+melee for exactly the opposite reason — facing that snapped, pinning the
+armoured cone on whoever attacked.)
+
+First sight of the player **snaps** rather than eases. Measured on the way
+through: easing from the due-south default at the new slow turn rate left the
+Arachnid opening every fight rotating on the spot for ~1.4 s with its plate
+aimed at nothing, and every swing in that window landing free. A boss should be
+oriented when the doors shut. The HUD's `· ARMORED` tag now reads `armorUp` as
+well as `shielded`, or it would have gone blank on exactly the boss whose
+armour most needs explaining.
+
 ### Guard, shooters, motes, and drops — four things play found
 
 All four came from the owner actually playing the game, and three of them

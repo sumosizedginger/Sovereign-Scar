@@ -47,7 +47,7 @@ assertion before changing it.
 
 ## State
 
-Everything below is committed and green. Suite: **2199 unit / 2994 total**.
+Everything below is committed and green. Suite: **2218 unit / 3013 total**.
 
 | area | state |
 |---|---|
@@ -72,6 +72,8 @@ Everything below is committed and green. Suite: **2199 unit / 2994 total**.
 | Mote burst: ring wider than the mote ever came | **fixed — named constants, honest tell** |
 | Drops spawning at flight altitude (uncollectable) | **fixed — `dropSite()`, both sites** |
 | `Enemy.loot` — assigned since day one, read by nothing | **wired up** |
+| Arachnid hittable only from inside its own model | **fixed — directional carapace** |
+| `BossBase.state.facingVec` — dead data, never updated | **live via `faceToward()`** |
 
 ## What to do next
 
@@ -134,9 +136,26 @@ pattern is worth internalising, because it is the same one three times:
   test noticed because no test asked whether the reward could be picked up.
   `dropSite()` is now the single rule, applied at both drop sites.
 
+- The Arachnid's `shielded = true` is the same shape a third time. That flag is
+  **absolute** — `applyHit` refuses a shielded defender from every bearing — so
+  combined with a leap that lands on the player, the only place damage ever
+  registered was inside the model. **Before changing a boss's hitbox, measure
+  its reach**: this one read as a reach bug and was not (3.6 m reach against a
+  2.24 m body). Directional armour (`armorUp` + `inFrontArc`) is the tool; an
+  absolute `shielded` should be reserved for genuinely untouchable phases.
+
 None of these would have been caught by a passing suite, and each has a spec
 proven to fail on the previous code. Same family as Trap 3: a green number is
 not evidence the thing works.
+
+**If you give a boss any directional rule, check it can turn.** `faceToward()`
+is new on `BossBase` because `state.facingVec` had been fixed at `{x:0,z:-1}`
+since the class was written — dead data, so a plate welded to due south. Two
+things matter and both were found by measuring, not reasoning: the turn rate
+must be **slower than the player can orbit** (or the armoured arc tracks the
+attacker and the flank is unreachable — the old bulwark bug), and first sight
+of the player must **snap**, or the boss opens the fight rotating on the spot
+with its armour aimed at nothing.
 
 Then, if you want to keep going on looks, **ticket 6 of `docs/VISUAL_PLAN.md` is
 the only one not finished**. It delivered bake-time silhouette trim and per-kit

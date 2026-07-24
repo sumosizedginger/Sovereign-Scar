@@ -451,14 +451,55 @@ export class ObsidianArachnid extends BossBase {
         this.legs = legs;
         this.leapCd = 3;
         this._leapT = 0;
-        this.shielded = true; // armor; underside weak when leaping
+        // Its carapace is armoured; its flanks and its underside are not.
+        //
+        // This used to be `shielded = true`, an ABSOLUTE gate: `applyHit`
+        // refuses a shielded defender from every angle, so in phase 1 the only
+        // frames that could damage it at all were its own leap. And the leap
+        // lands the spider ON the player. The two facts together produced
+        // exactly what the owner reported — "I had to stand inside it in order
+        // to hit it" — because that was, mechanically, the only place damage
+        // ever registered. Measured, not guessed: reach was never the issue
+        // (`anchor_link` connects out to 3.6m against a 2.24m visual edge).
+        //
+        // Directional armour instead, via the same `armorUp` + `inFrontArc`
+        // path the bulwark already uses. Head-on is a clang; the flank and the
+        // back are open. The fight becomes "get around it", which you do from
+        // OUTSIDE the body, and which the dungeon's own lock-on strafing is
+        // built for.
+        this.shielded = false;
+        // ±60°, narrower than the bulwark's ±75°: a boss you must circle needs
+        // a shorter walk to the flank than a trash mob does.
+        this.armorArc = Math.PI / 3;
+        this._openT = 0;
         this.presenceScale(1.3);
     }
+
+    /**
+     * True while the carapace actually refuses a blow. Open during any
+     * committed action (that is the leap window, unchanged), for the length of
+     * a parry, and from phase 2 onward.
+     */
+    get armorUp() {
+        return this.phase < 2 && !this.action && this._openT <= 0
+            && this.state.current !== 'DEAD';
+    }
+
+    /** A parry drops the plate, exactly as it does on a bulwark. */
+    stagger(sec = 0.9) {
+        this._openT = Math.max(this._openT, sec);
+        return super.stagger(sec);
+    }
+
     tickAI(dt, player) {
         for (let i = 0; i < this.legs.length; i++) {
             this.legs[i].rotation.x = Math.sin(this.t * 6 + i) * 0.35;
         }
+        if (this._openT > 0) this._openT -= dt;
         if (!player) return;
+        // Turn no faster than the player can strafe, so circling to the flank
+        // is a race the player wins in about a second and a half.
+        this.faceToward(player, dt, 1.1);
         if (this.busy) {
             // Airborne through the wind-up, crumpled on the floor through the
             // recovery. Its armoured back is only off the ground while it is
@@ -471,7 +512,9 @@ export class ObsidianArachnid extends BossBase {
             }
             return;
         }
-        this.shielded = this.phase < 2;
+        // `shielded` stays false for good — the plate is directional now and
+        // lives in `armorUp`, which is derived rather than assigned. An
+        // absolute flag here is what made every angle a clang.
         this.root.position.y = 1.0;
         const d = Math.hypot(
             player.root.position.x - this.root.position.x,
@@ -500,7 +543,9 @@ export class ObsidianArachnid extends BossBase {
                         radius: 2.4, color: 0xa040ff,
                     };
                 },
-                onWindup: () => { this.shielded = false; },
+                // The leap is still a full opening from ANY angle — `armorUp`
+                // reads false while an action is committed.
+                onWindup: () => {},
                 strike: (p, aim) => {
                     this.root.position.x = aim.x;
                     this.root.position.z = aim.z;
@@ -508,10 +553,7 @@ export class ObsidianArachnid extends BossBase {
                     sfx.stomp();
                     if (this.inBlast(p, aim.x, aim.z, 2.5)) this.hitPlayer(p, 2, 0.4);
                 },
-                onRecover: () => {
-                    this.root.position.y = 1.0;
-                    this.shielded = this.phase < 2;
-                },
+                onRecover: () => { this.root.position.y = 1.0; },
             });
             return;
         }

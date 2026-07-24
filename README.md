@@ -13,12 +13,12 @@ Built on **[My-Engine](https://github.com/sumosizedginger/My-Engine) 0.2.0** (pi
 
 ```bash
 npm run serve          # http://127.0.0.1:8799/
-npm test               # unit + browser E2E (2994 assertions)
+npm test               # unit + browser E2E (3013 assertions)
 npm run test:unit      # unit only
 ```
 
-Open the URL, click once to unlock audio, then explore with WASD. **Right mouse**
-guards (tap it to parry), **T** locks on. Press **Enter** to advance story lines,
+Open the URL, click once to unlock audio, then explore with WASD. **B** (or
+right mouse) guards — hold to block, tap to parry — and **T** locks on. Press **Enter** to advance story lines,
 **Tab** for the map. A new game begins on the Scarred Crust — the Crypt Breach
 lies north.
 
@@ -33,7 +33,7 @@ lies north.
   multi-Y towers, grapple chasms, phantom walls, meltable ice, sludge pools,
   magma vents, flicker gauntlets)
 - **A full combat verb set** — telegraphed enemy attacks answered by a **guard
-  and a 0.18 s parry** (once you find the Bulwark Shield partway through the
+  that fully blocks and a 0.3 s parry** (once you find the Bulwark Shield partway through the
   first dungeon — before it, telegraphs have to be read and dodged), plus
   **lock-on** so you can circle what you are fighting instead of only backing
   away from it

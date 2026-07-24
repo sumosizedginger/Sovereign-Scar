@@ -136,6 +136,56 @@ export class BossBase {
     }
 
     /**
+     * Turn the body toward the player at a capped rate, keeping
+     * `state.facingVec` and the mesh yaw in step.
+     *
+     * `state.facingVec` has existed on every boss since the class was written
+     * and was never once updated — a fixed `{x:0,z:-1}`. Nothing read it, so
+     * nothing broke, but it meant a boss could not express ANY directional
+     * rule: `inFrontArc` against a facing that never turns is a plate welded
+     * to due north. Bosses that want directional armour call this.
+     *
+     * `rotation.y = atan2(fv.x, fv.z)` maps rig-local +Z onto the facing
+     * vector — the same convention as `player.js` and `enemy.js`, so a mesh
+     * built head-forward along +Z points where it is going.
+     *
+     * The rate is the whole design. It must be SLOWER than the player can
+     * orbit, or the armoured arc tracks whoever is attacking and the flank the
+     * fight is built around is geometrically unreachable — the exact bug that
+     * once made the bulwark unkillable by melee.
+     */
+    faceToward(player, dt, turnRate = 1.1) {
+        if (!player?.root) return;
+        const dx = player.root.position.x - this.root.position.x;
+        const dz = player.root.position.z - this.root.position.z;
+        if (Math.hypot(dx, dz) < 1e-6) return;
+        const want = Math.atan2(dx, dz);
+        // First sight of the player SNAPS. `state.facingVec` defaults to
+        // {x:0,z:-1} — due south — which for a mesh built head-forward along
+        // +Z is 180° from where the player enters. Easing from that default at
+        // a deliberately slow turn rate meant the boss opened every fight
+        // rotating on the spot for the better part of two seconds, with its
+        // armoured face pointed at nothing: measured, the first 1.4s of the
+        // Arachnid fight had its plate facing away and every swing landing
+        // free. A boss should be oriented when the doors shut, not a beat and
+        // a half later.
+        if (!this._faced) {
+            this._faced = true;
+            this.state.facingVec = { x: Math.sin(want), z: Math.cos(want) };
+            this.root.rotation.y = want;
+            return;
+        }
+        const have = Math.atan2(this.state.facingVec.x, this.state.facingVec.z);
+        let delta = want - have;
+        while (delta > Math.PI) delta -= Math.PI * 2;
+        while (delta < -Math.PI) delta += Math.PI * 2;
+        const step = turnRate * dt;
+        const a = Math.abs(delta) <= step ? want : have + Math.sign(delta) * step;
+        this.state.facingVec = { x: Math.sin(a), z: Math.cos(a) };
+        this.root.rotation.y = a;
+    }
+
+    /**
      * S6 (P1-5): uniform visual-presence scale — grows the mesh and the
      * combat radii together so gameplay matches the silhouette. Call once
      * at the end of a subclass constructor. Bosses that re-assign

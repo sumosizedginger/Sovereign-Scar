@@ -53,7 +53,10 @@ export function applyHit(defender, move, attacker) {
     // (which is what lock-on strafing is FOR) or to parry the swing, which
     // drops the plate for the length of the stagger. Ray weapons are melee's
     // equal here on purpose — the lesson is positioning, not loadout.
-    if (defender.armorUp && inFrontArc(defender, attacker)) {
+    // `armorArc` lets a defender declare a narrower plate than the bulwark's
+    // ±75°. A boss the player must circle needs a shorter walk to the flank
+    // than a trash mob does, or "go around it" becomes "jog around it".
+    if (defender.armorUp && inFrontArc(defender, attacker, defender.armorArc)) {
         if (defender.onBlocked) defender.onBlocked(attacker, move);
         gsfx.hitArmor();
         juice.addTrauma(0.08);

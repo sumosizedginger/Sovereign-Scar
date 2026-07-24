@@ -281,7 +281,12 @@ export class HUD {
             this._bossFill.style.width = `${(frac * 100).toFixed(1)}%`;
             const phase = boss.phase || 1;
             const maxP = boss.maxPhase || 3;
-            this._bossPhase.textContent = `PHASE ${phase}/${maxP}` + (boss.shielded ? ' · ARMORED' : '') + (boss.canHit === false ? ' · PHASED' : '');
+            // `armorUp` as well as `shielded`: a directional plate (the
+            // Arachnid's carapace) is still armour, and a label that only
+            // tracked the absolute flag would silently go blank on exactly the
+            // boss whose armour the player most needs explaining.
+            const armored = boss.shielded || boss.armorUp;
+            this._bossPhase.textContent = `PHASE ${phase}/${maxP}` + (armored ? ' · ARMORED' : '') + (boss.canHit === false ? ' · PHASED' : '');
             // Color by phase
             if (frac > 0.55) this._bossFill.style.background = 'linear-gradient(90deg,#c04040,#ff8060)';
             else if (frac > 0.28) this._bossFill.style.background = 'linear-gradient(90deg,#c07020,#ffb040)';
