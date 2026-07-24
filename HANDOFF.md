@@ -74,6 +74,32 @@ Everything below is committed and green. Suite: **2218 unit / 3013 total**.
 | `Enemy.loot` — assigned since day one, read by nothing | **wired up** |
 | Arachnid hittable only from inside its own model | **fixed — directional carapace** |
 | `BossBase.state.facingVec` — dead data, never updated | **live via `faceToward()`** |
+| **Seven issues from the 2026-07-23 playtest** | **open — see `docs/PLAYTEST-2026-07-23.md`** |
+
+> ## ⚠ Start here: `docs/PLAYTEST-2026-07-23.md`
+>
+> Seven issues reported from a real run of beats 06 → 12, each already traced
+> to code with file/line citations and the arithmetic worked out. **None are
+> fixed.** Two are blockers:
+>
+> - **Bosses have no collision of any kind.** `BossBase`'s constructor never
+>   receives a `collisionWorld`, so `circleStrafe`/`moveToward` write straight
+>   to the transform. A boss driven at a player standing near a wall ends up
+>   inside the masonry and unreachable. `bounceArena` — the clamp that would
+>   have prevented it — exists in `bosses/base.js` and is called by nothing.
+> - **The flying mote is unreachable by every melee weapon in the game**, by
+>   design (`flyHeight` 3.4 vs a 2.0 vertical gate). Its two real answers are
+>   the Light Caster and a parry the game never teaches. The owner wants it
+>   beatable in the air; that is a design call recorded in the doc.
+>
+> The remaining five: reflected bolts deal 2 against 3.85+ HP so a parry is
+> still mandatory; enemies walk out through doorways; Beat 07 (and 09, and 12)
+> are blown out and the certification gate cannot see it; pickup emissive
+> destroys the silhouettes that file was written to protect; breakable minerals
+> reward nothing.
+>
+> The doc includes a suggested work order and a note on what the suite
+> physically cannot verify.
 
 ## What to do next
 
