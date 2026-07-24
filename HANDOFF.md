@@ -40,6 +40,19 @@ npm run test:unit      # unit only — fast, no browser
 >
 > Changing the remote URL is blocked in this environment, which is why the
 > hazard cannot simply be removed.
+>
+> **The second half of this trap is reading, not writing.** My-Engine now holds
+> a *stale copy of the whole game* from the sessions that pushed there by
+> mistake — as of 2026-07-24 its `main` sits at `b6b571d`, six commits behind,
+> and it is missing `docs/PLAYTEST-2026-07-23.md` and `docs/GRAPHICS-OVERHAUL.md`
+> entirely. It looks like the project. It is not. The owner went looking for the
+> playtest doc, did not find it, and reasonably concluded it had never been
+> committed. **Sovereign-Scar is the only source of truth. Confirm which repo
+> you are looking at before concluding a file is missing:**
+>
+> ```bash
+> git log --oneline -1 && git ls-remote https://github.com/sumosizedginger/Sovereign-Scar.git refs/heads/main
+> ```
 
 The suite is the contract. It is large on purpose and most of it encodes a
 lesson rather than a behaviour; if something fails, read the comment above the
@@ -75,6 +88,8 @@ Everything below is committed and green. Suite: **2218 unit / 3013 total**.
 | Arachnid hittable only from inside its own model | **fixed — directional carapace** |
 | `BossBase.state.facingVec` — dead data, never updated | **live via `faceToward()`** |
 | **Seven issues from the 2026-07-23 playtest** | **open — see `docs/PLAYTEST-2026-07-23.md`** |
+| **Seven graphics tickets (AO in the wrong channel, + 6)** | **open — see `docs/GRAPHICS-OVERHAUL.md`** |
+| Camera framing | **correct as-is — a top-down Zelda frames the room, not the hero** |
 
 > ## ⚠ Start here: `docs/PLAYTEST-2026-07-23.md`
 >
@@ -120,6 +135,31 @@ Everything below is committed and green. Suite: **2218 unit / 3013 total**.
 
 ## What to do next
 
+**Everything open lives in two documents. Read them in this order.**
+
+1. **`docs/PLAYTEST-2026-07-23.md`** — seven gameplay issues from a real run of
+   beats 06 → 12, each traced to code with file/line citations, none fixed.
+   **Start with issue 6, boss collision.** It is the blocker, and fixing it
+   partly resolves issue 7.
+2. **`docs/GRAPHICS-OVERHAUL.md`** — seven ordered graphics tickets on why the
+   game still reads flat. **Start with ticket 1, ambient occlusion out of the
+   albedo channel.** It is a bug rather than a taste call, it is measured, and
+   three later tickets depend on the material classifier it repairs.
+
+Before starting either: confirm the baseline. `npm run test:unit` was
+**2218/2218** at `acd8138`. Write the failing spec *before* each fix and run it
+against current code to prove it fails first — this project has repeatedly
+shipped specs that passed for the wrong reason (Traps 3 and 4 below). Commit
+each fix with its CHANGELOG entry as it lands rather than batching, so an
+interrupted session still hands off cleanly.
+
+Both documents state their own confidence per issue: which claims are measured,
+which are read from code, and which are taste and must not be tuned against.
+Respect that labelling — one recommendation in the graphics doc has already been
+withdrawn after the owner corrected it.
+
+### Background — how the current state was reached
+
 **Questions 1 and 2 of `docs/OPEN_QUESTIONS.md` are resolved (2026-07-23) by
 owner decision: brightness should be the same across the board.** The Abyss
 no longer runs a deliberately darker band than the Crust, and every boss room
@@ -128,7 +168,7 @@ of fourteen needed a `lightTune`; three of those sit on a genuine brightness
 cliff and are much closer rather than exact — see the doc for the full
 table). `node tests/qa/contrast-probe.mjs` still prints live figures if you
 want to check current numbers.
->
+
 > **Read this before touching `MOOD_PRESETS.abyss` again.** The first pass at
 > the above hit the brightness number by cranking a saturated ambient/key —
 > and it made every Abyss surface read as one flat purple wash, no material
@@ -141,7 +181,7 @@ want to check current numbers.
 > This is the same lesson as Trap 3 below, from the other direction: a
 > passing number is not proof the picture is right.
 
-**Two things still open:**
+**Two more items — the first still open, the second closed and recorded:**
 
 - **Overworld fog-of-war reported resetting after a dungeon exit (3/3
   reproductions by the owner).** Direct testing of the save-persistence code
@@ -203,7 +243,11 @@ with its armour aimed at nothing.
 Then, if you want to keep going on looks, **ticket 6 of `docs/VISUAL_PLAN.md` is
 the only one not finished**. It delivered bake-time silhouette trim and per-kit
 weathering; **vertical interest inside rooms** is what remains, and it is the
-item worth a designer rather than an implementer.
+item worth a designer rather than an implementer. It is carried forward as
+**ticket 4 of `docs/GRAPHICS-OVERHAUL.md`**, where it is argued up the priority
+list: the camera frames the room, so an empty floor is most of the picture, and
+it is what makes soft shadows and contact darkening pay off — shadows need
+something to cast them.
 
 Understand why before you start. Both things that landed are safe to apply to
 all fifteen levels in one pass *because of a structural argument*, not because
