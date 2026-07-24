@@ -92,14 +92,27 @@ Everything below is committed and green. Suite: **2218 unit / 3013 total**.
 >   the Light Caster and a parry the game never teaches. The owner wants it
 >   beatable in the air; that is a design call recorded in the doc.
 >
-> The remaining five: reflected bolts deal 2 against 3.85+ HP so a parry is
-> still mandatory; enemies walk out through doorways; Beat 07 (and 09, and 12)
-> are blown out and the certification gate cannot see it; pickup emissive
-> destroys the silhouettes that file was written to protect; breakable minerals
-> reward nothing.
+> The remaining five: a held-shield reflect never kills an ordinary shooter at
+> any beat, difficulty, or upgrade level (best case 3 damage against 3.5 HP), so
+> a parry is still mandatory; enemies walk out through doorways; Beat 07 (and
+> 09, and 12) are blown out and the certification gate cannot see it; pickup
+> emissive destroys the silhouettes that file was written to protect; breakable
+> minerals reward nothing.
 >
 > The doc includes a suggested work order and a note on what the suite
 > physically cannot verify.
+
+> ## Graphics: `docs/GRAPHICS-OVERHAUL.md`
+>
+> Separate from the playtest doc and separate from `VISUAL_PLAN.md` (whose six
+> tickets are all done). Eight tickets, ordered, on why the game still reads
+> flat. The first is a **bug**, not a taste call: the voxel mesher bakes ambient
+> occlusion into the vertex *colour* attribute, so the lights wash it out and it
+> corrupts the material classifier that reads the same attribute — **measured,
+> 10 of 11 palette swatches change material family purely from sitting in a
+> corner.** The second is that the hero renders at **5.5% of frame height, ~40px
+> at 720p**, which is roughly a third of what this genre uses; every animation
+> and silhouette fix this project has landed is invisible at that size.
 
 ## What to do next
 
