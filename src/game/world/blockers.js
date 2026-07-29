@@ -759,10 +759,22 @@ export function createBlockerRuntime(ctx, level, b, origin = { x: 0, z: 0 }) {
         const wz1 = open === 'S' ? z1 - 1 : z1;
         const wx0 = open === 'W' ? x0 + 1 : x0;
         const wx1 = open === 'E' ? x1 - 1 : x1;
+        // AND ONE SIDE WALL IS NOT BUILT AT ALL.
+        //
+        // `flush` names the side the alcove is already backed against — the room's
+        // own perimeter wall, one cell outside the footprint. A wall built there
+        // seals nothing, and it costs the entire interior: the side walls stand on
+        // the outermost columns, so with both up a three-wide alcove encloses a
+        // ONE-CELL space. Widening the mouth above only fixed the door; the room
+        // behind it was still a 1.0 slot around a 0.8 body.
+        //
+        // Omitting it makes the interior two cells wide. Nothing opens up that was
+        // not already closed, because the perimeter is still there.
+        const flush = b.flush || null;
         if (open !== 'N') fillBox(vmap, wx0, wx1, 1, 2, z0, z0, c);
         if (open !== 'S') fillBox(vmap, wx0, wx1, 1, 2, z1, z1, c);
-        if (open !== 'W') fillBox(vmap, x0, x0, 1, 2, wz0, wz1, c);
-        if (open !== 'E') fillBox(vmap, x1, x1, 1, 2, wz0, wz1, c);
+        if (open !== 'W' && flush !== 'W') fillBox(vmap, x0, x0, 1, 2, wz0, wz1, c);
+        if (open !== 'E' && flush !== 'E') fillBox(vmap, x1, x1, 1, 2, wz0, wz1, c);
         const walls = meshAndCollide(vmap, ctx.scene, ctx.collisionWorld, {
             origin: { x: origin.x, y: 0, z: origin.z },
             solidPrefix: `blk:${b.id}:vault`,

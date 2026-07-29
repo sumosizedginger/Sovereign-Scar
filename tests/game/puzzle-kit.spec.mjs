@@ -655,6 +655,42 @@ export function run(t) {
         t.ok('the back wall is still there', s.solid(0, -1));
         t.ok('and both sides are still walled', s.solid(-1, 0) && s.solid(1, 0));
 
+        // ── and the room behind the door is not a slot ─────────────────────
+        //
+        // Widening the mouth last time fixed the DOOR. The side walls stand on
+        // the outermost columns, so a three-wide alcove still enclosed a
+        // one-cell interior: a 1.0 space around a 0.8 body, 0.10 of clearance a
+        // side — the very number that made the doorway unusable, moved one step
+        // further in. `flush` names the side already backed by the room's own
+        // perimeter wall, one cell outside the footprint; the vault wall there
+        // seals nothing and costs the whole interior.
+        const flushed = (open, flush) => {
+            const queries = [];
+            createBlockerRuntime(
+                { scene: new THREE.Scene(), collisionWorld: new CollisionWorld() },
+                {
+                    signals: new SignalBus(), destructibles: [], keyStore: keyStoreStub(),
+                    addVoxelQuery: (fn) => { queries.push(fn); return () => {}; },
+                    getVoxelAt: () => false,
+                },
+                { type: 'vault', id: 'v', rect: { x0: -1, x1: 1, z0: -1, z1: 1 }, open, flush },
+                { x: 0, y: 0, z: 0 }
+            );
+            return (x, z) => queries.some((q) => q(x, 1.5, z));
+        };
+
+        for (const [flush, gone, kept] of [['E', 1, -1], ['W', -1, 1]]) {
+            const f = flushed('S', flush);
+            t.ok(`the ${flush} wall is not built when the room's own wall is already there`,
+                !f(gone, 0), `flush ${flush}`);
+            t.ok('the other side is still walled', f(kept, 0), `flush ${flush}`);
+            t.ok('and the back wall still is too', f(0, -1), `flush ${flush}`);
+            // Two cells of interior, not one: the open column plus the middle.
+            const interior = [-1, 0, 1].filter((x) => !f(x, 0)).length;
+            t.ok('the alcove interior is two cells across, not one', interior === 2,
+                `flush ${flush} — ${interior} free of 3`);
+        }
+
         // The gate spans the whole face, so a closed vault is exactly as closed
         // as it was before the mouth was widened — otherwise this "fix" would
         // have quietly deleted the puzzle.
@@ -1029,7 +1065,7 @@ export function run(t) {
             t.ok('and the cache is not buried',
                 cache.every((p) => !level.getVoxelAt(
                     p.mesh.position.x, p.mesh.position.y, p.mesh.position.z)),
-                'the vault interior is the one cell its walls do not fill');
+                'the cache sits in the interior its walls do not fill');
             level.dispose?.();
         }
     }

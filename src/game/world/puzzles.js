@@ -66,6 +66,37 @@ const CORNERS = [
  */
 export const MIN_HALF = 7;
 
+/**
+ * How wide the alcove is ACROSS ITS MOUTH, in cells.
+ *
+ * Five, and the two that were shaved off are the whole reason. The side walls
+ * stand on the outermost columns, so a three-wide alcove has a **one-cell
+ * interior**: the player came through a three-cell doorway into a 1.0 slot with
+ * 0.10 of clearance either side of a 0.8 body. That is the same 0.10 that made
+ * the doorway itself unusable last time, moved one step further in — the door
+ * was widened and the room behind it was left a slot.
+ *
+ * At five the interior is three cells across, so the space the reward sits in is
+ * as wide as the way into it. Measured by `tests/qa/puzzle-solve.mjs`, which
+ * drives the real body through the real geometry.
+ *
+ * The depth stays three. Depth costs nothing — nothing has to squeeze past
+ * anything along it — and growing the footprint is what disqualifies corners.
+ *
+ * IT MUST BE ODD. `cx` is the midpoint of the footprint and every loose piece is
+ * placed relative to it; an even width puts `cx` on a half-integer, and `settle`
+ * is integer-grid from end to end — cell keys, the ring search, `canPush`. Width
+ * four does not misplace a few pieces, it places NONE: the whole campaign bakes
+ * zero puzzles. Three and five are the choices.
+ *
+ * It stays at THREE, and the interior is widened instead by dropping the wall
+ * that was never doing anything — see `flush` below. Five measured well (the
+ * route in went from 1.40 to 2.00) but the bigger footprint lost three corners
+ * outright and left a fourth puzzle unsolvable, and an optional cache that
+ * cannot be solved is worse than one that is merely snug.
+ */
+const VAULT_W = 3;
+
 /** Plate-led on odd beats, switch-led on even ones. */
 export function flavourFor(beatNo) {
     return beatNo % 2 === 1 ? 'plate' : 'switch';
@@ -98,9 +129,9 @@ function layoutPuzzle(def, roomId, room, beatNo, isBlocked = () => false) {
     let corner = null;
     let box = null;
     for (const c of order) {
-        const bx0 = c.sx > 0 ? half - 3 : -half + 1;
+        const bx0 = c.sx > 0 ? half - VAULT_W : -half + 1;
         const bz0 = c.sz > 0 ? half - 3 : -half + 1;
-        const rect = { x0: bx0, x1: bx0 + 2, z0: bz0, z1: bz0 + 2 };
+        const rect = { x0: bx0, x1: bx0 + VAULT_W - 1, z0: bz0, z1: bz0 + 2 };
         // The footprint plus a one-cell apron on the two INWARD sides, so the
         // furniture in front of the gate has somewhere to stand.
         //
@@ -135,7 +166,21 @@ function layoutPuzzle(def, roomId, room, beatNo, isBlocked = () => false) {
     const id = `pz-${beatNo}-${slot}`;
     const signal = sig(beatNo, slot);
     const out = [
-        { type: 'vault', id: `${id}-vault`, rect: { x0, x1, z0, z1 }, open },
+        // `flush` is the side that is already backed by the room's own perimeter
+        // wall, and it is the side whose vault wall is therefore pointless.
+        //
+        // The corner search puts the footprint hard against the room edge — x0 is
+        // `-half + 1`, the first walkable column, with the perimeter at `-half` —
+        // so one of the two side walls is built one cell in front of a wall that
+        // was already there. It seals nothing and it costs the whole interior:
+        // the side walls stand on the outermost columns, so with both of them up
+        // a three-wide alcove has a ONE-CELL interior. The hero is 0.8 across, so
+        // the reward sat in a 1.0 slot with 0.10 of clearance a side — the same
+        // 0.10 that made the doorway unusable last time, one step further in.
+        //
+        // Dropping it makes the interior two cells (0.60 a side) at no cost to
+        // the footprint, so no corner is disqualified and no puzzle is lost.
+        { type: 'vault', id: `${id}-vault`, rect: { x0, x1, z0, z1 }, open, flush: sx > 0 ? 'E' : 'W' },
         {
             type: 'timed_gate', id: `${id}-gate`,
             rect: { x0, x1, z0: gateZ, z1: gateZ }, signal,

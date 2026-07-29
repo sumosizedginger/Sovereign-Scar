@@ -71,8 +71,8 @@ assertion before changing it.
 ## State
 
 Everything below is green in the working tree. `npm test` — unit + full browser
-E2E — **4449/4449**, run end to end after the second play's fixes.
-`npm run test:unit` alone: **3585/3585**.
+E2E — **4457/4457**, run end to end after the third play's fix.
+`npm run test:unit` alone: **3593/3593**.
 
 Every one of those nine fixes has been reverted and the suite re-run to confirm
 something fails without it (`HANDOFF` trap 10). The first pass of that found
@@ -568,6 +568,8 @@ node tests/qa/swing-readout.mjs    # blade tip world position through a strike
 node tests/qa/certification-captures.mjs   # re-shoot the 44 cert images
 node tests/qa/content-density.mjs  # how much GAME is in the game (see below)
 node tests/qa/stereo-field.mjs     # L/R rms for a source walked across the frame
+node tests/qa/puzzle-solve.mjs     # stand, shove, walk in — real body, real ground
+node tests/qa/room-map.mjs <beat> <room>   # draw a room; LOOK at it (trap 26)
 ```
 
 `content-density.mjs` is the odd one out and worth calling out: every other
@@ -673,6 +675,45 @@ smoke. It took looking at `beat-01-crypt-entry.png` to see it; nothing in the
 suite could have. Traps 3 and 5 in this file are the same lesson about
 different statistics. **When you change how the game looks, open the captures.
 Then change the number.**
+
+**26. Fix the door and the same number is waiting one step further in.**
+Trap 25's alcove mouth was widened from one cell to three and measured: 0.10 of
+clearance a side became 1.10. The owner came back **still stuck**. The side walls
+stand on the alcove's *outermost columns*, so a three-wide alcove encloses a
+**one-cell interior** — the player now walked through a 3.0 doorway into a 1.0
+room with, exactly, **0.10 of clearance a side**. The fix had been applied where
+the complaint pointed and nowhere else.
+
+A clearance bug is a property of a **route**, not a place. Whatever produced the
+tight gap — walls derived per-side, a footprint measured in cells — is still
+producing them further along. When one lands, measure the whole route: approach,
+doorway, interior, and the way back out.
+
+The fix worth copying is the *shape* of it. The alcove sits hard against the
+room's own perimeter (`x0` is `-half + 1`; the wall is at `-half`), so one of its
+two side walls was built one cell in front of a wall that already existed. It
+sealed nothing and cost the entire interior. Deleting it doubled the space at
+**zero** change to the footprint. Enlarging the footprint instead was tried and
+measured worse: three corners disqualified, a fourth puzzle unsolvable. **Prefer
+removing redundant geometry to growing the thing.** (And the width must be ODD —
+`cx` is the midpoint every loose piece is placed against, and `settle` is
+integer-grid end to end. Width four bakes *zero* puzzles campaign-wide.)
+
+**Two probes lie in ways worth knowing.** `puzzle-solve.mjs` was wrong three
+times before it was right: it sampled at `origin + z`, which is the **seam**
+between two rows (cell `(x,z)` is the box `[x, x+1]`, so its centre is `x + 0.5`
+— `rectW` knows this, `W` does not); it tested the push stance at a single point
+0.05 clear of the block and the lattice rounded it 0.05 *inside*, making 25 of 38
+puzzles look unshovable; and it walked the hero **straight across a chasm**,
+because the collision world holds XZ solids and **a hole is not a solid**.
+Reachability needs ground *and* width, one-cell climbs, free falls, and seeding
+from the spawn **and every door** — that last correction has now been needed
+twice, by two probes, against the same room (`weepinghall`).
+
+When a probe says the campaign is clean, draw the one room you know is unusual:
+`node tests/qa/room-map.mjs <beat> <room>` prints the voxel field and the
+collision world's answer for a 0.4 body side by side. Both findings this session
+were a **disagreement between those two pictures** before they were a number.
 
 **25. "The cell is free" is not "a body fits".**
 Every reward alcove in the campaign had a **one-cell mouth**: the side walls ran

@@ -5,6 +5,68 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixes from the third play — the room behind the door
+
+The owner, still stuck: *"YOU NEED TO MAKE SURE THERE IS ROOM FOR THE PLAYER TO
+ENTER THE ROOM, MOVE THE BLOCK ONTO THE PAD, AND ENTER THE SPACE WITHOUT ISSUE!
+Right now there are too many areas where they are too close."*
+
+**The alcove interior was still a one-cell slot.** Last play widened the *mouth*
+from one cell to three and measured it: 0.10 of clearance a side became 1.10.
+That fixed the door and left the room behind it alone. The side walls stand on
+the **outermost columns**, so a three-wide alcove still enclosed a single cell —
+the player came through a 3.0 doorway into a 1.0 space, and a 0.8 body has
+**0.10 of clearance a side** in it. The same number, one step further in.
+
+The fix costs nothing, because the wall was never doing anything. The corner
+search puts the footprint hard against the room edge (`x0` is `-half + 1`, the
+first walkable column, with the perimeter wall at `-half`), so one of the two
+side walls is built one cell in front of a wall that already exists. The vault
+def now carries `flush`, naming that side, and `blockers.js` does not build it.
+The interior is two cells — **0.60 a side, six times the room** — the footprint
+is unchanged, and all 38 puzzles survive.
+
+Widening the footprint instead was tried first and measured worse: at five cells
+the route in went 1.40 → 2.00, but three corners were disqualified outright and
+a fourth puzzle became unsolvable. An optional cache that cannot be solved is
+worse than one that is merely snug. Also learned, the hard way: **the width must
+be odd.** `cx` is the footprint's midpoint and every loose piece is placed
+against it; an even width puts it on a half-integer and `settle` is integer-grid
+end to end. Width four does not misplace a few pieces — the campaign bakes
+**zero**.
+
+**New probe: `tests/qa/puzzle-solve.mjs`.** The first one that drives the real
+`PushableBlock` through the real `tryPush` (0.9 units a shove, continuous space,
+half-extent 0.7) instead of modelling it as 1-cell grid steps, and the first that
+asks whether the *player* can stand where the shove has to come from. It reports
+38 puzzles, 0 unreachable, 0 unshovable, 0 unsolvable, 0 un-enterable, 0 trapped.
+
+It was wrong three times first, and each was a lesson worth keeping:
+
+- **It sampled the seam.** `level-builder` registers cell `(x,z)` as the box
+  `[x, x+1]`, so a cell's centre is `x + 0.5`, and `blockers.js` knows this for
+  rectangles (`rectW` maps `x0..x1` to `[x0, x1+1]`) but not for points (`W` is
+  `origin + local`, a cell **corner**). Sampling a row at `origin + z` samples
+  the boundary between two rows: every doorway in the campaign read as 0.25 wide
+  while the same probe reported the player could walk through it. Two
+  measurements disagreeing is the tell.
+- **It stood in the crate.** The push stance was tested at one point, 0.05 clear
+  of the block; the 0.25 lattice rounded it 0.05 *inside*. 25 of 38 puzzles
+  looked unshovable. `tryPush` accepts a whole band out to `half + 0.9`, so the
+  probe now tests the band.
+- **It walked across a chasm.** The collision world holds XZ solids only, and
+  **a hole is not a solid**. Beat 07's `weepinghall` is split end to end by a
+  grapple gap with the puzzle on the far bank; a width-only probe strolled over
+  it and pronounced the campaign clean. It is now height-aware — ground under
+  the body, one-cell climbs, free falls — and seeded from the spawn *and every
+  door*, which is the same correction `puzzle-reach.mjs` needed against this
+  same room.
+
+**Also new: `tests/qa/room-map.mjs`**, which draws a room twice — the voxel field
+and the collision world's answer for a 0.4 body. Both findings this session
+appeared as a disagreement between those two pictures before they appeared as a
+number, which is the point.
+
 ### Fixes from the second play
 
 Five more reports, and the two that mattered most were the same bug wearing
