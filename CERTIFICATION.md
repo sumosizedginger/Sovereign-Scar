@@ -86,20 +86,20 @@ spindle→iron, quarry→slate, bonetown→new ashField; all 20–105 → 57–8
 
 | Beat | Rooms | A | B | C | D | E | F | G | H | I | Lum | Shots |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 01 Crypt Breach | 6 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 50 / 58 | [entry](docs/media/certification/beat-01-crypt-entry.png) · [boss](docs/media/certification/beat-01-crypt-boss.png) |
-| 02 Eastern Spindle | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 48 / 81 | [entry](docs/media/certification/beat-02-spindle-entry.png) · [boss](docs/media/certification/beat-02-spindle-boss.png) |
-| 03 Duval Sink | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 65 / 69 | [entry](docs/media/certification/beat-03-sink-entry.png) · [boss](docs/media/certification/beat-03-sink-boss.png) |
-| 04 Sky Monument | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 54 / 69 | [entry](docs/media/certification/beat-04-sky-entry.png) · [boss](docs/media/certification/beat-04-sky-boss.png) |
-| 05 Citadel of the Proxy | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 50 / 77 | [entry](docs/media/certification/beat-05-citadel-entry.png) · [boss](docs/media/certification/beat-05-citadel-boss.png) |
-| 06 Bleeding Quarry | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 52 / 75 | [entry](docs/media/certification/beat-06-quarry-entry.png) · [boss](docs/media/certification/beat-06-quarry-boss.png) |
-| 07 Sluice of Tears | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 53 / 42 | [entry](docs/media/certification/beat-07-sluice-entry.png) · [boss](docs/media/certification/beat-07-sluice-boss.png) |
-| 08 Bone Forest | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 44 / 58 | [entry](docs/media/certification/beat-08-bone-entry.png) · [boss](docs/media/certification/beat-08-bone-boss.png) |
-| 09 Ruined Town | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 54 / 51 | [entry](docs/media/certification/beat-09-town-entry.png) · [boss](docs/media/certification/beat-09-town-boss.png) |
-| 10 Cryo Vault | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 59 / 50 | [entry](docs/media/certification/beat-10-cryo-entry.png) · [boss](docs/media/certification/beat-10-cryo-boss.png) |
-| 11 Rot Mire | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 58 / 51 | [entry](docs/media/certification/beat-11-mire-entry.png) · [boss](docs/media/certification/beat-11-mire-boss.png) |
-| 12 Pyre Peak | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 60 / 45 | [entry](docs/media/certification/beat-12-pyre-entry.png) · [boss](docs/media/certification/beat-12-pyre-boss.png) |
-| 13 GUMOI Tower | 9 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 51 / 39 | [entry](docs/media/certification/beat-13-gumoi-entry.png) · [boss](docs/media/certification/beat-13-gumoi-boss.png) |
-| 14 Leviathan Core | 6 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 59 / 76 | [entry](docs/media/certification/beat-14-leviathan-entry.png) · [boss](docs/media/certification/beat-14-leviathan-boss.png) |
+| 01 Crypt Breach | 6 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 82 / 88 | [entry](docs/media/certification/beat-01-crypt-entry.png) · [boss](docs/media/certification/beat-01-crypt-boss.png) |
+| 02 Eastern Spindle | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 79 / 79 | [entry](docs/media/certification/beat-02-spindle-entry.png) · [boss](docs/media/certification/beat-02-spindle-boss.png) |
+| 03 Duval Sink | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 78 / 98 | [entry](docs/media/certification/beat-03-sink-entry.png) · [boss](docs/media/certification/beat-03-sink-boss.png) |
+| 04 Sky Monument | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 84 / 99 | [entry](docs/media/certification/beat-04-sky-entry.png) · [boss](docs/media/certification/beat-04-sky-boss.png) |
+| 05 Citadel of the Proxy | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 80 / 92 | [entry](docs/media/certification/beat-05-citadel-entry.png) · [boss](docs/media/certification/beat-05-citadel-boss.png) |
+| 06 Bleeding Quarry | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 69 / 88 | [entry](docs/media/certification/beat-06-quarry-entry.png) · [boss](docs/media/certification/beat-06-quarry-boss.png) |
+| 07 Sluice of Tears | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 72 / 73 | [entry](docs/media/certification/beat-07-sluice-entry.png) · [boss](docs/media/certification/beat-07-sluice-boss.png) |
+| 08 Bone Forest | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 74 / 93 | [entry](docs/media/certification/beat-08-bone-entry.png) · [boss](docs/media/certification/beat-08-bone-boss.png) |
+| 09 Ruined Town | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 71 / 79 | [entry](docs/media/certification/beat-09-town-entry.png) · [boss](docs/media/certification/beat-09-town-boss.png) |
+| 10 Cryo Vault | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 85 / 55 | [entry](docs/media/certification/beat-10-cryo-entry.png) · [boss](docs/media/certification/beat-10-cryo-boss.png) |
+| 11 Rot Mire | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 79 / 81 | [entry](docs/media/certification/beat-11-mire-entry.png) · [boss](docs/media/certification/beat-11-mire-boss.png) |
+| 12 Pyre Peak | 8 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 71 / 75 | [entry](docs/media/certification/beat-12-pyre-entry.png) · [boss](docs/media/certification/beat-12-pyre-boss.png) |
+| 13 GUMOI Tower | 9 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 78 / 60 | [entry](docs/media/certification/beat-13-gumoi-entry.png) · [boss](docs/media/certification/beat-13-gumoi-boss.png) |
+| 14 Leviathan Core | 6 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 77 / 90 | [entry](docs/media/certification/beat-14-leviathan-entry.png) · [boss](docs/media/certification/beat-14-leviathan-boss.png) |
 
 Notes: boss shots were taken mid-fight (HP bar + phase tags visible — the
 G evidence); Beat 13's horizontal banding is the flicker shader, Beat 14's
