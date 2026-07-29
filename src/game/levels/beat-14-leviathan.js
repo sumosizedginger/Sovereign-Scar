@@ -21,7 +21,7 @@ export const BEAT14_DEF = {
     mood: 'abyss',
     // Per-level luminance trim into the Abyss certification band [35,75]
     // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
-    lightTune: { ambient: 1.2, key: 1.5 },
+    lightTune: { ambient: 1.0, key: 1.3 },
     start: 'threshold',
     prebake: true,
     floorColor: 0x483a5c, // certification retune: old 0x1a1424 was near-black in linear terms
@@ -85,6 +85,13 @@ export const BEAT14_DEF = {
             },
         },
         recursion: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -2],
             half: 9,
             wallH: 5,
@@ -171,6 +178,7 @@ export const BEAT14_DEF = {
                 { x: -3, z: -3, kind: 'bulwark', hp: 5 },
                 { x: 3, z: -3, kind: 'mote', hp: 5 },
                 { x: 0, z: 3, kind: 'lancer', hp: 5 },
+                { x: 4, z: 4, kind: 'weaver', hp: 5 },
             ],
             doors: [
                 { to: 'recursion', side: 'S', at: 0, type: 'open' },

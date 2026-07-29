@@ -28,7 +28,8 @@ export const BEAT08_DEF = {
     // the Crust's brightness) — this boost is now compounding on top of an
     // already-brighter base and needs to come back down. Re-tune from here,
     // not from feel: node tests/qa/contrast-probe.mjs.
-    lightTune: { ambient: 1.25, key: 1.2 },
+    // Raised after AO-split + grade: entry was metering ~34 against [45,90].
+    lightTune: { ambient: 1.35, key: 1.32 },
     start: 'rootgate',
     prebake: true,
     floorColor: 0x544c34, // certification retune: old 0x2a2618 sat under 2% linear reflectance
@@ -68,6 +69,13 @@ export const BEAT08_DEF = {
             ],
         },
         bonegrove: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -1],
             half: 11,
             wallH: 4,
@@ -151,6 +159,13 @@ export const BEAT08_DEF = {
             },
         },
         ossuary: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -2],
             half: 9,
             wallH: 4,
@@ -212,13 +227,20 @@ export const BEAT08_DEF = {
             },
         },
         ribvault: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -3],
             half: 8,
             wallH: 5,
             enemies: [
                 { x: -3, z: -3, kind: 'bulwark', hp: 4 },
                 { x: 3, z: -3, kind: 'lancer', hp: 4 },
-                { x: 0, z: 3, kind: 'bulwark', hp: 3 },
+                { x: 0, z: 3, kind: 'bulwark', ai: 'lunge', hp: 3 },
             ],
             platforms(map, h) {
                 for (let lvl = 1; lvl <= 3; lvl++) {

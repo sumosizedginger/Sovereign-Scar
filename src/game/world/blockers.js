@@ -21,6 +21,22 @@ import { DestructibleVoxelMesh } from './destructible-voxel-mesh.js';
 import { meshAndCollide } from './level-builder.js';
 import { CRUST_COLORS, ABYSS_COLORS } from '../assets/palettes.js';
 import { sfx } from '../../audio/synth.js';
+import { gsfx } from '../audio/sfx-bank.js';
+import { PushableBlock } from './pushable-block.js';
+import { plateHeld, socketFilled, traceBeam } from './puzzle-kit.js';
+
+/**
+ * Phase E1 — how long a switch holds its signal open, and how far a block
+ * travels per shove.
+ *
+ * `GATE_HOLD` is the only number in the puzzle kit that is really a difficulty
+ * dial. Long enough to cross a room at walking speed and not one step further:
+ * the whole shape of a timed gate is "you cannot also stop to fight".
+ */
+export const GATE_HOLD = 6.0;
+export const PUSH_STEP = 0.9;
+/** Distance past the room edge at which a puzzle resets itself. */
+export const PUZZLE_RESET_AT = 6;
 
 // ── Pure helpers (unit-tested) ─────────────────────────────────────────────
 
@@ -73,7 +89,16 @@ export function applyBlockerToMap(map, b) {
         fillBox(map, b.rect.x0, b.rect.x1, 1, 2, b.rect.z0, b.rect.z1,
             b.color || CRUST_COLORS.slateDark);
     }
-    // wedge_crack builds its own destructible mesh; caster_dark is runtime-only
+    // wedge_crack builds its own destructible mesh; caster_dark is runtime-only.
+    //
+    // Every Phase E1 piece is runtime-only too, INCLUDING the vault's three
+    // permanent walls, and that is not an implementation convenience. Puzzles
+    // are authored from a table (see `puzzles.js`) and rooms place their own
+    // pickups inside `onBake`, which runs after the room mesh is built — so a
+    // vault baked into the mesh had already chosen its corner before anyone
+    // knew what was standing there, and it buried a small key in beat 13 and a
+    // suture in beat 14 on the first run. Built at runtime, after `onBake`, the
+    // puzzle can look at the room and move.
 }
 
 // ── Runtime half ───────────────────────────────────────────────────────────
@@ -322,6 +347,432 @@ export function createBlockerRuntime(ctx, level, b, origin = { x: 0, z: 0 }) {
                 if (shroud.parent) shroud.parent.remove(shroud);
                 shroud.geometry.dispose();
                 shroud.material.dispose();
+            },
+        };
+    }
+
+    // ── Phase E1: the puzzle kit ───────────────────────────────────────────
+    //
+    // Five primitives, and NONE of them is interesting alone. That is the
+    // point: a plate on its own is a light switch, a gate on its own is a door,
+    // and a block on its own is furniture. Plate + timed gate + block is a
+    // complete Zelda puzzle, and the player is the one who assembles it.
+    //
+    // They talk through `level.signals`, never to each other. A plate does not
+    // know what it opens and a gate does not know what holds it, which is why
+    // any of them can be recombined without touching a line of this file.
+
+    if (b.type === 'pushable') {
+        const at = W(b.at);
+        const spawn = { x: at.x, y: b.y != null ? b.y : 1.0, z: at.z };
+        const block = new PushableBlock(
+            spawn, b.size || 1.4, ctx.collisionWorld, ctx.scene,
+            { id: `blk:${b.id}`, color: b.color || CRUST_COLORS.clay, mass: b.mass || 1 }
+        );
+        block.spawn = { ...spawn };
+        block.canReset = true;
+        block.spin = b.spin || 0;
+        block.mirror = !!b.mirror;
+        // Terraces and boss-arena shaping live in the platform map, which is
+        // standable-but-not-solid on purpose. The collision world cannot see
+        // them, so the block is told to ask the level directly. Sampled at the
+        // height the block's own body occupies, not at the floor.
+        block.blocked = (x, z) => !!level.getVoxelAt?.(x, spawn.y, z);
+        if (b.mirror) block.mesh.material.color.setHex(0xbfe8ff);
+        // Registered on the LEVEL, not held privately, because plates, sockets
+        // and beams all need to see every block in the room and none of them
+        // should have to be told about each one.
+        (level.puzzleBlocks || (level.puzzleBlocks = [])).push(block);
+
+        let cool = 0;
+        return {
+            block,
+            update(dt, game) {
+                cool = Math.max(0, cool - dt);
+                const player = game.player;
+                const p = player.root.position;
+
+                // THE RESET. Walk out of the room and everything goes back
+                // where it started. This is the entire softlock answer, and it
+                // is a rule rather than a special case: there is no arrangement
+                // of blocks, walls and corners that survives leaving the room.
+                const d = Math.hypot(p.x - origin.x, p.z - origin.z);
+                if (d > (b.roomHalf || 12) + PUZZLE_RESET_AT) {
+                    if (block.position.x !== block.spawn.x
+                        || block.position.z !== block.spawn.z) {
+                        block.position.x = block.spawn.x;
+                        block.position.z = block.spawn.z;
+                        block.mesh.position.set(block.spawn.x, block.spawn.y, block.spawn.z);
+                        block._registerSolid();
+                    }
+                    return;
+                }
+
+                if (cool > 0 || player.dashTimer > 0) return;
+                const mv = game.input?.moveVector?.() || { x: 0, z: 0 };
+                if (!mv.x && !mv.z) return;
+                const len = Math.hypot(mv.x, mv.z) || 1;
+                const dir = { x: mv.x / len, z: mv.z / len };
+                if (block.tryPush(p, dir, PUSH_STEP)) {
+                    cool = 0.18;
+                    sfx.heave?.();
+                }
+            },
+            dispose() {
+                const list = level.puzzleBlocks || [];
+                const i = list.indexOf(block);
+                if (i >= 0) list.splice(i, 1);
+                block.dispose();
+            },
+        };
+    }
+
+    if (b.type === 'pressure_plate') {
+        const at = W(b.at);
+        const r = b.r != null ? b.r : 1.1;
+        const disc = new THREE.Mesh(
+            new THREE.CylinderGeometry(r, r, 0.12, 20),
+            new THREE.MeshStandardMaterial({
+                color: 0x8a6830, emissive: 0x2a1c08, roughness: 0.8,
+            })
+        );
+        disc.position.set(at.x, 1.06, at.z);
+        ctx.scene.add(disc);
+        const plate = { at, r, accepts: b.accepts };
+        let was = false;
+        return {
+            update(dt, game) {
+                const held = plateHeld(plate, {
+                    player: game.player.root.position,
+                    blocks: level.puzzleBlocks || [],
+                    enemies: level.enemies || [],
+                });
+                // Named source: a plate and a switch may hold the same signal,
+                // and before this the one that updated last simply overwrote
+                // the other.
+                level.signals?.set(b.signal, held, b.id);
+                if (held !== was) {
+                    was = held;
+                    disc.position.y = held ? 1.0 : 1.06;
+                    disc.material.emissive.setHex(held ? 0xffd060 : 0x2a1c08);
+                    gsfx.doorOpen?.();
+                }
+            },
+            dispose() {
+                if (disc.parent) disc.parent.remove(disc);
+                disc.geometry.dispose();
+                disc.material.dispose();
+            },
+        };
+    }
+
+    if (b.type === 'block_socket') {
+        const at = W(b.at);
+        const r = b.r != null ? b.r : 1.0;
+        const ring = new THREE.Mesh(
+            new THREE.RingGeometry(r * 0.62, r, 24),
+            new THREE.MeshBasicMaterial({
+                color: 0xffd060, transparent: true, opacity: 0.55,
+                side: THREE.DoubleSide, depthWrite: false,
+            })
+        );
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(at.x, 1.03, at.z);
+        ctx.scene.add(ring);
+        const socket = { at, r, blockId: b.blockId ? `blk:${b.blockId}` : null };
+        // A filled socket LATCHES. The block can be shoved out afterwards and
+        // the door it opened stays open — a reward you have already earned must
+        // not be taken back by the furniture.
+        if (isCleared()) level.signals?.latch(b.signal);
+        let done = isCleared();
+        return {
+            update() {
+                if (done) return;
+                if (!socketFilled(socket, level.puzzleBlocks || [])) return;
+                done = true;
+                level.signals?.latch(b.signal);
+                level.keyStore?.open?.(persistId);
+                ring.material.opacity = 0.9;
+                ring.material.color.setHex(0x9affc0);
+                gsfx.secretFound?.();
+            },
+            dispose() {
+                if (ring.parent) ring.parent.remove(ring);
+                ring.geometry.dispose();
+                ring.material.dispose();
+            },
+        };
+    }
+
+    if (b.type === 'switch') {
+        const at = W(b.at);
+        const post = new THREE.Mesh(
+            new THREE.BoxGeometry(0.5, 1.3, 0.5),
+            new THREE.MeshStandardMaterial({
+                color: 0x8a8478, emissive: 0x201810, roughness: 0.7,
+            })
+        );
+        post.position.set(at.x, 1.65, at.z);
+        ctx.scene.add(post);
+        let hold = 0;
+        // A switch is STRUCK, not interacted with — it rides the destructible
+        // list, which is the one channel every weapon already routes a swing
+        // through. Charged strikes, dash-attacks and the ray all reach it for
+        // free, and none of them had to be told a switch exists.
+        const target = {
+            // The opt-in. `weapon.shatter` gates the ordinary destructible loop
+            // and is true of exactly two weapons, so without this a player
+            // holding the Anchor Link or the Light Caster could not work a
+            // switch at all — and switches are the whole puzzle vocabulary of
+            // the seven even-numbered dungeons. Ore does not opt in, and keeps
+            // needing the Wedge or the Mallet, which is what those are for.
+            struckByAnything: true,
+            shatterAtWorld(x, y, z) {
+                if (Math.hypot(x - at.x, z - at.z) > 2.0) return 0;
+                hold = b.hold != null ? b.hold : GATE_HOLD;
+                post.material.emissive.setHex(0xffd060);
+                gsfx.keyGet?.();
+                return 1;
+            },
+        };
+        level.destructibles.push(target);
+        return {
+            update(dt) {
+                if (hold > 0) {
+                    hold -= dt;
+                    if (hold <= 0) {
+                        hold = 0;
+                        post.material.emissive.setHex(0x201810);
+                    }
+                }
+                level.signals?.set(b.signal, hold > 0, b.id);
+            },
+            dispose() {
+                const i = level.destructibles.indexOf(target);
+                if (i >= 0) level.destructibles.splice(i, 1);
+                if (post.parent) post.parent.remove(post);
+                post.geometry.dispose();
+                post.material.dispose();
+            },
+        };
+    }
+
+    if (b.type === 'timed_gate') {
+        // Built and torn down at runtime rather than baked, because a gate that
+        // lived in the room mesh could never open.
+        const gateMap = new Map();
+        fillBox(gateMap, b.rect.x0, b.rect.x1, 1, 2, b.rect.z0, b.rect.z1,
+            b.color || 0x6a5426);
+        let built = null;
+        let unsub = null;
+        const raise = () => {
+            if (built) return;
+            built = meshAndCollide(gateMap, ctx.scene, ctx.collisionWorld, {
+                origin: { x: origin.x, y: 0, z: origin.z },
+                solidPrefix: `blk:${b.id}:gate`,
+            });
+            unsub = level.addVoxelQuery?.(built.getVoxelAt) || null;
+        };
+        const drop = () => {
+            if (!built) return;
+            try { unsub?.(); } catch (_) {}
+            unsub = null;
+            built.dispose();
+            built = null;
+        };
+        raise();
+        // THE GATE MUST NOT CLOSE ON THE PLAYER, and this is a softlock rather
+        // than an annoyance. The vault behind it is a one-cell alcove with three
+        // permanent walls; a gate that re-raises while the player is inside
+        // seals them into a box with no exit, no reset (the block reset only
+        // fires when you LEAVE the room, which you now cannot) and nothing to
+        // hit. On the switch-led beats — every even-numbered dungeon — the
+        // sequence is simply "hit the switch, walk in, take the cache, wait six
+        // seconds", which is what taking a cache looks like.
+        //
+        // So the signal decides when the gate MAY close and the player's
+        // position decides whether it does. Nothing here can hold it shut: a
+        // gate that stays open one beat longer than it should is a slightly
+        // easier puzzle, and this file has already taken that trade twice.
+        const clear = b.clear || b.rect;
+        const inTheWay = (game) => {
+            const p = game?.player?.root?.position || game?.player?.rig?.position;
+            if (!p) return false;
+            const lx = p.x - origin.x;
+            const lz = p.z - origin.z;
+            return lx >= clear.x0 - 1 && lx <= clear.x1 + 1
+                && lz >= clear.z0 - 1 && lz <= clear.z1 + 1;
+        };
+        return {
+            get raised() { return !!built; },
+            update(dt, game) {
+                const open = !!level.signals?.get(b.signal);
+                if (open) drop();
+                else if (!inTheWay(game)) raise();
+            },
+            dispose() { drop(); },
+        };
+    }
+
+    if (b.type === 'beam_source') {
+        const at = W(b.at);
+        const dir = b.dir || { x: 1, z: 0 };
+        const emitter = new THREE.Mesh(
+            new THREE.BoxGeometry(0.6, 0.9, 0.6),
+            new THREE.MeshStandardMaterial({
+                color: 0xbfe8ff, emissive: 0x60b0ff, emissiveIntensity: 1.6,
+            })
+        );
+        emitter.position.set(at.x, 1.5, at.z);
+        ctx.scene.add(emitter);
+        // Segments are rebuilt only when the path actually changes shape. A
+        // beam re-meshed every frame is sixty allocations a second for a
+        // picture that is usually identical to the last one.
+        const segs = [];
+        let sig = '';
+        const clearSegs = () => {
+            for (const s of segs) {
+                if (s.parent) s.parent.remove(s);
+                s.geometry.dispose();
+                s.material.dispose();
+            }
+            segs.length = 0;
+        };
+        return {
+            update() {
+                const targets = level.beamTargets || [];
+                const res = traceBeam({ at, dir }, {
+                    mirrors: (level.puzzleBlocks || []).filter((k) => k.mirror),
+                    targets,
+                    isSolid: (x, z) => !!level.getVoxelAt?.(x, 1.4, z),
+                    maxDist: b.range || 30,
+                });
+                const key = res.path.map((p) => `${p.x.toFixed(1)},${p.z.toFixed(1)}`).join('|');
+                if (key !== sig) {
+                    sig = key;
+                    clearSegs();
+                    for (let i = 0; i < res.path.length - 1; i++) {
+                        const a = res.path[i], c = res.path[i + 1];
+                        const len = Math.hypot(c.x - a.x, c.z - a.z);
+                        if (len < 0.05) continue;
+                        const m = new THREE.Mesh(
+                            new THREE.BoxGeometry(len, 0.1, 0.1),
+                            new THREE.MeshBasicMaterial({
+                                color: 0xbfe8ff, transparent: true, opacity: 0.75,
+                                depthWrite: false,
+                            })
+                        );
+                        m.position.set((a.x + c.x) / 2, 1.5, (a.z + c.z) / 2);
+                        m.rotation.y = Math.atan2(-(c.z - a.z), c.x - a.x);
+                        ctx.scene.add(m);
+                        segs.push(m);
+                    }
+                }
+                for (const tg of targets) {
+                    tg.lit = res.hit === tg;
+                    level.signals?.set(tg.signal, tg.lit, b.id);
+                }
+            },
+            dispose() {
+                clearSegs();
+                if (emitter.parent) emitter.parent.remove(emitter);
+                emitter.geometry.dispose();
+                emitter.material.dispose();
+            },
+        };
+    }
+
+    if (b.type === 'beam_target') {
+        const at = W(b.at);
+        const lens = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.55, 0.55, 0.9, 16),
+            new THREE.MeshStandardMaterial({
+                color: 0x506070, emissive: 0x101820, emissiveIntensity: 1,
+            })
+        );
+        lens.position.set(at.x, 1.5, at.z);
+        ctx.scene.add(lens);
+        const tg = { at, r: b.r != null ? b.r : 0.9, signal: b.signal, lit: false };
+        (level.beamTargets || (level.beamTargets = [])).push(tg);
+        // A lit lens LATCHES, exactly as a filled socket does. Beat 12's exam is
+        // the beam and every other dungeon's is the socket, and the socket has
+        // always latched — "the exam is the one puzzle whose answer stays
+        // answered" is this file's own stated rule and the lens was the one
+        // piece that did not follow it. Without this, shoving the mirror back
+        // off the beam takes the reward away again.
+        if (isCleared()) {
+            tg.lit = true;
+            level.signals?.latch(b.signal);
+        }
+        let was = false;
+        return {
+            update() {
+                if (tg.lit && !isCleared()) {
+                    level.signals?.latch(b.signal);
+                    level.keyStore?.open?.(persistId);
+                }
+                if (tg.lit !== was) {
+                    was = tg.lit;
+                    lens.material.emissive.setHex(tg.lit ? 0xbfe8ff : 0x101820);
+                    if (tg.lit) gsfx.secretFound?.();
+                }
+            },
+            dispose() {
+                const list = level.beamTargets || [];
+                const i = list.indexOf(tg);
+                if (i >= 0) list.splice(i, 1);
+                if (lens.parent) lens.parent.remove(lens);
+                lens.geometry.dispose();
+                lens.material.dispose();
+            },
+        };
+    }
+
+    if (b.type === 'vault') {
+        // Three permanent walls of a reward alcove; the fourth side is a
+        // `timed_gate` and is what the puzzle opens.
+        //
+        // Alcoves rather than gates across corridors, and that is a deliberate,
+        // load-bearing decision. A gate across a route has to know the route is
+        // not the only way to a door. Get an alcove wrong and the player misses
+        // a pickup. Get a corridor gate wrong and the run is over.
+        const { x0, x1, z0, z1 } = b.rect;
+        const c = b.color || CRUST_COLORS.slateDark;
+        const open = b.open || 'S';
+        const vmap = new Map();
+        // THE MOUTH IS THREE CELLS WIDE, NOT ONE.
+        //
+        // The side walls used to run the alcove's full depth, so they met the
+        // open side and pinched the doorway down to the single middle cell. The
+        // hero's collision half-extent is 0.4, so getting in meant threading a
+        // 1.0 gap with 0.10 of clearance either side — the tightest doorway in
+        // the game, by a factor of about five, guarding every reward alcove in
+        // the campaign. The owner's report was "the side rooms ... too close to
+        // what we are unlocking to be able to get in", and every cell-level
+        // check in the puzzle probes passed the whole time: each of those cells
+        // WAS empty and reachable. None of them asked how much room a body has.
+        //
+        // Stopping the side walls one cell short opens the full three-cell face.
+        // The gate already spans that whole row, so a closed vault is exactly as
+        // closed as it ever was.
+        const wz0 = open === 'N' ? z0 + 1 : z0;
+        const wz1 = open === 'S' ? z1 - 1 : z1;
+        const wx0 = open === 'W' ? x0 + 1 : x0;
+        const wx1 = open === 'E' ? x1 - 1 : x1;
+        if (open !== 'N') fillBox(vmap, wx0, wx1, 1, 2, z0, z0, c);
+        if (open !== 'S') fillBox(vmap, wx0, wx1, 1, 2, z1, z1, c);
+        if (open !== 'W') fillBox(vmap, x0, x0, 1, 2, wz0, wz1, c);
+        if (open !== 'E') fillBox(vmap, x1, x1, 1, 2, wz0, wz1, c);
+        const walls = meshAndCollide(vmap, ctx.scene, ctx.collisionWorld, {
+            origin: { x: origin.x, y: 0, z: origin.z },
+            solidPrefix: `blk:${b.id}:vault`,
+        });
+        const unsub = level.addVoxelQuery?.(walls.getVoxelAt) || null;
+        return {
+            update() {},
+            dispose() {
+                try { unsub?.(); } catch (_) {}
+                walls.dispose();
             },
         };
     }

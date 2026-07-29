@@ -62,6 +62,41 @@ export function run(t) {
         t.ok('flat frame has zero contrast', s.contrast === 0, `contrast=${s.contrast}`);
         t.ok('every pixel sampled at stride 1', s.samples === W * H, `samples=${s.samples}`);
     }
+    // ---------------------------------------------------------------
+    // shoulder / blow-out fraction (playtest issue 2)
+    // ---------------------------------------------------------------
+    {
+        // Near-white desaturated milk: mean lands in band, contrast can pass
+        // on a checkerboard, but shoulderFrac must catch the ACES-shoulder look.
+        const milk = stats(frame(() => 230));
+        t.ok('milk frame has high shoulderFrac', milk.shoulderFrac > 0.8,
+            `shoulder=${milk.shoulderFrac.toFixed(3)}`);
+        t.ok('milk frame mean can still land in band',
+            milk.mean >= 45 && milk.mean <= 250, `mean=${milk.mean}`);
+        // Saturated bright/dark checker: high contrast, but the bright cells
+        // are pure red (high chroma) so they do NOT count as grey milk.
+        const checkerPx = new Uint8Array(W * H * 4);
+        for (let y = 0; y < H; y++) {
+            for (let x = 0; x < W; x++) {
+                const i = (y * W + x) * 4;
+                if ((x + y) & 1) {
+                    checkerPx[i] = 255; checkerPx[i + 1] = 40; checkerPx[i + 2] = 40;
+                } else {
+                    checkerPx[i] = 30; checkerPx[i + 1] = 30; checkerPx[i + 2] = 30;
+                }
+                checkerPx[i + 3] = 255;
+            }
+        }
+        const checker = stats(checkerPx);
+        t.ok('high-chroma bright checker has low shoulderFrac',
+            checker.shoulderFrac < 0.15, `shoulder=${checker.shoulderFrac.toFixed(3)}`);
+        t.ok('high-contrast checker has high contrast',
+            checker.contrast >= 40, `contrast=${checker.contrast}`);
+        // Mid-grey has neither clip nor shoulder.
+        const mid = stats(frame(() => 100));
+        t.ok('mid-grey has zero shoulder', mid.shoulderFrac === 0);
+        t.ok('mid-grey has zero clip', mid.clipFrac === 0);
+    }
     {
         // Rec.709: pure green is much brighter than pure blue.
         const px = new Uint8Array(W * H * 4);

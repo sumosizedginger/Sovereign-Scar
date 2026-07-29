@@ -47,7 +47,7 @@ export const BEAT11_DEF = {
     mood: 'abyss',
     // Per-level luminance trim into the Abyss certification band [35,75]
     // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
-    lightTune: { ambient: 1.2 },
+    lightTune: { ambient: 0.78 },
     start: 'lichgate',
     prebake: true,
     friction: 'sludge',
@@ -89,6 +89,13 @@ export const BEAT11_DEF = {
             ],
         },
         mirefloor: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -1],
             half: 11,
             wallH: 4,
@@ -163,6 +170,13 @@ export const BEAT11_DEF = {
             },
         },
         readingroom: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -2],
             half: 9,
             wallH: 4,
@@ -175,7 +189,7 @@ export const BEAT11_DEF = {
             },
             enemies: [
                 { x: -4, z: 0, kind: 'bulwark', hp: 5 },
-                { x: 4, z: 0, kind: 'brood', hp: 4 },
+                { x: 4, z: 0, kind: 'brood', ai: 'lunge', hp: 4 },
             ],
             doors: [
                 { to: 'mirefloor', side: 'S', at: 0, type: 'locked' },
@@ -219,6 +233,13 @@ export const BEAT11_DEF = {
             },
         },
         stacksump: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -3],
             half: 8,
             wallH: 4,
@@ -228,7 +249,8 @@ export const BEAT11_DEF = {
             enemies: [
                 { x: -3, z: -3, kind: 'bulwark', hp: 4 },
                 { x: 3, z: -3, kind: 'brood', hp: 4 },
-                { x: 0, z: 3, kind: 'bulwark', hp: 4 },
+                { x: 0, z: 3, kind: 'bulwark', ai: 'drift', hp: 4 },
+                { x: -5, z: 4, kind: 'weaver', hp: 4 },
             ],
             doors: [
                 { to: 'readingroom', side: 'S', at: 0, type: 'locked' },

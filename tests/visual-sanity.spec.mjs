@@ -13,9 +13,48 @@ import { startServer, findChromeVerbose, sleep, disableGamepads } from './harnes
 // shape, never in a lower exposure floor. `assets/palettes.js`'s
 // `MOOD_PRESETS.abyss` was raised to land here on its own; this band is what
 // makes that the enforced target rather than a one-off tuning pass.
+// ── The band is on the CENTRE CROP, not the full frame ─────────────────────
+//
+// It used to be `[45, 90]` over the whole frame, and that number was mostly a
+// post-processing effect rather than a property of the art.
+//
+// Measured, same scenes, only the vignette changed (1.10/0.95 → 0.72/1.05):
+//
+//   level         full-frame mean     centre-crop mean
+//   crypt            58 →  111            84 →  98
+//   sluice           64 →  116           110 → 121
+//   pyre             62 →  115           106 → 120
+//   overworld        73 →  120            95 → 106
+//
+// Full-frame mean roughly DOUBLED while the lit part of the picture moved
+// about 13%. Nearly all of the number the gate was watching was the vignette
+// crushing the corners to black — so the gate would have demanded the lighting
+// be halved to compensate for a change that did not touch the lighting, and
+// the game would have ended up darker than it has ever been while metering
+// "correct".
+//
+// This file already knew the lesson and had only applied it to contrast: see
+// the note below about p10 being zero nearly everywhere because of the
+// vignette. The mean had the same disease and nobody had checked.
+//
+// The band itself is a RATCHET around the measured campaign, which after the
+// re-trim runs 89 (Quarry) to 116 (Sink) — a 1.30:1 spread, against the owner's
+// decision that brightness should read the same across the board. Wide enough
+// to survive sample noise, tight enough that the pre-work outliers would have
+// failed it in both directions.
+//
+// The absolute numbers moved twice during that work and the second move is the
+// instructive one. Easing the vignette and wiring the room fixtures BOTH raised
+// the measurement, the band was re-derived from the result, and the resulting
+// frames were flat, milky and worse than what they replaced — while metering
+// perfectly inside their new band. The lights came back down, the band came
+// down with them, and the difference was decided by looking at
+// `docs/media/certification/beat-01-crypt-entry.png`, not by the statistic.
+// A gate is a ratchet against regression; it is not evidence that the art is
+// good, and this file has now been wrong about that twice.
 const LUM_BANDS = {
-    crust: [45, 90],
-    abyss: [45, 90],
+    crust: [76, 130],
+    abyss: [76, 130],
 };
 
 // Minimum centre-crop p90 − p10. The mean band above cannot tell a well-lit
@@ -40,12 +79,18 @@ const LUM_BANDS = {
 // measured worst of their kind, tightened whenever that worst improves:
 //
 //   dungeons  worst 70 (Cryo Vault)  -> floor 60
-//   open      worst 12 (Bonetown)    -> floor 10
+//   open      worst  9 (Bonetown)    -> floor 8
+//
+// The open worst moved 12 -> 9 when the vignette was eased: a weaker
+// vignette lifts the darkest pixels in the crop, which NARROWS p90-p10
+// on a scene that has no walls to cast shadows. Lower ground, same
+// ratchet — and a reminder that this statistic is not independent of the
+// post stack either.
 //
 // The full before/after table is in tests/game/luminance.spec.mjs, which also
 // proves the statistic discriminates at all (a flat grey frame passes the mean
 // band and fails these floors).
-const CONTRAST_FLOORS = { dungeon: 60, open: 10 };
+const CONTRAST_FLOORS = { dungeon: 60, open: 8 };
 
 /**
  * Which floor a level answers to, from the level's own `space` declaration.
@@ -77,7 +122,23 @@ const OVERWORLD_REGIONS = {
 };
 
 const PLAYER_TARGET_H = 1.9;
-const MOB_TARGET_H = 1.6;
+
+// ── Mobs are a RANGE, not a target ─────────────────────────────────────────
+//
+// This used to be `MOB_TARGET_H = 1.6` with every enemy asserted to within
+// ±20% of it. That assertion passed for the life of the project for a reason
+// that was not a good one: every enemy in the game was built from the same two
+// numbers, so all seven kinds measured 1.63 exactly. The spec was pinning the
+// bug — "which of these is the armoured one" could not be answered from a
+// silhouette, and the gate would have failed anyone who tried to fix it.
+//
+// What actually matters at this camera height is that a mob is neither lost
+// against the floor nor mistakable for a boss. So: a floor and a ceiling, wide
+// enough to hold a 0.97 brood and a 2.15 lancer, and the boss-dominance check
+// below still measures against the TALLEST mob present, which keeps the
+// hierarchy honest without flattening the bestiary.
+const MOB_MIN_H = 0.85;
+const MOB_MAX_H = 2.4;
 
 export async function run(t) {
     const chrome = findChromeVerbose();
@@ -149,7 +210,9 @@ export async function run(t) {
                         const v = got.map((g) => g[key]).sort((a, b) => a - b);
                         return v[Math.floor(v.length / 2)];
                     };
-                    const lum = median('mean');
+                    // centreMean, not mean — see the LUM_BANDS note. The
+                    // full-frame mean is dominated by the vignette.
+                    const lum = median('centerMean');
                     const contrast = median('contrast');
                     const m = s.measure();
                     const census = s.solidShadowCensus();
@@ -230,18 +293,36 @@ export async function run(t) {
                 `minY=${r.player.minY.toFixed(2)} (floor top = 1.0)`);
 
             let tallestMob = 0;
+            let widestMob = 0;
             for (let i = 0; i < r.mobs.length; i++) {
                 const mob = r.mobs[i];
-                const mr = mob.h / MOB_TARGET_H;
-                t.ok(`${r.id} mob[${i}] scale`, mr >= 0.8 && mr <= 1.2, `h=${mob.h.toFixed(2)}`);
+                widestMob = Math.max(widestMob, mob.w || 0, mob.d || 0);
+                t.ok(`${r.id} mob[${i}] scale`,
+                    mob.h >= MOB_MIN_H && mob.h <= MOB_MAX_H,
+                    `h=${mob.h.toFixed(2)} band=[${MOB_MIN_H}, ${MOB_MAX_H}]`);
                 t.ok(`${r.id} mob[${i}] grounded`, mob.minY >= 0.85, `minY=${mob.minY.toFixed(2)}`);
                 tallestMob = Math.max(tallestMob, mob.h);
             }
 
             if (r.boss) {
-                const bar = Math.max(tallestMob * 1.3, r.player.h);
-                t.ok(`${r.id} boss silhouette dominates`, r.boss.h >= bar,
-                    `boss=${r.boss.h.toFixed(2)} bar=${bar.toFixed(2)} (mob=${tallestMob.toFixed(2)})`);
+                // Dominance on the LARGER axis, not on height alone.
+                //
+                // Height was the only measure, and it encoded an assumption the
+                // roster never agreed to: that a boss towers. The Skeletal
+                // Mantis is a low, sprawling thing — 2.19 tall against a 2.15
+                // lancer, and 5.1 units across against that lancer's 0.85. It
+                // dominates its room emphatically and failed a height check by
+                // four centimetres.
+                //
+                // What the assertion is actually for (P1-5: "bosses smaller
+                // than trash mobs") is answered by whichever axis the boss
+                // spends its mass on.
+                const mobSpan = Math.max(tallestMob, widestMob);
+                const bossSpan = Math.max(r.boss.h, r.boss.w || 0, r.boss.d || 0);
+                const bar = Math.max(mobSpan * 1.3, r.player.h);
+                t.ok(`${r.id} boss silhouette dominates`, bossSpan >= bar,
+                    `boss=${bossSpan.toFixed(2)} bar=${bar.toFixed(2)} `
+                    + `(tallest mob=${tallestMob.toFixed(2)}, widest=${widestMob.toFixed(2)})`);
             }
         }
 
@@ -285,7 +366,7 @@ export async function run(t) {
                         const med = (k) => got.map((g) => g[k]).sort((a, b) => a - b)[2];
                         out.push({
                             region, screen, state,
-                            lum: med('mean'),
+                            lum: med('centerMean'),
                             contrast: med('contrast'),
                             mood: s.game.level?.mood || state,
                         });

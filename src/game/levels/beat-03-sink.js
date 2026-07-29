@@ -23,6 +23,12 @@ export const BEAT03_DEF = {
     friction: 'sand',
     floorColor: CRUST_COLORS.clay,
     wallColor: CRUST_COLORS.clayDark,
+    // The Sink had no tune at all and came out the brightest level in the
+    // campaign — centre-crop mean 147 against a campaign median of 118, on a
+    // pale clay palette that the albedo compensation was already lifting.
+    // Nothing had ever measured it, because the gate banded FULL-FRAME mean
+    // and the vignette was holding that number down everywhere equally.
+    lightTune: { ambient: 0.52, key: 0.58 },
     banner: 'The Sink hunts vibration. Reach the Spur\'s nest.',
     // Z6 — this dungeon's one idea, and the four rooms that carry it:
     // introduce it safely, complicate it, fuse it with combat, then examine it.
@@ -59,6 +65,13 @@ export const BEAT03_DEF = {
             ],
         },
         dunecross: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -1],
             half: 10,
             wallH: 4,
@@ -200,6 +213,13 @@ export const BEAT03_DEF = {
             },
         },
         undertow: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -3],
             half: 8,
             wallH: 4,

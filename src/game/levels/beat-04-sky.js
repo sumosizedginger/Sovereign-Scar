@@ -207,7 +207,7 @@ export const BEAT04_DEF = {
             half: 8,
             wallH: 5,
             enemies: [
-                { x: -3, z: -3, kind: 'frost', hp: 3, ai: 'ranged' },
+                { x: -3, z: -3, kind: 'frost', hp: 3, ai: 'drift' },
                 { x: 3, z: -3, kind: 'mote', hp: 3 },
                 { x: 0, z: 3, kind: 'sentinel', hp: 3, ai: 'charge' },
             ],

@@ -17,12 +17,29 @@
 // was no reason to move and no way to lose.
 
 import * as THREE from 'three';
-import { BossBase } from './base.js';
+import { BossBase, bossHit, discMesh, BOSS_EMISSIVE_MAX } from './base.js';
 import { DestructibleVoxelMesh } from '../world/destructible-voxel-mesh.js';
 import { fillBox } from '../../voxel/helpers.js';
 import { CRUST_COLORS } from '../assets/palettes.js';
 import { sfx } from '../../audio/synth.js';
 import { markShadowRoles } from '../render/shadow-roles.js';
+import { voxBlob, voxBox, voxSphere } from './boss-models.js';
+
+// The mound's own reach, and how often it can bite. 1.5 is the mound mesh's
+// visible footprint — one number for the picture and the rule, so the thing you
+// can see crossing the floor is exactly the thing that hurts.
+export const WAKE_R = 1.5;
+export const WAKE_CD = 1.0;
+
+// BREACH: the radius the phase-3 sweep will cover, and how long the sweep runs.
+// The telegraph is the WHOLE circle, drawn up front, because the damage rotates
+// through it — a marker that rotated with the attack would be a telegraph that
+// re-aims, which this project has now been bitten by twice. Drawing the entire
+// swept area is an honest overstatement: everything inside it is at risk, and
+// leaving it is the answer.
+export const BREACH_R = 4.5;
+export const BREACH_TIME = 1.6;
+export const BREACH_HALF = Math.PI / 5;
 
 export class SandSpur extends BossBase {
     constructor(scene, collisionWorld, particles, path = [], opts = {}) {
@@ -50,14 +67,12 @@ export class SandSpur extends BossBase {
         this.trail = [];
         const n = opts.segments || 6;
         for (let i = 0; i < n; i++) {
-            const mesh = new THREE.Mesh(
-                new THREE.BoxGeometry(0.9, 0.7, 0.9),
-                new THREE.MeshStandardMaterial({
-                    color: i === 0 ? 0xc4a060 : 0x9a8b78,
-                    roughness: 0.9,
-                    emissive: i === 0 ? 0x402010 : 0x000000,
-                    emissiveIntensity: 0.4,
-                })
+            const mesh = voxBox(
+                0.9, 0.7, 0.9,
+                i === 0 ? 0xc4a060 : 0x9a8b78,
+                i === 0 ? 0x402010 : 0x000000,
+                0.4,
+                { roughness: 0.9 }
             );
             // S6 (P1-5): emerged silhouette must clear the mob bar (~2.1+)
             mesh.scale.setScalar(3.1);
@@ -73,12 +88,7 @@ export class SandSpur extends BossBase {
         this.home = { x: this.lair.x, z: this.lair.z };
 
         // The weak seam only lights while beached — it is the "hit here" sign.
-        const weak = new THREE.Mesh(
-            new THREE.SphereGeometry(0.22, 8, 8),
-            new THREE.MeshStandardMaterial({
-                color: 0xffd060, emissive: 0xffd060, emissiveIntensity: 0.4,
-            })
-        );
+        const weak = voxSphere(0.22, 0xffd060, 0xffd060, 0.4);
         weak.position.set(0, 0.42, 0);
         this.segments[0].add(weak);
         this.weak = weak;
@@ -88,10 +98,10 @@ export class SandSpur extends BossBase {
         markShadowRoles(this.mound);
 
         // The sand mound: the whole read while the Spur is underground.
-        const mound = new THREE.Mesh(
-            new THREE.ConeGeometry(1.5, 0.9, 10),
-            new THREE.MeshStandardMaterial({ color: 0xc9b183, roughness: 1 })
-        );
+        // A dome, not a cone: from a top-down camera a cone standing on its
+        // base is a flat disc, and the mound is the entire read while the Spur
+        // is underground.
+        const mound = voxBlob(1.5, 0.75, 1.5, 0xc9b183, 0x000000, 0, { roughness: 1 });
         mound.visible = false;
         mound.castShadow = true;
         mound.receiveShadow = true;
@@ -114,10 +124,105 @@ export class SandSpur extends BossBase {
         this.actionCd = 1.6;
     }
 
+    /**
+     * SAND-WAKE — the hunt, made a threat.
+     *
+     * The mound is the best tell in the game: it crosses the floor toward you,
+     * at a speed you can see, and you can outrun it. And it did **nothing**.
+     * The Spur tracked you underground where you could not hit it, and standing
+     * directly in its path cost you exactly as much as standing anywhere else,
+     * so the entire HUNT phase — most of the fight's running time — was a
+     * countdown with no decisions in it.
+     *
+     * Now the mound itself is the hazard. It is already drawn, already moving
+     * at a legible speed, and already pointed at you: it is a telegraph that
+     * was carrying no threat, which is the opposite of this session's other
+     * bug and just as bad. The radius is the mound's own, so the picture and
+     * the rule are the same object.
+     *
+     * Deliberately cheap — one damage, a full second between bites, and only
+     * while submerged. It is a reason to keep moving, not a second attack.
+     */
+    _wake(dt, player) {
+        this._wakeCd = (this._wakeCd || 0) - dt;
+        if (!this.submerged || !player || player.health?.dead) return;
+        if (this._wakeCd > 0) return;
+        const d = Math.hypot(
+            player.root.position.x - this.root.position.x,
+            player.root.position.z - this.root.position.z
+        );
+        if (d > WAKE_R) return;
+        bossHit(player, 1, 0.7, this.root.position, this);
+        this._wakeCd = WAKE_CD;
+        sfx.grab();
+    }
+
     onPhaseChange(phase) {
         // Faster hunts and a shorter beached window: the same loop, tighter.
         this.speed = 3.0 + phase * 0.9;
         this.contactDamage = phase >= 3 ? 2 : 1;
+    }
+
+    /**
+     * BREACH — phase 3, and the one time you fight it above ground.
+     *
+     * It comes up on ITSELF rather than on you, and sweeps a full turn. The
+     * telegraph is the whole circle it will cover, drawn once, up front: the
+     * damage rotates through that circle over `BREACH_TIME`, and a marker that
+     * rotated with it would be a telegraph that re-aims — the exact thing this
+     * project has now been bitten by twice. Overstating the danger is the only
+     * honest direction here, and it happens to be the right instruction too:
+     * the answer is *leave the circle*, not *time the arm*.
+     *
+     * The plan calls this "breach-spin" and asks for a rotating cone. That is
+     * what it is; the name is short because the sweep is the whole move.
+     */
+    _breach() {
+        this.startAction({
+            name: 'breach',
+            windup: 0.8,
+            recover: 1.4,
+            cooldown: 2.4,
+            aim: () => ({
+                x: this.root.position.x, z: this.root.position.z,
+                radius: BREACH_R, color: 0xc4a060,
+            }),
+            onWindup: () => { sfx.heave(); },
+            strike: () => {
+                // Surface and STAY up. Unlike `erupt`, this does not dive on
+                // recovery — the arch is the fight for the next few seconds,
+                // which is both the threat and the biggest opening in it.
+                this.submerged = false;
+                this.canHit = true;
+                this.shielded = false;
+                this._surfaceAt(this.root.position.x, this.root.position.z);
+                this._spinT = BREACH_TIME;
+                this._spinAng = Math.random() * Math.PI * 2;
+                sfx.stomp();
+            },
+            onRecover: () => {
+                this.submerged = true;
+                this.canHit = false;
+                this.shielded = true;
+                sfx.whoosh();
+            },
+        });
+    }
+
+    /** Drive the breach sweep: one rotation, damaging what it passes over. */
+    _spin(dt, player) {
+        if (!(this._spinT > 0)) return;
+        this._spinT -= dt;
+        this._spinAng += (Math.PI * 2 / BREACH_TIME) * dt;
+        if (!player || player.health?.dead) return;
+        if (this._spinHitCd > 0) { this._spinHitCd -= dt; return; }
+        const dir = { x: Math.cos(this._spinAng), z: Math.sin(this._spinAng) };
+        if (this.inCone(player, this.root.position, dir, BREACH_R, BREACH_HALF)) {
+            this.hitPlayer(player, 2, 0.6);
+            // One bite per rotation at most. A sweep that connects every frame
+            // it overlaps you is not a sweep, it is a wall.
+            this._spinHitCd = BREACH_TIME * 0.5;
+        }
     }
 
     /** Surface: erupt where the player stands, then lie beached and open. */
@@ -182,9 +287,15 @@ export class SandSpur extends BossBase {
             const patience = this.phase >= 2 ? 2.6 : 3.6;
             if (player && this.actionCd <= 0 && (d < 1.6 || this._huntT > patience)) {
                 this._huntT = 0;
-                this._erupt(player);
+                // Phase 3 mixes the breach in. Not every time: `erupt` is the
+                // move the whole dungeon teaches, and a phase that replaces it
+                // rather than adding to it would throw that away.
+                if (this.phase >= 3 && this._rand() < 0.4) this._breach();
+                else this._erupt(player);
             }
         }
+        this._wake(dt, player);
+        this._spin(dt, player);
 
         // Trail history — segments follow where the head has been.
         this.trail.unshift({ x: this.root.position.x, z: this.root.position.z });
@@ -220,8 +331,17 @@ export class SandSpur extends BossBase {
                 this.root.position.z
             );
         }
+        // The seam marks the window; it does not sweeten it. Beaching IS this
+        // boss's recovery, so `vulnerableMult` is already 2 here — and stacking
+        // the weak multiplier on top would make it 4x, which is not a mechanic,
+        // it is the fight ending early (owner's call, 2026-07-27). `applyHit`
+        // takes the max, so the number is unchanged and what the player gains
+        // is a hit that SOUNDS different: the seam finally tells the truth
+        // about a window that was always there.
+        this.weakOpen = beached;
         if (this.weak) {
-            this.weak.material.emissiveIntensity = beached ? 3.2 : 0.4;
+            this.weak.material.emissiveIntensity =
+                BOSS_EMISSIVE_MAX * (beached ? 1 : 0.13);
         }
 
         if (this.burrow.mesh) {

@@ -11,6 +11,8 @@
 import * as THREE from 'three';
 import { meshAndCollide, buildRoomFloor, VS } from './level-builder.js';
 import { KITS as DUNGEON_KITS, applyKit, markTraversal } from '../levels/dungeon-kits.js';
+import { buildRoomLights, disposeRoomLights } from './room-lights.js';
+import { coach } from '../ui/coach.js';
 import { fillBox } from '../../voxel/helpers.js';
 import { stampMap } from '../assets/props.js';
 import { CRUST_COLORS, ABYSS_COLORS, MOOD_PRESETS } from '../assets/palettes.js';
@@ -21,11 +23,68 @@ import { applyBlockerToMap, createBlockerRuntime } from './blockers.js';
 import { applyRoomTrim } from './room-trim.js';
 import { applyRoomDecals } from './room-decals.js';
 import { scaleEnemyHp, beatNumberOf, applyBossCurve } from './threat-curve.js';
+import { EncounterDirector, tokensForBeat } from './encounter-director.js';
+import { eliteSpawns } from './elites.js';
+import { puzzleFor } from './puzzles.js';
+import { SETTLEMENTS, addSettlement, addTownDead } from './settlements.js';
+import { terraceRoom } from './terracing.js';
+import { stampKitProps, shapeBossArena } from './kit-props.js';
+import { SignalBus } from './puzzle-kit.js';
 import { gsfx } from '../audio/sfx-bank.js';
 import { buildPickupMesh, disposePickupMesh } from '../assets/pickup-shapes.js';
 
 export const ROOM_STRIDE = 64;
+
+/**
+ * Seconds of a TOTAL stalemate before a sealed room lets go.
+ *
+ * A seal is a promise that the room is clearable. `tests/game/room-seal.spec.mjs`
+ * checks the promise against the level DATA — never the entry room, never one
+ * with an overworld exit, never one holding something unreachable — and that is
+ * everything a static check can see. It cannot see a RUNTIME state in which the
+ * fight stops resolving, and one existed: with dev god mode on, `health.damage`
+ * returned before `damageFilter`, so no parry could fire, so a bulwark's plate
+ * never dropped, so a sealed room held the player against an enemy that could
+ * neither hurt them nor be hurt. Measured: 89 enemy wind-ups, 0 staggers, 0
+ * damage in either direction, door still shut after two minutes.
+ *
+ * That specific cause is fixed in `dev/dev-mode.js`. This is the guarantee that
+ * the NEXT one costs a player forty-five seconds instead of their save.
+ *
+ * The release condition is deliberately a mutual stalemate — no hit landing in
+ * EITHER direction — rather than a timer on the room. A real fight always moves
+ * some HP somewhere, so this cannot be used to wait out a fight you are losing:
+ * standing still and letting an enemy hit you resets it. It fires only when the
+ * game has genuinely stopped resolving, which is never a fight and always a bug.
+ */
+export const SEAL_STALEMATE_RELEASE = 45;
+
+/**
+ * The absolute ceiling on how long a seal may hold, in seconds.
+ *
+ * Nothing resets this while the room is still sealed. It is not a difficulty
+ * dial and it is not meant to be reachable in play — four minutes is longer
+ * than any authored fight in the campaign by a wide margin — it exists so that
+ * "sealed forever" is not a state the game has, whatever goes wrong upstream.
+ */
+export const SEAL_HARD_RELEASE = 240;
 export const DOOR_WIDTH = 2;
+
+/** Collision half-extent of the player, matching what physics.update is given. */
+const PLAYER_HALF = 0.4;
+
+/**
+ * Seconds a refused door stays quiet before it can fire again.
+ *
+ * `checkDoorTriggers` runs every frame. Without this, a refusal that fails to
+ * push the player clear of the trigger — because a wall is behind them, or the
+ * push was simply too short — refuses again next frame, resets their velocity
+ * again, and keeps doing it. See `refuseDoor`.
+ *
+ * Long enough to walk out of a 1.2-unit trigger at any speed the player has,
+ * short enough that a deliberate second attempt feels immediate.
+ */
+const DOOR_REFUSE_COOLDOWN = 0.7;
 
 /** Shared lock id for both sides of a door: sorted room pair. */
 export function doorKey(dungeonId, roomA, roomB) {
@@ -53,6 +112,94 @@ export function doorCells(room, door) {
         else cells.push({ x: half, z: c });
     }
     return cells;
+}
+
+/**
+ * How high the hero climbs without jumping. `MAX_STEP_HEIGHT` in
+ * `voxel-physics-body.js`, restated here because a flood fill that disagrees
+ * with the body it is modelling is worse than no flood fill.
+ */
+const WALK_STEP = 1;
+
+/**
+ * Every cell of `room` the player can actually WALK to, and the height they
+ * stand at when they get there.
+ *
+ * WHY THIS EXISTS
+ *
+ * "The cell is empty" is not "the player can reach it", and until this the
+ * puzzle layout only ever asked the first question. Beat 07's `weepinghall`
+ * has a chasm three cells deep running the full width of the room; the corner
+ * search found a corner on the far side of it, every piece fitted, nothing was
+ * blocked, and the whole beat — vault, plate, block and the cache inside —
+ * baked somewhere the player cannot stand. From the chair that reads exactly as
+ * the owner described it: a switch you cannot trigger and a prize you cannot
+ * get into.
+ *
+ * Flooded from the room's spawn AND from every door threshold, because a player
+ * arrives through doors far more often than they arrive at the spawn, and a
+ * corner reachable only from a door the room does have is perfectly fine.
+ *
+ * Bottom-up per column, which matters in exactly the place it is easy to get
+ * wrong: beat 08 is called `gravecanopy` and its columns read
+ * `floor · gap · gap · gap · canopy · canopy`. The highest surface is a roof
+ * nobody walks on. The lowest surface with a body's worth of room above it is
+ * the floor they are standing on.
+ */
+export function walkableCells(room, origin, solidAt) {
+    const half = room.half || 0;
+    const MAX_Y = 8;
+    const surfaceY = (lx, lz) => {
+        const x = origin.x + lx;
+        const z = origin.z + lz;
+        for (let top = 1; top <= MAX_Y; top++) {
+            if (!solidAt(x, top - 0.5, z)) continue;
+            if (solidAt(x, top + 0.5, z)) continue;
+            if (solidAt(x, top + 1.5, z)) continue;
+            return top;
+        }
+        return null;
+    };
+
+    const seen = new Map();
+    const queue = [];
+    const seed = (lx, lz) => {
+        if (Math.abs(lx) > half || Math.abs(lz) > half) return;
+        const k = `${lx},${lz}`;
+        if (seen.has(k)) return;
+        const y = surfaceY(lx, lz);
+        if (y == null) return;
+        seen.set(k, y);
+        queue.push([lx, lz, y]);
+    };
+
+    seed(Math.round(room.spawn?.x || 0), Math.round(room.spawn?.z || 0));
+    for (const door of room.doors || []) {
+        for (const c of doorCells(room, door)) {
+            seed(Math.round(c.x), Math.round(c.z));
+            // One cell inward, because the threshold itself sits in the wall
+            // line and a door cell can read as unstandable on its own.
+            seed(Math.round(c.x) - Math.sign(c.x) * (Math.abs(c.x) === half ? 1 : 0),
+                Math.round(c.z) - Math.sign(c.z) * (Math.abs(c.z) === half ? 1 : 0));
+        }
+    }
+
+    while (queue.length) {
+        const [x, z, y] = queue.shift();
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const nx = x + dx;
+            const nz = z + dz;
+            if (Math.abs(nx) > half || Math.abs(nz) > half) continue;
+            const k = `${nx},${nz}`;
+            if (seen.has(k)) continue;
+            const ny = surfaceY(nx, nz);
+            // Climbing is capped; falling is not.
+            if (ny == null || ny - y > WALK_STEP) continue;
+            seen.set(k, ny);
+            queue.push([nx, nz, ny]);
+        }
+    }
+    return seen;
 }
 
 /** Perimeter walls with gaps punched at each door. */
@@ -191,12 +338,31 @@ export function createDungeon(ctx, def, opts = {}) {
     const pickups = [];
     const destructibles = [];
     const enemies = []; // live combat list across baked rooms (shared identity)
+    // Phase D1. One per dungeon, holding the concurrency budget for the act:
+    // one committed attacker in beats 01-04, two through 10, three in the
+    // finale. That single number is the encounter difficulty dial the campaign
+    // never had — orthogonal to `threat-curve.js` (which sets HP) and
+    // `run-mode.js` (which scales everything globally).
+    const director = new EncounterDirector(
+        tokensForBeat(beatNumberOf(def.id)), () => enemies
+    );
+    // Phase E1. One bus per dungeon: plates, switches, sockets and lenses all
+    // publish here, and gates subscribe. No piece ever points at another, which
+    // is why they recombine.
+    const signals = new SignalBus();
+    const puzzleBlocks = [];
+    const beamTargets = [];
     let currentRoomId = def.start;
     let transition = null; // { t, dur, to, pin: {x,z} }
     let bossSpawned = false;
     let bossRoomId = null;
     let disposed = false;
     let themeHintShown = false; // Z6: the dungeon states its idea exactly once
+    // Stalemate valve state — see SEAL_STALEMATE_RELEASE and tickSealStalemate.
+    let sealStallT = 0;
+    let sealStallSig = null;
+    let sealHeldT = 0;
+    let doorRefusedT = 0;   // see refuseDoor / DOOR_REFUSE_COOLDOWN
 
     // Void dressing (S5 pattern) — one big fog-floor for the whole dungeon.
     const voidPlane = new THREE.Mesh(
@@ -262,6 +428,43 @@ export function createDungeon(ctx, def, opts = {}) {
         });
         for (const b of room.blockers || []) applyBlockerToMap(map, b); // W7
 
+        // Phase F1 — the dungeon's authored props, finally built. `structural`
+        // and `dressing` have carried 28 named prop kinds since the kits were
+        // written and were read by nothing at all. They stamp into the room map
+        // itself, so they mesh with the room and cost no extra draw call.
+        //
+        // After the blockers and before the light fixtures: a prop must never
+        // grow through a grapple gap or a wedge crack, and the fixtures need to
+        // see the finished silhouette to sit on top of it.
+        {
+            const kit = DUNGEON_KITS[def.id];
+            const doorGuard = new Set();
+            for (const door of room.doors || []) {
+                for (const c of doorCells(room, door)) {
+                    for (let dx = -3; dx <= 3; dx++) {
+                        for (let dz = -3; dz <= 3; dz++) {
+                            doorGuard.add(`${c.x + dx},${c.z + dz}`);
+                        }
+                    }
+                }
+            }
+            stampKitProps(map, kit, room, roomId, (x, z) => {
+                if (Math.abs(x) > room.half - 1 || Math.abs(z) > room.half - 1) return true;
+                if (doorGuard.has(`${x},${z}`)) return true;
+                if (map.has(`${x},1,${z}`)) return true;
+                const sp = room.spawn;
+                if (sp && Math.hypot(x - (sp.x || 0), z - (sp.z || 0)) < 4) return true;
+                for (const e of room.enemies || []) {
+                    if (Math.hypot(x - e.x, z - e.z) < 3) return true;
+                }
+                // Never in a boss arena. The boss owns that floor, and a
+                // fourteen-metre body clipping through a prop is worse than a
+                // bare room.
+                if (room.boss) return true;
+                return false;
+            });
+        }
+
         // Multi-Y platforms (G5): meshed WITHOUT XZ solids so their tops are
         // standable — VoxelPhysicsBody climbs 1-cell steps via getVoxelAt.
         // Built BEFORE the room mesh so Z2 can see both maps at once: a rise
@@ -270,6 +473,50 @@ export function createDungeon(ctx, def, opts = {}) {
         if (room.platforms) {
             pmap = new Map();
             room.platforms(pmap, buildHelpers(room));
+        }
+        // Phase E2 — vertical interest, added to the PLATFORM map on purpose.
+        // Platform voxels are meshed without XZ solids, so a terrace is
+        // standable but never blocking and a one-cell step is exactly what the
+        // physics body climbs. That is what makes it safe to generate: no
+        // arrangement this can produce is able to make anywhere unreachable,
+        // which is the traversal audit that stopped this ticket twice before.
+        //
+        // Skipped in the boss room and in the overworld: an arena's shape is
+        // boss design and belongs to `bossRule`, and the overworld's terrain
+        // already has a grammar of its own that this would fight.
+        // Phase F1 — `bossRule`: fourteen authored arena shapes, read by nothing
+        // until now. Arena shape is boss design as much as a moveset is.
+        if (room.boss && !def.overworld) {
+            if (!pmap) pmap = new Map();
+            shapeBossArena(pmap, DUNGEON_KITS[def.id], room,
+                room.wallColor || wallColor);
+        }
+        if (!room.boss && !def.overworld && !room.noTerrace) {
+            if (!pmap) pmap = new Map();
+            const doorCellSet = new Set();
+            for (const door of room.doors || []) {
+                for (const c of doorCells(room, door)) {
+                    for (let dx = -2; dx <= 2; dx++) {
+                        for (let dz = -2; dz <= 2; dz++) {
+                            doorCellSet.add(`${c.x + dx},${c.z + dz}`);
+                        }
+                    }
+                }
+            }
+            terraceRoom(pmap, room, roomId,
+                room.wallColor || wallColor,
+                (x, z) => {
+                    // Never over a door or its approach, never over the spawn,
+                    // and never over anything the room already built.
+                    if (doorCellSet.has(`${x},${z}`)) return true;
+                    const sp = room.spawn;
+                    if (sp && Math.hypot(x - (sp.x || 0), z - (sp.z || 0)) < 3) return true;
+                    if (map.has(`${x},1,${z}`)) return true;
+                    for (const e of room.enemies || []) {
+                        if (Math.hypot(x - e.x, z - e.z) < 2) return true;
+                    }
+                    return false;
+                });
         }
 
         // Z2: mark the rim of every climbable one-cell rise, so "can I get up
@@ -282,7 +529,17 @@ export function createDungeon(ctx, def, opts = {}) {
         });
         const platformBuilt = pmap ? meshAndCollide(pmap, scene, null, { origin }) : null;
 
-        const rec = { built, platformBuilt, plugs: new Map(), enemies: [], room, blockers: [] };
+        // The kit's declared emissive motif, as actual fixtures that actually
+        // cast light. This field had been carried per-dungeon since the kits
+        // were written and read by nothing; see world/room-lights.js.
+        const roomLights = buildRoomLights(
+            DUNGEON_KITS[def.id], room, roomId, origin, scene, ctx.localLights
+        );
+
+        const rec = {
+            built, platformBuilt, plugs: new Map(), enemies: [], room,
+            blockers: [], roomLights,
+        };
         for (const b of room.blockers || []) {
             const rt = createBlockerRuntime(ctx, api, b, origin);
             if (rt) rec.blockers.push(rt);
@@ -296,7 +553,18 @@ export function createDungeon(ctx, def, opts = {}) {
         // Z5: a splitter's children have to join the SAME room record, or they
         // survive the room being disposed and leak into the next one.
         const spawnInto = (pos, eopts) => {
-            const child = new Enemy(scene, collisionWorld, pos, eopts);
+            // Brood children inherit the parent's room bounds so a split in a
+            // doorway cannot scatter kids into the corridor.
+            const child = new Enemy(scene, collisionWorld, pos, {
+                roomBounds: eopts?.roomBounds,
+                // Splits inherit the ground query too. A Brood Mother standing
+                // on a terrace sheds four children, and without this every one
+                // of them is born inside the step their parent is on.
+                getVoxelAt: api.getVoxelAt,
+                ...eopts,
+            });
+            // freeSpotNear can still place in a doorway (collision gap). Clamp.
+            if (child.roomBounds) child._clampToRoom();
             rec.enemies.push(child);
             enemies.push(child);
             return child;
@@ -305,26 +573,199 @@ export function createDungeon(ctx, def, opts = {}) {
         // figure so an enemy's behaviour still has time to happen once the
         // player's weapon damage has tripled. See world/threat-curve.js.
         const beatNo = beatNumberOf(def.id);
+        // Room confinement (playtest issue 7): a doorway is a real gap in the
+        // collision geometry, so without a bounds clamp an enemy simply walks
+        // out after the player. Inset past the wall so the doorway is not an
+        // exit, while the player's own door transit is left alone.
+        const inset = 1.1;
+        const roomBounds = {
+            minX: origin.x - room.half + inset,
+            maxX: origin.x + room.half - inset,
+            minZ: origin.z - room.half + inset,
+            maxZ: origin.z + room.half - inset,
+        };
         for (const e of room.enemies || []) {
             const enemy = new Enemy(scene, collisionWorld,
                 { x: origin.x + e.x, y: 1.0, z: origin.z + e.z },
-                { ...e, hp: scaleEnemyHp(e.hp, beatNo) });
+                { ...e, hp: scaleEnemyHp(e.hp, beatNo), roomBounds,
+                    getVoxelAt: api.getVoxelAt });
             attachSplit(enemy, spawnInto);
             rec.enemies.push(enemy);
             enemies.push(enemy);
+        }
+
+        // Phase D2 — the elite. ONE place, driven by the table in elites.js and
+        // by each dungeon's own authored `theme.combine` room, rather than ten
+        // hand-edited level files. `combine` is the right slot by definition:
+        // its stated job in every dungeon is "the mechanic, now with combat".
+        if (def.theme?.combine === roomId && !room.boss) {
+            for (const s of eliteSpawns(beatNo, room.half)) {
+                const elite = new Enemy(scene, collisionWorld,
+                    { x: origin.x + s.dx, y: 1.0, z: origin.z + s.dz },
+                    { ...s.opts, hp: scaleEnemyHp(s.opts.hp, beatNo), roomBounds,
+                        getVoxelAt: api.getVoxelAt });
+                elite._clampToRoom();
+                attachSplit(elite, spawnInto);
+                rec.enemies.push(elite);
+                enemies.push(elite);
+            }
         }
         baked.set(roomId, rec);
 
         if (room.boss && !bossSpawned) {
             bossSpawned = true;
             bossRoomId = roomId;
+            // Arena clamp centres on the room, not the boss's off-centre spawn.
+            api.bossHome = { x: origin.x, z: origin.z };
+            api.halfSize = room.half;
             room.boss(ctx, api, origin); // factory must call attachBoss(api, …)
             // Same curve, same reason: authored boss HP is flat 12-18 across the
             // whole campaign, so nine of fourteen bosses died faster than the
             // trash in the corridor outside. See world/threat-curve.js.
             applyBossCurve(api.boss, beatNumberOf(def.id));
         }
+        const pickupsBefore = pickups.length;
         if (room.onBake) room.onBake(api, origin, ctx);
+
+        // Phase E2 — lift anything that landed inside a terrace.
+        //
+        // Rooms place their pickups in `onBake`, which runs long after the
+        // platform map was meshed, so a key authored on flat floor can now be
+        // standing inside a step. Twelve of them were, on the first run,
+        // including three small keys and a boss key — every one of which is a
+        // hard progression stop.
+        //
+        // Lifting rather than moving sideways is deliberate: the pickup stays
+        // exactly where it was authored in XZ, and ends up on TOP of the new
+        // high ground, which is where you would have put it if the high ground
+        // had been there first.
+        if (platformBuilt) {
+            for (let i = pickupsBefore; i < pickups.length; i++) {
+                const p = pickups[i];
+                const pos = (p.mesh || p).position;
+                if (!pos) continue;
+                let lifted = 0;
+                while (lifted < 4 && platformBuilt.getVoxelAt(pos.x, pos.y, pos.z)) {
+                    pos.y += 1;
+                    lifted++;
+                }
+                if (lifted) p.baseY = pos.y;
+            }
+        }
+
+        // And seat every body in the room on the ground, for the same reason
+        // and one more.
+        //
+        // `Enemy` snaps itself down to the floor when it is constructed, but at
+        // construction time this room is not in `baked` yet — `baked.set` is
+        // below — so `api.getVoxelAt` cannot see the very terraces the enemy is
+        // standing in, returns nothing, and the snap is a no-op. Five bodies in
+        // the campaign spawned submerged for exactly that reason and the fix in
+        // the constructor did not touch one of them. So it happens again here,
+        // where the geometry exists. (`onBake` may also have added bodies of its
+        // own, which is the other reason this is the right place.)
+        for (const e of rec.enemies) {
+            if (!e?.rig || !e.seatOnGround) continue;
+            e.seatOnGround();
+        }
+
+        // Phase E1 — this room's puzzle beat, built LAST.
+        //
+        // Last, and that ordering is the fix rather than a detail. Rooms place
+        // their own pickups inside `onBake`, so a puzzle that chose its corner
+        // any earlier was choosing it blind — the first version walled a small
+        // key into beat 13 and a suture into beat 14. Built here, it can see
+        // both the room's geometry and everything the room just put down, and
+        // it moves to a free corner or declines to exist.
+        //
+        // TWO predicates, not one, and they are not interchangeable. The first
+        // is GEOMETRY — walls, kit props, terraces — and a puzzle piece standing
+        // in it is a piece nobody can reach or shove. The second is the room's
+        // own CONTENT, and it is a preference: the vault must respect it because
+        // the vault builds walls and walling a key in is how this broke the
+        // first time, but a plate three feet from a torch is simply a plate.
+        // Passing the union of the two as one hard rule cost eleven of the
+        // campaign's forty-two puzzle beats before this was split.
+        //
+        // The hard rule also asks whether the player can GET there, which was
+        // the missing third of it. A cell can be empty, unblocked, correctly
+        // settled and on the far side of a chasm — see `walkableCells`.
+        //
+        // HONEST NOTE, because the next person deserves it: on the campaign as
+        // it stands this line changes NOTHING. The counterfactual sweep removes
+        // it and the suite does not notice, and it does not notice because
+        // every cell the corner search would pick is already reachable in all
+        // 42 puzzle rooms — the flood is seeded from the doors as well as the
+        // spawn, so even Beat 07's chasm room has both banks covered. It is
+        // insurance against future authoring, not live behaviour, and it should
+        // not be read as tested. (HANDOFF trap 23, third kind.)
+        const walkable = walkableCells(room, origin, (x, y, z) =>
+            !!built.getVoxelAt(x, y, z) || !!platformBuilt?.getVoxelAt?.(x, y, z));
+        const puzzle = puzzleFor(def, roomId, room, beatNo,
+            (lx, lz) => {
+                const wx = origin.x + lx;
+                const wz = origin.z + lz;
+                if (built.getVoxelAt(wx, 1, wz)) return true;
+                if (platformBuilt?.getVoxelAt?.(wx, 1, wz)) return true;
+                if (!walkable.has(`${lx},${lz}`)) return true;
+                return false;
+            },
+            (lx, lz) => {
+                const wx = origin.x + lx;
+                const wz = origin.z + lz;
+                for (const p of pickups) {
+                    const pp = (p.mesh || p).position;
+                    if (pp && Math.hypot(pp.x - wx, pp.z - wz) < 1.4) return true;
+                }
+                for (const e of rec.enemies) {
+                    if (Math.hypot(e.rig.position.x - wx, e.rig.position.z - wz) < 1.4) return true;
+                }
+                return false;
+            });
+        // Kept, not discarded. `puzzleFor` SETTLES pieces against the geometry
+        // that actually got built, so the authored table and the baked layout
+        // are different things — and re-deriving the layout from the table is
+        // how a probe ends up auditing coordinates the game never used. (It is
+        // the same "test the bake, not the table" this project has now learned
+        // three times.) `tests/qa/puzzle-reach.mjs` reads this.
+        rec.puzzle = puzzle;
+        for (const b of puzzle) {
+            const rt = createBlockerRuntime(ctx, api, b, origin);
+            if (rt) rec.blockers.push(rt);
+        }
+        // Phase E3 — the people, on the same hook and for the same reason: they
+        // go into `rec.blockers`, so a screen that unloads takes its settlement
+        // with it. The alternative (`addSystem`, which the acquisition-chain
+        // props use) is level-scoped and would leave two dozen rigs in the scene
+        // after the overworld swapped the screen out from under them.
+        const town = SETTLEMENTS[roomId];
+        if (town) rec.blockers.push(addSettlement(api, ctx, origin, town));
+        // Beat 09's dead. Its own theme line is "What the Town Forgot", and
+        // until now the town it is named after was empty.
+        if (def.id === 'beat-09-town' && !room.boss) {
+            rec.blockers.push(addTownDead(api, ctx, origin, room.half));
+        }
+
+        // And something inside the vault worth opening it for. Shards, not a
+        // secret and not a suture: at three puzzles a dungeon this is forty-two
+        // pickups, and routing them through `scoreType: 'secret'` would have
+        // handed the player thirty thousand points and (on beats 07-14) another
+        // forty-two sutures — silently rewriting two economies that were tuned
+        // against fourteen caches.
+        const vault = puzzle.find((b) => b.type === 'vault');
+        if (vault) {
+            const vx = origin.x + (vault.rect.x0 + vault.rect.x1) / 2;
+            const vz = origin.z + (vault.rect.z0 + vault.rect.z1) / 2;
+            addPickup({ x: vx, y: 1.2, z: vz }, {
+                id: `${def.id}:${roomId}:vault`,
+                color: 0x9ad0ff,
+                label: 'Sealed cache',
+                onPickup(game) {
+                    game.player.inventory.addShards?.(12);
+                    game.hud?.toast?.('Sealed cache — 12 scar shards', 1800);
+                },
+            });
+        }
     }
 
     function disposeRoom(roomId) {
@@ -332,6 +773,10 @@ export function createDungeon(ctx, def, opts = {}) {
         if (!rec) return;
         rec.built.dispose();
         rec.platformBuilt?.dispose();
+        // Both dispose paths, not one. A light left registered after its
+        // fixture is gone keeps lighting an empty room from a mesh that no
+        // longer exists — and the pool has no way to notice.
+        disposeRoomLights(rec.roomLights, ctx.localLights);
         for (const rt of rec.blockers || []) { try { rt.dispose(); } catch (_) {} }
         for (const plug of rec.plugs.values()) plug.dispose();
         for (const e of rec.enemies) {
@@ -529,18 +974,190 @@ export function createDungeon(ctx, def, opts = {}) {
         sfx.whoosh?.();
     }
 
+    /**
+     * A room the player must clear before it lets them leave.
+     *
+     * Nothing in this game used to seal. You could walk into a room, ignore
+     * every enemy in it, and leave through the far door — which means the whole
+     * combat system was optional. That is a strange thing to build a guard, a
+     * parry, a poise pool, directional armour and seven enemy kinds for: the
+     * player who never fights is never wrong, and the systems that took the
+     * longest to build are the ones they never meet.
+     *
+     * Authored per room (`seal: true`), not blanket, because a Zelda dungeon
+     * that sealed EVERY room would be a corridor of arenas. The rule is: the
+     * room you can be surprised in seals; the rooms you pass through do not.
+     *
+     * Only the room's own baked enemies count. A brood child spawned by a split
+     * counts too — it is in `rec.enemies` — which is the point of that fight.
+     */
+    function sealedBy(roomId) {
+        const room = def.rooms[roomId];
+        if (!room || !room.seal) return null;
+        const rec = baked.get(roomId);
+        if (!rec) return null;
+        // Given up on by the stalemate valve — see SEAL_STALEMATE_RELEASE. Once
+        // broken it stays broken for this visit; re-arming it would put the
+        // player straight back into the state that broke it.
+        if (rec.sealBroken) return null;
+        const alive = rec.enemies.filter(
+            (e) => e.state?.current !== 'DEAD' && !e.defeated
+        );
+        return alive.length ? alive.length : null;
+    }
+
+    /**
+     * Watch the sealed room for a fight that has stopped being a fight.
+     *
+     * The signature is every HP the encounter can move. If it has not changed
+     * for SEAL_STALEMATE_RELEASE seconds, nothing is happening in either
+     * direction and the door opens. See the constant for why the condition is
+     * mutual rather than a plain timer.
+     */
+    function tickSealStalemate(dt, game) {
+        const room = def.rooms[currentRoomId];
+        const rec = baked.get(currentRoomId);
+        if (!room || !room.seal || !rec || rec.sealBroken) {
+            sealStallT = 0; sealStallSig = null; sealHeldT = 0;
+            return;
+        }
+        const alive = rec.enemies.filter(
+            (e) => e.state?.current !== 'DEAD' && !e.defeated
+        );
+        if (!alive.length) { sealStallT = 0; sealStallSig = null; sealHeldT = 0; return; }
+
+        let sig = game.player?.health?.hp || 0;
+        for (const e of alive) sig += (e.hp || 0);
+        // The CEILING, which is the guarantee the signature above cannot give.
+        //
+        // The signature is mutual on purpose — an enemy hitting you counts as
+        // the fight still resolving, so a player cannot open the door by
+        // standing back from a fight they are losing. That is right, and it has
+        // one hole: a room that can still hurt you but can NEVER be resolved
+        // resets the timer every time it lands a hit, and the seal then holds
+        // hardest in exactly the case where the player is helpless. An enemy
+        // embedded in a terrace, which this game shipped until the same session
+        // as this comment, is precisely that room.
+        //
+        // So the stalemate valve keeps its shape, and a second, much longer
+        // clock runs underneath it that NOTHING resets while the room is still
+        // sealed. A real fight never approaches it; a deadlock always reaches
+        // it. Nobody is ever locked in a room forever.
+        sealHeldT += dt;
+        if (sealHeldT >= SEAL_HARD_RELEASE) {
+            rec.sealBroken = true;
+            sealStallT = 0;
+            sealHeldT = 0;
+            gsfx.doorOpen?.();
+            game.hud?.toast?.('The seal gives way — this room is not resolving.', 3200);
+            return;
+        }
+
+        if (sig !== sealStallSig) {
+            sealStallSig = sig;
+            sealStallT = 0;
+            return;
+        }
+        sealStallT += dt;
+        if (sealStallT < SEAL_STALEMATE_RELEASE) return;
+        rec.sealBroken = true;
+        sealStallT = 0;
+        sealHeldT = 0;
+        gsfx.doorOpen?.();
+        game.hud?.toast?.('The seal gives way — nothing here is resolving.', 3200);
+    }
+
+    /** Public: is the current room holding the player? (HUD + tests) */
+    function sealState() {
+        const n = sealedBy(currentRoomId);
+        return n ? { roomId: currentRoomId, remaining: n } : null;
+    }
+
+    /**
+     * Refuse a door: push the player off the trigger and hand control back.
+     *
+     * Every refusal used to do this inline, three times over:
+     *
+     *     game.player.rig.position.x -= n.x * 1.4;
+     *     game.player.rig.position.z -= n.z * 1.4;
+     *     game.player.physics.resetVelocity();
+     *
+     * A raw write to the position, with NO collision resolution, of a fixed
+     * 1.4 — against a locked door whose trigger reaches 1.2. Two ways to be
+     * trapped by that, and the owner hit them in Beat 12 with no small key:
+     *
+     *   • the 1.4 goes wherever it points, through walls, off ledges and into
+     *     lava, because nothing consults the collision world;
+     *   • if it is blocked, or if 1.4 was not enough, the player is still
+     *     inside the 1.2 trigger next frame. `checkDoorTriggers` runs every
+     *     frame with no cooldown, so the door refuses again, and again — and
+     *     each refusal calls `resetVelocity()`, so they can never build the
+     *     momentum to walk out. The bounce becomes the cage.
+     *
+     * So: resolve the push against the collision world, derive the distance
+     * from the trigger that has to be cleared rather than from a magic number,
+     * and set a cooldown so a refusal cannot re-fire while the player is
+     * walking away. The cooldown is the actual guarantee — even if geometry
+     * blocks the push entirely, the player keeps their velocity and their
+     * input and can leave under their own power.
+     */
+    function refuseDoor(door, game) {
+        // Still cooling down from the last refusal: do nothing at all. Not the
+        // push, not the velocity reset, not the toast. The player walks into
+        // the doorway and is stopped by geometry like any other wall, which is
+        // both correct and escapable.
+        //
+        // The cooldown deliberately gates the BOUNCE and not the door check.
+        // Gating `checkDoorTriggers` instead was the first attempt and it broke
+        // seven world-e2e assertions: a door the player can now open was being
+        // skipped for 0.7s along with the refusal, so a key was never spent and
+        // the room never changed. A refusal is the only thing worth suppressing.
+        if (doorRefusedT > 0) return false;
+        const n = SIDE_NORMAL[door.side];
+        // Far enough to clear the trigger that just fired, plus a margin. The
+        // old 1.4 cleared a locked door's 1.2 by two centimetres.
+        const push = triggerReach(door) + 0.8;
+        const p = game.player.rig.position;
+        const nx = p.x - n.x * push;
+        const nz = p.z - n.z * push;
+        if (collisionWorld) {
+            const r = collisionWorld.resolveMove(p.x, p.z, nx, nz, PLAYER_HALF);
+            p.x = r.x; p.z = r.z;
+        } else {
+            p.x = nx; p.z = nz;
+        }
+        game.player.physics.resetVelocity();
+        doorRefusedT = DOOR_REFUSE_COOLDOWN;
+        return true;
+    }
+
     function tryDoor(door, game) {
         const type = door.type || 'open';
+        // The seal outranks the door's own type — including `exit`. A room that
+        // has not been cleared does not let you leave it by ANY route, or the
+        // rule is "clear the room unless you happen to have come in the other
+        // way", which is not a rule.
+        const held = sealedBy(currentRoomId);
+        if (held) {
+            if (refuseDoor(door, game)) {
+                gsfx.doorLocked();
+                game.hud?.toast?.(
+                    held === 1 ? 'Sealed — one still standing' : `Sealed — ${held} still standing`,
+                    1500
+                );
+            }
+            coach('room-seal',
+                'Some rooms hold the door shut until the room is clear. '
+                + 'The way out is through what is in here with you.');
+            return;
+        }
         if (type === 'exit') {
             // Leaves the dungeon entirely (back to the overworld) — the def
             // decides where; bounce if it doesn't handle exits.
             if (def.onExit) {
                 def.onExit(game, api);
             } else {
-                const n = SIDE_NORMAL[door.side];
-                game.player.rig.position.x -= n.x * 1.4;
-                game.player.rig.position.z -= n.z * 1.4;
-                game.player.physics.resetVelocity();
+                refuseDoor(door, game);
             }
             return;
         }
@@ -549,10 +1166,14 @@ export function createDungeon(ctx, def, opts = {}) {
             let opened = false;
             if (type === 'locked') {
                 opened = keyStore.trySpendSmallKey();
-                if (!opened) game.hud?.toast?.('Locked — needs a small key');
+                if (!opened && doorRefusedT <= 0) {
+                    game.hud?.toast?.('Locked — needs a small key');
+                }
             } else {
                 opened = keyStore.hasBossKey();
-                if (!opened) game.hud?.toast?.('Sealed — the boss key is elsewhere');
+                if (!opened && doorRefusedT <= 0) {
+                    game.hud?.toast?.('Sealed — the boss key is elsewhere');
+                }
             }
             if (!opened) {
                 game.anchorThread?.failed?.(
@@ -561,12 +1182,7 @@ export function createDungeon(ctx, def, opts = {}) {
                         ? 'SYSTEM: Find the boss key, then return to this sealed door.'
                         : 'SYSTEM: Find a small key in this dungeon, then return to this lock.'
                 );
-                // bounce back along the inward normal
-                const n = SIDE_NORMAL[door.side];
-                game.player.rig.position.x -= n.x * 1.4;
-                game.player.rig.position.z -= n.z * 1.4;
-                game.player.physics.resetVelocity();
-                gsfx.doorLocked();
+                if (refuseDoor(door, game)) gsfx.doorLocked();
                 return;
             }
             keyStore.open(dk);
@@ -645,13 +1261,19 @@ export function createDungeon(ctx, def, opts = {}) {
                 enterRoom(to, game);
             }
         } else {
+            if (doorRefusedT > 0) doorRefusedT = Math.max(0, doorRefusedT - dt);
             checkDoorTriggers(game);
+            tickSealStalemate(dt, game);
         }
 
         for (const s of systems) if (s.update) s.update(dt, game);
         for (const rec of baked.values()) {
             for (const rt of rec.blockers || []) rt.update(dt, game);
         }
+        // Before the enemies, not after: adoption has to happen before anything
+        // asks for a token, and separation reads positions the enemies are
+        // about to move from.
+        director.update(dt);
         for (const e of enemies) {
             if (e.managedBySystem) continue;
             if (e.update) e.update(dt, game.player);
@@ -733,6 +1355,7 @@ export function createDungeon(ctx, def, opts = {}) {
             const rec = baked.get(roomId);
             rec.built.dispose();
             rec.platformBuilt?.dispose();
+            disposeRoomLights(rec.roomLights, ctx.localLights);
             for (const rt of rec.blockers || []) { try { rt.dispose(); } catch (_) {} }
             for (const plug of rec.plugs.values()) plug.dispose();
             for (const e of rec.enemies) e.dispose();
@@ -777,10 +1400,20 @@ export function createDungeon(ctx, def, opts = {}) {
         name: def.name,
         map: null,
         built: null,
+        // Exposed so attachBoss can wire BossBase.collisionWorld without every
+        // beat factory having to pass it by hand.
+        collisionWorld,
+        // Same reason: a boss registers a real light for its own glow, and
+        // attachBoss is the one place that sees both the boss and the level.
+        localLights: ctx.localLights || null,
         enemies,
         destructibles,
         pickups,
         systems,
+        director,
+        signals,
+        puzzleBlocks,
+        beamTargets,
         spawn: {
             x: startO.x + (startRoom.spawn?.x || 0),
             y: 1.95,
@@ -809,7 +1442,11 @@ export function createDungeon(ctx, def, opts = {}) {
         update,
         dispose,
         addEnemy(pos, eopts) {
-            const e = new Enemy(scene, collisionWorld, pos, eopts);
+            // Sweep every place, not one: this is the fourth and last door
+            // enemies come through, and a body built here would otherwise be
+            // the only kind in the game still blind to the floor.
+            const e = new Enemy(scene, collisionWorld, pos,
+                { getVoxelAt: api.getVoxelAt, ...eopts });
             enemies.push(e);
             const rec = baked.get(currentRoomId);
             if (rec) rec.enemies.push(e);
@@ -839,6 +1476,9 @@ export function createDungeon(ctx, def, opts = {}) {
         // Dungeon-specific surface
         keyStore,
         currentRoomId: () => currentRoomId,
+        // Exposed so the HUD can say the room is holding you, and so specs can
+        // assert the seal without driving a door collision.
+        sealState,
         /**
          * World origin of the room the player is standing in.
          *
@@ -889,6 +1529,14 @@ export function createDungeon(ctx, def, opts = {}) {
             return found
                 ? { roomId: currentRoomId, x: found.x, y: 1.95, z: found.z }
                 : { roomId: currentRoomId, x, y: 1.95, z };
+        },
+        /**
+         * The puzzle layout a room actually BAKED, settled against its real
+         * geometry — not the authored offsets `puzzleFor` starts from. Returns
+         * `[]` for a room with no puzzle or one that has not been baked yet.
+         */
+        puzzleDefs(roomId) {
+            return baked.get(roomId)?.puzzle || [];
         },
         // W6: room-graph view for the Tab map
         /**

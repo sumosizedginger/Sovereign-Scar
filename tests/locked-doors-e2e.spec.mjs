@@ -88,6 +88,16 @@ export async function run(t) {
                         // couple of small offsets cover clutter near the wall.
                         for (const off of [0, 1.5, -1.5]) {
                             lvl.enterRoom(roomId, game);
+                            // Sealed rooms hold their doors until cleared.
+                            // This spec is about whether the unlock TRIGGER
+                            // can be reached from against the plug, which is a
+                            // different question from whether the room's fight
+                            // is winnable — so empty it and test the lock.
+                            for (const e of lvl.enemies || []) {
+                                if (e.managedBySystem || e.bossId || e === lvl.boss) continue;
+                                if (e.state) e.state.current = 'DEAD';
+                                e.defeated = true;
+                            }
                             if (type === 'boss') lvl.keyStore.grantBossKey();
                             else lvl.keyStore.grantSmallKey();
                             const startRoom = lvl.currentRoomId();

@@ -35,7 +35,20 @@ const OVERWORLD_BASE_TUNE = {
     // an already-brighter base and pushed Cryomire and Tombfields both over
     // the ceiling (95–99 against 90). Re-measured down from here, not by feel:
     // node tests/qa/certification-captures.mjs prints every region's figure.
+    // Kept near the post-2026-07-23 remeasure. Dark-region (quarry) shortfall
+    // is handled by ABYSS_REGION_MULT so ice-bright screens are not overdriven.
     abyss: { key: 1.36, ambient: 1.44 },
+};
+
+/**
+ * Abyss screens share one floor colour, so albedoTrim cannot separate them.
+ * Regions whose grammar still reads dark under that floor get a small extra
+ * multiplier. Keep these modest — a 1.12 lift takes quarry ~42.7 → ~48
+ * without pushing Cryomire-class screens through the ceiling.
+ */
+const ABYSS_REGION_MULT = {
+    quarry: 1.12,
+    spindle: 1.06,
 };
 
 /** The floor each base trim was tuned against; compensation is relative to it. */
@@ -129,11 +142,18 @@ export function createOverworld(ctx, screensDef, opts = {}) {
             // under one set of lights, so one level-wide trim gave Tombfields'
             // pale clay 76 and the Spindle's iron 32 — in the same level, from
             // the same lighting, with a floor of 45. See render/albedo-trim.js.
-            lightTune: tuneForFloor(
-                OVERWORLD_BASE_TUNE[mood] || OVERWORLD_BASE_TUNE.crust,
-                screenFloor,
-                REFERENCE_FLOOR[mood] || REFERENCE_FLOOR.crust
-            ),
+            lightTune: (() => {
+                const base = { ...(OVERWORLD_BASE_TUNE[mood] || OVERWORLD_BASE_TUNE.crust) };
+                if (mood === 'abyss' && s.track && ABYSS_REGION_MULT[s.track]) {
+                    const m = ABYSS_REGION_MULT[s.track];
+                    for (const k of Object.keys(base)) base[k] = +(base[k] * m).toFixed(4);
+                }
+                return tuneForFloor(
+                    base,
+                    screenFloor,
+                    REFERENCE_FLOOR[mood] || REFERENCE_FLOOR.crust
+                );
+            })(),
             wallColor: mood === 'abyss' ? ABYSS_COLORS.abyssWall : CRUST_COLORS.slate,
             onBake: s.onBake,
             doors: (s.edges || []).map((e) => ({

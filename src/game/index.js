@@ -9,12 +9,14 @@ import { ParticleSystem } from '../engine/particles.js';
 import { CollisionWorld } from '../engine/collision.js';
 import { updateSmears } from '../engine/smear.js';
 import { initAudio, sfx, setVolumes, refreshDroneVolumes } from '../audio/synth.js';
+import { setListener } from '../audio/spatial.js';
 import { world } from '../context.js';
 
 import { Input } from './input.js';
 import { CameraRig } from './camera-rig.js';
 import { juice } from './fx/juice.js';
 import { SoulMotes } from './fx/soul-motes.js';
+import { ImpactFx } from './fx/impact.js';
 import { OcclusionController } from './fx/occlusion.js';
 import { LockReticle } from './fx/lock-reticle.js';
 import { AnchorMarkers } from './fx/grapple-rope.js';
@@ -23,12 +25,15 @@ import { prewarmLevel } from './render/prewarm.js';
 import { bossSubtitle } from './bosses/subtitles.js';
 import { Player } from './player.js';
 import { HUD } from './ui/hud.js';
-import { setCoachSink } from './ui/coach.js';
+import { coach, setCoachSink, setCoachStore } from './ui/coach.js';
 import { MoodController } from './fx/mood-controller.js';
 import { refreshScoreVolume, setIntensity as setMusicIntensity } from './audio/score.js';
 import { gsfx } from './audio/sfx-bank.js';
 import { createFlickerPass, updateFlickerPass } from './fx/flicker-shader-pass.js';
 import { createWrapPass, updateWrapPass } from './render/wrap-shader-pass.js';
+import { createColorGradePass, applyGradePreset } from './fx/color-grade-pass.js';
+import { DustMotes } from './fx/atmosphere.js';
+import { KITS } from './levels/dungeon-kits.js';
 import { frameLuminanceStats } from './render/luminance.js';
 import { ContactShadows } from './fx/contact-shadow.js';
 import { isGlowing, isSeeThrough } from './render/shadow-roles.js';
@@ -45,7 +50,7 @@ import {
 import { MenuOverlay } from './ui/menu.js';
 import { MapScreen } from './ui/map-screen.js';
 import { EndingSequence } from './ui/credits.js';
-import { Inventory } from './kernel/inventory.js';
+import { Inventory, MEMORY_VIAL_CAP } from './kernel/inventory.js';
 import { bossHeartMax } from './kernel/health.js';
 import {
     tryPurchase, damageMult, dashIframeBonus, grappleRange,
@@ -68,7 +73,9 @@ import {
     refillCharges,
 } from './kernel/lives.js';
 import { SCORE_VERSION, WitnessScore } from './kernel/score.js';
-import { addScore, getScores } from '../engine/settings.js';
+import {
+    addScore, getScores, getSetting, setSetting, getProgress, setProgress,
+} from '../engine/settings.js';
 
 // ── Boot ──────────────────────────────────────────────────────────────────
 // S4: capture the engine lights so MoodController can drive ambient/key.
@@ -85,6 +92,19 @@ const input = new Input(window);
 const hud = new HUD();
 // Let combat code speak without holding a HUD reference (see ui/coach.js).
 setCoachSink((text, ms) => hud.toast(text, ms));
+// Phase G — and somewhere to remember it. `hintsSeen` has been in the progress
+// schema since it was written and was read and written by nothing, so every
+// reload re-taught the whole game to a player who had been at it for hours.
+setCoachStore({
+    load: () => getProgress().hintsSeen || [],
+    save: (ids) => setProgress({ hintsSeen: ids }),
+});
+// Same fix, same cause, and this one holds the screen for three seconds rather
+// than a toast you can look past.
+hud.story?.setStore?.({
+    load: () => getProgress().storySeen || [],
+    save: (ids) => setProgress({ storySeen: ids }),
+});
 const mood = new MoodController();
 mood.bindLights({
     keySun: gameLights?.keySun,
@@ -119,7 +139,10 @@ const camRig = new CameraRig({ height: CAM_HEIGHT, back: CAM_HEIGHT * 0.35 });
 const occlusion = new OcclusionController();
 // Ticket G: pooled local lights — only the nearest few motivated sources
 // (userData.localLight) cast real light; the rest keep bloom without a light.
-const localLights = new LocalLightPool(scene, { budget: 4 });
+// Budget raised 4 → 5 (top of the audited 3–5 range) now that rooms actually
+// register fixtures: a hall gets up to five lamps plus a boss glow, and at a
+// budget of four the boss would have evicted the room it is standing in.
+const localLights = new LocalLightPool(scene, { budget: 5 });
 // Z4: ground marker under the locked target.
 const lockReticle = new LockReticle(scene);
 // Grapple anchors within reach pulse, so the traversal layer is visible
@@ -129,16 +152,20 @@ const anchorMarkers = new AnchorMarkers(scene);
 // Custom passes before OutputPass
 const flickerPass = createFlickerPass();
 const wrapPass = createWrapPass();
+const colorGradePass = createColorGradePass();
 {
     const passes = composer.passes;
     const outIdx = passes.indexOf(outputPass);
     if (outIdx >= 0) {
-        passes.splice(outIdx, 0, flickerPass, wrapPass);
+        // Grade sits just before output so it sees the composed frame.
+        passes.splice(outIdx, 0, flickerPass, wrapPass, colorGradePass);
     } else {
         composer.addPass(flickerPass);
         composer.addPass(wrapPass);
+        composer.addPass(colorGradePass);
     }
 }
+const dustMotes = new DustMotes(scene);
 
 juice.bindVignette(vignettePass);
 
@@ -154,6 +181,9 @@ const volState = {
 };
 juice.reduceShake = !!bootSettings.reduceShake;
 juice.reduceFlash = !!bootSettings.reduceFlash;
+// Phase G — and reconcile the two stores at boot, so a save made before the
+// key mismatch was closed comes back consistent instead of half-on.
+if (bootSettings.reduceFlash != null) setSetting('reduceFlashing', !!bootSettings.reduceFlash);
 
 function applyVolumes() {
     setVolumes({
@@ -182,12 +212,35 @@ applyVolumes();
 
 const player = new Player(scene, collisionWorld, () => false);
 const soulMotes = new SoulMotes(scene);
+// Phase F2 — sparks and material debris on the receiving end of every hit.
+// Installed on `juice` rather than reached for inside `applyHit`, so the combat
+// layer stays free of anything that owns a scene and every headless spec keeps
+// running with the hook simply absent.
+const impactFx = new ImpactFx(scene);
+juice.onImpact = (defender, dir) => {
+    impactFx.burst(defender?.root?.position, dir, defender);
+};
 const heartDrops = new HeartDropManager(scene);
 const contactShadows = new ContactShadows(scene);
 let deathEcho = null;
 let anchorThread = null;
 let witnessScore = null;
 player.onCombatHit = () => witnessScore?.extendChain?.();
+// Playtest issue 1: minerals that break must pay something. Loot is low-rate
+// so shatter is *sometimes* worth walking over to, not a farm; a `hidden`
+// pickup on the destructible fires once the island is gone (isEmpty).
+player.onShatter = (dest, _n) => {
+    const o = dest?.origin || { x: 0, y: 1, z: 0 };
+    heartDrops.dropAt(o.x, o.y + 0.4, o.z, { heart: 0.22 });
+    const lvl = game.level;
+    if (dest?.hiddenPickup && dest.isEmpty && lvl?.addPickup) {
+        lvl.addPickup(
+            { x: o.x, y: (o.y || 1) + 0.35, z: o.z },
+            dest.hiddenPickup
+        );
+        dest.hiddenPickup = null;
+    }
+};
 
 // Juice feeds (A1–A3, A5)
 player.health.onDamage = () => {
@@ -200,6 +253,11 @@ player.health.onDamage = () => {
 juice.onKill = (defender) => {
     const p = defender?.root?.position;
     if (p) soulMotes.burst(p);
+    // Phase F2 — a short pull-in on the killing blow. Small (0.35s, half a
+    // metre) on purpose: this is punctuation, and a camera that lunges on every
+    // trash kill is a camera the player fights. It is skipped for bosses, whose
+    // deaths already have their own staging.
+    if (!defender?.bossId) camRig.kick(0.35, 0.5);
 };
 
 // C3: apply purchased upgrades to the player's derived stats only.
@@ -303,7 +361,9 @@ game.collectMemoryVial = (stableId) => {
     if (!player.inventory.grantMemoryVialSlot()) return false;
     witnessScore?.award?.('optional_item', flag);
     saveSovereignProgress({ inventory: player.inventory.toJSON() });
-    hud.toast(`Memory Vial found. ${player.inventory.memoryVialSlots}/4 chassis recovered.`, 2600);
+    hud.toast(
+        `Memory Vial found. ${player.inventory.memoryVialSlots}/${MEMORY_VIAL_CAP} `
+        + 'chassis recovered.', 2600);
     return true;
 };
 
@@ -397,6 +457,11 @@ function loadLevel(id) {
         player,
         camera,
         renderer,
+        // Rooms bake lazily — the one-shot `localLights.scan(scene)` below only
+        // ever saw the room the level loaded into, so a fixture in any other
+        // room would have been registered never. Handing the pool to the baker
+        // lets each room register its own light at the moment it exists.
+        localLights,
     };
     occlusion.clear(); // drop the previous level's occluders before rebuilding
     localLights.clear();
@@ -458,6 +523,31 @@ function loadLevel(id) {
     }
     updateFlickerPass(flickerPass, 0, level.flicker || 0);
     updateWrapPass(wrapPass, 0, level.wrap || 0);
+    // Per-region grade: cryo/pyre get identity tints; abyss/crust defaults.
+    {
+        const id = meta.id || '';
+        let grade = level.mood || 'crust';
+        if (/cryo/.test(id)) grade = 'cryo';
+        else if (/pyre/.test(id)) grade = 'pyre';
+        else if (level.mood === 'abyss') grade = 'abyss';
+        applyGradePreset(colorGradePass, grade);
+    }
+    {
+        const ro = level.currentRoomOrigin?.() || level.spawn || { x: 0, z: 0 };
+        dustMotes.setCenter(ro.x || 0, ro.z || 0);
+        // Phase F1 — the `atmosphere` channel, at last. Every dungeon has
+        // declared its own since the kits were written; all sixteen regions and
+        // all fourteen dungeons shared one grey dust field because nothing ever
+        // read the tag. Embers over the Pyre, vapour in the Cryo Vault, drips
+        // in the Sluice, an index scan in the Tower.
+        const kit = KITS[level.id];
+        if (kit?.atmosphere) {
+            dustMotes.setAtmosphere(kit.atmosphere);
+        } else {
+            dustMotes.setProfile(null);
+            dustMotes.setColor(level.mood === 'abyss' ? 0xb0a0d0 : 0xd8c8a0);
+        }
+    }
     game.activeBoss = level.boss || null;
 
     // Boss intro moment (A6): name card + camera push shortly after load.
@@ -589,6 +679,14 @@ const menu = new MenuOverlay({
             quality: getQuality(),
             reduceShake: juice.reduceShake,
             reduceFlash: juice.reduceFlash,
+            // Phase G — the two accessibility settings that had working engine
+            // logic in six files and no switch, plus the key mismatch that made
+            // the flash toggle a half-toggle. Read from engine settings, which
+            // is where `smear.js`, `renderer.js`, `flicker-shader-pass.js` and
+            // `mood-controller.js` all look.
+            reduceMotion: getSetting('reduceMotion'),
+            reduceHorrorAudio: getSetting('reduceHorrorAudio'),
+            monoAudio: getSetting('monoAudio'),
             showTimer,
         }),
         scores: () => getScores(),
@@ -620,6 +718,23 @@ const menu = new MenuOverlay({
                 case 'reduceFlash':
                     juice.reduceFlash = ev.value;
                     persistSetting('reduceFlash', ev.value);
+                    // THE KEY MISMATCH, closed. The menu wrote `reduceFlash`
+                    // into the progress mirror; the flicker shader reads
+                    // `reduceFlashing` out of engine settings. Two names, one
+                    // apparent switch, and the toggle labelled "Reduce flashes"
+                    // did not touch the flicker pass it most obviously names.
+                    // One press now writes both, because they are one setting.
+                    setSetting('reduceFlashing', ev.value);
+                    break;
+                case 'reduceMotion':
+                    setSetting('reduceMotion', ev.value);
+                    break;
+                case 'reduceHorrorAudio':
+                    setSetting('reduceHorrorAudio', ev.value);
+                    break;
+                case 'monoAudio':
+                    // setSetting persists on its own; no persistSetting mirror.
+                    setSetting('monoAudio', ev.value);
                     break;
                 case 'showTimer':
                     showTimer = ev.value;
@@ -882,6 +997,18 @@ function frame() {
     juice.update(dt);
     const sdt = dt * juice.timeScale;
 
+    // Tell the mixer where the frame is looking, so placed sounds land on the
+    // side of the stereo field they are drawn on.
+    //
+    // Once, here, rather than after each `camRig.update` — the rig is updated
+    // from two branches (title attract, gameplay) and a third would eventually
+    // be added without this. That makes the listener one frame stale, which is
+    // the right trade: 16 ms of camera drift is centimetres, and the
+    // alternative is a placement that silently stops following the camera the
+    // next time somebody adds a mode.
+    const listenAt = camRig.focusPoint();
+    setListener(listenAt.x, listenAt.z, camRig.viewHalfWidth());
+
     // Gamepad (B5): poll once per frame; d-pad/A/B nav feeds menus + ending
     input.pollGamepad();
     // One-shot hint when a stick is off-centre at connect and being ignored.
@@ -1107,6 +1234,23 @@ function frame() {
             const b = game.activeBoss;
             return (b && !b.defeated) ? [...enemies, b] : enemies;
         };
+        // Lock-on is the control that turns "back away and swing" into
+        // "circle it", and the game never mentioned it. Say so the first time
+        // the player is outnumbered, which is the first time it matters.
+        if (!player.lockOn.target) {
+            let near = 0;
+            const pp = player.root.position;
+            for (const e of enemies) {
+                if (e.state?.current === 'DEAD' || e.defeated) continue;
+                if (Math.hypot(e.root.position.x - pp.x, e.root.position.z - pp.z) < 9) near++;
+            }
+            if (near >= 2) {
+                coach('lock-on',
+                    'More than one. Press T to lock on — you keep facing your '
+                    + 'target and movement becomes a strafe, so you can circle '
+                    + 'instead of backing away. Y switches target.');
+            }
+        }
         player.update(sdt, input, enemies, destructibles, camera, renderer);
         lockReticle.update(sdt, player.lockOn.target);
 
@@ -1192,7 +1336,10 @@ function frame() {
             const ro = game.level?.currentRoomOrigin?.();
             const p = player.root.position;
             mood.aimKeyLight(ro ? ro.x : p.x, ro ? ro.z : p.z);
+            if (ro) dustMotes.setCenter(ro.x, ro.z);
+            else dustMotes.setCenter(p.x, p.z);
         }
+        dustMotes.update(sdt);
 
         // Contact shadows are reconciled from the live entity lists rather than
         // attached at each spawn site, so a new enemy kind cannot ship without
@@ -1203,6 +1350,19 @@ function frame() {
             pickups: game.level?.pickups || [],
             boss: game.activeBoss || game.level?.boss || null,
         });
+
+        // Phase D2 — name the elite once, the first time you are close enough
+        // to be fighting it. Reusing the boss card rather than inventing a
+        // second announcement widget: a named thing arriving is one event, and
+        // the game already knows how to say it.
+        for (const e of enemies) {
+            if (!e?.elite || e._eliteAnnounced || e.state?.current === 'DEAD') continue;
+            const p = player.root.position;
+            if (Math.hypot(e.root.position.x - p.x, e.root.position.z - p.z) > 12) continue;
+            e._eliteAnnounced = true;
+            hud.bossCard(e.eliteName || 'ELITE', 'ELITE', 1.3);
+            sfx.stinger();
+        }
 
         for (const [i, enemy] of enemies.entries()) {
             if (!enemy || enemy._witnessScored || enemy.state?.current !== 'DEAD') continue;
@@ -1267,6 +1427,8 @@ function frame() {
         }
         localLights.update(player.root.position); // Ticket G: budget nearest lights
         camRig.update(sdt, player.root.position);
+
+        impactFx.update(sdt);
 
         // Soul motes home to the player and pay out shards (A5)
         soulMotes.update(
@@ -1506,10 +1668,24 @@ function frame() {
         // keep the boss alive rooms away)
         boss: (() => {
             const b = game.activeBoss || game.level?.boss || null;
-            if (!b || !b.root) return b;
             const p = player.root.position;
-            const d = Math.hypot(b.root.position.x - p.x, b.root.position.z - p.z);
-            return d < 30 ? b : null;
+            if (b && b.root) {
+                const d = Math.hypot(b.root.position.x - p.x, b.root.position.z - p.z);
+                if (d < 30) return b;
+            }
+            // Phase D2 — an elite borrows the boss bar when there is no boss to
+            // use it. It is the same widget answering the same question ("what
+            // is the named thing I am fighting, and how much of it is left"),
+            // and an elite with no health bar is just an enemy that takes a
+            // surprising number of hits.
+            let near = null;
+            let bestD = 18;
+            for (const e of (game.level?.enemies || [])) {
+                if (!e?.elite || !e.root || e.state?.current === 'DEAD') continue;
+                const d = Math.hypot(e.root.position.x - p.x, e.root.position.z - p.z);
+                if (d < bestD) { bestD = d; near = e; }
+            }
+            return near;
         })(),
         bossesDefeated: (prog.bossesDefeated || []).length,
         dt,
@@ -1675,9 +1851,17 @@ window.__sovereignScar = {
         });
     },
     measure() {
+        // Width and depth as well as height. The visual gate used to judge
+        // "does the boss dominate?" on height alone, which quietly assumed
+        // every boss towers — and the roster contains creatures that sprawl.
         const box = (o) => {
             const b = new THREE.Box3().setFromObject(o);
-            return { h: b.max.y - b.min.y, minY: b.min.y };
+            return {
+                h: b.max.y - b.min.y,
+                w: b.max.x - b.min.x,
+                d: b.max.z - b.min.z,
+                minY: b.min.y,
+            };
         };
         const out = { player: box(player.rig), mobs: [], boss: null };
         for (const e of game.level?.enemies || []) {
@@ -1703,7 +1887,7 @@ hud.toast('SOVEREIGN SCAR — The Wound That Remembers', 2800);
 frame();
 
 console.info(
-    '%cSovereign Scar %c0.1.0%c — engine My-Engine 0.2.0 pinned',
+    '%cSovereign Scar %c0.3.0%c — engine My-Engine 0.2.0 pinned',
     'color:#7fe0ff;font-weight:bold',
     'color:#ffd060',
     'color:#9aa8bc'

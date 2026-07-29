@@ -63,7 +63,17 @@ export class MapScreen {
             return;
         }
         this.isOpen = true;
-        game.witnessScore?.award?.('map_memory', game.levelId || data.name || 'map');
+        // Phase G — the map pickup pays, not the act of LOOKING at the map.
+        //
+        // This awarded 500 points for pressing Tab, once per level, whether or
+        // not the player had found that level's map at all. Fourteen dungeons
+        // is 7,000 free points on the scoreboard for opening a menu — and a
+        // score you get for opening a menu quietly tells the player the score
+        // is not worth reading. The award now requires the map to have been
+        // EARNED, which is what `map_memory` was always meant to name.
+        if (game.level?.keyStore?.mapPickup?.()) {
+            game.witnessScore?.award?.('map_memory', game.levelId || data.name || 'map');
+        }
         if (game.player?.inventory?.hasItem?.('resonance_fork')) game.replayThreadMotif?.();
         this._pausedBefore = game.paused;
         game.paused = true;

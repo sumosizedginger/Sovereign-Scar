@@ -15,12 +15,25 @@ import { VoxelPhysicsBody } from './physics/voxel-physics-body.js';
 import { getProfile } from './physics/friction-profiles.js';
 import { HealthPool } from './kernel/health.js';
 import { Inventory } from './kernel/inventory.js';
-import { getWeapon, PHASE_BOOT } from './combat/weapons.js';
+import {
+    getWeapon, PHASE_BOOT,
+    CHARGE_TIME, CHARGE_WINDUP, CHARGE_MOVE_MULT, DASH_ATTACK,
+} from './combat/weapons.js';
 import { combatSweep, applyHit } from './combat/combat-sweeper.js';
 import { GrappleController } from './combat/grapple.js';
 import { GuardController, GUARD_SPEED_MULT } from './combat/guard.js';
 import { LockOnController } from './combat/lock-on.js';
 import { coach } from './ui/coach.js';
+import { INPUT_BUFFER } from './input.js';
+
+/**
+ * Half-width of the Light Caster's uncharged ray, in world units.
+ *
+ * Named because it is now used twice — once to decide what the beam hits and
+ * once to draw it — and two hand-copied 0.7s is exactly how a weapon ends up
+ * drawn one size and resolved another.
+ */
+export const RAY_LATERAL = 0.7;
 
 export class Player {
     constructor(scene, collisionWorld, getVoxelAt) {
@@ -66,6 +79,14 @@ export class Player {
         this.attackCd = 0;
         this.dashCd = 0;
         this.dashTimer = 0;
+        // Phase C. Three numbers and one object, all of them readable from
+        // outside so the HUD and the specs share the player's own state rather
+        // than re-deriving it.
+        this.chargeT = 0;          // seconds the attack button has been held
+        this.chargeArmed = false;  // has crossed CHARGE_TIME (drives the cue)
+        this.chargeStrike = null;  // { t, weapon, charge } — committed, locked
+        this.dashAttackT = 0;      // seconds the lunging body stays lethal
+        this._dashAttackHit = null;
         this.grapple = new GrappleController();
         // The hero used to swing an empty fist with every weapon, and the
         // grapple had no visuals at all — press G and you were simply
@@ -110,8 +131,27 @@ export class Player {
         };
         // Dull and wooden, deliberately unlike the parry's bright ring: you
         // took the hit, you did not beat it.
-        this.guard.onBlock = () => { gsfx.guardBlock(); juice.addTrauma(0.12); };
-        this.guard.onBreak = () => { vsfx.hurt(); juice.addTrauma(0.5); };
+        this.guard.onBlock = () => {
+            gsfx.guardBlock();
+            juice.addTrauma(0.12);
+            // The shield's real cost is poise, and poise is a pool the player
+            // has no reason to look at until something tells them it exists.
+            // `docs/CONTROLS.md` explains all of this beautifully and is not in
+            // the game; before this the coach had three lines total, against
+            // guard, parry, poise, guard-break, lock-on, target-switching, the
+            // grapple, the boot, the wedge, the caster, mirror travel, vials
+            // and dust.
+            coach('guard-poise',
+                'Blocking costs poise, not health — watch the pips. '
+                + 'Run out and your guard breaks, which is worse than the hit.');
+        };
+        this.guard.onBreak = () => {
+            vsfx.hurt();
+            juice.addTrauma(0.5);
+            coach('guard-break',
+                'Guard broken. Turtling loses to this — let poise recover, '
+                + 'or answer with a parry: tap guard as the blow lands.');
+        };
 
         // Z4: Z-targeting. `getCandidates` is installed by the game loop, which
         // is the only thing that knows the live enemy list for the current room.
@@ -144,6 +184,11 @@ export class Player {
         this.state.current = 'IDLE';
         this.guard.reset();
         this.lockOn.release();
+        this.chargeT = 0;
+        this.chargeArmed = false;
+        this.chargeStrike = null;
+        this.dashAttackT = 0;
+        this._dashAttackHit = null;
     }
 
     tryAttack(enemies, destructibles, opts = {}) {
@@ -162,6 +207,21 @@ export class Player {
             gsfx.attack('light_caster');
             const hits = [];
             const range = weapon.range || 12;
+            // The ray had NO visual whatsoever — the caller was supposed to draw
+            // it with the LightLineSystem and never did, so the only feedback
+            // for the game's one ranged weapon was the sound and whatever it
+            // happened to kill. Drawn as the lane it resolves: from the player,
+            // `range` long, as wide as the lateral gate below.
+            this.arcSmear.spawn({
+                position: this.rig.position,
+                facingVec: this.state.facingVec,
+                color: weapon.smearColor || 0xfff0a0,
+                lift: 0.75,
+                lane: { length: range, width: RAY_LATERAL * 2 },
+            });
+            // The ray reaches a switch the same way it reaches an enemy — all
+            // the way down the lane, at the lane's own width.
+            this._strike(destructibles, range, RAY_LATERAL + 0.6);
             for (const e of enemies) {
                 if (!e || e.state?.current === 'DEAD') continue;
                 if (e.canHit === false || e.shielded) continue;
@@ -170,7 +230,7 @@ export class Player {
                 const fv = this.state.facingVec;
                 const forward = ox * fv.x + oz * fv.z;
                 const lateral = Math.abs(-ox * fv.z + oz * fv.x);
-                if (forward > 0 && forward < range && lateral < 0.7 + (e.hitRadius || 0)) {
+                if (forward > 0 && forward < range && lateral < RAY_LATERAL + (e.hitRadius || 0)) {
                     applyHit(e, weapon, this);
                     hits.push(e);
                 }
@@ -191,6 +251,11 @@ export class Player {
             position: this.rig.position,
             facingVec: this.state.facingVec,
             radius: weapon.range || 1.8,
+            // The weapon's OWN arc, not the pool's default 110 degrees. The fan
+            // still under-draws the rectangle's far corners and still leaves the
+            // hole at the hilt — that is what makes it read as a sword rather
+            // than a pie — but it no longer covers ground the swing cannot reach.
+            arc: weapon.arcRad,
             color: weapon.smearColor || 0x7fe0ff,
         });
 
@@ -203,13 +268,294 @@ export class Player {
             const pz = this.rig.position.z + fv.z * 1.2;
             const py = this.rig.position.y + 0.5;
             for (const d of destructibles) {
+                // Struck-by-anything targets are handled by `_strike` below, on
+                // every weapon. Letting them through here too would fire them
+                // twice per swing for the two weapons that shatter.
+                if (d?.struckByAnything) continue;
                 if (d && d.shatterAtWorld) {
                     const n = d.shatterAtWorld(px, py, pz, weapon.shatterRadius || 3);
-                    if (n > 0) vsfx.shatter();
+                    if (n > 0) {
+                        vsfx.shatter();
+                        // Playtest issue 1: shatter used to throw away its
+                        // return value except for the sound. Breaking ore is
+                        // the verb the Heavy Mallet toast promises — pay it.
+                        this.onShatter?.(d, n);
+                    }
                 }
             }
         }
+        this._strike(destructibles, 1.2, 2.0);
         return hits;
+    }
+
+    /**
+     * Anything on the destructible list that ANY hit sets off.
+     *
+     * `weapon.shatter` gates the loop above, and it is only true of the Tectonic
+     * Wedge and the Heavy Mallet — which is right for ore, because breaking rock
+     * is what those two are for and that gating is the reward for carrying them.
+     * It was catastrophically wrong for the puzzle switch, which rode the same
+     * list on the assumption that "every weapon already routes a swing through
+     * it". Every weapon does not. A player holding the Anchor Link or the Light
+     * Caster could not activate a switch at all, and switches are the entire
+     * puzzle vocabulary of the seven even-numbered dungeons.
+     *
+     * So a target may opt in to being struck by anything. The ore does not, and
+     * nothing about it changes.
+     */
+    _strike(destructibles, forward = 1.2, radius = 2.0) {
+        if (!destructibles) return;
+        const fv = this.state.facingVec;
+        const py = this.rig.position.y + 0.5;
+        // Sampled ALONG the reach rather than at one point on it, so a 16-unit
+        // beam does not have to be modelled as a 16-unit-wide ball to cover its
+        // own length. `radius` stays the lane's half-width at every sample.
+        const steps = Math.max(1, Math.ceil(forward / radius));
+        for (let i = 1; i <= steps; i++) {
+            const at = (forward * i) / steps;
+            const px = this.rig.position.x + fv.x * at;
+            const pz = this.rig.position.z + fv.z * at;
+            for (const d of destructibles) {
+                if (d?.struckByAnything && d.shatterAtWorld) d.shatterAtWorld(px, py, pz, radius);
+            }
+        }
+    }
+
+    /**
+     * Phase C — the charge, one frame of it.
+     *
+     * The state machine is deliberately small: hold, arm, release, commit,
+     * resolve. The two rules that matter are both about what CANNOT happen.
+     *
+     * A charge cannot be held through a guard break. The break is the game's
+     * punishment for turtling and it already drains attack and dash; letting a
+     * charge survive it would hand the player a free committed move the instant
+     * the stun ended, which is the same bug input buffering was careful not to
+     * introduce.
+     *
+     * A committed strike cannot be steered. Once `chargeStrike` exists the
+     * player is locked in place for `CHARGE_WINDUP` and the strike resolves
+     * from where they stood. That is what makes the hero readable — this game
+     * asks every boss in it to keep that promise, and the player does not get
+     * an exemption.
+     */
+    _updateCharge(dt, input, enemies, destructibles) {
+        if (this.health.dead) {
+            this.chargeStrike = null;
+            this.chargeT = 0;
+            this.chargeArmed = false;
+            return;
+        }
+        if (this.chargeStrike) {
+            this.chargeStrike.t -= dt;
+            if (this.chargeStrike.t <= 0) {
+                const cs = this.chargeStrike;
+                this.chargeStrike = null;
+                this._resolveCharge(cs, enemies, destructibles);
+            }
+            return;
+        }
+        const weapon = getWeapon(this.inventory.activeWeapon);
+        if (!weapon.charge || this.guard.broken) {
+            this.chargeT = 0;
+            this.chargeArmed = false;
+            return;
+        }
+        // Guarding is the other committed stance; you cannot wind a swing
+        // behind your own shield, or the shield stops being a trade.
+        const held = !!input.attackHeld?.() && !this.guard.raised;
+        if (held) {
+            this.chargeT += dt;
+            if (!this.chargeArmed && this.chargeT >= CHARGE_TIME) {
+                this.chargeArmed = true;
+                this._chargePulse = 0;
+                gsfx.chargeReady();
+                coach('charge-attack',
+                    'Held long enough — let go for a committed strike. '
+                    + 'It hits harder and wider, but you cannot move while it lands.');
+            }
+            // The ring keeps pulsing while the charge is banked. One cue at the
+            // moment it arms is not enough: the player is looking at the fight,
+            // and a tell you can miss by blinking is a tell that does not exist
+            // for anyone playing with the sound off.
+            if (this.chargeArmed) {
+                this._chargePulse = (this._chargePulse || 0) + dt;
+                if (this._chargePulse >= 0.22) {
+                    this._chargePulse = 0;
+                    this.arcSmear.spawn({
+                        position: this.rig.position,
+                        facingVec: this.state.facingVec,
+                        radius: 1.1,
+                        color: weapon.charge.smearColor || 0xffffff,
+                        arc: Math.PI * 2,
+                        lift: 0.1,
+                    });
+                }
+            }
+            return;
+        }
+        if (this.chargeArmed) this._commitCharge(weapon);
+        this.chargeT = 0;
+        this.chargeArmed = false;
+    }
+
+    /** Release: lock the body, then resolve a beat later. */
+    _commitCharge(weapon) {
+        const charge = weapon.charge;
+        this.chargeStrike = { t: CHARGE_WINDUP, weapon, charge };
+        this.attackCd = Math.max(this.attackCd, CHARGE_WINDUP + (charge.recover || 0.5));
+        this.animator?.attack(this.inventory.activeWeapon, {
+            windup: CHARGE_WINDUP,
+            strikeDur: 0.16,
+            recover: Math.max(0.16, (charge.recover || 0.5) - 0.16),
+        });
+        gsfx.chargeRelease(this.inventory.activeWeapon);
+        this.physics.resetVelocity();
+    }
+
+    /** The committed move lands. Returns the hit list, for the specs. */
+    _resolveCharge(cs, enemies = [], destructibles = null) {
+        const { charge } = cs;
+        const fv = this.state.facingVec;
+        // The smear is drawn to the shape that resolves, not to a convenient
+        // one: a disc gets four overlapping fans covering the full turn, a lane
+        // gets a narrow wedge whose width is the lane's.
+        if (charge.radial) {
+            for (let i = 0; i < 4; i++) {
+                this.arcSmear.spawn({
+                    position: this.rig.position,
+                    facingVec: { x: Math.cos(i * Math.PI / 2), z: Math.sin(i * Math.PI / 2) },
+                    radius: charge.range,
+                    color: charge.smearColor || 0xffffff,
+                    spin: 9,
+                });
+            }
+        } else {
+            // A thrust and a beam are RECTANGLES — that is literally what
+            // `hitboxCheck` resolves for any non-radial move — so they are drawn
+            // as the rectangle, starting at the player and reaching exactly as
+            // far as they hit. Drawing them as a sector was the player-side
+            // version of the telegraph lie this project spent a whole session
+            // hunting in the bosses: the Caster's lance resolved over a lane
+            // 1.8 wide beginning at the player's feet and was drawn as a wedge
+            // beginning five and a half units in front of them.
+            this.arcSmear.spawn({
+                position: this.rig.position,
+                facingVec: fv,
+                color: charge.smearColor || 0xffffff,
+                lane: { length: charge.range, width: charge.depthTolerance * 2 },
+            });
+        }
+        juice.addTrauma(0.22);
+
+        const hits = combatSweep(this, enemies, charge);
+        for (const h of hits) {
+            applyHit(h, charge, this);
+            // The shockwave's job is the opening, not the kill.
+            if (charge.stagger) {
+                if (h.stagger) h.stagger(charge.stagger);
+                else if (h.attackCd != null) h.attackCd = Math.max(h.attackCd, charge.stagger);
+            }
+        }
+
+        if (charge.shatter && destructibles) {
+            // A spin breaks what is around it; a thrust breaks what is in
+            // front of it. Same rule as the ordinary swing, same offset.
+            const px = this.rig.position.x + (charge.radial ? 0 : fv.x * charge.range * 0.5);
+            const pz = this.rig.position.z + (charge.radial ? 0 : fv.z * charge.range * 0.5);
+            const py = this.rig.position.y + 0.5;
+            for (const d of destructibles) {
+                if (!d || !d.shatterAtWorld || d.struckByAnything) continue;
+                const n = d.shatterAtWorld(px, py, pz, charge.shatterRadius || 3);
+                if (n > 0) {
+                    vsfx.shatter();
+                    this.onShatter?.(d, n);
+                }
+            }
+        }
+        // A charged move sets off a switch whatever it is charged with — a
+        // radial one from where the player stands, a lane one down its length.
+        // A radial move is sampled at the player, not ahead of them — a spin
+        // that reached forward only would be a spin that could not set off the
+        // switch it just swept through behind your back.
+        if (charge.radial) this._strike(destructibles, 0, charge.range);
+        else this._strike(destructibles, charge.range, charge.depthTolerance + 0.6);
+        this.onChargeStrike?.(charge, hits);
+        return hits;
+    }
+
+    /**
+     * Phase C — the dash-attack.
+     *
+     * Attacking mid-dash converts the dash into a committed lunge. Before this,
+     * dash was purely defensive: the i-frame window was the entire product, and
+     * against anything that shoots there was no way to spend a dash offensively
+     * at all. The lunge is the gap-closer, and it costs the rest of the dash —
+     * you are pointed one way for its whole length and cannot turn out of it.
+     */
+    tryDashAttack(enemies) {
+        if (this.dashTimer <= 0 || this.health.dead) return false;
+        const weapon = getWeapon(this.inventory.activeWeapon);
+        const fv = this.state.facingVec;
+        this.physics.applyImpulse(fv.x * DASH_ATTACK.impulse, 0, fv.z * DASH_ATTACK.impulse);
+        this.dashTimer += DASH_ATTACK.extend;
+        this.dashAttackT = DASH_ATTACK.active;
+        this._dashAttackHit = new Set();
+        this.attackCd = (weapon.cooldown || 0.3) + DASH_ATTACK.recover;
+        gsfx.attack(this.inventory.activeWeapon);
+        this.arcSmear.spawn({
+            position: this.rig.position,
+            facingVec: fv,
+            radius: (weapon.range || 1.8) * 1.2,
+            color: weapon.smearColor || 0x7fe0ff,
+            arc: 0.7,
+        });
+        this.animator?.attack(this.inventory.activeWeapon, {
+            windup: 0.03,
+            strikeDur: DASH_ATTACK.active,
+            recover: DASH_ATTACK.recover,
+        });
+        return true;
+    }
+
+    /**
+     * The lunging body is lethal for as long as it is lunging, and each thing it
+     * runs through is hit ONCE. Without the set a lunge would tick damage every
+     * frame it overlapped, which at 60fps is roughly twelve hits — the move
+     * would not be a gap-closer, it would be the best attack in the game.
+     */
+    _tickDashAttack(dt, enemies, destructibles) {
+        if (this.dashAttackT <= 0) return [];
+        this.dashAttackT -= dt;
+        const expired = this.dashAttackT <= 0;
+        // The lunge's body is lethal, and it is a body — sampled where it is,
+        // not in front of itself.
+        this._strike(destructibles, 0, DASH_ATTACK.radius);
+        if (!enemies || !enemies.length) {
+            if (expired) { this.dashAttackT = 0; this._dashAttackHit = null; }
+            return [];
+        }
+        const weapon = getWeapon(this.inventory.activeWeapon);
+        const move = {
+            damage: (weapon.damage != null ? weapon.damage : 1) * DASH_ATTACK.damageMult,
+            knockback: weapon.knockback || 2,
+            radial: true,
+            range: DASH_ATTACK.radius,
+            depthTolerance: DASH_ATTACK.radius,
+            vertical: 1.4,
+        };
+        const landed = [];
+        for (const e of combatSweep(this, enemies, move)) {
+            if (this._dashAttackHit.has(e)) continue;
+            this._dashAttackHit.add(e);
+            applyHit(e, move, this);
+            landed.push(e);
+        }
+        if (expired) {
+            this.dashAttackT = 0;
+            this._dashAttackHit = null;
+        }
+        return landed;
     }
 
     tryDash() {
@@ -246,6 +592,15 @@ export class Player {
         if (this._lastHp != null && this.health.hp < this._lastHp) {
             this.animator?.hit();
         }
+        // Hazard slow is LATCHED and cleared here, once, at the top of the
+        // frame. Everything that slows the player (boss patches, the Weaver's
+        // strands) accumulates into `hazardSlow` with a max during its own
+        // update; the player consumes last frame's total and resets the field
+        // so nothing has to know when to clear it. Without the reset, walking
+        // out of a web in a room with no boss in it left the player slowed for
+        // the rest of the game — nothing else would ever have written a zero.
+        this._hazardSlow = this.hazardSlow || 0;
+        this.hazardSlow = 0;
         this.health.update(dt);
         this.arcSmear.update(dt);
         if (this.attackCd > 0) this.attackCd -= dt;
@@ -286,6 +641,11 @@ export class Player {
                 'Nothing to block with yet — read the ring and walk out of it.');
         }
 
+        // Phase C. Both run before movement, because both can take movement
+        // away: a committed charge pins the body, and a lunge owns the heading.
+        this._updateCharge(dt, input, enemies, destructibles);
+        this._tickDashAttack(dt, enemies, destructibles);
+
         // Keep the hands matched to the inventory. Cheap — both are a no-op
         // unless what the player owns actually changed.
         this.heldWeapon.set(this.inventory.activeWeapon);
@@ -306,7 +666,11 @@ export class Player {
             }
             this.physics.resetVelocity();
         } else {
-            const mv = input.moveVector();
+            // A committed charge does not walk. The wish vector is zeroed
+            // rather than the speed, so facing stops updating too — the strike
+            // resolves along the heading you released on, which is the heading
+            // the smear was about to be drawn along.
+            const mv = this.chargeStrike ? { x: 0, z: 0 } : input.moveVector();
             // A Link to the Past facing model: you face where you walk, and
             // standing still keeps your last facing. Mouse aim used to
             // overwrite this every single frame, so the keyboard never
@@ -323,8 +687,20 @@ export class Player {
             const result = this.physics.update(this.collisionWorld, dt, {
                 wishX: mv.x,
                 wishZ: mv.z,
+                // `hazardSlow` is written by boss hazard patches (BossBase
+                // `spawnPatch`) and read HERE, so the player still owns its own
+                // speed and a boss never reaches into it. A dash ignores it on
+                // purpose: dashing out of a web or a slick is the answer to
+                // being in one, and a slow that also slowed the escape would
+                // just be damage with extra steps.
                 speed: this.dashTimer > 0 ? 14
-                    : this.speed * (this.guard.raised ? GUARD_SPEED_MULT : 1),
+                    : this.speed
+                        * (this.guard.raised ? GUARD_SPEED_MULT : 1)
+                        * (1 - Math.min(0.75, this._hazardSlow || 0))
+                        // Winding a charge slows you. That is the tell: an
+                        // opponent can see a hero walking wrong, the same way
+                        // the hero reads a boss planting its feet.
+                        * (this.chargeT > 0 ? CHARGE_MOVE_MULT : 1),
                 half: 0.4,
             });
             if (this.dashTimer > 0) this.dashTimer -= dt;
@@ -358,14 +734,35 @@ export class Player {
             this.rig.visible = true;
         }
 
-        // A broken guard is the punishment for turtling: for BREAK_STUN seconds
-        // you cannot swing, dash, or re-raise. The inputs are still drained so
-        // they do not queue up and all fire the instant the stun ends.
-        const attackPressed = input.consumeAttack();
-        const dashPressed = input.consumeDash();
-        if (!this.guard.broken) {
-            if (attackPressed) this.tryAttack(enemies, destructibles);
-            if (dashPressed) this.tryDash();
+        // Two different things happen to a press here, and the difference is
+        // the whole point.
+        //
+        // A broken guard is the PUNISHMENT for turtling: for BREAK_STUN seconds
+        // you cannot swing, dash, or re-raise. Those inputs are drained and
+        // thrown away, so they cannot queue up and all fire the instant the
+        // stun ends — buffering a punishment deletes the punishment.
+        //
+        // A cooldown is not a punishment, it is a rhythm. A press that lands a
+        // few frames before the swing is ready is the player asking correctly,
+        // slightly early. That press is left ON RECORD (we do not consume while
+        // the gate is shut) and fires the moment the cooldown expires, up to
+        // INPUT_BUFFER later. Consuming unconditionally — which this used to do
+        // — read the press, found the gate shut, and silently binned it.
+        //
+        // A committed charge drains both for the same reason a guard break
+        // does: it is a commitment the player chose, and honouring presses made
+        // during it would let them cancel out of their own wind-up.
+        if (this.guard.broken || this.chargeStrike) {
+            input.consumeAttack();
+            input.consumeDash();
+        } else {
+            if (this.attackCd <= 0 && input.consumeAttack(INPUT_BUFFER)) {
+                // Mid-dash, the same press means something else. Phase C's
+                // second half: the dash gets an offensive spend.
+                if (this.dashTimer > 0) this.tryDashAttack(enemies);
+                else this.tryAttack(enemies, destructibles);
+            }
+            if (this.dashCd <= 0 && input.consumeDash(INPUT_BUFFER)) this.tryDash();
         }
 
         const wc = input.consumeWeaponCycle();

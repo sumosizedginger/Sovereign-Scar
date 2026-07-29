@@ -22,6 +22,8 @@ export const BEAT02_DEF = {
     mood: 'crust',
     start: 'gatehouse',
     prebake: true,
+    // AO-split + grade left entry ~41.5; lift into [45,90].
+    lightTune: { ambient: 1.05, key: 1.06 },
     banner: 'The Spindle turns. Sever every Tri-Compiler core.',
     // Z6 — this dungeon's one idea, and the four rooms that carry it:
     // introduce it safely, complicate it, fuse it with combat, then examine it.
@@ -58,6 +60,13 @@ export const BEAT02_DEF = {
             ],
         },
         gearworks: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -1],
             half: 11,
             wallH: 4,
@@ -133,6 +142,13 @@ export const BEAT02_DEF = {
             },
         },
         vaultrow: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -2],
             half: 9,
             wallH: 4,
@@ -193,6 +209,13 @@ export const BEAT02_DEF = {
             },
         },
         prebosscourt: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -3],
             half: 8,
             wallH: 4,

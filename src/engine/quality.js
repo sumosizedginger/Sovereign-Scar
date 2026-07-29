@@ -21,7 +21,12 @@ export const TIERS = {
         env: true, postExtras: false, aberration: false, reflections: false
     },
     high: {
-        pixelRatio: 2, bloom: true, bloomStrength: 0.9, shadowMap: 2048,
+        // 4096: 2048 across a ±30 frustum is 2048/60 = ~34 texels per world
+        // unit, not the ~68 an earlier version of this comment claimed — the
+        // arithmetic dropped the factor of two on the frustum's full span. Thin
+        // either way for blocky geometry (graphics overhaul ticket 2), and the
+        // penumbra is derived from this number, so it had to be right.
+        pixelRatio: 2, bloom: true, bloomStrength: 0.9, shadowMap: 4096,
         env: true, postExtras: true, aberration: false, reflections: false
     },
     ultra: {

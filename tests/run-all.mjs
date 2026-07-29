@@ -30,6 +30,22 @@ import { run as runBlockers } from './game/blockers.spec.mjs';
 import { run as runMigration } from './game/migration.spec.mjs';
 import { run as runWorld7 } from './game/world7.spec.mjs';
 import { run as runCombatFeel } from './game/combat-feel.spec.mjs';
+import { run as runInputBuffer } from './game/input-buffer.spec.mjs';
+import { run as runPlayerMoves } from './game/player-moves.spec.mjs';
+import { run as runEncounterDirector } from './game/encounter-director.spec.mjs';
+import { run as runElites } from './game/elites.spec.mjs';
+import { run as runPuzzleKit } from './game/puzzle-kit.spec.mjs';
+import { run as runWorldLife } from './game/world-life.spec.mjs';
+import { run as runKitChannels } from './game/kit-channels.spec.mjs';
+import { run as runPhaseG } from './game/phase-g.spec.mjs';
+import { run as runSpatialAudio } from './game/spatial-audio.spec.mjs';
+import { run as runBossFacing } from './game/boss-facing.spec.mjs';
+import { run as runWeakPoints } from './game/weak-points.spec.mjs';
+import { run as runChooseAction } from './game/choose-action.spec.mjs';
+import { run as runTelegraphTruth } from './game/telegraph-truth.spec.mjs';
+import { run as runTriCompiler } from './game/tri-compiler.spec.mjs';
+import { run as runBossLethality } from './game/boss-lethality.spec.mjs';
+import { run as runBossMovesets } from './game/boss-movesets.spec.mjs';
 import { run as runBossGrammar } from './game/boss-grammar.spec.mjs';
 import { run as runRunMode } from './game/run-mode.spec.mjs';
 import { run as runLives } from './game/lives.spec.mjs';
@@ -64,6 +80,13 @@ import { run as runShadowRoles } from './game/shadow-roles.spec.mjs';
 import { run as runRoomTrim } from './game/room-trim.spec.mjs';
 import { run as runRoomDecals } from './game/room-decals.spec.mjs';
 import { run as runAlbedoTrim } from './game/albedo-trim.spec.mjs';
+import { run as runBodies } from './game/bodies.spec.mjs';
+import { run as runRoomLights } from './game/room-lights.spec.mjs';
+import { run as runBossBodies } from './game/boss-bodies.spec.mjs';
+import { run as runRoomSeal } from './game/room-seal.spec.mjs';
+import { run as runReflectArmor } from './game/reflect-armor.spec.mjs';
+import { run as runGodModeCombat } from './game/god-mode-combat.spec.mjs';
+import { run as runCredits } from './game/credits.spec.mjs';
 
 const unitOnly = process.argv.includes('--unit-only');
 
@@ -108,6 +131,22 @@ async function main() {
     runNamed('migration', runMigration);
     runNamed('world7', runWorld7);
     runNamed('combat-feel', runCombatFeel);
+    runNamed('input-buffer', runInputBuffer);
+    runNamed('player-moves', runPlayerMoves);
+    runNamed('encounter-director', runEncounterDirector);
+    runNamed('elites', runElites);
+    runNamed('puzzle-kit', runPuzzleKit);
+    runNamed('world-life', runWorldLife);
+    runNamed('kit-channels', runKitChannels);
+    runNamed('phase-g', runPhaseG);
+    runNamed('spatial-audio', runSpatialAudio);
+    runNamed('boss-facing', runBossFacing);
+    runNamed('weak-points', runWeakPoints);
+    runNamed('choose-action', runChooseAction);
+    runNamed('telegraph-truth', runTelegraphTruth);
+    runNamed('tri-compiler', runTriCompiler);
+    runNamed('boss-lethality', runBossLethality);
+    runNamed('boss-movesets', runBossMovesets);
     runNamed('boss-grammar', runBossGrammar);
     runNamed('run-mode', runRunMode);
     runNamed('lives', runLives);
@@ -142,6 +181,13 @@ async function main() {
     runNamed('room-trim', runRoomTrim);
     runNamed('room-decals', runRoomDecals);
     runNamed('albedo-trim', runAlbedoTrim);
+    runNamed('bodies', runBodies);
+    runNamed('room-lights', runRoomLights);
+    runNamed('boss-bodies', runBossBodies);
+    runNamed('room-seal', runRoomSeal);
+    runNamed('reflect-armor', runReflectArmor);
+    runNamed('god-mode-combat', runGodModeCombat);
+    runNamed('credits', runCredits);
 
     if (!unitOnly) {
         const { run: runSmoke } = await import('./smoke.spec.mjs');
@@ -178,6 +224,21 @@ async function main() {
         const campaignE2E = createSink('campaign-e2e');
         await runCampaignE2E(campaignE2E);
         sinks.push(campaignE2E);
+
+        const { run: runDoorRefusal } = await import('./door-refusal-e2e.spec.mjs');
+        const doorRefusal = createSink('door-refusal-e2e');
+        await runDoorRefusal(doorRefusal);
+        sinks.push(doorRefusal);
+
+        const { run: runBossReach } = await import('./boss-reach-e2e.spec.mjs');
+        const bossReach = createSink('boss-reach-e2e');
+        await runBossReach(bossReach);
+        sinks.push(bossReach);
+
+        const { run: runSealStalemate } = await import('./seal-stalemate-e2e.spec.mjs');
+        const sealStalemate = createSink('seal-stalemate-e2e');
+        await runSealStalemate(sealStalemate);
+        sinks.push(sealStalemate);
 
         const { run: runWorldE2E } = await import('./world-e2e.spec.mjs');
         const worldE2E = createSink('world-e2e');

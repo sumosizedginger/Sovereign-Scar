@@ -1,5 +1,11 @@
 // C3: Reconstitution Altar — a glowing kintsugi shrine that opens the
-// upgrade shop when the player interacts nearby. One per act (beats 01/06/13).
+// upgrade shop when the player interacts nearby.
+//
+// Phase G — this line used to say "one per act (beats 01/06/13)". It is in ALL
+// FOURTEEN, and has been for a long time. A comment that describes a design the
+// code stopped following is worse than no comment: it is the thing the next
+// reader trusts instead of counting, and it is how the suture ledger in
+// `world7.js` stayed wrong for as long as it did.
 
 import * as THREE from 'three';
 

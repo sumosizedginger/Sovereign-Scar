@@ -21,9 +21,14 @@ import { ObsidianArachnid, attachBoss } from '../bosses/index.js';
 import { addAltar } from '../world/altar.js';
 import { grantBuriedFrequency } from '../narrative/item-chains.js';
 
+/**
+ * @param {Array<[number,number]|{x:number,z:number,hidden?:object,gate?:boolean}>} spots
+ */
 function addBoulders(level, ctx, origin, spots, prefix) {
     for (let i = 0; i < spots.length; i++) {
-        const [ox, oz] = spots[i];
+        const s = spots[i];
+        const ox = Array.isArray(s) ? s[0] : s.x;
+        const oz = Array.isArray(s) ? s[1] : s.z;
         const m = buildBoulder(0, 0, 0, 2, CRUST_COLORS.slate);
         const dest = new DestructibleVoxelMesh(
             m,
@@ -33,6 +38,11 @@ function addBoulders(level, ctx, origin, spots, prefix) {
             `${prefix}-${i}`,
             { origin: { x: origin.x + ox, y: 0.5, z: origin.z + oz }, scene: ctx.scene, voxelSize: 0.45 }
         );
+        // Reveal: when the island is fully gone, the shatter path spawns this.
+        if (s && s.hidden) dest.hiddenPickup = s.hidden;
+        // Gate: room clear waits on this boulder being empty (break-the-rock
+        // as a puzzle). Softlock-safe only if the player can already shatter.
+        if (s && s.gate) dest.blocksClear = true;
         level.destructibles.push(dest);
         level.addSystem({ update() {}, dispose: () => dest.dispose() });
     }
@@ -44,7 +54,8 @@ export const BEAT06_DEF = {
     mood: 'abyss',
     // Per-level luminance trim into the Abyss certification band [35,75]
     // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
-    lightTune: { ambient: 1.8, key: 1.45 },
+    // Raised after AO-split + grade: entry was metering ~41 against [45,90].
+    lightTune: { ambient: 1.45, key: 1.30 },
     start: 'pitgate',
     prebake: true,
     banner: 'The quarry bleeds gold. Something larger molts in the dark.',
@@ -84,6 +95,13 @@ export const BEAT06_DEF = {
             ],
         },
         quarryfloor: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -1],
             half: 11,
             wallH: 4,
@@ -93,7 +111,7 @@ export const BEAT06_DEF = {
             },
             enemies: [
                 { x: -5, z: 4, kind: 'brood', hp: 4 },
-                { x: 5, z: -5, kind: 'scarab', hp: 4 },
+                { x: 5, z: -5, kind: 'scarab', ai: 'drift', hp: 4 },
             ],
             doors: [
                 { to: 'pitgate', side: 'S', at: 0, type: 'open' },
@@ -102,7 +120,14 @@ export const BEAT06_DEF = {
                 { to: 'siftery', side: 'E', at: 0, type: 'open' },
             ],
             onBake(level, origin, ctx) {
-                addBoulders(level, ctx, origin, [[-4, -3], [0, -5], [3, 3]], 'b06-floor');
+                addBoulders(level, ctx, origin, [
+                    [-4, -3],
+                    [0, -5],
+                    // One boulder hides a small shard cache — the reveal job
+                    // from playtest issue 1. Player finds it by finishing the
+                    // island, not by walking over a free pickup.
+                    { x: 3, z: 3, hidden: { color: 0xc9a227, label: 'Ore seam cache', reward: { type: 'currency', amount: 5 } } },
+                ], 'b06-floor');
                 addKeyPickup(level, 'beat-06-quarry', 'floor-key',
                     { x: origin.x - 9, y: 1.2, z: origin.z + 9 }, 'small');
             },
@@ -117,6 +142,9 @@ export const BEAT06_DEF = {
             enemies: [{ x: 3, z: -3, kind: 'brood', hp: 4, ai: 'charge' }],
             doors: [{ to: 'quarryfloor', side: 'E', at: 0, type: 'open' }],
             onBake(level, origin, ctx) {
+                // Mallet room: both boulders pay (loot), one is decorative
+                // scenery next to the weapon so "shatter ore" has an object
+                // the toast just promised.
                 addBoulders(level, ctx, origin, [[-3, 2], [2, -4]], 'b06-crush');
                 level.addPickup({ x: origin.x - 5, y: 1.2, z: origin.z + 5 }, {
                     color: 0xc9a227,
@@ -164,6 +192,13 @@ export const BEAT06_DEF = {
             },
         },
         deepcut: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -2],
             half: 9,
             wallH: 4,
@@ -174,7 +209,7 @@ export const BEAT06_DEF = {
             },
             enemies: [
                 { x: -4, z: 0, kind: 'brood', hp: 4 },
-                { x: 4, z: 0, kind: 'scarab', hp: 4 },
+                { x: 4, z: 0, kind: 'scarab', ai: 'chase', hp: 4 },
             ],
             doors: [
                 { to: 'quarryfloor', side: 'S', at: 0, type: 'locked' },
@@ -221,6 +256,13 @@ export const BEAT06_DEF = {
             },
         },
         veinworks: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -3],
             half: 8,
             wallH: 4,
@@ -228,7 +270,7 @@ export const BEAT06_DEF = {
                 abyssTint(map);
             },
             enemies: [
-                { x: -3, z: -3, kind: 'brood', hp: 4 },
+                { x: -3, z: -3, kind: 'brood', ai: 'drift', hp: 4 },
                 { x: 3, z: -3, kind: 'scarab', hp: 4, ai: 'charge' },
             ],
             doors: [

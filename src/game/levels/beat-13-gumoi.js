@@ -31,6 +31,8 @@ export const BEAT13_DEF = {
     floorColor: ABYSS_COLORS.abyssFloor,
     wallColor: ABYSS_COLORS.violet,
     flicker: 0.45,
+    // AO-split + grade left entry ~38; lift into [45,90].
+    lightTune: { ambient: 1.12, key: 1.08 },
     banner: 'The Tower indexes every wrong turn. Climb anyway.',
     // Z6 — this dungeon's one idea, and the four rooms that carry it:
     // introduce it safely, complicate it, fuse it with combat, then examine it.
@@ -69,6 +71,13 @@ export const BEAT13_DEF = {
             ],
         },
         towerfoot: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -1],
             half: 10,
             wallH: 5,
@@ -139,7 +148,7 @@ export const BEAT13_DEF = {
                 h.fillBox(map, 6, 7, 1, 4, -3, 3, ABYSS_COLORS.violet);
             },
             enemies: [
-                { x: -4, z: 0, kind: 'lancer', hp: 5 },
+                { x: -4, z: 0, kind: 'lancer', ai: 'drift', hp: 5 },
                 { x: 4, z: 0, kind: 'mote', hp: 5 },
                 { x: 0, z: -4, kind: 'bulwark', hp: 5 },
             ],
@@ -192,6 +201,7 @@ export const BEAT13_DEF = {
             enemies: [
                 { x: -3, z: -3, kind: 'lancer', hp: 5 },
                 { x: 3, z: -3, kind: 'mote', hp: 5 },
+                { x: 0, z: 4, kind: 'censer', hp: 4 },
             ],
             platforms(map, h) {
                 spiral(map, h, 0, -3, 5, ABYSS_COLORS.violet);

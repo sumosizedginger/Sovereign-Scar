@@ -14,18 +14,66 @@ const EPILOGUE = [
     { speaker: 'SYSTEM', text: 'Construct: you are free. The wound remembers, and so will we.' },
 ];
 
-const CREDITS = [
-    ['SOVEREIGN SCAR', 'The Wound That Remembers'],
+/** The person the credits are actually about. */
+export const AUTHOR = 'sumosizedginger';
+
+/**
+ * The credit roll.
+ *
+ * This used to read `['GAME', 'Sovereign Scar team']` — a team that does not
+ * exist and never did — while the author's name appeared exactly once, attached
+ * to the ENGINE rather than to the game, on a line above `MADE WITH Claude`.
+ * A player reaching the end of fourteen dungeons would have come away thinking
+ * a studio built this and a tool helped.
+ *
+ * It is one person's game. Every dungeon, every boss, every rule about how the
+ * fight reads, and the call on every one of them, is theirs. The roll says so
+ * now, and `tests/game/credits.spec.mjs` keeps it saying so.
+ *
+ * Rows are `[label, value, style?]`. `style: 'lead'` renders large.
+ */
+export const CREDITS = [
+    ['SOVEREIGN SCAR', 'The Wound That Remembers', 'lead'],
     ['', ''],
-    ['ENGINE', 'My-Engine 0.2.0 — sumosizedginger'],
-    ['GAME', 'Sovereign Scar team'],
-    ['NARRATIVE BIBLE', 'The Predecessor'],
+    ['CREATED BY', AUTHOR, 'lead'],
+    ['', ''],
+    ['DESIGN', AUTHOR],
+    ['DIRECTION', AUTHOR],
+    ['WORLD & DUNGEON DESIGN', AUTHOR],
+    ['COMBAT DESIGN', AUTHOR],
+    ['BESTIARY & BOSSES', AUTHOR],
+    ['ART DIRECTION', AUTHOR],
+    ['LIGHTING & LOOK', AUTHOR],
+    ['NARRATIVE', AUTHOR],
+    ['SOUND & SCORE DIRECTION', AUTHOR],
+    ['ENGINE', `My-Engine 0.2.0 — ${AUTHOR}`],
+    ['PRODUCTION', AUTHOR],
+    ['PLAYTEST & QA', AUTHOR],
+    ['', ''],
+    ['THE FINAL CALL ON ALL OF IT', AUTHOR, 'lead'],
+    ['', ''],
+    ['', 'Fourteen dungeons. Fourteen bosses.'],
+    ['', 'One person decided every one of them.'],
+    ['', ''],
     ['BUILT WITH', 'three.js r185 · zero build · offline first'],
     ['MADE WITH', 'Claude'],
     ['', ''],
     ['', 'The Scar is quiet now.'],
     ['', 'Thank you for playing.'],
 ];
+
+/**
+ * How long the roll takes, derived from how much roll there is.
+ *
+ * The scroll is a CSS keyframe from `translateY(60vh)` to `translateY(-110%)`,
+ * so its SPEED depends on the height of the content — a fixed 24s meant that
+ * lengthening the credits silently sped them up until nobody could read them.
+ * Pacing it per row keeps the reading speed constant whatever gets added later.
+ */
+const CREDIT_ROW_SECONDS = 1.7;
+const CREDITS_MIN_SECONDS = 20;
+export const CREDITS_SECONDS = Math.max(
+    CREDITS_MIN_SECONDS, Math.round(CREDITS.length * CREDIT_ROW_SECONDS));
 
 export class EndingSequence {
     /**
@@ -101,7 +149,7 @@ export class EndingSequence {
             this._render();
         } else if (this.phase === 'epilogue' && this.t > 7) {
             this.advance(); // auto-advance slow readers' slides
-        } else if (this.phase === 'credits' && this.t > 26) {
+        } else if (this.phase === 'credits' && this.t > CREDITS_SECONDS + 2) {
             this._finish();
         }
     }
@@ -173,15 +221,17 @@ export class EndingSequence {
                 `</div>` +
                 `<div style="color:#5a647a;font-size:11px;margin-top:28px">Enter — credits</div>`;
         } else if (this.phase === 'credits') {
-            const rows = CREDITS.map(([k, v]) =>
-                `<div style="padding:10px 0">` +
-                (k ? `<div style="color:#d4a84b;font-size:11px;letter-spacing:0.3em;margin-bottom:4px">${k}</div>` : '') +
-                (v ? `<div style="font-size:16px;letter-spacing:0.06em">${v}</div>` : '') +
-                `</div>`
-            ).join('');
+            const rows = CREDITS.map(([k, v, style]) => {
+                const lead = style === 'lead';
+                return `<div style="padding:${lead ? 16 : 10}px 0">` +
+                    (k ? `<div style="color:#d4a84b;font-size:11px;letter-spacing:0.3em;margin-bottom:${lead ? 8 : 4}px">${k}</div>` : '') +
+                    (v ? `<div style="font-size:${lead ? 26 : 16}px;letter-spacing:0.06em;` +
+                        `color:${lead ? '#ffd060' : '#d8e4f0'}">${v}</div>` : '') +
+                    `</div>`;
+            }).join('');
             this.el.innerHTML =
                 `<div style="height:100%;overflow:hidden;display:flex;align-items:flex-end;justify-content:center;width:100%">` +
-                `<div style="animation:ss-credits-scroll 24s linear forwards;text-align:center;padding-bottom:10vh">${rows}</div>` +
+                `<div style="animation:ss-credits-scroll ${CREDITS_SECONDS}s linear forwards;text-align:center;padding-bottom:10vh">${rows}</div>` +
                 `</div>` +
                 `<style>@keyframes ss-credits-scroll { from { transform: translateY(60vh); } to { transform: translateY(-110%); } }</style>`;
         }

@@ -75,6 +75,18 @@ export async function run(t) {
                 const lvl = s.game.level;
                 const rid = Object.keys(lvl.def.rooms).find((k) => lvl.def.rooms[k].boss);
                 lvl.enterRoom(rid, s.game);
+                // Sealed rooms would hold the player short of the arena;
+                // this spec measures the BOSS, so clear the way to it.
+                // `managedBySystem` is the discriminator, not `bossId`. A
+                // multi-core boss pushes its CORES into level.enemies, and they
+                // carry neither a bossId nor identity with `lvl.boss` — so a
+                // filter written on those two killed the Tri-Compiler outright
+                // and then measured a corpse for inertness.
+                for (const e of lvl.enemies || []) {
+                    if (e.managedBySystem || e.bossId || e === lvl.boss) continue;
+                    if (e.state) e.state.current = 'DEAD';
+                    e.defeated = true;
+                }
                 return lvl;
             }
 
@@ -87,7 +99,18 @@ export async function run(t) {
             function observe(id, ox, oz) {
                 const lvl = enter(id), p = s.player, boss = lvl.boss;
                 const tgt = boss.cores ? boss.cores[0] : boss;
-                const at = { x: tgt.home.x + ox, z: tgt.home.z + oz };
+                // Offsets are measured from where the BOSS IS, not from its
+                // arena home.
+                //
+                // `home` is the arena clamp's centre — the room's origin — and
+                // several bosses spawn a few units off it. The Crypt Warden
+                // sits 4 units north of its home and wakes at 7; measured from
+                // home, both of this spec's vantage points landed 8.1 and 9.2
+                // units away, so the Warden correctly stayed asleep and the
+                // spec read "the boss does not react" about a boss that had
+                // never been asked to.
+                const anchor = tgt.root.position;
+                const at = { x: anchor.x + ox, z: anchor.z + oz };
                 const path = [];
                 let openTicks = 0, hurtTicks = 0, hp0 = p.health.hp;
                 for (let i = 0; i < 900; i++) {

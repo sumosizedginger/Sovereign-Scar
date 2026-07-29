@@ -14,6 +14,7 @@ export class CameraRig {
         this._pos = { x: 0, y: this.height, z: this.back };
         this._look = { x: 0, y: this.lookY, z: 0 };
         this._focus = null; // { t, dur, toH, toB, target } — boss-intro push-in
+        this._kick = null;  // { t, dur, depth } — Phase F2 killing-blow pull-in
         this._bounds = null; // W2: room-lock rect for the look-at target
         this._second = null; // Ticket D: live second subject (boss) for two-subject framing
         this._secondW = 0; // smoothed engagement weight so framing eases in/out
@@ -57,6 +58,40 @@ export class CameraRig {
         return { x, z };
     }
 
+    /**
+     * The point the frame is centred on, in world XZ.
+     *
+     * This is the look-at target, NOT the player. They are the same thing almost
+     * always — but during two-subject boss framing the frame deliberately slides
+     * toward the midpoint, and during a `focus()` push-in it slides toward the
+     * point of interest. Audio placement reads this rather than the player so
+     * that what you hear on the left is what is drawn on the left. Panning off
+     * the player instead would put a boss dead centre of the screen slightly to
+     * one side of your ears, which is worse than not panning at all.
+     */
+    focusPoint() {
+        return { x: this._look.x, z: this._look.z };
+    }
+
+    /**
+     * Half the frame's width on the floor plane, in world units.
+     *
+     * Derived from the LIVE rig position rather than from `height`/`back`, so it
+     * follows the push-in and the two-subject widen — both of which change how
+     * much world is on screen, and therefore what "at the edge of the frame"
+     * means for a pan. Shake is excluded on purpose: a sound source should not
+     * wobble across the stereo field because the camera got hit.
+     */
+    viewHalfWidth() {
+        const dist = Math.hypot(
+            this._pos.x - this._look.x,
+            this._pos.y - this._look.y,
+            this._pos.z - this._look.z,
+        );
+        const halfV = Math.tan(((camera.fov || 65) * Math.PI / 180) / 2) * dist;
+        return Math.max(1, halfV * (camera.aspect || 1.6));
+    }
+
     /** Snap immediately over target. */
     snapTo(target) {
         const x = target.x, y = target.y || 0, z = target.z;
@@ -82,6 +117,23 @@ export class CameraRig {
      * dip can never bleed its height/back blend into the next level. */
     clearFocus() {
         this._focus = null;
+        this._kick = null;
+    }
+
+    /**
+     * Phase F2 — a brief pull-in on the killing blow.
+     *
+     * Deliberately NOT `focus()`. A kick must never cancel or be cancelled by a
+     * boss intro: those two events can and do land on the same frame (the blow
+     * that clears the last add as the boss card fires), and whichever one wrote
+     * `_focus` last would have silently eaten the other. It is its own tiny
+     * channel, it only ever subtracts height, and it cannot move the look-at —
+     * so a camera that is already framing two subjects keeps framing them.
+     */
+    kick(duration = 0.35, depth = 0.5) {
+        // A kick already in flight is REFRESHED, not stacked. Three kills in
+        // half a second is a good moment, not three times the camera move.
+        this._kick = { t: 0, dur: Math.max(0.05, duration), depth };
     }
 
     update(dt, target) {
@@ -102,6 +154,16 @@ export class CameraRig {
                 z += (f.target.z - z) * fk * 0.8;
             }
             if (u >= 1) this._focus = null;
+        }
+
+        if (this._kick) {
+            const k = this._kick;
+            k.t += dt;
+            const u = Math.min(1, k.t / k.dur);
+            const dip = Math.sin(Math.PI * u);
+            effH -= k.depth * dip;
+            effB -= k.depth * 0.35 * dip;
+            if (u >= 1) this._kick = null;
         }
 
         // Two-subject framing (Ticket D): weight eases toward 1 while a

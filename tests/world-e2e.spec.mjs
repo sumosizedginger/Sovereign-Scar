@@ -561,12 +561,27 @@ export async function run(t) {
             tick(1);
             out.gotBossKey = s.game.level.keyStore.hasBossKey();
 
+            // Clear the room before leaving it.
+            //
+            // Some rooms now SEAL until their enemies are down, which is a
+            // deliberate combat rule and not what this spec is about — it is
+            // about doors, keys and room transitions. Walking a dungeon
+            // without fighting is no longer a thing a player can do, so the
+            // walkthrough does what a player would and empties the room.
+            const clearRoom = () => {
+                for (const e of s.game.level.enemies || []) {
+                    if (e.managedBySystem || e.bossId || e === s.game.level.boss) continue;
+                    if (e.state) e.state.current = 'DEAD';
+                    e.defeated = true;
+                }
+            };
             // back east, north to the antechamber, boss door with the key
             player.rig.position.set(-58.7, 1.95, -128);
             tick(1); tick(10);
             player.rig.position.set(0, 1.95, -136.4);
             tick(1); tick(10);
             out.roomC = s.game.level.currentRoomId();
+            clearRoom(); // the antechamber seals until it is cleared
             player.rig.position.set(0, 1.95, -199.4);
             tick(2); tick(10);
             out.roomBoss = s.game.level.currentRoomId();

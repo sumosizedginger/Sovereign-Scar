@@ -64,10 +64,13 @@ function getGeo() {
 function getMat() {
     if (!sharedMat) {
         sharedTex = buildFalloffTexture();
+        // Warm, soft disc — pure black ellipses read as stickers once real AO
+        // exists (graphics overhaul ticket 2). A dark brown at lower opacity
+        // grounds without competing with the baked contact seam.
         sharedMat = new THREE.MeshBasicMaterial({
-            color: 0x000000,
+            color: 0x1a1410,
             transparent: true,
-            opacity: 0.42,
+            opacity: 0.32,
             alphaMap: sharedTex || undefined,
             depthWrite: false,   // never occlude what stands on it
             polygonOffset: true, // and never fight the floor it sits on

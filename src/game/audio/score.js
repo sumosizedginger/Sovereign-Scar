@@ -234,6 +234,66 @@ export function duckScore(amount = 0.45, seconds = 1.2) {
     }
 }
 
+/**
+ * The figure a phase change plays, by phase, as scale degrees.
+ *
+ * Degrees rather than semitones so it is in the track's own key and mode
+ * automatically — a stinger that is in a different key from the music is a
+ * sound effect wearing a tune's clothes, and every track in `tracks.js` is in a
+ * different key.
+ */
+export const STINGER_FIGURES = {
+    // Phase 2: the tonic triad, ascending to the octave. Consonant, assertive —
+    // "it stood up", not "you are losing".
+    2: [0, 2, 4, 7],
+    // Phase 3 and beyond: the same shape, but landing on the seventh instead of
+    // the octave, so it arrives UNRESOLVED. The fight is not over and the tune
+    // is the thing that says so. The player should be able to hear which phase
+    // they just entered with their eyes shut, which is the same rule the SFX
+    // bank is built on.
+    3: [0, 2, 4, 6],
+};
+
+/**
+ * A boss changed phase — react musically.
+ *
+ * `sfx.phase()` already fires on the same event and fires INSTANTLY; that is the
+ * alarm. This is the follow-through, and it is deliberately quantised to the
+ * next beat instead of playing immediately. A stinger landing a sixteenth off
+ * the grid does not read as the score responding, it reads as the score being
+ * interrupted — and the two together (an immediate hit, then the music agreeing
+ * with it a beat later) is the shape the moment wants.
+ *
+ * Worst-case delay is the lookahead plus three sixteenths — about 0.5 s at these
+ * tempos.
+ *
+ * @param {number} phase the phase just entered (2, 3, …)
+ * @returns {boolean} whether anything was scheduled, so a spec can tell the
+ *                    difference between "played" and "silently did nothing".
+ */
+export function scoreStinger(phase = 2) {
+    if (!playing || !buses || !track || !ac()) return false;
+    const spb = 60 / track.bpm;
+    const stepDur = spb / 4;
+    // Land on the next beat, not the next bar: a bar line can be two seconds
+    // away at 60 bpm, and by then the phase change is ancient history.
+    const when = nextStepTime + ((4 - (step % 4)) % 4) * stepDur;
+
+    const root = noteToMidi(track.key);
+    const figure = STINGER_FIGURES[Math.min(3, Math.max(2, phase | 0))];
+
+    // A bell per eighth — long tails, so the figure rings over whatever the
+    // arrangement is doing rather than fighting it for the same instant.
+    figure.forEach((deg, i) => {
+        bellVoice(buses, when + i * stepDur * 2,
+            midiToFreq(scaleNote(root + 24, track.mode, deg)), 2.2, 0.06);
+    });
+    // One low tom underneath the first note, for the weight the bells have none
+    // of. Tuned to the tonic so it is part of the chord and not a thud.
+    tomVoice(buses, when, midiToFreq(scaleNote(root, track.mode, 0)) * 2, 0.3);
+    return true;
+}
+
 function masterTarget() {
     return 0.85 * channelGain('music') * ducking;
 }

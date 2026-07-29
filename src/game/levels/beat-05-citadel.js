@@ -24,6 +24,8 @@ export const BEAT05_DEF = {
     mood: 'crust',
     start: 'approach',
     prebake: true,
+    // AO-split + grade left entry ~40; lift into [45,90].
+    lightTune: { ambient: 1.08, key: 1.08 },
     banner: 'Three memory keys open the Wedge. The Proxy guards the fold.',
     // Z6 — this dungeon's one idea, and the four rooms that carry it:
     // introduce it safely, complicate it, fuse it with combat, then examine it.
@@ -60,6 +62,13 @@ export const BEAT05_DEF = {
             ],
         },
         greathall: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -1],
             half: 11,
             wallH: 6,
@@ -136,7 +145,7 @@ export const BEAT05_DEF = {
                 h.fillBox(map, -2, 2, 1, 6, -2, 2, CRUST_COLORS.iron);      // the monolith
                 h.fillBox(map, -1, 1, 7, 8, -1, 1, CRUST_COLORS.goldLeaf); // its crown
             },
-            enemies: [{ x: 5, z: 5, kind: 'sentinel', hp: 4 }],
+            enemies: [{ x: 5, z: 5, kind: 'sentinel', ai: 'lunge', hp: 4 }],
             doors: [
                 { to: 'greathall', side: 'S', at: 0, type: 'locked' },
                 { to: 'sanctum', side: 'N', at: 0, type: 'locked' },
@@ -197,6 +206,13 @@ export const BEAT05_DEF = {
             },
         },
         sanctum: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -3],
             half: 8,
             wallH: 6,

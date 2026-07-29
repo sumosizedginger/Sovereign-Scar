@@ -1,6 +1,8 @@
 // src/audio/synth.js
 // Purpose: Web Audio synthesis primitives + sfx object (verbatim from original).
-// Dependencies: none
+// Dependencies: audio/spatial.js (placement only — see below)
+
+import { spatialize } from './spatial.js';
 
 let audioCtx = null;
 let noiseBuf = null;
@@ -38,6 +40,37 @@ export function channelGain(channel = 'sfx') {
     return gainFor(channel);
 }
 
+/**
+ * Where a one-shot goes out.
+ *
+ * `spatialize` returns the destination itself unless the caller is inside an
+ * `at()` scope AND a listener is set, so every sound that is not deliberately
+ * placed — menus, the player's own weapon, the low-health heartbeat — builds the
+ * exact graph it always did. Placement is opt-in at the call site.
+ *
+ * THE MUSIC BUS IS NEVER PLACED, and that is a rule of the mixer rather than a
+ * consequence of nobody having wrapped a music call yet. Measured in the live
+ * game: a `playTone(..., 'music')` made inside a placement scope panned to
+ * 0.62 like anything else. Nothing does that today — the bed's pulse is driven
+ * from the mood update, well away from any scope — but a music bed that slides
+ * into one ear when a boss walks left is a mix fault nobody would think to look
+ * for, and the one thing certain about a hazard this cheap to close is that the
+ * code will be rearranged later by someone who never read this comment.
+ *
+ * Exported so the spec can test the decision `outputFor` actually branches on
+ * rather than a restatement of it — a unit test cannot reach `outputFor`
+ * itself, because it dereferences an AudioContext that is deliberately null
+ * under Node (see `music-bed.spec.mjs`, which depends on that).
+ */
+export function channelIsPlaced(channel) {
+    return channel !== 'music';
+}
+
+function outputFor(channel) {
+    if (!channelIsPlaced(channel)) return audioCtx.destination;
+    return spatialize(audioCtx, audioCtx.destination);
+}
+
 /** An oscillator gliding f0->f1 over dur seconds while gain decays to ~0; optional lowpass at lp Hz. No-ops before initAudio(). */
 export function playTone(type, f0, f1, dur, vol, lp, channel = 'sfx') {
     if (!audioCtx) return;
@@ -59,7 +92,7 @@ export function playTone(type, f0, f1, dur, vol, lp, channel = 'sfx') {
         node = fl;
     }
     node.connect(g);
-    g.connect(audioCtx.destination);
+    g.connect(outputFor(channel));
     o.start(t);
     o.stop(t + dur + 0.02);
 }
@@ -82,7 +115,7 @@ export function playNoise(dur, vol, fType, f0, f1, q, channel = 'sfx') {
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
     src.connect(fl);
     fl.connect(g);
-    g.connect(audioCtx.destination);
+    g.connect(outputFor(channel));
     src.start(t);
     src.stop(t + dur + 0.02);
 }

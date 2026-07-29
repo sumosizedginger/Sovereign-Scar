@@ -89,14 +89,18 @@ export function run(t) {
     t.ok('base roughness preserved (0.88)', Math.abs(mat.roughness - 0.88) < 1e-6);
     t.ok('base metalness preserved (0.04)', Math.abs(mat.metalness - 0.04) < 1e-6);
     t.ok('family hook installed', typeof mat.onBeforeCompile === 'function');
-    // Bumped with the metalness rebalance — the old key would have served a
-    // cached program compiled from the previous GLSL.
-    t.ok('shared program cache key', mat.customProgramCacheKey() === 'ss-level-family-v2');
+    // Bumped whenever the injected GLSL changes — the old key would have served
+    // a cached program compiled from the previous chunk set. v4 adds the
+    // interpolated noise and the normal perturbation.
+    t.ok('shared program cache key', mat.customProgramCacheKey() === 'ss-level-family-v4-ao-detail-bump');
     t.ok('no per-material envMapIntensity override', mat.envMapIntensity === 1,
         'it multiplies with scene.environmentIntensity; one knob, in mood-environment.js');
     // The hook rewrites the standard includes without throwing.
     const shader = {
-        fragmentShader: 'a\n#include <roughnessmap_fragment>\nb\n#include <metalnessmap_fragment>\nc',
+        vertexShader: '#include <common>\nv\n#include <begin_vertex>\nw',
+        fragmentShader: '#include <common>\na\n#include <color_fragment>\n'
+            + '#include <roughnessmap_fragment>\nb\n#include <metalnessmap_fragment>\nc\n'
+            + '#include <normal_fragment_begin>\nd\n#include <aomap_fragment>\ne',
     };
     const beforeLen = shader.fragmentShader.length;
     mat.onBeforeCompile(shader);
@@ -111,6 +115,38 @@ export function run(t) {
         shader.fragmentShader.includes('#include <roughnessmap_fragment>')
         && shader.fragmentShader.includes('#include <metalnessmap_fragment>'));
     t.ok('hook grew the shader', shader.fragmentShader.length > beforeLen);
+
+    // --- the surface detail actually is noise, and it moves the normal -------
+    //
+    // The previous implementation sampled `floor(p)` and used the result raw.
+    // That is a lookup table of constants, not value noise: one value per cell,
+    // a hard edge at every boundary, and at the chosen scale the cells were 1.8
+    // world units across — which is why the overworld floor in the captures
+    // reads as blotchy staining rather than as ground.
+    t.ok('the noise interpolates between cells instead of stepping',
+        shader.fragmentShader.includes('3.0 - 2.0 * f')
+        && /mix\(\s*mix\(mix\(/.test(shader.fragmentShader),
+        'trilinear mix ladder with a smoothstep fade');
+    t.ok('the noise is sampled at cell corners, not at a single floored cell',
+        shader.fragmentShader.includes('ssHash31(i + vec3(1.0, 1.0, 1.0))'));
+
+    // The half that was documented in this file's own header from day one and
+    // never written. Brightness noise on a flat face is still a flat face;
+    // tilting the normal is what makes it catch light unevenly.
+    t.ok('the normal is perturbed by the same grain',
+        shader.fragmentShader.includes('#include <normal_fragment_begin>')
+        && shader.fragmentShader.includes('normal = normalize(normal + clamp('),
+        'ticket 3 shipped only the albedo half');
+    t.ok('the perturbation reuses the grain rather than resampling it',
+        shader.fragmentShader.includes('dFdx(ssGrain)'),
+        'central differences would cost six more noise evaluations per fragment');
+    t.ok('the perturbation is clamped against grazing-angle blowup',
+        shader.fragmentShader.includes('abs(_det) > 1e-8'));
+    // Order matters as much as presence: ssGrain is written in the albedo chunk
+    // and read in the normal chunk, and three.js emits color_fragment first.
+    t.ok('the albedo chunk precedes the normal chunk in the emitted source',
+        shader.fragmentShader.indexOf('ssGrain =')
+            < shader.fragmentShader.indexOf('dFdx(ssGrain)'));
 
     // --- mottling: deterministic and mean-preserving ---
     function coloredGeo() {
@@ -183,7 +219,36 @@ export function run(t) {
     for (const s of sources) pool.register({ x: s.x, y: 1, z: s.z, intensity: 2, priority: s.priority });
     pool.update({ x: 0, y: 0, z: 0 });
     const lit = fakeScene.children.filter((l) => l.intensity > 0);
-    t.ok('pool lights exactly the budget', lit.length === 3, `lit=${lit.length}`);
+    // Two, not three, and that is the point: `register` defaults `distance` to
+    // 10, and only the sources at x=0 and x=3 are inside their own falloff. A
+    // point light contributes exactly nothing past its `distance`, so ranking
+    // one into the budget spends a real shader light slot on darkness. Measured
+    // in the Pyre before this rule existed: three of five pooled slots were
+    // held by fixtures in rooms 60+ units away.
+    t.ok('pool lights only sources that can actually reach the focus',
+        lit.length === 2, `lit=${lit.length}`);
+    t.ok('the pool still fills its budget when enough sources are in range',
+        (() => {
+            // Its own scene: the pool above still holds two lit lights in
+            // `fakeScene`, and counting both pools' output as one number is how
+            // a spec quietly stops measuring what it claims to.
+            const scene2 = {
+                children: [],
+                add(o) { o.parent = this; this.children.push(o); },
+                remove(o) { o.parent = null; this.children = this.children.filter((c) => c !== o); },
+            };
+            const near = new LocalLightPool(scene2, { budget: 3, makeLight });
+            for (let i = 0; i < 6; i++) near.register({ x: i, y: 1, z: 0, intensity: 2, distance: 20 });
+            near.update({ x: 0, y: 0, z: 0 });
+            return scene2.children.filter((l) => l.intensity > 0).length === 3;
+        })());
+    // An unbounded source (distance 0 = infinite, three.js convention) is never
+    // culled — the rule is about reach, not about distance being set.
+    t.ok('a source with no falloff is always eligible',
+        selectActive(
+            [{ x: 900, z: 0, priority: 0, distance: 0 }, { x: 1, z: 0, priority: 0, distance: 5 }],
+            { x: 0, y: 0, z: 0 }, 1
+        ).length === 1);
     pool.clear();
     const litAfter = fakeScene.children.filter((l) => l.intensity > 0);
     t.ok('clear() parks every pooled light', litAfter.length === 0, `lit=${litAfter.length}`);

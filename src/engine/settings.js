@@ -21,6 +21,14 @@ export const SETTING_DEFAULTS = {
     reduceFlashing: false,
     reduceMotion: false,
     reduceHorrorAudio: false,    // mutes whisper / softens sub-bass, never text
+    // Collapse stereo placement to centre. NOT a preference — for a player
+    // with hearing in one ear, a cue panned to the deaf side is not quieter,
+    // it is gone: measured at PAN_LIMIT 0.85 the far channel carries 0.033 rms
+    // against 0.406 unplaced, about -22dB. Stereo placement makes wind-ups
+    // easier to locate for most players and deletes them for that one, so the
+    // feature ships with its own off switch. Distance rolloff is kept — it
+    // carries the same information in one channel.
+    monoAudio: false,
     alwaysShowDialogue: false,   // replay intro/boss intros even when seen
     keybindings: null,           // null = input.js defaults; else {action: code}
     lastHero: 0
@@ -33,8 +41,21 @@ const PROGRESS_DEFAULTS = {
     bossIntroSeen: [],           // bossIds whose intro dialogue has played
     contentWarningAck: false,
     hintsSeen: [],               // onboarding hint ids
+    storySeen: [],               // story-panel line ids already heard (Phase G)
     tutorialDone: false,
-    unlockedEndings: []          // 'destroyer' | 'liberator' | 'merged'
+    // Phase G — `unlockedEndings` is GONE, and this comment is the tombstone.
+    //
+    // It held 'destroyer' | 'liberator' | 'merged', it was written by nothing,
+    // and `setSetting` — the only writer — was called nowhere in the codebase.
+    // Every player who has ever finished this game got the same nine-line
+    // epilogue. The field was not a feature that needed finishing; it was a
+    // promise in the save schema that the game had no way to keep, and leaving
+    // it there means the next reader spends an hour working out why their
+    // ending never changes.
+    //
+    // Trap 4 applies: deleting the CALL is not deleting the feature. The field
+    // is out of the schema, out of `resetAll`, out of the reload guard, and
+    // `settings.spec.mjs` now fails if it comes back.
 };
 
 const MAX_SCORES = 10;
@@ -181,7 +202,7 @@ export function resetAll() {
     settings = Object.assign({}, SETTING_DEFAULTS);
     progress = Object.assign({}, PROGRESS_DEFAULTS,
         // fresh arrays/objects — the defaults object must never be mutated
-        { heroCompletions: {}, bossIntroSeen: [], hintsSeen: [], unlockedEndings: [] });
+        { heroCompletions: {}, bossIntroSeen: [], hintsSeen: [], storySeen: [] });
     scores = [];
     try {
         if (window.localStorage) {
@@ -195,7 +216,7 @@ export function resetAll() {
 // alias across resetAll — make sure the live copies are always our own.
 if (progress.bossIntroSeen === PROGRESS_DEFAULTS.bossIntroSeen) progress.bossIntroSeen = [];
 if (progress.hintsSeen === PROGRESS_DEFAULTS.hintsSeen) progress.hintsSeen = [];
-if (progress.unlockedEndings === PROGRESS_DEFAULTS.unlockedEndings) progress.unlockedEndings = [];
+if (progress.storySeen === PROGRESS_DEFAULTS.storySeen) progress.storySeen = [];
 if (progress.heroCompletions === PROGRESS_DEFAULTS.heroCompletions) progress.heroCompletions = {};
 
 // Debug/test handle (matches gameWorld's convention in game.js).

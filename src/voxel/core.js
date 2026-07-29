@@ -25,15 +25,25 @@ export const FACES = [
     { n: [ 0, 0,-1], u: [0, 1, 0], v: [1, 0, 0] }
 ];
 
-export const AO_LEVELS = [1.0, 0.82, 0.66, 0.5];
+// Deepest level was 0.5 while AO lived in the albedo channel (lights washed
+// it out, so deeper looked muddy rather than solid). Now AO rides its own
+// attribute and multiplies only the indirect term — 0.35 is genuine contact.
+export const AO_LEVELS = [1.0, 0.78, 0.55, 0.35];
 export const CORNER_SIGNS = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
 
 /**
- * Convert a voxel Map into a single BufferGeometry with position, normal, color (baked AO).
+ * Convert a voxel Map into a single BufferGeometry with position, normal,
+ * color (albedo ONLY), and aoLevel (per-vertex ambient occlusion).
+ *
+ * Graphics overhaul ticket 1: AO used to be multiplied into vertex colour.
+ * That put contact darkening in the albedo channel, so (a) lights washed it
+ * out and (b) the material classifier that reads vColor flipped 10 of 11
+ * palette families purely from sitting in a corner. Colour is clean albedo
+ * now; the shader applies aoLevel to indirect light only.
  */
 export function buildVoxelGeo(map, jitterAmt) {
     if (jitterAmt === undefined) jitterAmt = 0.06;
-    const pos = [], nrm = [], col = [];
+    const pos = [], nrm = [], col = [], aoAttr = [];
     const has = (x, y, z) => map.has(vkey(x, y, z));
     const c = new THREE.Color();
 
@@ -41,6 +51,9 @@ export function buildVoxelGeo(map, jitterAmt) {
         const p = k.split(',');
         const x = +p[0], y = +p[1], z = +p[2];
         c.setHex(cv);
+        // Tiny deterministic jitter stays on albedo as pre-shader grain.
+        // Amplitude is half what mottleColors used, because the shader now
+        // owns the larger surface-detail term (ticket 3).
         const j = 1 + (hash3(x, y, z) - 0.5) * jitterAmt;
         const cr = Math.min(1, c.r * j), cg = Math.min(1, c.g * j), cb = Math.min(1, c.b * j);
 
@@ -69,8 +82,9 @@ export function buildVoxelGeo(map, jitterAmt) {
             for (const ti of order) {
                 pos.push(corn[ti][0], corn[ti][1], corn[ti][2]);
                 nrm.push(f.n[0], f.n[1], f.n[2]);
-                const a = ao[ti];
-                col.push(cr * a, cg * a, cb * a);
+                // Albedo only — no AO multiply.
+                col.push(cr, cg, cb);
+                aoAttr.push(ao[ti]);
             }
         }
     }
@@ -78,5 +92,6 @@ export function buildVoxelGeo(map, jitterAmt) {
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.setAttribute('aoLevel', new THREE.Float32BufferAttribute(aoAttr, 1));
     return g;
 }

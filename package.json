@@ -13,7 +13,7 @@
     "type": "git",
     "url": "https://github.com/sumosizedginger/My-Engine.git"
   },
-  "author": "sumosizedginger + Sovereign Scar team",
+  "author": "sumosizedginger",
   "license": "MIT",
   "devDependencies": {
     "puppeteer-core": "^25.3.0",

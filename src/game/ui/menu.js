@@ -34,7 +34,30 @@ export function buildScreens() {
             { type: 'slider', id: 'sfxVol', label: 'SFX volume', value: s.sfxVol, min: 0, max: 1, step: 0.05 },
             { type: 'select', id: 'quality', label: 'Quality', value: s.quality, options: ['low', 'med', 'high', 'ultra'] },
             { type: 'toggle', id: 'reduceShake', label: 'Reduce screen shake', value: !!s.reduceShake },
-            { type: 'toggle', id: 'reduceFlash', label: 'Reduce flashes', value: !!s.reduceFlash },
+            {
+                type: 'toggle', id: 'reduceFlash', label: 'Reduce flashes', value: !!s.reduceFlash,
+                note: 'hit flashes, damage vignette, and the flicker shader',
+            },
+            // Phase G. Both of these had WORKING ENGINE LOGIC IN SIX FILES and
+            // no way to switch them on: `smear.js` shrinks its arcs for
+            // `reduceMotion`, `mood-controller.js` checks `reduceHorrorAudio`
+            // in four places, `renderer.js` reads one and `flicker-shader-pass`
+            // the other — and nothing in the game ever called `setSetting` for
+            // either. They were accessibility features that shipped switched
+            // off and unreachable.
+            {
+                type: 'toggle', id: 'reduceMotion', label: 'Reduce motion', value: !!s.reduceMotion,
+                note: 'shorter swing arcs, calmer camera',
+            },
+            {
+                type: 'toggle', id: 'reduceHorrorAudio', label: 'Reduce horror audio',
+                value: !!s.reduceHorrorAudio,
+                note: 'mutes whispers and sub-bass — never text',
+            },
+            {
+                type: 'toggle', id: 'monoAudio', label: 'Mono audio', value: !!s.monoAudio,
+                note: 'centres all sound — for one-sided hearing',
+            },
             { type: 'toggle', id: 'showTimer', label: 'Show play timer', value: !!s.showTimer },
             { type: 'text', label: '←/→ adjust · Enter toggle · Esc back' },
         ];

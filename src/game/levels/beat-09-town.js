@@ -50,7 +50,9 @@ export const BEAT09_DEF = {
     mood: 'abyss',
     // Per-level luminance trim into the Abyss certification band [35,75]
     // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
-    lightTune: { ambient: 2.25, key: 2.0 },
+    // Was 2.25 / 2.0. Swept with Sluice; first cut to 1.4/1.3 overcorrected
+    // (mean ~22). Mid retrim keeps the band and avoids the milk wash.
+    lightTune: { ambient: 1.85, key: 1.72 },
     start: 'towngate',
     prebake: true,
     floorColor: ABYSS_COLORS.abyssFloor,
@@ -101,7 +103,7 @@ export const BEAT09_DEF = {
             },
             enemies: [
                 { x: -5, z: 5, kind: 'mote', hp: 5 },
-                { x: 5, z: -5, kind: 'sentinel', hp: 4 },
+                { x: 5, z: -5, kind: 'sentinel', ai: 'drift', hp: 4 },
             ],
             doors: [
                 { to: 'towngate', side: 'S', at: 0, type: 'open' },
@@ -122,7 +124,7 @@ export const BEAT09_DEF = {
             build(map, h) {
                 h.fillBox(map, -1, 1, 1, 4, -5, -4, ABYSS_COLORS.bone); // altar wall
             },
-            enemies: [{ x: 3, z: 3, kind: 'scarab', hp: 5 }],
+            enemies: [{ x: 3, z: 3, kind: 'scarab', ai: 'lunge', hp: 5 }],
             doors: [{ to: 'townsquare', side: 'E', at: 0, type: 'open' }],
             onBake(level, origin) {
                 if (!level.keyStore.mapPickup()) {
@@ -162,6 +164,13 @@ export const BEAT09_DEF = {
             },
         },
         highstreet: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -2],
             half: 9,
             wallH: 4,
@@ -219,9 +228,10 @@ export const BEAT09_DEF = {
             half: 8,
             wallH: 5,
             enemies: [
-                { x: -3, z: -3, kind: 'mote', hp: 5 },
+                { x: -3, z: -3, kind: 'mote', ai: 'chase', hp: 5 },
                 { x: 3, z: -3, kind: 'sentinel', hp: 4, ai: 'ranged' },
                 { x: 0, z: 3, kind: 'scarab', hp: 5, ai: 'charge' },
+                { x: -4, z: 4, kind: 'censer', hp: 3 },
             ],
             platforms(map, h) {
                 for (let lvl = 1; lvl <= 4; lvl++) {

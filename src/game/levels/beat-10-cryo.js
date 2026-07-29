@@ -44,7 +44,7 @@ export const BEAT10_DEF = {
     mood: 'abyss',
     // Per-level luminance trim into the Abyss certification band [35,75]
     // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
-    lightTune: { ambient: 1.3 },
+    lightTune: { ambient: 1.05 },
     start: 'ventgate',
     prebake: true,
     friction: 'ice',
@@ -86,6 +86,13 @@ export const BEAT10_DEF = {
             ],
         },
         vaultfloor: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -1],
             half: 11,
             wallH: 4,
@@ -155,6 +162,13 @@ export const BEAT10_DEF = {
             },
         },
         glacierhall: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -2],
             half: 9,
             wallH: 4,
@@ -163,7 +177,7 @@ export const BEAT10_DEF = {
                 h.fillBox(map, 6, 7, 1, 3, -3, 3, ABYSS_COLORS.ice);
             },
             enemies: [
-                { x: -4, z: 0, kind: 'brood', hp: 4 },
+                { x: -4, z: 0, kind: 'brood', ai: 'chase', hp: 4 },
                 { x: 4, z: 0, kind: 'frost', hp: 4 },
             ],
             doors: [
@@ -208,12 +222,19 @@ export const BEAT10_DEF = {
             },
         },
         coldstore: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -3],
             half: 8,
             wallH: 4,
             enemies: [
                 { x: -3, z: -3, kind: 'brood', hp: 4 },
-                { x: 3, z: -3, kind: 'frost', hp: 4, ai: 'ranged' },
+                { x: 3, z: -3, kind: 'frost', hp: 4, ai: 'lunge' },
                 { x: 0, z: 3, kind: 'brood', hp: 4 },
             ],
             doors: [

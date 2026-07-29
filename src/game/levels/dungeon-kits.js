@@ -68,7 +68,10 @@ export const KITS = {
         emissive: 'mineral_seam', atmosphere: 'grit', bossRule: 'stepped_pit',
     },
     'beat-07-sluice': {
-        name: 'Sluice', floorPattern: 'lanes', capShade: 1.3, accent: 0x60c0ff,
+        // capShade was 1.3 — stacked on a pale palette and a high lightTune it
+        // helped blow the floor into the ACES shoulder. Structural surfaces stay
+        // nearer neutral; identity lives in the accent (ticket 5).
+        name: 'Sluice', floorPattern: 'lanes', capShade: 1.12, accent: 0x4a9fd4,
         structural: ['channels', 'gates'], dressing: ['hanging_chains', 'wet_debris'],
         emissive: 'wet_reflection', atmosphere: 'drips', bossRule: 'flooded_channel',
     },

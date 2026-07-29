@@ -35,6 +35,20 @@ export function hitboxCheck(attacker, defender, move) {
     const forward = ox * fx + oz * fz;   // reach toward the enemy
     const lateral = -ox * fz + oz * fx;  // sideways offset (the "lane" gap)
 
+    // Phase C — `radial`: a true circle around the attacker, facing ignored.
+    //
+    // `omni` already existed for spin attacks, but it is a SQUARE: it keeps the
+    // lateral gate and only drops the sign of the forward test, so a move with
+    // range === depthTolerance reaches 1.41x further into its corners than the
+    // circle the smear draws. A player-side move whose shape is "everything
+    // around me" has to actually be a disc, or the answer to "why did that
+    // miss" is "you were at 4 o'clock".
+    if (move.radial) {
+        const dyR = defender.root.position.y - attacker.root.position.y;
+        if (Math.abs(dyR) > move.vertical + r) return false;
+        return Math.hypot(ox, oz) <= move.range + r;
+    }
+
     // Lateral (depth) gate. For ±X facing this is the classic dz check.
     if (Math.abs(lateral) > move.depthTolerance + r) return false;
 

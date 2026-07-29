@@ -22,7 +22,11 @@ export const BEAT07_DEF = {
     mood: 'abyss',
     // Per-level luminance trim into the Abyss certification band [35,75]
     // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
-    lightTune: { ambient: 2.0, key: 1.85 },
+    // Was ambient 2.0 / key 1.85 — second-brightest, and under ACES 1.25 the
+    // pale floor sat in the shoulder (playtest issue 2). First retrim to
+    // 1.35/1.25 overcorrected (mean ~22). Land between: clear [45,90] without
+    // returning to milk.
+    lightTune: { ambient: 1.60, key: 1.48 },
     start: 'floodgate',
     prebake: true,
     floorColor: ABYSS_COLORS.abyssFloor,
@@ -62,6 +66,13 @@ export const BEAT07_DEF = {
             ],
         },
         weepinghall: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -1],
             half: 11,
             wallH: 4,
@@ -167,6 +178,13 @@ export const BEAT07_DEF = {
             },
         },
         drownedway: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -2],
             half: 9,
             wallH: 4,
@@ -177,7 +195,7 @@ export const BEAT07_DEF = {
             },
             enemies: [
                 { x: -4, z: 0, kind: 'lancer', hp: 3 },
-                { x: 4, z: 0, kind: 'frost', hp: 4 },
+                { x: 4, z: 0, kind: 'frost', ai: 'chase', hp: 4 },
             ],
             doors: [
                 { to: 'weepinghall', side: 'S', at: 0, type: 'locked' },
@@ -221,6 +239,13 @@ export const BEAT07_DEF = {
             },
         },
         surgechamber: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -3],
             half: 8,
             wallH: 4,
@@ -231,6 +256,7 @@ export const BEAT07_DEF = {
                 { x: -3, z: -3, kind: 'lancer', hp: 3 },
                 { x: 3, z: -3, kind: 'frost', hp: 3, ai: 'ranged' },
                 { x: 0, z: 3, kind: 'lancer', hp: 4 },
+                { x: 5, z: 5, kind: 'weaver', hp: 3 },
             ],
             doors: [
                 { to: 'drownedway', side: 'S', at: 0, type: 'locked' },

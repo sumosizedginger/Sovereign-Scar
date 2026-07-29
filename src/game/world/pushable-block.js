@@ -51,6 +51,14 @@ export class PushableBlock {
 
     /**
      * Attempt push from player position with facing impulse.
+     *
+     * Returns whether the block ACTUALLY MOVED, which is not the same question
+     * as whether the shove was legal. The first version returned true the moment
+     * the reach and facing gates passed, so a block wedged against a wall still
+     * burned the push cooldown and still played the heave — the game grunting
+     * with effort at a block that had not travelled a millimetre, once every
+     * 0.18s for as long as the player kept trying. "Nothing happened" is
+     * information the player is entitled to.
      */
     tryPush(playerPos, facing, strength = 1.2) {
         const dx = this.position.x - playerPos.x;
@@ -66,15 +74,23 @@ export class PushableBlock {
         const nx = this.position.x + fx * step;
         const nz = this.position.z + fz * step;
 
+        // Terraces are the reason this predicate exists. Phase E2 puts raised
+        // ground in the PLATFORM map, which is meshed deliberately WITHOUT XZ
+        // solids so that a step is standable and can never wall anything off —
+        // and `resolveMove` only knows about XZ solids, so nothing at all
+        // stopped a block being shoved into a ledge to sit half-buried in it.
+        if (this.blocked && this.blocked(nx, nz)) return false;
+
         // Temporary remove self solid for resolve
         this.collisionWorld.removeSolid(this.id);
         const r = this.collisionWorld.resolveMove(this.position.x, this.position.z, nx, nz, this.half);
+        const moved = Math.hypot(r.x - this.position.x, r.z - this.position.z) > 1e-3;
         this.position.x = r.x;
         this.position.z = r.z;
         this.mesh.position.x = r.x;
         this.mesh.position.z = r.z;
         this._registerSolid();
-        return true;
+        return moved;
     }
 
     dispose() {

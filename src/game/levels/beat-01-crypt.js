@@ -24,6 +24,8 @@ export const BEAT01_DEF = {
     mood: 'crust',
     start: 'tomb',
     prebake: true, // 6 small rooms bake in milliseconds; boss exists at load
+    // AO-split + grade left entry ~42; lift into [45,90].
+    lightTune: { ambient: 1.05, key: 1.08 },
     banner: 'Escape the Crypt. Salvage the Anchor Link from the Warden.',
     // Z6 — this dungeon's one idea, and the four rooms that carry it:
     // introduce it safely, complicate it, fuse it with combat, then examine it.
@@ -62,6 +64,24 @@ export const BEAT01_DEF = {
                 h.fillBox(map, -5, -5, 1, 3, -7, -7, CRUST_COLORS.goldLeaf);
                 h.fillBox(map, 5, 5, 1, 3, -7, -7, CRUST_COLORS.goldLeaf);
                 h.fillBox(map, -2, 2, 1, 1, -6, -6, CRUST_COLORS.goldLeaf);
+                // Graphics overhaul ticket 4 — vertical interest prototype.
+                // Corner pillars + a low perimeter plinth give the key light
+                // something to cast across and the floor something to meet.
+                // All of it sits against the walls, outside the spawn walk
+                // corridor, so traversal is unchanged (the structural claim
+                // that makes a one-room prototype safe to land).
+                for (const [px, pz] of [[-6, -6], [6, -6], [-6, 6], [6, 6]]) {
+                    h.fillBox(map, px, px, 1, 4, pz, pz, CRUST_COLORS.slate);
+                    h.fillBox(map, px, px, 5, 5, pz, pz, CRUST_COLORS.goldLeaf);
+                }
+                // Low plinth along the west wall — shadows fall across it.
+                h.fillBox(map, -6, -5, 1, 1, -3, 3, CRUST_COLORS.slateDark);
+            },
+            // One-cell raised platform in the SE corner — standable (no XZ
+            // solid), so soft shadows and contact darkening have a step to
+            // fall across without changing the collision plan of the room.
+            platforms(map, h) {
+                h.fillBox(map, 3, 5, 1, 1, 3, 5, CRUST_COLORS.slate);
             },
             doors: [
                 { to: 'corridor', side: 'N', at: 0, type: 'open' },
@@ -210,6 +230,13 @@ export const BEAT01_DEF = {
             },
         },
         antechamber: {
+            // Sealed: the doors hold until this room is clear.
+            // Nothing in this game used to seal, so every fight in it was
+            // optional — you could walk past the whole bestiary and never
+            // use the guard, the parry or the lock-on. Authored per room
+            // rather than applied to all of them: this is a room you can
+            // be surprised in, not one you pass through.
+            seal: true,
             grid: [0, -3],
             half: 8,
             wallH: 4,

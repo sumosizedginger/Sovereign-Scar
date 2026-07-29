@@ -95,12 +95,42 @@ export function padSheet() {
         .filter(Boolean).join('\n');
 }
 
+/**
+ * How long a press keeps asking, in seconds.
+ *
+ * Attack and dash used to be plain booleans: set on keydown, read once, and
+ * cleared unconditionally whether or not anything could act on them. The
+ * Anchor Link's cooldown is 0.28s and the Heavy Mallet's is 0.50s, so a press
+ * landing inside that window was read, discarded, and never happened — at a
+ * natural attack rhythm that is roughly one input in three. It does not read as
+ * "I mistimed that", it reads as the game ignoring you.
+ *
+ * 0.15s is the usual figure and it is short enough that a press cannot survive
+ * long enough to fire somewhere the player was no longer asking for it.
+ *
+ * NOT a queue: the window holds ONE press, and a second press replaces the
+ * first rather than stacking behind it. A queue would let a mash spend itself
+ * over the following second, which is the failure this is supposed to prevent.
+ */
+export const INPUT_BUFFER = 0.15;
+
 export class Input {
-    constructor(dom = window) {
+    /**
+     * @param {object} [dom] event target (defaults to window)
+     * @param {object} [opts]
+     * @param {function} [opts.clock] seconds-valued clock, injectable so specs
+     *   can drive the buffer deterministically instead of sleeping.
+     */
+    constructor(dom = window, opts = {}) {
         this.keys = new Set();
         this.mouse = { x: 0, y: 0, down: false, right: false };
-        this._attackPressed = false;
-        this._dashPressed = false;
+        // Timestamps, not booleans — see INPUT_BUFFER. `-Infinity` means "no
+        // press on record"; every read guards with Number.isFinite so the
+        // sentinel can never satisfy an unbounded window.
+        this._clock = opts.clock
+            || (() => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000);
+        this._attackAt = -Infinity;
+        this._dashAt = -Infinity;
         this._interactPressed = false;
         this._weaponCycle = 0;
         this._moodToggle = false;
@@ -122,6 +152,11 @@ export class Input {
         this._padGuard = false;
         this._lockToggle = false;
         this._lockCycle = false;
+        // Phase C: the charge reads the attack button as a LEVEL, not an edge.
+        // The press still fires a normal swing immediately (that behaviour is
+        // untouched); holding past CHARGE_TIME is what buys the committed move,
+        // so a player who never holds the button loses nothing.
+        this._padAttack = false;
 
         // Dev mode (D1): edge-triggered dev inputs, gated at the consume site
         this._devToggle = false;
@@ -152,8 +187,8 @@ export class Input {
         this._onKeyDown = (e) => {
             this.padActive = false; // keyboard use reverts the pad legend
             this.keys.add(e.code);
-            if (e.code === 'Space' || e.code === 'KeyJ') this._attackPressed = true;
-            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyK') this._dashPressed = true;
+            if (e.code === 'Space' || e.code === 'KeyJ') this._attackAt = this._clock();
+            if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyK') this._dashAt = this._clock();
             if (e.code === 'KeyE' || e.code === 'KeyF') this._interactPressed = true;
             if (e.code === 'KeyQ') this._weaponCycle = -1;
             if (e.code === 'KeyR') this._weaponCycle = 1;
@@ -229,6 +264,18 @@ export class Input {
         return this.mouse.right || this.keys.has('KeyB') || this._padGuard;
     }
 
+    /**
+     * Phase C: attack button state THIS frame, for the charge.
+     *
+     * Deliberately NOT a consume: the swing keeps its edge trigger through
+     * `consumeAttack`, and the charge watches the same button held down. The two
+     * never fight because they read different things about it — one asks "was
+     * there a press", the other "is it still down".
+     */
+    attackHeld() {
+        return this.keys.has('Space') || this.keys.has('KeyJ') || this._padAttack;
+    }
+
     /** WASD / arrows as XZ wish vector (unnormalized); falls back to pad stick. */
     moveVector() {
         let x = 0, z = 0;
@@ -292,8 +339,9 @@ export class Input {
         const az = this._armAim ? dz(raz) : 0;
         this.padAim = Math.hypot(ax, az) > 0.3 ? { x: ax, z: az } : null;
 
-        if (pressed(0)) { this._attackPressed = true; this._menuCodes.push('Enter'); }
-        if (pressed(1)) { this._dashPressed = true; this._menuCodes.push('Backspace'); }
+        if (pressed(0)) { this._attackAt = this._clock(); this._menuCodes.push('Enter'); }
+        this._padAttack = !!b[0];
+        if (pressed(1)) { this._dashAt = this._clock(); this._menuCodes.push('Backspace'); }
         if (pressed(2)) this._interactPressed = true;
         if (pressed(3)) this._grapple = true;
         if (pressed(4)) this._weaponCycle = -1;
@@ -324,16 +372,40 @@ export class Input {
         return v;
     }
 
-    consumeAttack() {
-        const v = this._attackPressed;
-        this._attackPressed = false;
-        return v;
+    /**
+     * Take the pending attack press, if there is one young enough to still mean
+     * it.
+     *
+     * `window` is in seconds. Omitting it keeps the original edge-trigger
+     * semantics exactly — any press since the last consume counts, however old
+     * — which is what the menus, the pause drain and `gamepad.spec.mjs` expect.
+     * Gameplay passes `INPUT_BUFFER`.
+     *
+     * A press is cleared whether or not it was fresh enough to fire. A stale
+     * one must not linger: it would otherwise sit in the field until some later
+     * caller with a larger window fired it, seconds after the player asked.
+     *
+     * **Only call this when you can actually act on the answer.** The buffer
+     * works because the caller does NOT consume while its gate is shut — the
+     * press stays on record, ageing, and fires the moment the cooldown ends.
+     * A caller that consumes unconditionally and throws the result away has
+     * reimplemented the bug this replaced.
+     */
+    consumeAttack(window = Infinity) {
+        const at = this._attackAt;
+        if (!Number.isFinite(at)) return false;
+        const fresh = this._clock() - at <= window;
+        this._attackAt = -Infinity;
+        return fresh;
     }
 
-    consumeDash() {
-        const v = this._dashPressed;
-        this._dashPressed = false;
-        return v;
+    /** As `consumeAttack`, for the dash. */
+    consumeDash(window = Infinity) {
+        const at = this._dashAt;
+        if (!Number.isFinite(at)) return false;
+        const fresh = this._clock() - at <= window;
+        this._dashAt = -Infinity;
+        return fresh;
     }
 
     consumeInteract() {

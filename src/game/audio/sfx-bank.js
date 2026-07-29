@@ -22,6 +22,7 @@
 //    shut.
 
 import { audioCtx, channelGain } from '../../audio/synth.js';
+import { spatialize } from '../../audio/spatial.js';
 
 let bus = null;
 
@@ -69,7 +70,14 @@ function gainNode(peak, when, dur, attack = 0.002, verb = 0.18) {
     g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak * channelGain('sfx')), when + attack);
     g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
     const b = ensureBus();
-    g.connect(b.dry);
+    // The DRY path is placed; the reverb send is not, and is tapped off `g`
+    // ahead of the panner. Two reasons, and they are the same reason. A room's
+    // reflections arrive from every surface, so hard-panning the tail with the
+    // source is the one thing that makes a convolver sound like a filter. And
+    // because the send bypasses the distance rolloff, a far-off sound keeps its
+    // full tail while its direct signal drops — the wet/dry ratio rises with
+    // distance, which is what distance actually sounds like.
+    g.connect(spatialize(audioCtx, b.dry));
     if (verb > 0) {
         const s = audioCtx.createGain();
         s.gain.value = verb;
@@ -163,6 +171,31 @@ export function hitFlesh() {
     tone('sine', 190 * k, 70 * k, 0.13, 0.24);
 }
 
+/**
+ * The sword found the lit weak point.
+ *
+ * Built out of `hitFlesh` plus a bright ringing partial on top, rather than as
+ * a new sound, because it has to read as THE SAME HIT LANDING BETTER. A wholly
+ * different voice would say "different weapon"; this says "that one counted".
+ *
+ * Sits above the body of the hit in both pitch and decay so it survives a busy
+ * mix — this fires at the one moment the player is being rewarded for reading a
+ * boss correctly, and it must not be the sound that gets buried.
+ */
+export function weakPoint() {
+    const k = cents(rand(-1, 1));
+    const t = now();
+    // The flesh hit underneath, so the impact still has weight.
+    noise(0.09, 0.26, 'lowpass', 1100 * k, 300 * k, 0.9, t, 0.2);
+    tone('sine', 190 * k, 70 * k, 0.13, 0.24, t);
+    // ...and the ring that says it was the right place. A rising fifth, the
+    // same interval the parry resolves on, because it is the same lesson:
+    // you read it, and the game is telling you so.
+    tone('triangle', 1320 * k, 1320 * k, 0.22, 0.13, t + 0.02, 0.5, 0.002);
+    tone('triangle', 1980 * k, 1980 * k, 0.3, 0.09, t + 0.07, 0.55, 0.002);
+    noise(0.05, 0.14, 'highpass', 5000, 9000, 0.8, t, 0.45);
+}
+
 /** The sword connected with a plate and did nothing. Deliberately unrewarding. */
 export function hitArmor() {
     const k = cents(rand(-2, 2));
@@ -221,6 +254,44 @@ export function enemyDie() {
     noise(0.22, 0.2, 'lowpass', 1600 * k, 250 * k, 0.9, t, 0.3);
     tone('triangle', 400 * k, 120 * k, 0.24, 0.16, t, 0.35);
     tone('sine', 600 * k, 180 * k, 0.2, 0.08, t + 0.03, 0.35);
+}
+
+// ── The charge (Phase C) ───────────────────────────────────────────────────
+
+/**
+ * The charge came up. A single rising note held under the swing noise, because
+ * the player is looking at the fight and not at their hands — this cue is the
+ * only reliable way to know the committed move is bought and paid for.
+ *
+ * Deliberately quiet and high: it has to sit under an ongoing fight without
+ * being mistaken for a threat.
+ */
+export function chargeReady() {
+    const t = now();
+    tone('triangle', 660, 1320, 0.16, 0.06, t, 0.3, 0.004);
+    tone('sine', 1980, 1980, 0.1, 0.03, t + 0.05, 0.35, 0.002);
+}
+
+/**
+ * The charge went off. Weighted by weapon like the ordinary swings are, since
+ * the whole point of Phase C is that the four weapons stop being four numbers.
+ */
+export function chargeRelease(weaponId = 'anchor_link') {
+    const t = now();
+    const k = cents(rand(-1, 1));
+    if (weaponId === 'tectonic_wedge') {
+        // A thrust: one long push, no rotation in it at all.
+        noise(0.34, 0.3, 'bandpass', 400 * k, 2600 * k, 1.1, t, 0.3);
+        tone('sawtooth', 150 * k, 420 * k, 0.3, 0.18, t, 0.3, 0.02);
+    } else if (weaponId === 'light_caster') {
+        tone('sawtooth', 900 * k, 2600 * k, 0.3, 0.13, t, 0.35);
+        tone('sine', 2600 * k, 900 * k, 0.24, 0.06, t + 0.02, 0.4);
+    } else {
+        // Spins and the shockwave: a body turning, then the impact.
+        noise(0.4, 0.3, 'lowpass', 1800 * k, 200 * k, 0.9, t, 0.35);
+        tone('sine', 200 * k, 52 * k, 0.36, 0.24, t, 0.35, 0.006);
+        tone('triangle', 300 * k, 140 * k, 0.28, 0.1, t + 0.04, 0.35);
+    }
 }
 
 // ── Targeting ──────────────────────────────────────────────────────────────
@@ -384,7 +455,8 @@ export function menuBack() {
 
 /** Everything, as one object, mirroring the kit's `sfx` shape. */
 export const gsfx = {
-    attack, hitFlesh, hitArmor, guardBlock, parry, guardBreak, guardUp, guardDown,
+    attack, chargeReady, chargeRelease,
+    hitFlesh, hitArmor, weakPoint, guardBlock, parry, guardBreak, guardUp, guardDown,
     enemyDie, lockOn, lockOff, footstep, dash, land,
     grappleFire, grappleHit, grapplePull,
     shardGet, heartGet, keyGet, sutureGet, secretFound, itemGet,

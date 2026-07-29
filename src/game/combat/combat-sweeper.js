@@ -3,6 +3,7 @@
 import { hitboxCheck } from '../../combat/hitbox.js';
 import { juice } from '../fx/juice.js';
 import { gsfx } from '../audio/sfx-bank.js';
+import { at as audioAt } from '../../audio/spatial.js';
 
 /**
  * Sweep a move against many defenders; returns hit list.
@@ -58,17 +59,45 @@ export function applyHit(defender, move, attacker) {
     // than a trash mob does, or "go around it" becomes "jog around it".
     if (defender.armorUp && inFrontArc(defender, attacker, defender.armorArc)) {
         if (defender.onBlocked) defender.onBlocked(attacker, move);
-        gsfx.hitArmor();
+        audioAt(defender.root?.position, () => gsfx.hitArmor());
         juice.addTrauma(0.08);
+        // Phase F2 — a blow turned by a plate throws sparks too, and it is the
+        // one place they carry the most information: "that did nothing" and
+        // "that did nothing BECAUSE of the plate you are standing in front of"
+        // are different messages, and until now the only thing separating them
+        // was a sound.
+        if (juice.onImpact) {
+            juice.onImpact(defender, (attacker?.state?.facingVec) || { x: 1, z: 0 }, move);
+        }
         return { killed: false, damage: 0, blocked: true, armored: true };
     }
     // C3: Edge upgrade — attacker-side damage multiplier.
-    // `vulnerableMult` is the defender side: a boss recovering from a committed
-    // attack takes double. Punishing the opening is what makes reading the
-    // wind-up worth doing instead of just mashing whenever you are in range.
+    //
+    // The defender side is TWO windows that must not compound:
+    //
+    //   `vulnerableMult`  a boss recovering from a committed attack takes
+    //                     double. Punishing the opening is what makes reading
+    //                     the wind-up worth doing instead of mashing.
+    //   `weakMult`        a boss whose modelled weak point is lit takes double
+    //                     while `weakOpen` is true.
+    //
+    // MAX, NOT PRODUCT, and that is a design decision rather than an
+    // implementation detail. On the Sand Spur the two windows are the same
+    // window — it beaches itself, which IS its recovery, and the gold seam on
+    // its head lights up at that exact moment. Multiplying would quietly make
+    // that 4x, which is not a new mechanic, it is the fight ending early. Under
+    // max, the Spur's seam becomes an honest sign for a window that already
+    // paid double, and the Kinetic Core — whose bob-high window paid nothing at
+    // all, measured 254 frames in 600 at a flat 1x — gets a real spike.
+    //
+    // Nothing else in the game sets `weakOpen`, so this is inert for enemies.
+    const openMult = Math.max(
+        defender.vulnerableMult || 1,
+        defender.weakOpen ? (defender.weakMult || 1) : 1
+    );
     const dmg = (move.damage != null ? move.damage : 1)
         * ((attacker && attacker.damageMult) || 1)
-        * (defender.vulnerableMult || 1);
+        * openMult;
     if (defender.hp == null) defender.hp = 1;
     // Notify before HP mutation so handlers can still cancel via shielded re-check
     if (defender.onHit) defender.onHit(dmg, attacker, move);
@@ -78,12 +107,32 @@ export function applyHit(defender, move, attacker) {
     defender.hp -= dmg;
     if (defender.hp > 0) attacker?.onCombatHit?.(defender, dmg);
     // Four outcomes, four sounds: blocked, armoured, wounded, killed. The
-    // player should be able to tell which one happened with their eyes shut.
-    if (defender.hp > 0) gsfx.hitFlesh(); else gsfx.enemyDie();
+    // player should be able to tell which one happened with their eyes shut —
+    // and, now, which of three things in the room it happened to. A ray weapon
+    // reaching across the arena and a swing at your feet used to sound like they
+    // landed in the same place.
+    audioAt(defender.root?.position, () => {
+        if (defender.hp <= 0) gsfx.enemyDie();
+        // A weak-point hit gets its own voice even when the number did not
+        // change (the Spur's seam marks a window that already paid double).
+        // Telling the player "that one counted" is the whole job of the cue,
+        // and it was previously a light with no sound and no consequence.
+        else if (defender.weakOpen) gsfx.weakPoint();
+        else gsfx.hitFlesh();
+    });
 
     // Juice: connect crunch + white flash on the struck target
     juice.hitstop(0.05);
     juice.flashTarget(defender.root);
+    // Phase F2 — the other half of the impact, on the DEFENDER's terms. The
+    // hook is installed by the game loop (the only thing that owns a scene) and
+    // is absent in every headless spec, so this costs nothing there. The
+    // attacker's facing is passed rather than a radial direction: debris thrown
+    // along the blow says which way the hit came from, and in a room with three
+    // enemies that is information rather than decoration.
+    if (juice.onImpact) {
+        juice.onImpact(defender, (attacker?.state?.facingVec) || { x: 1, z: 0 }, move);
+    }
 
     if (move.knockback && attacker && defender.root && defender.root.position) {
         const fv = (attacker.state && attacker.state.facingVec) || { x: 1, z: 0 };

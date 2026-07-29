@@ -13,6 +13,68 @@ function persistSetting(key, value) {
     saveSovereignProgress({ settings: { ...cur, [key]: value } });
 }
 
+/**
+ * Make a health pool immortal without changing how a fight resolves.
+ *
+ * God mode means "I do not die". It must NOT mean "combat resolves
+ * differently", and the obvious implementation makes it mean exactly that:
+ *
+ *     if (god) return { accepted: false };     // ← the bug
+ *
+ * `HealthPool.damage` is where `damageFilter` runs, and `damageFilter` is
+ * `GuardController.resolve` — so returning here silently switches OFF the
+ * PARRY, the verb the whole defensive kit is built around. The consequence is
+ * not "the dev takes no damage": a `bulwark`'s plate is opened by a parry or by
+ * flanking, so a god-mode player who parries is fighting something that cannot
+ * be opened at all. Inside a SEALED room that is a softlock. Measured in
+ * beat-05 greathall: 89 enemy wind-ups, 0 staggers, 0 damage in either
+ * direction, door still shut after two minutes — with a blade and with the
+ * Light Caster alike, because a plate refuses rays from the front too. With god
+ * off, the same fight ends in 7 wind-ups and 3 parries.
+ *
+ * This wrapper has broken combat once before in the same shape: an earlier
+ * version took `(n, iframes)` and dropped the rest, eating the `meta.from` the
+ * directional guard resolves against, so the shield never engaged.
+ *
+ * So run the REAL path with both damage multipliers pinned to zero. The filter
+ * resolves — a parry still staggers whoever swung, poise still spends, the
+ * guard arc still matters, i-frames still arm — and `dealt` is 0, so the pool
+ * returns before it can touch `hp`. `onDamage` is muted for the same call
+ * because a hurt flash for zero damage is a lie in the other direction.
+ *
+ * Both multipliers, not one: `damage()` picks `environmentDamageMult` when
+ * `source === 'environment'`, so zeroing only the hostile one leaves lava
+ * killing a god-mode player.
+ *
+ * Exported and dependency-free so `tests/game/god-mode-combat.spec.mjs` can
+ * drive the real thing — `DevMode` itself builds DOM on construction, and a
+ * spec that reproduces this logic instead of importing it passes whatever the
+ * shipped wrapper does.
+ *
+ * @param {object} health         a HealthPool
+ * @param {() => boolean} isGod   whether god mode is active right now
+ */
+export function installGodDamageWrapper(health, isGod) {
+    const orig = health.damage.bind(health);
+    health.damage = (...args) => {
+        if (!isGod()) return orig(...args);
+        const inMult = health.incomingDamageMult;
+        const envMult = health.environmentDamageMult;
+        const onDamage = health.onDamage;
+        health.incomingDamageMult = 0;
+        health.environmentDamageMult = 0;
+        health.onDamage = null;
+        try {
+            return { ...orig(...args), accepted: false };
+        } finally {
+            health.incomingDamageMult = inMult;
+            health.environmentDamageMult = envMult;
+            health.onDamage = onDamage;
+        }
+    };
+    return health;
+}
+
 class DevMode {
     constructor() {
         this.enabled = false;
@@ -59,19 +121,11 @@ class DevMode {
 
         // God mode (D2): permanent wrapper, flag checked inside — avoids
         // double-wrap bugs. player.health.damage is the single damage entry.
+        // The wrapper itself lives in `installGodDamageWrapper` above, where a
+        // spec can reach it without constructing DevMode (which builds DOM).
         if (!this._wrapped) {
             this._wrapped = true;
-            const health = game.player.health;
-            const orig = health.damage.bind(health);
-            // Forward EVERY argument. This wrapper used to take (n, iframes)
-            // and drop the rest, which silently ate the `source` and `meta`
-            // that the Z3 guard resolves direction from — every hit arrived
-            // with no known origin, so the shield never engaged. A pass-
-            // through wrapper must not have an opinion about arity.
-            health.damage = (...args) => {
-                if (this.enabled && this.god) return { accepted: false };
-                return orig(...args);
-            };
+            installGodDamageWrapper(game.player.health, () => this.enabled && this.god);
         }
 
         this.panel = new DevPanel(this);

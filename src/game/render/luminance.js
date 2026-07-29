@@ -56,6 +56,16 @@ function pct(hist, total, q) {
  *            centerMean:number,centerP10:number,centerP90:number,
  *            contrast:number,samples:number}}
  */
+/**
+ * ACES-shoulder / blow-out signature: bright AND nearly grey. The playtest
+ * issue-2 failure mode (pale floor pushed into the ACES shoulder) is
+ * "desaturated milk" — high luminance with channels within a few counts of
+ * each other. Mean luminance cannot see it; contrast on a checkerboard
+ * cannot see it either. This fraction can.
+ */
+export const SHOULDER_LUMA = 200;
+export const SHOULDER_CHROMA = 12; // max channel spread in 0–255
+
 export function frameLuminanceStats(px, w, h, stride = 16) {
     const hist = new Uint32Array(256);
     const cHist = new Uint32Array(256);
@@ -63,15 +73,20 @@ export function frameLuminanceStats(px, w, h, stride = 16) {
     const cx0 = (w * m) | 0, cx1 = (w * (1 - m)) | 0;
     const cy0 = (h * m) | 0, cy1 = (h * (1 - m)) | 0;
     let sum = 0, n = 0, cSum = 0, cN = 0;
+    let shoulderN = 0, clipN = 0;
 
     for (let p = 0; p < w * h; p += stride) {
         const i = p * 4;
-        const y = LR * px[i] + LG * px[i + 1] + LB * px[i + 2];
+        const r = px[i], g = px[i + 1], bch = px[i + 2];
+        const y = LR * r + LG * g + LB * bch;
         const b = y < 0 ? 0 : y > 255 ? 255 : Math.round(y);
         sum += y; hist[b]++; n++;
         const x = p % w, row = (p / w) | 0;
         if (x >= cx0 && x < cx1 && row >= cy0 && row < cy1) {
             cSum += y; cHist[b]++; cN++;
+            if (y >= 245) clipN++;
+            const spread = Math.max(r, g, bch) - Math.min(r, g, bch);
+            if (y >= SHOULDER_LUMA && spread <= SHOULDER_CHROMA) shoulderN++;
         }
     }
 
@@ -87,6 +102,9 @@ export function frameLuminanceStats(px, w, h, stride = 16) {
         centerP10: cp10,
         centerP90: cp90,
         contrast: cp90 - cp10,
+        // Centre-crop fractions in [0,1]. Playtest issue 2 / Trap 3.
+        clipFrac: cN ? clipN / cN : 0,
+        shoulderFrac: cN ? shoulderN / cN : 0,
         samples: n,
     };
 }

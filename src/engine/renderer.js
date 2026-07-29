@@ -42,7 +42,19 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 // main.js resets it manually once per frame instead (see animate()).
 renderer.info.autoReset = false;
 renderer.shadowMap.enabled = true;
-// r182 folded the soft kernel into PCFShadowMap and deprecated the old name.
+// PCFShadowMap, plainly, because it is the only soft option left.
+//
+// This used to ask for PCFSoftShadowMap "when available", on the belief that
+// the constant still selected a softer filter on builds that kept both. It does
+// not: the pinned r185 bundle contains ZERO occurrences of the
+// SHADOWMAP_TYPE_PCF_SOFT define, three.js converts the request back to
+// PCFShadowMap internally, and the browser console logged a deprecation warning
+// on every single boot of this game.
+//
+// Nothing is lost by asking for the real thing — `shadow.radius` is honoured by
+// the PCF path (and, as it happens, is IGNORED by the soft path, so the
+// deprecated constant would have been the worse of the two). Softness is set in
+// world units in engine/lights.js.
 renderer.shadowMap.type = THREE.PCFShadowMap;
 // r152+ renamed outputEncoding/sRGBEncoding to outputColorSpace/SRGBColorSpace.
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -79,11 +91,23 @@ export const bloomPass = new UnrealBloomPass(
 );
 composer.addPass(bloomPass);
 
-// Vignette: subtle darkened corners, reinforcing the existing CSS vignette
-// (index.html #vignette) in 3D so it holds up under bloom.
+// Vignette: darkened corners.
+//
+// This was tuned to "reinforce the existing CSS vignette (index.html
+// #vignette)". There is no such element — index.html has a body background
+// gradient and nothing else — so the pass was set to double something that was
+// never there, and it shows: in the certification captures the outer ~15% of
+// every frame is crushed to pure black. On the bright levels that reads as
+// atmosphere; on the Sluice it turns the game into a purple oval in a black
+// box, and it eats the corners of rooms the player is trying to read.
+//
+// darkness 1.1 → 0.92, offset 0.95 → 1.0. The first attempt went to 0.72
+// and that was too far in the other direction: the frame lost the darkness at
+// its edge that was doing real mood work, and the capture read as milk. Still
+// a vignette, no longer a letterbox.
 export const vignettePass = new ShaderPass(VignetteShader);
-vignettePass.uniforms.offset.value = 0.95;
-vignettePass.uniforms.darkness.value = 1.1;
+vignettePass.uniforms.offset.value = 1.0;
+vignettePass.uniforms.darkness.value = 0.92;
 composer.addPass(vignettePass);
 
 // Chromatic aberration: a CRT/retro cue, not a distortion — but even at a

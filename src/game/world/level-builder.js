@@ -53,7 +53,11 @@ export function meshAndCollide(map, scene, collisionWorld, opts = {}) {
     const geo = buildVoxelGeo(map, opts.jitter != null ? opts.jitter : 0.05);
     // Ticket G: mean-preserving vertex-colour mottling for tactile surfaces —
     // deterministic per vertex, so it never shifts a room's average luminance.
-    if (opts.mottle !== false) mottleColors(geo, opts.mottle || 0.06);
+    // Graphics overhaul ticket 1: mottle used to multiply the colour attribute,
+    // which (with AO in the same channel) corrupted the material classifier.
+    // Grain now lives in the level-material shader as a mean-preserving detail
+    // term. Opt-in only for callers that still want CPU mottle (tests, props).
+    if (opts.mottle) mottleColors(geo, opts.mottle);
     geo.scale(VS, VS, VS);
     geo.translate(VS * 0.5, VS * 0.5, VS * 0.5);
     const mesh = new THREE.Mesh(geo, mat);

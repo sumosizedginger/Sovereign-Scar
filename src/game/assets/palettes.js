@@ -227,6 +227,50 @@ export const ENEMY_PALETTES = {
         mouth: 0x2c3814,
         teeth: 0xc8d8a8,
     },
+    // Phase D3 — the Weaver. Pale, dusty, silk-coloured: it is the one enemy
+    // whose product is the thing it leaves lying on the floor, so it reads as
+    // the same material as its webs.
+    weaver: {
+        skin: 0xb8b0a0,
+        skinDark: 0x7a746a,
+        skinD2: 0x4c4842,
+        hair: 0x5a5650,
+        hairDark: 0x2c2a26,
+        hairLight: 0x8a8478,
+        belt: 0xd8d0bc,
+        beltDark: 0x8c8474,
+        eyeGlow: 0xe8f0ff,
+        freck: 0xa09888,
+        beard: 0x5a5650,
+        beardDark: 0x2c2a26,
+        eyeWhite: 0xf0f0e8,
+        pupil: 0x181410,
+        brow: 0x5a5650,
+        mouth: 0x4c4038,
+        teeth: 0xe0dcd0,
+    },
+    // Phase D3 — the Censer. Warm gold against a bestiary of cold greys and
+    // greens. Nothing else in the game is this colour, and that is the whole
+    // job: the enemy you have to kill FIRST has to be the one you can find.
+    censer: {
+        skin: 0xc8a860,
+        skinDark: 0x8a7038,
+        skinD2: 0x54441e,
+        hair: 0x6a5426,
+        hairDark: 0x342810,
+        hairLight: 0xa08a4a,
+        belt: 0xffd880,
+        beltDark: 0xa08040,
+        eyeGlow: 0xffe8a0,
+        freck: 0xb09850,
+        beard: 0x6a5426,
+        beardDark: 0x342810,
+        eyeWhite: 0xf8f0d8,
+        pupil: 0x201808,
+        brow: 0x6a5426,
+        mouth: 0x503c18,
+        teeth: 0xf0e8c8,
+    },
 };
 
 // Presentation policy: mood may tint colour/fog/lights, but bloom/film/vignette

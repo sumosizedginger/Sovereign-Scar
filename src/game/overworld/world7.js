@@ -8,6 +8,7 @@ import { CRUST_COLORS, ABYSS_COLORS } from '../assets/palettes.js';
 import { CRUST_REGION } from './screens.js';
 import { addForkDigSite, addWeatherRelay, addEngineerCamp } from '../narrative/item-chains.js';
 import { runGrammar } from './grammars.js';
+import { SETTLEMENTS } from '../world/settlements.js';
 
 // ── Seeded rand (mulberry32 over a string hash) ────────────────────────────
 function hash(str) {
@@ -121,10 +122,16 @@ const BLOCKERS = {
 };
 
 // Scar Sutures: the campaign ledger promises SIXTEEN automatic grants (four
-// optional hearts at four Sutures each). Fourteen come from cache-labelled
-// dungeon pickups in beats 07-14; these two item-gated overworld secrets
-// complete the count. Each sits past a C4 blocker so the acquisition needs
-// its gating item, per the spec's "item-gated overworld secrets" pattern.
+// optional hearts at four Sutures each). Sixteen come from the dungeons —
+// twelve authored caches plus the four beats whose `scoreType: 'secret'`
+// pickups convert — and these two item-gated overworld secrets round the count
+// to eighteen, which is four whole hearts with two spare.
+//
+// Phase G checked this rather than trusting it, and the check is the point:
+// ROAD-TO-TEN's survey reported fourteen sutures and a wasted remainder, and
+// acting on that number would have added two the game did not need. What it
+// actually has is eighteen, `upgrades.spec.mjs` counts the grant sites from the
+// level defs, and the spec is what stopped the "fix".
 export const OVERWORLD_SUTURES = {
     'r3c0': { x: -20, z: 1 },   // across the sinklands grapple gap (magnetic_grapple)
     'r6c3': { x: -11, z: -16 }, // beyond the bone dash ledge (phase_boot)
@@ -158,6 +165,11 @@ function screenFeatures(sid) {
     if (SECRETS[sid]) feats.push(SECRETS[sid]);
     if (OVERWORLD_SUTURES[sid]) feats.push(OVERWORLD_SUTURES[sid]);
     if (CHAIN_PROPS[sid]) feats.push(CHAIN_PROPS[sid]);
+    // Phase E3 — a settlement is a feature the terrain has to leave alone. It
+    // is the biggest one in the game (a fire and up to eight standing figures
+    // around it), so it declares a fat anchor at the screen centre: boulders
+    // grown through somebody's chest is not the impression this is for.
+    if (SETTLEMENTS[sid]) feats.push({ x: 0, z: 0, r: 8 });
     return feats;
 }
 
@@ -212,7 +224,13 @@ export function buildWorld7() {
             s.build = buildTerrain(sid, region, 'shared', s, feats);
             s.crust = { build: buildTerrain(sid, region, 'crust', s, feats) };
             s.abyss = { build: buildTerrain(sid, region, 'abyss', s, feats) };
-            const mobCount = 1 + Math.floor(rand() * 2 + R.density);
+            // Phase E3 — nothing hostile spawns in a settlement. Not for
+            // difficulty reasons: a camp with five survivors standing around a
+            // fire while a sentinel patrols between them says the survivors are
+            // props, and the whole point of putting them there is that they are
+            // not. The three settlement screens are the only places in
+            // forty-nine where the player can stand still.
+            const mobCount = SETTLEMENTS[sid] ? 0 : 1 + Math.floor(rand() * 2 + R.density);
             for (let i = 0; i < mobCount; i++) {
                 const kind = R.enemies[Math.floor(rand() * R.enemies.length)];
                 s.enemies.push({

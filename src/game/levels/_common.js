@@ -6,6 +6,7 @@ import { meshAndCollide, buildRoomFloor, buildPerimeter, VS } from '../world/lev
 import { stampMap } from '../assets/props.js';
 import { CRUST_COLORS, ABYSS_COLORS, MOOD_PRESETS } from '../assets/palettes.js';
 import { Enemy, DummyTarget, attachSplit } from '../enemy.js';
+import { EncounterDirector } from '../world/encounter-director.js';
 
 /**
  * Create a standard level shell.
@@ -21,6 +22,12 @@ export function createLevelShell(ctx, opts = {}) {
     const destructibles = [];
     const pickups = [];
     const systems = []; // { update(dt), dispose() }
+    // Phase D1. The shell is used by the sandbox and the hand-built levels
+    // that predate the room graph; two is the middle of the campaign's budget
+    // and `opts.attackTokens` lets any of them say otherwise.
+    const director = new EncounterDirector(
+        opts.attackTokens != null ? opts.attackTokens : 2, () => enemies
+    );
     const map = new Map();
     const half = opts.half != null ? opts.half : 12;
     const wallH = opts.wallH != null ? opts.wallH : 3;
@@ -101,6 +108,7 @@ export function createLevelShell(ctx, opts = {}) {
     }
 
     function update(dt, game) {
+        director.update(dt);
         for (const s of systems) if (s.update) s.update(dt, game);
         // Skip entities already stepped by a system (bosses dual-registered
         // for combat + custom AI would otherwise advance 2×dt per frame).
@@ -143,6 +151,7 @@ export function createLevelShell(ctx, opts = {}) {
         destructibles,
         pickups,
         systems,
+        director,
         spawn,
         getVoxelAt: built.getVoxelAt,
         update,

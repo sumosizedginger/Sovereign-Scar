@@ -1,11 +1,12 @@
 // Unit tests for multi-phase boss framework + roster + attachBoss.
 
 import * as THREE from 'three';
-import { BossBase, attachBoss, moveToward, bounceArena } from '../../src/game/bosses/base.js';
+import { BossBase, attachBoss, moveToward, bounceArena, circleStrafe } from '../../src/game/bosses/base.js';
 import { applyHit, inFrontArc } from '../../src/game/combat/combat-sweeper.js';
 import { hitboxCheck } from '../../src/combat/hitbox.js';
 import { WEAPONS } from '../../src/game/combat/weapons.js';
 import { Enemy } from '../../src/game/enemy.js';
+import { CollisionWorld } from '../../src/engine/collision.js';
 
 /**
  * A stand-in attacker `dist` from `target` at `deg` around it, facing back in.
@@ -30,9 +31,15 @@ import {
 import { SandSpur } from '../../src/game/bosses/sand-spur.js';
 import { KineticCore } from '../../src/game/bosses/kinetic-core.js';
 import { LEVELS } from '../../src/game/levels/registry.js';
-import {
-    createMultiCoreBoss, createPhantasm, createLeviathanCore,
-} from '../../src/game/bosses/legacy-factories.js';
+import { readFileSync, existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Read as TEXT, not imported: the point is that the module is GONE, and an
+// import of a deleted file cannot be a test of its absence — it is a crash.
+const bossIndexSource = readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)),
+        '../../src/game/bosses/index.js'), 'utf8');
 
 export function run(t) {
     // Utilities
@@ -125,9 +132,17 @@ export function run(t) {
     }
 
     // Legacy factories
-    t.ok('createMultiCoreBoss fn', typeof createMultiCoreBoss === 'function');
-    t.ok('createPhantasm fn', typeof createPhantasm === 'function');
-    t.ok('createLeviathanCore fn', typeof createLeviathanCore === 'function');
+    // Phase G — the three legacy factories are CUT, and this is the guard
+    // that keeps them cut. They were exported, re-exported, and called by no
+    // beat file in the campaign; the only thing asserting them was the three
+    // lines that used to be here, checking that a function was a function.
+    t.ok('the legacy boss factories stay deleted',
+        !existsSync(path.join(path.dirname(fileURLToPath(import.meta.url)),
+            '../../src/game/bosses/legacy-factories.js')),
+        'trap 4: deleting the call is not deleting the feature');
+    t.ok('and nothing re-exports them',
+        !/from '\.\/legacy-factories\.js'/.test(bossIndexSource),
+        'a dead module with a live re-export is still shipped code');
 
     // Registry
     t.ok('16 levels registered', LEVELS.length === 16, `n=${LEVELS.length}`);
@@ -227,12 +242,25 @@ export function run(t) {
         t.ok('the spider has real bulk', edge > 1.8, `edge=${edge.toFixed(2)}`);
 
         // Standing well clear of the body must be a legal swing.
-        const OUT = 3.0;
+        //
+        // Derived from the measured body, not written as a constant. This was
+        // `const OUT = 3.0`, which was outside the spider when it was authored
+        // and inside it the moment the boss was given real presence — so the
+        // spec started asserting that a hero standing INSIDE the model was
+        // outside it, and failed for a reason that had nothing to do with the
+        // bug it exists to guard. A test position relative to a body has to be
+        // measured from that body.
+        const OUT = edge + 0.4;
         t.ok('a swing from outside the body reaches it',
             hitboxCheck(heroFacing(b, OUT, 180), b, WEAPONS.anchor_link) === true,
-            `standing ${OUT}m out, body edge ${edge.toFixed(2)}m`);
+            `standing ${OUT.toFixed(2)}m out, body edge ${edge.toFixed(2)}m`);
         t.ok('...and that really is outside it', OUT > edge,
-            `${OUT} vs ${edge.toFixed(2)}`);
+            `${OUT.toFixed(2)} vs ${edge.toFixed(2)}`);
+        // The margin has to stay inside the weapon, or the assertion above
+        // passes for the wrong reason on the next boss that grows.
+        t.ok('the flank is reachable without closing inside the carapace',
+            OUT <= WEAPONS.anchor_link.range + b.hitRadius,
+            `out=${OUT.toFixed(2)} reach=${(WEAPONS.anchor_link.range + b.hitRadius).toFixed(2)}`);
 
         // The plate is DIRECTIONAL, not absolute. This is the whole fix: it
         // used to refuse every bearing.
@@ -301,4 +329,88 @@ export function run(t) {
         t.ok('the bulwark plate still spans the wider default',
             inFrontArc(e, at70) === true, '70 degrees must still be refused');
     }
+
+    // --- Playtest 2026-07-23 issue 6: bosses respect collision + arena ------
+    //
+    // Bosses used to write straight to the transform. Drive one into a solid
+    // for two seconds and assert its final position is OUTSIDE the solid —
+    // in world space, not by checking a flag.
+    {
+        class WallBoss extends BossBase {
+            constructor(scene, opts) { super(scene, opts); }
+            tickAI(dt, player) {
+                if (!player) return;
+                moveToward(this.root.position, player.root.position, 8, dt);
+            }
+        }
+        const scene = { add() {}, remove() {} };
+        const cw = new CollisionWorld();
+        // Wall from x=2..4, z=-5..5 — boss starts at 0 and is driven east.
+        cw.addSolid({ minX: 2, maxX: 4, minZ: -5, maxZ: 5, id: 'wall' });
+        const boss = new WallBoss(scene, {
+            id: 'wall-test', name: 'Wall', hp: 10,
+            position: { x: 0, y: 1.2, z: 0 },
+            collisionWorld: cw,
+            arenaRadius: 20,
+            hitRadius: 1.2,
+        });
+        const player = { root: { position: { x: 10, y: 1.95, z: 0 } } };
+        for (let i = 0; i < 120; i++) boss.update(1 / 60, player, null);
+        t.ok('boss cannot walk through a solid wall',
+            boss.root.position.x < 2 - 0.1,
+            `x=${boss.root.position.x.toFixed(3)} (must stay west of wall at x=2)`);
+        // Arena clamp: shove past the legal box and update must pull it back.
+        boss.root.position.x = 50;
+        boss.root.position.z = 50;
+        boss.update(1 / 60, null, null);
+        t.ok('arena clamp pulls a boss back inside home±radius',
+            Math.abs(boss.root.position.x - boss.home.x) <= boss.arenaRadius + 1e-6
+            && Math.abs(boss.root.position.z - boss.home.z) <= boss.arenaRadius + 1e-6,
+            `pos=(${boss.root.position.x},${boss.root.position.z}) home=${JSON.stringify(boss.home)} r=${boss.arenaRadius}`);
+        boss.dispose?.();
+    }
+    {
+        // circleStrafe also respects the bound resolver on the position.
+        const scene = { add() {}, remove() {} };
+        const boss = new BossBase(scene, {
+            id: 'strafe', name: 'S', hp: 5,
+            position: { x: 0, y: 1.2, z: 0 },
+            arenaRadius: 4,
+        });
+        // Minimal subclass so update runs tickAI empty + confine.
+        const player = { root: { position: { x: 0, y: 1.95, z: 0 } } };
+        // Spiral toward the player while they sit at the origin — without a
+        // clamp the boss can wander freely; with home clamp it stays in box.
+        for (let i = 0; i < 180; i++) {
+            circleStrafe(boss.root.position, player, 1 / 60,
+                { speed: 6, spin: 2, close: 3, minRadius: 0.5 });
+            boss.confineToArena();
+        }
+        t.ok('circleStrafe cannot leave the arena',
+            Math.abs(boss.root.position.x) <= 4.001
+            && Math.abs(boss.root.position.z) <= 4.001,
+            `pos=(${boss.root.position.x.toFixed(2)},${boss.root.position.z.toFixed(2)})`);
+    }
+    {
+        // attachBoss wires collisionWorld from the level.
+        const systems = [];
+        const enemies = [];
+        const cw = new CollisionWorld();
+        const level = {
+            enemies, collisionWorld: cw, halfSize: 8,
+            addSystem(s) { systems.push(s); return s; }, boss: null,
+        };
+        const fake = new BossBase({ add() {}, remove() {} }, {
+            id: 'wired', name: 'W', hp: 3, position: { x: 1, z: 1 },
+        });
+        t.ok('boss starts without collisionWorld when constructed bare',
+            fake.collisionWorld == null);
+        attachBoss(level, fake, {});
+        t.ok('attachBoss wires the level collisionWorld',
+            fake.collisionWorld === cw);
+        t.ok('attachBoss derives arenaRadius from halfSize',
+            fake.arenaRadius === Math.max(3, 8 - 1.25),
+            `r=${fake.arenaRadius}`);
+    }
 }
+

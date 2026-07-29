@@ -130,6 +130,19 @@ export class HeartDropManager {
     }
 
     /**
+     * Drop loot at an arbitrary world point (destructible shatter, props).
+     * `table` is optional weight control: { heart?: 0..1, shards?: bool }.
+     * Low odds by default — breaking things is *sometimes* worth it, not a farm.
+     */
+    dropAt(x, y, z, table = {}) {
+        const heartChance = table.heart != null ? table.heart : 0.18;
+        if (Math.random() < heartChance * getActiveRunMode().heartDropChance) {
+            return this.spawn(x, y != null ? y : 1.0, z, table.amount || 1);
+        }
+        return null;
+    }
+
+    /**
      * Roll a drop for a slain enemy. Tuned so a fight is survivable without
      * making hearts so common that damage stops mattering: tougher enemies
      * (more max HP) drop more often, and a hurt player gets better odds —

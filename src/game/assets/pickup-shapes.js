@@ -15,7 +15,14 @@
 import * as THREE from 'three';
 import { markShadowRoles } from '../render/shadow-roles.js';
 
-function mat(color, emissiveIntensity = 2, extra = {}) {
+// Default used to be 2.0 (Scar Suture 2.4). Under ACES at exposure 1.25 that
+// sits deep in the shoulder: the shape this file was written to protect
+// collapses to a white ball with a faint colour fringe. Playtest issue 3.
+// Target: "glowing and still shaped" — enough to find on a dark floor, low
+// enough that internal edges survive on a bright one.
+const PICKUP_EMISSIVE = 0.85;
+
+function mat(color, emissiveIntensity = PICKUP_EMISSIVE, extra = {}) {
     return new THREE.MeshStandardMaterial({
         color,
         emissive: color,
@@ -32,7 +39,7 @@ function mat(color, emissiveIntensity = 2, extra = {}) {
  */
 function buildSuture(color) {
     const g = new THREE.Group();
-    const m = mat(color, 2.4);
+    const m = mat(color, 1.05);
     for (const s of [-1, 1]) {
         const lobe = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.26, 0.16), m);
         lobe.position.set(s * 0.13, 0.13, 0);
@@ -49,7 +56,7 @@ function buildSuture(color) {
 /** A Memory Vial chassis: a stoppered flask. Reads as equipment, not currency. */
 function buildVial(color) {
     const g = new THREE.Group();
-    const glass = mat(color, 1.6, { transparent: true, opacity: 0.85 });
+    const glass = mat(color, 0.75, { transparent: true, opacity: 0.85 });
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.22, 0.42, 6), glass);
     g.add(body);
     const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.16, 6), glass);
@@ -65,7 +72,7 @@ function buildVial(color) {
 /** A key: bit and ward. The one pickup whose shape players already read fluently. */
 function buildKey(color, boss = false) {
     const g = new THREE.Group();
-    const m = mat(color, boss ? 2.6 : 1.8);
+    const m = mat(color, boss ? 1.15 : 0.9);
     const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.5, 0.09), m);
     g.add(shaft);
     const bow = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.05, 5, 10), m);
@@ -94,7 +101,7 @@ function buildLore(color) {
 /** Currency: a cluster of small shards. Deliberately the least interesting. */
 function buildShards(color) {
     const g = new THREE.Group();
-    const m = mat(color, 2);
+    const m = mat(color, 0.9);
     const spots = [[0, 0.05, 0, 0.22], [0.14, -0.06, 0.06, 0.15], [-0.13, -0.04, -0.05, 0.13]];
     for (const [x, y, z, s] of spots) {
         const shard = new THREE.Mesh(new THREE.OctahedronGeometry(s, 0), m);
@@ -109,9 +116,9 @@ function buildShards(color) {
 function buildItem(color) {
     const g = new THREE.Group();
     const shell = new THREE.Mesh(new THREE.OctahedronGeometry(0.42, 0),
-        mat(color, 1.4, { transparent: true, opacity: 0.6 }));
+        mat(color, 0.7, { transparent: true, opacity: 0.6 }));
     g.add(shell);
-    const core = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.3, 0.16), mat(0xffffff, 3));
+    const core = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.3, 0.16), mat(0xffffff, 1.2));
     g.add(core);
     return g;
 }

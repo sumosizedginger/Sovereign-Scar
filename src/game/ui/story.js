@@ -33,6 +33,23 @@ export class StoryPanel {
         this.defaultHold = 3.2;
         this.visible = false;
         this.shownIds_ = new Set();
+        this.store = null;
+    }
+
+    /**
+     * Phase G — where "already heard" is remembered across sessions.
+     *
+     * `clear()` deliberately does NOT touch this. Clearing the panel on a level
+     * load drops what is on screen and what is queued; it must not un-hear a
+     * line, or loading a level would make every line in it new again — which is
+     * the bug, restated.
+     *
+     * @param {{load:() => string[], save:(ids:string[]) => void}|null} s
+     */
+    setStore(s) {
+        this.store = s && typeof s.load === 'function' ? s : null;
+        if (!this.store) return;
+        for (const id of this.store.load() || []) this.shownIds_.add(id);
     }
 
     /** Drop current + pending lines (used on level load). */
@@ -64,7 +81,15 @@ export class StoryPanel {
                 priority: line.priority || opts.priority || 'context',
             };
             if (item.id && this.shownIds_.has(item.id)) continue;
-            if (item.id) this.shownIds_.add(item.id);
+            if (item.id) {
+                this.shownIds_.add(item.id);
+                // Phase G — write it down. `shownIds_` was an in-memory Set and
+                // nothing persisted it, so every reload replayed every story
+                // beat the player had already heard: the same is-this-new
+                // failure as the coach hints, in a panel that HOLDS THE SCREEN
+                // for three seconds rather than a toast you can ignore.
+                try { this.store?.save([...this.shownIds_]); } catch (_) { /* optional */ }
+            }
             this.queue_.push(item);
         }
         this.queue_.sort((a, b) => priorityValue(b.priority) - priorityValue(a.priority));

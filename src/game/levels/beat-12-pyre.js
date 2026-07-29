@@ -23,7 +23,9 @@ export const BEAT12_DEF = {
     mood: 'abyss',
     // Per-level luminance trim into the Abyss certification band [35,75]
     // (see tests/qa/lum-probe.mjs); multiplies the mood preset's light levels.
-    lightTune: { ambient: 2.3, key: 2.05 },
+    // Was 2.3 / 2.05 — brightest. Swept with Sluice; 1.45/1.35 overcorrected
+    // (mean ~26). Mid retrim for [45,90] without full milk.
+    lightTune: { ambient: 1.65, key: 1.55 },
     start: 'scoriagate',
     prebake: true,
     floorColor: 0x5c3a26, // certification retune: ember-brown lifted out of the near-black
@@ -153,7 +155,7 @@ export const BEAT12_DEF = {
                 stampMap(map, buildMagmaVent(0, -5), 0, 1, 0);
             },
             enemies: [
-                { x: -4, z: 4, kind: 'lancer', hp: 4 },
+                { x: -4, z: 4, kind: 'lancer', ai: 'chase', hp: 4 },
                 { x: 4, z: 4, kind: 'mote', hp: 5 },
             ],
             doors: [
@@ -206,8 +208,9 @@ export const BEAT12_DEF = {
             },
             enemies: [
                 { x: -3, z: -3, kind: 'lancer', hp: 5 },
-                { x: 3, z: -3, kind: 'mote', hp: 4 },
+                { x: 3, z: -3, kind: 'mote', ai: 'lunge', hp: 4 },
                 { x: 0, z: 3, kind: 'lancer', hp: 5 },
+                { x: 4, z: -4, kind: 'censer', hp: 4 },
             ],
             doors: [
                 { to: 'ventfield', side: 'S', at: 0, type: 'locked' },
