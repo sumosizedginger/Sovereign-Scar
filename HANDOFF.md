@@ -38,8 +38,18 @@ npm run test:unit      # unit only — fast, no browser
 > git ls-remote https://github.com/sumosizedginger/Sovereign-Scar.git refs/heads/main
 > ```
 >
-> Changing the remote URL is blocked in this environment, which is why the
-> hazard cannot simply be removed.
+> Changing `origin`'s URL is blocked in this environment, so the hazard cannot
+> simply be removed. **Adding a second remote is not blocked**, and as of
+> 2026-07-29 there is one:
+>
+> ```bash
+> git push game HEAD:main      # game = Sovereign-Scar.git
+> ```
+>
+> That is a convenience, not a safety net. `origin` still points at My-Engine,
+> so a bare `git push` is exactly as dangerous as it always was, and the
+> `ls-remote` check above is still the only thing that proves where the work
+> landed.
 >
 > **The second half of this trap is reading, not writing.** My-Engine now holds
 > a *stale copy of the whole game* from the sessions that pushed there by
