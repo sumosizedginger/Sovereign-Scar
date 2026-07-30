@@ -5,6 +5,110 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Locked in on the way IN — the alcove was built across a door
+
+The owner, fourth time, in capitals: *"I AM LOCKED IN WHEN I ENTER THE ROOM.
+YOU NEED TO MAKE SURE YOUR HIDDEN SPOTS GIVE ROOM TO GET IN AND GIVE ROOM TO
+ENTER THE ROOM AND NOT GET STUCK. ACTUALLY MEASURE WHAT I AM TELLING YOU TO."*
+
+They were right, and the reason three rounds of probes missed it is that none of
+them measured the sentence. Every one asked *can the player reach the puzzle*.
+None asked *can the player get off the doormat*.
+
+**`tearwell` built its reward alcove at gap 0 from its east door.** Walk in from
+`weepinghall` and you stand in a pocket of **five lattice points** — a third of a
+square unit — with a raised gate beside you. `beat-07-sluice` is the beat in every
+screenshot.
+
+The corner search tests the footprint plus an apron against props, terraces,
+pickups and reachability, and **it had never once looked at a door**. It could not
+have caught this by accident either: the apron is deliberately inward-only,
+because an outward apron of solid-geometry tests hits the room's own perimeter
+wall and disqualifies every corner in every room. Doors live on that perimeter.
+So the footprint landed beside a threshold with nothing testing the one side that
+mattered.
+
+`puzzleFor` now takes an `isDoorway` predicate, `room-graph` fills it from the
+room's real `doorCells`, and a corner is given up if a doorway falls within two
+cells of the footprint on **any** side — all four, which is safe for this test
+where it was not for the geometry one, because the predicate answers true for door
+cells and nothing else.
+
+**New probe: `tests/qa/door-reach.mjs`** — for all 108 rooms and 196 doors, flood
+from **one seed at a time** with the real body, the real ground and the gate up,
+and ask whether each threshold is connected to the room. Flooding from one seed is
+the whole point: `puzzle-solve.mjs` seeded the spawn *and every door* into a
+single merged field, which turned a sealed doorway into a "reachable" island and
+is exactly how this survived a sweep I had already written.
+
+    before:  DOORS THAT LOCK YOU IN 5
+    after:   DOORS THAT LOCK YOU IN 0   (needs a traversal 4)
+
+Island size is what separates a bug from a design: `tearwell`'s was **5 points**,
+while `weepinghall`'s three doors report **2161** — 135 square units, the far bank
+of a grapple chasm whose own room hint reads "Cross on the anchors". A coffin is
+not a bank. The four remaining are large open ground and are listed separately for
+a human to check against each room's hint, not counted as failures.
+
+Verified live: `tearwell`'s alcove now bakes at x −6..−4, the far corner, and the
+whole door arrival row reads clear at both body heights.
+
+Honest about which half does what — **looking at doors at all** is what removes
+the lock-in, and a footprint-only test achieves it (the predicate marks the cell
+inside a threshold, which is inside the footprint); `door-reach` reports zero
+either way. The two-cell halo buys the *other* thing that was asked for, room to
+enter the room, and a binary connectivity sweep cannot tell one cell of floor
+(1.0 around a 0.8 body — 0.10 a side, the number this project keeps shipping)
+from enough to turn around in.
+
+Also surfaced and **not** fixed: three rooms whose spawn is not standable by this
+probe's reckoning — `beat-03-sink/hollow`, `beat-05-citadel/monolith`,
+`beat-12-pyre/ashgallery`. They may be water, a platform or a probe artefact.
+Unmeasured is unmeasured; they are written down rather than waved off.
+
+### The gate came up underneath you — the actual softlock
+
+Three play reports said the same thing and I read it as geometry twice. It was
+not geometry, it was the gate lifting the player onto its own roof.
+
+**Reproduced live before it was fixed.** In `tearwell`: the hero at local
+(5.4, −4.4), *inside* the alcove, at y **3.94**, with the voxel column beneath
+them reading `[1,0,0,0,0,0,0]` — floor and nothing else. Feet at y 2.99 on a gate
+whose top is y 3, `grounded: false`, `vy: −0.37`. Falling into a sealed box, with
+the block still parked at its spawn and the plate unpressed.
+
+**The cause is the half-cell, one more time.** A cell rect `x0..x1` spans world
+`[x0, x1 + 1]`. The guard that stops the gate closing on the player read:
+
+```js
+lx >= clear.x0 - 1 && lx <= clear.x1 + 1
+```
+
+which *looks* like a cell of slack either side and is not: `x1 + 1` is the
+footprint's exact world edge, so the low side got 1.0 of margin and the high side
+got **zero** — before adding a 0.4 body to it. A hero at local z −2.9 sits
+outside `lz <= z1 + 1` (−3) while their body spans −3.3 to −2.5 and overlaps the
+gate's own cell `[−4, −3]` by 0.3. The gate rose through them, lifted them two
+cells, and they slid off the inner side into an alcove whose walls are two high
+against a one-cell step — with the plate that opens it outside.
+
+It hit **two of every three puzzles**: `CORNER.teach` and `CORNER.develop` are
+both `sz: -1`, so `gateZ` is `z1`, the edge with no margin. Only `combine`
+(`sz: +1`) hung its gate on the padded side. The existing spec had the gate on
+that padded edge too, which is why it passed throughout.
+
+Two changes. The margin is now symmetric about the true world span and includes
+the body (`PAD = 0.55`). And the net that was missing entirely: **a gate opens
+for a player standing behind it.** With the signal off and the player inside,
+the old code ran *neither* branch — not `drop`, not `raise` — so a gate that had
+already shut stayed shut for good. That silent third case was the softlock.
+
+Verified in the running game: the gate drops while the hero is in the alcove,
+stays down as they pass through the doorway, and re-seals once they are clear at
+local z −1.8. The puzzle still works; it just cannot hold anyone in. Each half is
+counterfactual-verified separately — zeroing `PAD` fails the far-face spec,
+removing the release fails two others.
+
 ### Fixes from the third play — the room behind the door
 
 The owner, still stuck: *"YOU NEED TO MAKE SURE THERE IS ROOM FOR THE PLAYER TO

@@ -108,7 +108,36 @@ export function flavourFor(beatNo) {
  * Returns `[]` when the room is too small, is the boss room, or is not one of
  * the four named theme rooms — so this is safe to call for every room.
  */
-function layoutPuzzle(def, roomId, room, beatNo, isBlocked = () => false) {
+/**
+ * How much floor a doorway keeps for itself, in cells.
+ *
+ * Two, because one is not enough to turn around in. The alcove is placed hard
+ * against the room's perimeter — `x0` is `-half + 1` — and the perimeter is
+ * exactly where the doors are, so the footprint lands beside a threshold without
+ * ever occupying it. Nothing in the corner search had looked at a door: it tests
+ * the footprint and an INWARD apron against props, terraces and pickups, and a
+ * door cell sits on the outward side where nothing was tested at all.
+ *
+ * What that shipped: in `tearwell`, the alcove was built at gap 0 from the east
+ * door. Walking in from `weepinghall` put the player in a pocket of **five
+ * lattice points** with the gate up beside them. Measured by
+ * `tests/qa/door-reach.mjs`, which floods from one seed at a time — the earlier
+ * probe merged the spawn and every door into a single flood, which is precisely
+ * what turned a sealed doorway into a "reachable" island.
+ *
+ * Honest about which half does what: **looking at doors at all** is what removes
+ * the lock-in, and a footprint-only test would do it, because the predicate marks
+ * the cell inside a threshold and that cell is inside the footprint.
+ * `door-reach.mjs` reports zero lock-ins with the halo reduced to nothing. The
+ * two cells buy the other thing the owner asked for — *room to enter the room* —
+ * and a binary connectivity sweep cannot tell the difference between one cell of
+ * floor (1.0 around a 0.8 body: 0.10 a side, the number this project keeps
+ * shipping) and enough to turn around in.
+ */
+const DOOR_CLEAR = 2;
+
+function layoutPuzzle(def, roomId, room, beatNo, isBlocked = () => false,
+    isDoorway = () => false) {
     if (!def?.theme || !room || room.boss) return [];
     const half = room.half || 0;
     if (half < MIN_HALF) return [];
@@ -147,6 +176,18 @@ function layoutPuzzle(def, roomId, room, beatNo, isBlocked = () => false) {
         for (let x = xLo; x <= xHi && !clash; x++) {
             for (let z = zLo; z <= zHi; z++) {
                 if (isBlocked(x, z)) { clash = true; break; }
+            }
+        }
+        // And a halo on ALL FOUR sides for doorways only.
+        //
+        // All four, unlike the apron above: an apron of solid-geometry checks on
+        // the outward sides would hit the room's own perimeter wall and disqualify
+        // every corner in every room (that is why the apron is inward-only). A
+        // doorway test cannot, because it answers true for door cells and nothing
+        // else — and the outward side is the only place a door has ever been.
+        for (let x = rect.x0 - DOOR_CLEAR; x <= rect.x1 + DOOR_CLEAR && !clash; x++) {
+            for (let z = rect.z0 - DOOR_CLEAR; z <= rect.z1 + DOOR_CLEAR; z++) {
+                if (isDoorway(x, z)) { clash = true; break; }
             }
         }
         if (!clash) { corner = c; box = rect; break; }
@@ -470,13 +511,14 @@ function settle(out, { half, isBlocked, isSoft }) {
  * beat cannot be laid out honestly — so this is safe to call for every room.
  */
 export function puzzleFor(
-    def, roomId, room, beatNo, isBlocked = () => false, isSoft = () => false
+    def, roomId, room, beatNo, isBlocked = () => false, isSoft = () => false,
+    isDoorway = () => false
 ) {
     // The corner search answers to BOTH, because the vault it chooses a corner
     // for is real walls, and the first version of this system sealed a small key
     // and a scar suture inside them.
     const out = layoutPuzzle(def, roomId, room, beatNo,
-        (x, z) => isBlocked(x, z) || isSoft(x, z));
+        (x, z) => isBlocked(x, z) || isSoft(x, z), isDoorway);
     if (!out.length) return out;
     return settle(out, { half: room.half || 0, isBlocked, isSoft });
 }

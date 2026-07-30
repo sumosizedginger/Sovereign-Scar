@@ -71,8 +71,8 @@ assertion before changing it.
 ## State
 
 Everything below is green in the working tree. `npm test` — unit + full browser
-E2E — **4457/4457**, run end to end after the third play's fix.
-`npm run test:unit` alone: **3593/3593**.
+E2E — **4466/4466**, run end to end after the doorway fix.
+`npm run test:unit` alone: **3602/3602**.
 
 Every one of those nine fixes has been reverted and the suite re-run to confirm
 something fails without it (`HANDOFF` trap 10). The first pass of that found
@@ -675,6 +675,62 @@ smoke. It took looking at `beat-01-crypt-entry.png` to see it; nothing in the
 suite could have. Traps 3 and 5 in this file are the same lesson about
 different statistics. **When you change how the game looks, open the captures.
 Then change the number.**
+
+**28. Measure the sentence the owner said, not the sentence you can already test.**
+Four reports said "locked in when I enter the room". I measured alcove mouths,
+interiors, push routes, heights, gate logic — every one a real defect, none of it
+the thing said. `tearwell` built its reward alcove **at gap 0 from its east door**:
+walk in from `weepinghall` and you stand in a pocket of **five lattice points**.
+
+The corner search tests the footprint and an apron against props, terraces,
+pickups and reachability, and had **never looked at a door**. It could not catch
+it by accident, either: the apron is inward-only on purpose, because an outward
+apron of solid-geometry tests hits the room's perimeter wall and disqualifies
+every corner in every room — and doors are on that perimeter. The one side that
+mattered was the one side never tested.
+
+**And a sweep I had already written was hiding it.** `puzzle-solve.mjs` floods
+from the spawn *and every door*, merged into one field. A door sealed off by the
+alcove becomes its own island and still counts as reachable — merging the seeds
+destroys the only question worth asking. `door-reach.mjs` floods **one seed at a
+time**: 108 rooms, 196 doors, 5 locking you in, now 0.
+
+Two habits from it. **Island size separates a bug from a design** —
+`tearwell`'s was 5 lattice points, `weepinghall`'s three doors report 2161 (135
+square units, the far bank of a grapple chasm whose hint says "Cross on the
+anchors"). A coffin is not a bank; report the large ones separately for a human
+rather than counting them as failures. And **when the owner repeats themselves,
+the repetition is the datum** — that the same sentence came back four times meant
+my model of it was wrong, not that they were unclear.
+
+**27. The state nobody wrote a branch for is where softlocks live.**
+The timed gate's update was two branches: signal on → open, nobody in the way →
+close. Signal off **and** player already inside ran *neither*, so a gate that had
+shut stayed shut forever. That silent third case is the "stuck in a locked spot"
+of three separate play reports, and no probe could see it because it is not a
+property of the geometry — it is a hole in a state machine.
+
+How the player got behind it is trap 26's half-cell again. The guard read
+`lx >= clear.x0 - 1 && lx <= clear.x1 + 1`, which *looks* symmetric and is not: a
+rect of cells `x0..x1` spans world `[x0, x1 + 1]`, so `x1 + 1` is the exact edge
+and the high side had **zero** margin before you even add the hero's 0.4 body. A
+hero 0.2 short of the gate's cell still overlaps it, so the gate rose *through*
+them, lifted them two cells onto its roof, and dropped them into an alcove with
+two-high walls and a one-cell step limit.
+
+It hit two of every three puzzles — `CORNER.teach` and `CORNER.develop` are both
+`sz: -1`, so `gateZ` is `z1`, the unpadded edge. The spec that covered this used
+a fixture with the gate on the *padded* edge, so it passed the whole time.
+**When a rule is derived per-side, the fixture must use the side the campaign
+actually ships.**
+
+The lesson worth more than the fix: **I found this by running the game and
+reading the player's y.** Three probes and a full green suite said the campaign
+was clean. `window.__sovereignScar` exposes `game`, `player`, `level` and
+`collisionWorld`; the level has `puzzleDefs(roomId)`, `getVoxelAt`, `sealState`
+and `puzzleBlocks`. If the Browser pane is not displayed the page does not
+composite, so `requestAnimationFrame` never fires and nothing ticks — drive it
+with `level.update(1/60, game)` by hand.
 
 **26. Fix the door and the same number is waiting one step further in.**
 Trap 25's alcove mouth was widened from one cell to three and measured: 0.10 of

@@ -334,8 +334,21 @@ for (const def of BEAT_LIST) {
         const fOpen = walkField(hfOpen, staticsOpen, blockBox(), ox, oz, BODY, seeds);
         let inside = 0, insideFree = 0;
         const insidePts = [];
-        for (let x = vault.rect.x0; x <= vault.rect.x1 + 1; x += STEP) {
-            for (let z = vault.rect.z0; z <= vault.rect.z1 + 1; z += STEP) {
+        // THE POCKET, not the rect plus a margin.
+        //
+        // Sampling `z0 .. z1 + 1` reaches a full cell PAST the alcove, out into
+        // the open room, and reaching open floor is not getting in. It also
+        // included the gate row itself — standing in the doorway is not being
+        // inside either, and it is exactly where a block parked on a plate too
+        // close to the gate would let the probe declare success. The reward sits
+        // in the rows behind the gate; those are the rows that count.
+        const gz = gate ? (gate.rect.z0 === gate.rect.z1 ? gate.rect.z0 : null) : null;
+        const gx = gate && gate.rect.x0 === gate.rect.x1 ? gate.rect.x0 : null;
+        for (let x = vault.rect.x0; x <= vault.rect.x1 + 1 - STEP; x += STEP) {
+            for (let z = vault.rect.z0; z <= vault.rect.z1 + 1 - STEP; z += STEP) {
+                // Skip the doorway row/column.
+                if (gz != null && z >= gz && z < gz + 1) continue;
+                if (gx != null && x >= gx && x < gx + 1) continue;
                 const wx = ox + x, wz = oz + z;
                 const i = Math.round((wx - ox - hfOpen.lo) / STEP);
                 const j = Math.round((wz - oz - hfOpen.lo) / STEP);

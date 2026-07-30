@@ -314,6 +314,49 @@ export function run(t) {
         t.ok('and when every corner is taken, no puzzle is built',
             puzzleFor(def, roomId, room, n, () => true).length === 0,
             'missing a beat is a cost; walling a key into the scenery is a broken run');
+
+        // ── it does not build across a door ────────────────────────────────
+        //
+        // The alcove is placed hard against the room's perimeter, and the
+        // perimeter is where the doors are. The apron that would have caught this
+        // is INWARD-only — an outward apron of solid-geometry tests hits the
+        // perimeter wall and disqualifies every corner in every room — so the
+        // footprint could land beside a threshold with nothing looking.
+        //
+        // `tearwell` shipped that way: the alcove sat at gap 0 from the east door,
+        // and walking in from `weepinghall` put the player in a pocket of FIVE
+        // lattice points beside a raised gate. Three play reports of "locked in
+        // when I enter the room". `tests/qa/door-reach.mjs` is the sweep, and it
+        // floods from one seed at a time — the older probe merged the spawn and
+        // every door into one flood, which is what turned a sealed doorway into a
+        // "reachable" island.
+        const doorAt = (dx, dz) => (x, z) =>
+            Math.abs(x - dx) <= 0 && Math.abs(z - dz) <= 0;
+        const slot = puzzleFor(def, roomId, room, n).find((b) => b.type === 'vault');
+        // Put a door on the corner the slot prefers, one cell outside its own
+        // footprint, and it must give that corner up.
+        const dodged = puzzleFor(def, roomId, room, n, () => false, () => false,
+            doorAt(slot.rect.x0, slot.rect.z0 - 1));
+        const vd = dodged.find((b) => b.type === 'vault');
+        t.ok('a corner with a door beside it is given up',
+            !!vd && !(vd.rect.x0 === slot.rect.x0 && vd.rect.z0 === slot.rect.z0),
+            `door beside ${slot.rect.x0},${slot.rect.z0 - 1} -> ${JSON.stringify(vd?.rect)}`);
+
+        // Two cells of clearance, not one: one cell is not room to turn around.
+        const dodged2 = puzzleFor(def, roomId, room, n, () => false, () => false,
+            doorAt(slot.rect.x0, slot.rect.z0 - 2));
+        const vd2 = dodged2.find((b) => b.type === 'vault');
+        t.ok('and a door two cells out is still given room',
+            !!vd2 && !(vd2.rect.x0 === slot.rect.x0 && vd2.rect.z0 === slot.rect.z0),
+            JSON.stringify(vd2?.rect));
+
+        // A door far from every corner changes nothing.
+        const untouched = puzzleFor(def, roomId, room, n, () => false, () => false,
+            doorAt(0, 0));
+        const vu = untouched.find((b) => b.type === 'vault');
+        t.ok('a door nowhere near a corner costs no puzzle',
+            !!vu && vu.rect.x0 === slot.rect.x0 && vu.rect.z0 === slot.rect.z0,
+            JSON.stringify(vu?.rect));
     }
 
     // ── The whole campaign, baked ──────────────────────────────────────────
@@ -914,10 +957,17 @@ export function run(t) {
         t.ok('and stays closed with the signal off and nobody near',
             rt.raised === true);
 
-        // Open it, walk the player into the doorway, then drop the signal.
-        const game = at(0, 3);
-        rt.update(0.016, { ...game, });
+        rt.update(0.016, at(0, 8));
         t.ok('still closed until the signal says otherwise', rt.raised === true);
+
+        // A player INSIDE the footprint with the signal off is not a puzzle
+        // state, it is a trapped player, so the gate opens for them. This
+        // assertion used to read `raised === true` and was describing a sealed
+        // box: signal off and player inside ran neither branch, so the gate
+        // simply stayed up for good.
+        rt.update(0.016, at(0, 3));
+        t.ok('but a player sealed inside the footprint is let out',
+            rt.raised === false, 'signal off + player inside used to do nothing');
 
         const bus = new SignalBus();
         bus.set('sig', true);
@@ -945,6 +995,59 @@ export function run(t) {
         rt2.update(0.016, at(0, -8));
         t.ok('but shuts the moment they are clear', rt2.raised === true);
         rt.dispose(); rt2.dispose();
+
+        // ── the gate on the OTHER edge, which is the one that lifted people ──
+        //
+        // Both fixtures above hang the gate on the clear rect's LOW edge, and the
+        // old margin (`z0 - 1`) was a full cell there. The campaign hangs it on
+        // the HIGH edge for two of every three slots — `CORNER.teach` and
+        // `CORNER.develop` are both `sz: -1`, so `gateZ` is `z1` — and on that
+        // side the old test read `lz <= clear.z1 + 1`, which is the footprint's
+        // exact world edge with NO room for a body at all. So this geometry, not
+        // the geometry above, is what shipped, and it is where the bug lived.
+        //
+        // A hero 0.2 short of the gate's own cell still overlaps it by 0.2. The
+        // gate came up underneath them, lifted them two cells onto its roof, and
+        // they slid off the inner side into an alcove whose walls are two high
+        // against a one-cell step, with the plate outside. Reproduced live in
+        // `tearwell` before this was written: feet at y 2.99 on a gate topped at
+        // y 3, grounded false, falling in.
+        const bus3 = new SignalBus();
+        const rt3 = createBlockerRuntime(
+            { scene: new THREE.Scene(), collisionWorld: new CollisionWorld() },
+            {
+                signals: bus3, destructibles: [], addVoxelQuery: () => () => {},
+                getVoxelAt: () => false, keyStore: keyStoreStub(),
+            },
+            {
+                type: 'timed_gate', id: 'gate-test-3', signal: 'sig',
+                rect: { x0: -1, x1: 1, z0: 0, z1: 0 },
+                clear: { x0: -1, x1: 1, z0: -2, z1: 0 },
+            },
+            { x: 0, y: 0, z: 0 }
+        );
+        // Open it first — a gate is built raised, and "does not rise through a
+        // body" is only a claim about a gate that is currently down.
+        bus3.set('sig', true);
+        rt3.update(0.016, at(0, 6));
+        t.ok('the far-edge gate opens on its signal', rt3.raised === false);
+        bus3.set('sig', false);
+
+        // The gate's cell spans world z 0..1. A hero at 1.2 reaches back to 0.8.
+        rt3.update(0.016, at(0, 1.2));
+        t.ok('a gate does not rise through a body standing against its far face',
+            rt3.raised === false,
+            'it lifts them onto its roof and drops them in the alcove');
+        rt3.update(0.016, at(0, 6));
+        t.ok('and does close once nothing is touching it', rt3.raised === true);
+
+        // The net: whoever is behind a shut gate gets let out.
+        rt3.update(0.016, at(0, -1));
+        t.ok('a closed gate opens for a player sealed behind it',
+            rt3.raised === false, 'signal off + player inside used to do nothing at all');
+        rt3.update(0.016, at(0, 6));
+        t.ok('and shuts again behind them', rt3.raised === true);
+        rt3.dispose();
     }
 
     // ── The mirror turns the beam toward the lens, in world space ──────────

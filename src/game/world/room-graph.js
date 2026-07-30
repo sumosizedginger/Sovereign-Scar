@@ -721,6 +721,32 @@ export function createDungeon(ctx, def, opts = {}) {
                     if (Math.hypot(e.rig.position.x - wx, e.rig.position.z - wz) < 1.4) return true;
                 }
                 return false;
+            },
+            // THE DOORS. The corner search had never seen one.
+            //
+            // A reward alcove is placed hard against the room's perimeter, and
+            // the perimeter is where the doors are, so its footprint lands beside
+            // a threshold without ever occupying it — and the apron that would
+            // have caught it is inward-only, because an outward apron of
+            // solid-geometry tests hits the perimeter wall and disqualifies every
+            // corner in every room. So nothing looked, and `tearwell` shipped an
+            // alcove at gap 0 from its east door: walking in from `weepinghall`
+            // put the player in a five-point pocket beside a raised gate. This is
+            // the "locked in when I enter the room" of three play reports.
+            //
+            // A door's own cells and the cell inside it, so a body has floor to
+            // arrive on and room to turn. `tests/qa/door-reach.mjs` is the sweep.
+            (lx, lz) => {
+                const rh = room.half || 0;
+                for (const door of room.doors || []) {
+                    for (const c of doorCells(room, door)) {
+                        if (c.x === lx && c.z === lz) return true;
+                        const ix = Math.abs(c.x) === rh ? c.x - Math.sign(c.x) : c.x;
+                        const iz = Math.abs(c.z) === rh ? c.z - Math.sign(c.z) : c.z;
+                        if (ix === lx && iz === lz) return true;
+                    }
+                }
+                return false;
             });
         // Kept, not discarded. `puzzleFor` SETTLES pieces against the geometry
         // that actually got built, so the authored table and the baked layout

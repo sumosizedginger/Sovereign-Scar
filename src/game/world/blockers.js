@@ -595,19 +595,53 @@ export function createBlockerRuntime(ctx, level, b, origin = { x: 0, z: 0 }) {
         // gate that stays open one beat longer than it should is a slightly
         // easier puzzle, and this file has already taken that trade twice.
         const clear = b.clear || b.rect;
-        const inTheWay = (game) => {
-            const p = game?.player?.root?.position || game?.player?.rig?.position;
-            if (!p) return false;
+        // A CELL RECT'S WORLD SPAN IS [x0, x1 + 1], AND THE PLAYER IS NOT A POINT.
+        //
+        // The first version tested `lx >= clear.x0 - 1 && lx <= clear.x1 + 1`,
+        // which reads as "a cell of slack either side" and is not: `x1 + 1` is the
+        // footprint's exact world edge, so the low side got 1.0 of margin and the
+        // high side got **zero**. Add a 0.4 body to that and the gate raised into
+        // people. A hero at local z −2.9 is outside `lz <= z1 + 1` (−3) while
+        // their body spans −3.3 to −2.5 and overlaps the gate's own cell
+        // [−4, −3] by 0.3.
+        //
+        // What that cost: the gate came up underneath them and lifted them two
+        // cells onto its roof, they slid off the inner side into the alcove, and
+        // the alcove's walls are two high against a one-cell step. The plate that
+        // opens it was outside, with them sealed in. Reproduced live —
+        // `tearwell`, feet at y 2.99 on a gate whose top is y 3, grounded false.
+        // This is the "stuck in a locked spot" of three play reports.
+        const PAD = 0.55;
+        const box = (p, pad) => {
             const lx = p.x - origin.x;
             const lz = p.z - origin.z;
-            return lx >= clear.x0 - 1 && lx <= clear.x1 + 1
-                && lz >= clear.z0 - 1 && lz <= clear.z1 + 1;
+            return lx >= clear.x0 - pad && lx <= clear.x1 + 1 + pad
+                && lz >= clear.z0 - pad && lz <= clear.z1 + 1 + pad;
+        };
+        const playerAt = (game) =>
+            game?.player?.root?.position || game?.player?.rig?.position || null;
+        const inTheWay = (game) => {
+            const p = playerAt(game);
+            return !!p && box(p, PAD);
+        };
+        // AND THE NET UNDER ALL OF IT: never hold someone in.
+        //
+        // `inTheWay` only stops the gate CLOSING. It has nothing to say about a
+        // player who is already behind a closed one — and there the old code did
+        // nothing at all, which is precisely the state that does not recover:
+        // signal off, player inside, so neither branch ran and the gate stayed up
+        // for good. A player inside the footprint opens it, full stop. A gate that
+        // is open one beat longer than it should be is a slightly easier puzzle,
+        // which is a trade this file has already taken twice.
+        const behindIt = (game) => {
+            const p = playerAt(game);
+            return !!p && box(p, 0);
         };
         return {
             get raised() { return !!built; },
             update(dt, game) {
                 const open = !!level.signals?.get(b.signal);
-                if (open) drop();
+                if (open || behindIt(game)) drop();
                 else if (!inTheWay(game)) raise();
             },
             dispose() { drop(); },
