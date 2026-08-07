@@ -5,6 +5,48 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### The switch was inside the player
+
+The owner, on beat 08: *"Switch does not work in one room, the other room does not
+even have a switch."*
+
+Both rooms have one. **`gravecanopy`'s was at local 0,0 — the room's own spawn
+point.** The player materialises standing inside the post. That is not a switch
+you fail to operate, it is a switch you cannot see, because you are in it.
+
+The soft-occupancy predicate that `settle` consults has always accounted for
+pickups and enemy spawns and **never for the hero**. The `develop` switch is
+authored five units diagonally out from the vault, which in a half-7 room is
+exactly 0,0. Swept across the campaign: **10 pieces standing on a spawn**, two of
+them dead centre (beat 08's `gravecanopy`, beat 12's `slagworks`), the other eight
+a diagonal step away. Now 0 — the spawn is soft-occupied out to 2.0, so a piece
+prefers anywhere else and may still land there if the room leaves no choice, the
+same trade the predicate already makes for torches.
+
+**New probe: `tests/qa/switch-works.mjs`.** Three questions no probe had asked:
+does every gate have something in its own room that can drive its signal (0 of 38
+unwired); can a body stand within the 2.0 a strike needs (0 of 14 unreachable);
+and does striking it actually drop the gate (0 dead). Plus the spawn count above.
+
+Two of my own errors in it, both the same shape as the ones this file keeps
+recording:
+
+- **It struck the switch at distance zero.** Calling `shatterAtWorld` at the
+  post's own coordinates always passes the 2.0 gate and tests nothing a player
+  does. It now throws the hit from standable ground, projected 1.2 ahead the way
+  `_strike` does.
+- **The first spec for the fix ran on a dungeon that never had the bug.**
+  `BEAT_LIST[0]` is plate-flavoured and had nothing on a spawn, so the assertion
+  passed with the fix reverted. It now bakes beat 08 and beat 02 and fails
+  naming `gravecanopy:switch@0,0 (0.00)`. **A fixture that cannot fail is not a
+  fixture.**
+
+Not reproduced, and said plainly: with the switch struck from a real stance, all
+14 open their gate. `bonegrove`'s switch is 2 cells from the gate it opens, and
+`gravecanopy`'s now sits 7 units from its own. If "does not work" was about
+finding it rather than hitting it, that is a legibility problem in a half-11 room
+whose puzzle lives in one far corner, and it is not fixed here.
+
 ### Locked in on the way IN — the alcove was built across a door
 
 The owner, fourth time, in capitals: *"I AM LOCKED IN WHEN I ENTER THE ROOM.

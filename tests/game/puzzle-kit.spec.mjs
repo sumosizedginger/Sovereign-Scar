@@ -1169,6 +1169,53 @@ export function run(t) {
                 cache.every((p) => !level.getVoxelAt(
                     p.mesh.position.x, p.mesh.position.y, p.mesh.position.z)),
                 'the cache sits in the interior its walls do not fill');
+
+            // ── nothing stands where the player arrives ────────────────────
+            //
+            // The soft-occupancy predicate accounted for pickups and enemy
+            // spawns and never for the hero. The `develop` switch is authored
+            // five units diagonally out from the vault, which in a half-7 room
+            // lands on exactly 0,0 — `gravecanopy` and `slagworks` both put a
+            // switch INSIDE the player's body on entry, and eight more pieces sat
+            // a diagonal step away. A switch you are standing in reads as
+            // scenery: the owner's report was "the other room does not even have
+            // a switch".
+            //
+            // Asserted against the BAKE, not the table, because the predicate
+            // that fixes it lives in `room-graph` and the authored offsets are
+            // unchanged. `tests/qa/switch-works.mjs` sweeps all fourteen.
+            // ON A DUNGEON THAT ACTUALLY HAD THE BUG.
+            //
+            // The first version of this assertion ran on `BEAT_LIST[0]`, which
+            // never had a piece on its spawn — so it passed with the fix reverted
+            // and tested nothing. The offenders were the switch-flavoured beats:
+            // beat 08's `gravecanopy` and beat 12's `slagworks` sat at exactly
+            // 0,0. Pick a fixture that fails without the fix.
+            const onSpawn = [];
+            for (const beat of ['beat-08-bone', 'beat-02-spindle']) {
+                const d2 = BEAT_LIST.find((b) => b.id === beat);
+                if (!d2) continue;
+                let lv2 = null;
+                try {
+                    lv2 = createDungeon(
+                        { scene: new THREE.Scene(), collisionWorld: new CollisionWorld(), particles: null },
+                        { ...d2, prebake: true }, { keyStore: keyStoreStub() }
+                    );
+                } catch (e) { onSpawn.push(`${beat}: bake failed ${e.message}`); continue; }
+                for (const [rid, r] of Object.entries(d2.rooms || {})) {
+                    for (const p of lv2.puzzleDefs(rid)) {
+                        if (!p.at) continue;
+                        const dd = Math.hypot(p.at.x - (r.spawn?.x || 0),
+                            p.at.z - (r.spawn?.z || 0));
+                        if (dd < 2.0) {
+                            onSpawn.push(`${beat}/${rid}:${p.type}@${p.at.x},${p.at.z} (${dd.toFixed(2)})`);
+                        }
+                    }
+                }
+                lv2.dispose?.();
+            }
+            t.ok('no puzzle piece stands on the spot the player arrives at',
+                onSpawn.length === 0, onSpawn.join('  '));
             level.dispose?.();
         }
     }

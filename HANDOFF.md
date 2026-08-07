@@ -71,8 +71,8 @@ assertion before changing it.
 ## State
 
 Everything below is green in the working tree. `npm test` — unit + full browser
-E2E — **4466/4466**, run end to end after the doorway fix.
-`npm run test:unit` alone: **3602/3602**.
+E2E — **4467/4467**, run end to end after the spawn-clearance fix.
+`npm run test:unit` alone: **3603/3603**.
 
 Every one of those nine fixes has been reverted and the suite re-run to confirm
 something fails without it (`HANDOFF` trap 10). The first pass of that found
@@ -675,6 +675,27 @@ smoke. It took looking at `beat-01-crypt-entry.png` to see it; nothing in the
 suite could have. Traps 3 and 5 in this file are the same lesson about
 different statistics. **When you change how the game looks, open the captures.
 Then change the number.**
+
+**29. A fixture that cannot fail is not a fixture.**
+The fix: the soft-occupancy predicate `settle` consults knew about pickups and
+enemy spawns and **never about the hero**, so 10 puzzle pieces stood on a room's
+spawn — two of them dead centre (beat 08's `gravecanopy`, beat 12's `slagworks`,
+switches at exactly 0,0). The player materialises inside the post. The owner
+reported it as "the other room does not even have a switch", which is precisely
+right: you cannot see a switch you are standing in.
+
+The lesson is the spec, not the bug. My first assertion for it baked
+`BEAT_LIST[0]` — plate-flavoured, never had a piece on a spawn — so it **passed
+with the fix reverted**. Only the counterfactual caught that. Before believing a
+new spec, ask which fixture exhibited the defect and use *that* one; a green test
+over a sample that was always clean is worse than no test, because it reads as
+coverage. This is the third variety of the same mistake in this file (trap 5 spot
+checks, trap 26's per-side rule tested on the padded side).
+
+Same run, same shape, in the probe: `switch-works.mjs` first called
+`shatterAtWorld` at the switch's own coordinates. Distance zero always clears the
+2.0 gate and tests nothing a player can do — it now throws the strike from
+standable ground, projected 1.2 ahead the way `_strike` does.
 
 **28. Measure the sentence the owner said, not the sentence you can already test.**
 Four reports said "locked in when I enter the room". I measured alcove mouths,

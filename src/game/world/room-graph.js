@@ -713,6 +713,25 @@ export function createDungeon(ctx, def, opts = {}) {
             (lx, lz) => {
                 const wx = origin.x + lx;
                 const wz = origin.z + lz;
+                // WHERE THE PLAYER ARRIVES, which this predicate never knew.
+                //
+                // It has always accounted for pickups and enemy spawns and never
+                // for the hero. The develop switch is authored five units
+                // diagonally out from the vault, which in a half-7 room lands on
+                // exactly 0,0: `gravecanopy` and `slagworks` both put a switch
+                // *inside the player's body on entry*. Ten pieces across the
+                // campaign sat on the spawn, two of them dead centre. A switch you
+                // are standing in is not a switch you find — it reads as scenery,
+                // and the owner's report was "the other room does not even have a
+                // switch".
+                //
+                // Soft, not hard, and 2.0 so the diagonal neighbours move too: a
+                // piece prefers anywhere else and may still land here if the room
+                // leaves it no choice, which is the same trade this predicate
+                // already makes for torches. `tests/qa/switch-works.mjs` counts it.
+                const sx = origin.x + (room.spawn?.x || 0);
+                const sz = origin.z + (room.spawn?.z || 0);
+                if (Math.hypot(sx - wx, sz - wz) < 2.0) return true;
                 for (const p of pickups) {
                     const pp = (p.mesh || p).position;
                     if (pp && Math.hypot(pp.x - wx, pp.z - wz) < 1.4) return true;
