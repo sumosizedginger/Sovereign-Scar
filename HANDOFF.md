@@ -676,6 +676,34 @@ suite could have. Traps 3 and 5 in this file are the same lesson about
 different statistics. **When you change how the game looks, open the captures.
 Then change the number.**
 
+**30. Three rooms spawn the player inside the world. Still true.**
+`beat-05-citadel/monolith`'s spawn column reads `111111111` — solid rock top to
+bottom, because the room's centre *is* the monolith. `beat-12-pyre/ashgallery`
+reads `111100000`, inside a four-high pillar. `beat-03-sink/hollow` reads
+`000000000`, open void with the nearest ground three cells away.
+
+Room entry no longer lands anyone there (see below), but the **authored `spawn`
+coordinates are still those points**, and `level.spawn` is built from
+`startRoom.spawn` with a hardcoded `y: 1.95` before any room is baked, so it
+cannot self-correct. Every path that reads a room's spawn rather than going
+through `startTransition` is unaudited: dev jumps, mirror travel, and whatever
+respawn does in a room-graph level. **This is open work, not a closed item.**
+
+What chasing them *did* find: `enterRoom`'s guard against materialising inside
+geometry asked "is cell 0 solid and cells 1 and 2 clear" — the flat-floor game
+this was before Phase E2. On a terrace cells 1 and 2 are solid *because it is a
+step*, so every raised surface read as unusable, the search fell through to its
+null fallback, and the next line placed the hero at a hardcoded `y = 1.95` inside
+whatever they were on. Scanning for the surface instead took usable landing spots
+in `ashgallery` from 165 to 285 of 289. **Trap 24, third occurrence.**
+
+And a caveat worth keeping: that fix is reasoned, measured on the predicate, and
+suite-green — **not play-verified**. The probe written to drive real door
+transitions fired **0 of 188** (placement lives in `startTransition`, behind a
+door trigger and a camera the harness did not supply). It was deleted rather than
+shipped, because a probe reporting "0 buried" while driving nothing is worse than
+no probe. Finishing it is the obvious next job.
+
 **29. A fixture that cannot fail is not a fixture.**
 The fix: the soft-occupancy predicate `settle` consults knew about pickups and
 enemy spawns and **never about the hero**, so 10 puzzle pieces stood on a room's

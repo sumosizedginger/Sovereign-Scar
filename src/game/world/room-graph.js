@@ -883,19 +883,40 @@ export function createDungeon(ctx, def, opts = {}) {
     }
 
     /** Floor to stand on at (x,z) with head clearance above it. */
+    /**
+     * The Y a body's feet would rest at here, or null for a hole.
+     *
+     * SCANNED, NOT ASSUMED, and that is the whole point of this function.
+     * Everything below used to be written as "floor at cell 0, cells 1 and 2
+     * clear" — the flat-floor world this game had before Phase E2 put terraces in
+     * every room. On raised ground cells 1 and 2 are solid *because it is a step*,
+     * so every terrace in the campaign read as unusable: `nearestFreeEntry` would
+     * reject the whole search space, fall through to its null fallback, and leave
+     * the player materialising at the unsafe point it was trying to avoid.
+     *
+     * Bottom-up, because beat 08's `gravecanopy` has floor, a gap you walk
+     * through, and a canopy overhead — top-down finds the roof.
+     */
+    function surfaceTop(x, z) {
+        for (let top = 1; top <= 8; top++) {
+            if (!api.getVoxelAt(x, top - 0.5, z)) continue;
+            if (api.getVoxelAt(x, top + 0.5, z)) continue;    // the hero is
+            if (api.getVoxelAt(x, top + 1.5, z)) continue;    // ~1.9 tall
+            return top;
+        }
+        return null;
+    }
+
     function standable(x, z) {
-        return api.getVoxelAt(x, 0.5, z) && !api.getVoxelAt(x, 1.5, z);
+        return surfaceTop(x, z) != null;
     }
 
     /**
-     * Floor to stand on AND room for the whole body. The hero is ~1.9 tall on a
-     * floor whose top is y=1, so cells 1 and 2 must both be clear — checking
-     * only 1.5 lets a landing spot sit under a shelf or inside a 2-high block.
+     * Floor to stand on AND room for the whole body, at whatever height that
+     * floor happens to be.
      */
     function clearForBody(x, z) {
-        return api.getVoxelAt(x, 0.5, z)
-            && !api.getVoxelAt(x, 1.5, z)
-            && !api.getVoxelAt(x, 2.5, z);
+        return surfaceTop(x, z) != null;
     }
 
     /**
@@ -1005,7 +1026,15 @@ export function createDungeon(ctx, def, opts = {}) {
             entry.x, entry.z, Math.max(6, room.half), room, toRoomId);
         if (safeEntry) entry = safeEntry;
         const player = game.player;
-        player.rig.position.set(entry.x, 1.95, entry.z);
+        // AT THE HEIGHT OF THE GROUND WE JUST CHOSE, not a constant.
+        //
+        // 1.95 is the hero's rest height on a floor whose top is y=1, which was
+        // every floor in the game until Phase E2. `nearestFreeEntry` may now
+        // legitimately land them on a terrace three cells up, and dropping them at
+        // 1.95 there puts them inside it — the same arrival-inside-geometry this
+        // guard exists to prevent, reintroduced one line below the guard.
+        const top = surfaceTop(entry.x, entry.z);
+        player.rig.position.set(entry.x, (top != null ? top : 1) + 0.95, entry.z);
         player.physics.resetVelocity();
         player.physics.grounded = true;
         transition = {

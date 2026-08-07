@@ -5,6 +5,48 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Room entry still believed the floor was at y=1
+
+Chasing the three rooms the door sweep could not seed found something bigger than
+the rooms themselves.
+
+`enterRoom` already had a guard against materialising inside geometry, added the
+last time this happened. It asked: *is cell 0 solid, and are cells 1 and 2 clear?*
+That is the flat-floor game this was before Phase E2 put terraces in every room.
+**On a terrace cells 1 and 2 are solid because it is a step**, so every raised
+surface in the campaign read as unusable: `nearestFreeEntry` rejected its whole
+search space, fell through to a null fallback, and left the player at the unsafe
+point the guard exists to prevent. Then the line immediately below set them down
+at a hardcoded `y = 1.95` — *inside* whatever they were standing on.
+
+`standable` and `clearForBody` now scan for the surface (bottom-up, with head
+room) instead of assuming where it is, and the entry places the hero at that
+surface. On flat ground the scan returns 1 and nothing changes; on raised ground
+it finally works. Landing spots the entry search can use:
+
+    beat-03-sink/hollow        97 -> 140  (of 169 cells)
+    beat-05-citadel/monolith  244 -> 330  (of 361)
+    beat-12-pyre/ashgallery   165 -> 285  (of 289)
+
+`ashgallery` is terraced end to end and the old predicate rejected 43% of its own
+floor. This is trap 24 for the third time: a system added in one phase does not
+know about the phase before it.
+
+The three rooms themselves, for the record: `monolith`'s spawn column reads
+`111111111` — solid rock top to bottom, the room's centre is the monolith;
+`ashgallery`'s reads `111100000`, inside a four-high pillar; `hollow`'s reads
+`000000000`, open void. Room entry no longer lands anyone there, but the authored
+`spawn` coordinates are still those points and are used by paths this pass did not
+audit. **Left open, not closed.**
+
+**Honest about verification.** This one is reasoned, measured on the predicate,
+and suite-green — it is *not* play-verified. The probe written to drive real door
+transitions never fired one (0 of 188: the placement lives in `startTransition`,
+which needs a door trigger and a camera the harness did not supply), and a probe
+reporting "0 buried" while driving nothing is worse than no probe, so it was
+deleted rather than shipped. The counter that caught it was added for exactly that
+reason, one commit after learning it the hard way.
+
 ### The switch was inside the player
 
 The owner, on beat 08: *"Switch does not work in one room, the other room does not
