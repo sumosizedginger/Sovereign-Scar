@@ -311,15 +311,35 @@ export async function run(t) {
             tick(35);
             await new Promise((r) => setTimeout(r, 200));
             const p = s.player.root.position;
+            const col = [];
+            for (let y = 0; y <= 5; y++) col.push(s.game.level.getVoxelAt(p.x, y + 0.5, p.z) ? 1 : 0);
+            // WHERE THE BODY IS, not a fixed 1.5.
+            //
+            // This used to ask `getVoxelAt(p.x, 1.5, p.z)` — correct while y=1
+            // was the only floor in the game, and wrong the moment Phase E2 put
+            // terraces on the overworld: a voxel at 1.5 now means "standing on
+            // a step" exactly as often as it means "buried in a wall", and this
+            // assertion could not tell the two apart. Ask about the two cells
+            // the hero's ~1.9 of body actually occupies, measured from feet.
+            const feet = p.y - 0.95;
             return {
                 mood: s.game.level.mood,
-                standingInsideWall: s.game.level.getVoxelAt(p.x, 1.5, p.z),
+                standingInsideWall: !!(s.game.level.getVoxelAt(p.x, feet + 0.5, p.z)
+                    || s.game.level.getVoxelAt(p.x, feet + 1.5, p.z)),
                 onFloor: s.game.level.getVoxelAt(p.x, 0.5, p.z),
+                // A bare true/false told the next reader nothing about WHY, and
+                // this assertion has now been debugged twice from no evidence.
+                at: `${p.x.toFixed(1)},${p.y.toFixed(2)},${p.z.toFixed(1)}`,
+                column: col.join(''),
+                spawn: s.game.level.spawn,
+                bodyBlocked: s.collisionWorld?.blocked?.(p.x, p.z, 0.4),
             };
         });
+        const where = `at ${trap.at} col ${trap.column} blocked=${trap.bodyBlocked} `
+            + `spawn=${JSON.stringify(trap.spawn)}`;
         t.ok('swap-back lands in crust', trap.mood === 'crust', trap.mood);
-        t.ok('trapped spawn nudged to a free cell', trap.standingInsideWall === false);
-        t.ok('nudged spot still has floor', trap.onFloor === true);
+        t.ok('trapped spawn nudged to a free cell', trap.standingInsideWall === false, where);
+        t.ok('nudged spot still has floor', trap.onFloor === true, where);
 
         // ── W6: Tab map — overworld grid + dungeon room graph ──
         const mapRes = await page.evaluate(async () => {

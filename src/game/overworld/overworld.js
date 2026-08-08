@@ -289,35 +289,35 @@ export function createOverworld(ctx, screensDef, opts = {}) {
         },
     });
 
-    // Restore exact position when returning mid-screen
+    // Restore exact position when returning mid-screen.
+    //
+    // THE OWNER'S REPORT: "I spawned under the ground due to the raised land
+    // right next to the entrance." This is the line. Your x and z came back
+    // exactly, and y was forced to 1.95 — the height of flat ground — no matter
+    // what you had been standing on when you walked into the dungeon. Measured
+    // across the 49 screens, ELEVEN THOUSAND standable cells buried you on
+    // return, and the ones beside a dungeon arch are the cells you leave from.
     if (savedPos && savedPos.screen === startScreen) {
         const room = rooms[startScreen];
-        level.spawn = {
-            x: room.grid[0] * 64 + savedPos.x,
-            y: 1.95,
-            z: room.grid[1] * 64 + savedPos.z,
-        };
+        const x = room.grid[0] * 64 + savedPos.x;
+        const z = room.grid[1] * 64 + savedPos.z;
+        level.spawn = { x, z, y: level.groundY?.(x, z) ?? 1.95 };
     }
 
     // W5: never trap the player — if the (possibly state-swapped) layout put
     // a solid where they stand, nudge to the nearest free cell (ring search).
     {
-        const blocked = (x, z) => level.getVoxelAt(x, 1.5, z);
-        if (blocked(level.spawn.x, level.spawn.z)) {
-            outer:
-            for (let r = 1; r <= 8; r++) {
-                for (let dx = -r; dx <= r; dx++) {
-                    for (let dz = -r; dz <= r; dz++) {
-                        if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
-                        const nx = level.spawn.x + dx, nz = level.spawn.z + dz;
-                        if (!blocked(nx, nz) && level.getVoxelAt(nx, 0.5, nz)) {
-                            level.spawn = { x: nx, y: 1.95, z: nz };
-                            break outer;
-                        }
-                    }
-                }
-            }
-        }
+        // "Is cell 1 empty and cell 0 solid" was the flat-floor question, and on
+        // raised ground the answer is no for both — so this used to walk the
+        // player OFF a perfectly good terrace, and it could not tell "inside the
+        // monolith" from "on top of the monolith" either way.
+        //
+        // `safeSpot` is the room graph's own search, the same one a door arrival
+        // uses: cell-centred, body-checked against the collision world, ground
+        // height measured rather than assumed, and preferring floor to any perch
+        // it would have to climb.
+        const safe = level.safeSpot?.(level.spawn.x, level.spawn.z, 8);
+        if (safe) level.spawn = safe;
     }
 
     // W5: mirror-free holders (Proxy defeated) can swap anywhere outdoors —

@@ -74,6 +74,31 @@ export const DOOR_WIDTH = 2;
 const PLAYER_HALF = 0.4;
 
 /**
+ * Rig height above the surface they are standing on — `VoxelPhysicsBody`'s
+ * y extent, so feet land exactly on the surface top (player.js: extents.y).
+ */
+export const PLAYER_RISE = 0.95;
+
+/**
+ * Above every terrace and slab in the game, so a placement with no readable
+ * ground drops the player in rather than sealing them under. Gravity resolves it
+ * within a few frames; the alternative resolves into a reload.
+ */
+const SAFE_DROP_Y = 9 + PLAYER_RISE;
+
+/**
+ * Snap a world point to the centre of the cell containing it.
+ *
+ * Cells are corner-anchored — cell (x,z) is the box [x,x+1]x[z,z+1] — so a
+ * coordinate ending in .0 is a SEAM, with the body half in each neighbour, and
+ * a coordinate ending in .5 is the middle of one cell. Placement wants the
+ * middle, every time.
+ */
+function cellCentre(x, z) {
+    return { x: Math.floor(x) + 0.5, z: Math.floor(z) + 0.5 };
+}
+
+/**
  * Seconds a refused door stays quiet before it can fire again.
  *
  * `checkDoorTriggers` runs every frame. Without this, a refusal that fails to
@@ -907,8 +932,46 @@ export function createDungeon(ctx, def, opts = {}) {
         return null;
     }
 
+    /**
+     * The height the hero's rig sits at to stand on (x,z), or null for nowhere.
+     *
+     * The ONLY place the hero's rest height is written down. `1.95` used to be
+     * spelled out at seven different placement sites; six of them were still
+     * saying it after the seventh learned to scan, which is how the owner ended
+     * up buried twice more after the "fix".
+     */
+    function groundY(x, z) {
+        const top = surfaceTop(x, z);
+        return top == null ? null : top + PLAYER_RISE;
+    }
+
+    /**
+     * MAY THE BODY BE HERE AT ALL? — a different question from `surfaceTop`, and
+     * conflating the two is the bug this pair exists to keep apart.
+     *
+     * `surfaceTop` finds a solid with head room above it. The top of a perimeter
+     * wall answers yes. So does the top of an authored slab. But `CollisionWorld`
+     * is HEIGHT-BLIND on purpose — `blocked()` has no Y in it — so a column that
+     * is an XZ solid stops the body at every height, including standing on its
+     * roof. Placing the player up there is the "I became stuck on a raised area"
+     * report: every horizontal move is refused, and a body centred on the seam
+     * between two solids gets ejected toward opposite faces on alternate frames.
+     *
+     * `blocked` is also the only test here that knows the player is a BODY and
+     * not a point, which matters because a door's landing spot lands on a cell
+     * seam every single time (`doorWorldCenter` is on a half-cell, the 2.5 step
+     * is not) — so a point test can approve a cell whose neighbour swallows you.
+     *
+     * Terraces are untouched by this and must stay that way: `terraceRoom` writes
+     * into the PLATFORM map, which `bakeRoom` meshes with a null collision world,
+     * so no terrace of any height is ever a solid. Phase E2 stands.
+     */
+    function bodyFits(x, z) {
+        return !collisionWorld || !collisionWorld.blocked(x, z, PLAYER_HALF);
+    }
+
     function standable(x, z) {
-        return surfaceTop(x, z) != null;
+        return surfaceTop(x, z) != null && bodyFits(x, z);
     }
 
     /**
@@ -916,7 +979,7 @@ export function createDungeon(ctx, def, opts = {}) {
      * floor happens to be.
      */
     function clearForBody(x, z) {
-        return surfaceTop(x, z) != null;
+        return standable(x, z);
     }
 
     /**
@@ -958,17 +1021,37 @@ export function createDungeon(ctx, def, opts = {}) {
             && !insideAnyDoorTrigger(room, roomId, cx, cz);
         if (usable(x, z)) return { x, z };
         let fallback = clearForBody(x, z) ? { x, z } : null;
+        // GO DOWN, NOT JUST OUT.
+        //
+        // Every standable surface is a legal answer, including the ROOF of the
+        // thing we are trying to escape. The overworld's monolith is three cells
+        // tall, is in `getVoxelAt`, and carries no XZ solid at all — so when a
+        // mirror swap returned the player inside it, the old "first usable cell"
+        // search stepped one cell sideways, found the monolith's own roof, and
+        // stood them on top of the pillar at y=3.95.
+        //
+        // So rank candidates by ground height first and distance second: rings
+        // are still walked outward, but a nearer perch loses to a floor a little
+        // further away, and floor level ends the search because nothing beats it.
+        // When the entry point is already usable this never runs, so arrivals
+        // that legitimately land on a terrace are untouched.
+        let best = null, bestTop = Infinity;
         for (let r = 1; r <= maxR; r++) {
             for (let dx = -r; dx <= r; dx++) {
                 for (let dz = -r; dz <= r; dz++) {
                     if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
                     const cx = x + dx, cz = z + dz;
-                    if (usable(cx, cz)) return { x: cx, z: cz };
-                    if (!fallback && clearForBody(cx, cz)) fallback = { x: cx, z: cz };
+                    if (usable(cx, cz)) {
+                        const top = surfaceTop(cx, cz);
+                        if (top != null && top < bestTop) { bestTop = top; best = { x: cx, z: cz }; }
+                    } else if (!fallback && clearForBody(cx, cz)) {
+                        fallback = { x: cx, z: cz };
+                    }
                 }
             }
+            if (best && bestTop <= 1) return best; // on the floor; cannot do better
         }
-        return fallback; // solid-free but trigger-adjacent beats being buried
+        return best || fallback; // solid-free but trigger-adjacent beats burial
     }
 
     /** Nearest standable cell to a room's centre, searched in rings. */
@@ -1000,22 +1083,35 @@ export function createDungeon(ctx, def, opts = {}) {
         return { x: o.x + cx + 0.5, z: o.z + cz + 0.5 };
     }
 
-    function startTransition(door, game) {
-        const toRoomId = door.to;
-        // A boss push-in belongs to one room. Cancel it before the room pan so
-        // its height, back, and target cannot distort the next room's framing.
-        game.cameraRig?.clearFocus?.();
+    /**
+     * WHERE AND HOW HIGH the player lands when they walk into `toRoomId` from
+     * `fromRoomId` — the whole answer, in one place, with nothing left for the
+     * caller to add.
+     *
+     * Split out of `startTransition` so `tests/qa/entry-safety.mjs` can sweep the
+     * real arithmetic across all 14 dungeons and the overworld. The probe used to
+     * re-derive this, which is no test at all: a probe that reimplements the code
+     * it is checking agrees with itself and stays green while the game is wrong.
+     * Bakes the room first, because there is no ground to scan until it exists.
+     */
+    function arrivalPoint(toRoomId, fromRoomId) {
         bakeRoom(toRoomId);
-        const back = matchingDoor(toRoomId, currentRoomId);
+        const back = matchingDoor(toRoomId, fromRoomId);
         const room = def.rooms[toRoomId];
         const o = roomOrigin(room);
         let entry;
         if (back) {
             const c = doorWorldCenter(toRoomId, back);
             const n = SIDE_NORMAL[back.side]; // points OUT of the room
-            entry = { x: c.x - n.x * 2.5, z: c.z - n.z * 2.5 };
+            // Snapped to a cell centre. `doorWorldCenter` is on a half-cell and
+            // the step in is a whole 2.5, so every door in the game used to land
+            // the player exactly on the seam between two cells — body half-in
+            // each. When one of them was solid the two collision boxes ejected
+            // them toward opposite faces on alternate frames, which is what the
+            // owner felt as being stuck.
+            entry = cellCentre(c.x - n.x * 2.5, c.z - n.z * 2.5);
         } else {
-            entry = { x: o.x + (room.spawn?.x || 0), z: o.z + (room.spawn?.z || 0) };
+            entry = cellCentre(o.x + (room.spawn?.x || 0), o.z + (room.spawn?.z || 0));
         }
         // Never materialise inside geometry. A door's landing spot is a fixed
         // 2.5 units in from the gap, so any dressing a room happens to place
@@ -1025,7 +1121,6 @@ export function createDungeon(ctx, def, opts = {}) {
         const safeEntry = nearestFreeEntry(
             entry.x, entry.z, Math.max(6, room.half), room, toRoomId);
         if (safeEntry) entry = safeEntry;
-        const player = game.player;
         // AT THE HEIGHT OF THE GROUND WE JUST CHOSE, not a constant.
         //
         // 1.95 is the hero's rest height on a floor whose top is y=1, which was
@@ -1033,8 +1128,23 @@ export function createDungeon(ctx, def, opts = {}) {
         // legitimately land them on a terrace three cells up, and dropping them at
         // 1.95 there puts them inside it — the same arrival-inside-geometry this
         // guard exists to prevent, reintroduced one line below the guard.
-        const top = surfaceTop(entry.x, entry.z);
-        player.rig.position.set(entry.x, (top != null ? top : 1) + 0.95, entry.z);
+        //
+        // WHEN THE SCAN FINDS NOTHING, BE WRONG UPWARD. The old fallback here was
+        // a bare 1.95, so a point with no readable ground buried the player at the
+        // one height guaranteed to be inside anything raised. Falling is something
+        // the player watches happen and then walks away from; buried is a reload.
+        return { x: entry.x, y: groundY(entry.x, entry.z) ?? SAFE_DROP_Y, z: entry.z };
+    }
+
+    function startTransition(door, game) {
+        const toRoomId = door.to;
+        // A boss push-in belongs to one room. Cancel it before the room pan so
+        // its height, back, and target cannot distort the next room's framing.
+        game.cameraRig?.clearFocus?.();
+        const entry = arrivalPoint(toRoomId, currentRoomId);
+        const room = def.rooms[toRoomId];
+        const player = game.player;
+        player.rig.position.set(entry.x, entry.y, entry.z);
         player.physics.resetVelocity();
         player.physics.grounded = true;
         transition = {
@@ -1488,6 +1598,8 @@ export function createDungeon(ctx, def, opts = {}) {
         signals,
         puzzleBlocks,
         beamTargets,
+        // Filled in below, once the start room is baked — a surface scan cannot
+        // answer before there is anything to scan.
         spawn: {
             x: startO.x + (startRoom.spawn?.x || 0),
             y: 1.95,
@@ -1580,6 +1692,52 @@ export function createDungeon(ctx, def, opts = {}) {
             return room ? roomOrigin(room) : null;
         },
         isTransitioning: () => !!transition,
+        /**
+         * Rig height to stand on (x,z), or null where there is no ground.
+         *
+         * Exposed because everything that moves the player somewhere used to
+         * spell out the hero's rest height itself — the grapple-gap fall catch,
+         * the boot-ledge hop, the death fallback, the overworld's saved-position
+         * restore. Every one of them said 1.95, every one of them was written
+         * when that was the only floor height in the game, and every one of them
+         * buried the player once terraces arrived. There is one scan now.
+         */
+        groundY,
+        /**
+         * Can the player's BODY stand at (x,z)? Ground under it and no XZ solid
+         * through it — the two halves that have to be asked together.
+         *
+         * Exposed alongside `groundY` because asking only the height one is its
+         * own bug: inside a wall, `groundY` cheerfully answers with the wall's
+         * ROOF. `tests/world-e2e.spec.mjs` caught exactly that when the
+         * overworld's mirror-swap nudge was ported to the height query alone.
+         */
+        canStand: standable,
+        /**
+         * Nearest spot in the current room where the player can actually be,
+         * as {x, y, z} — cell-centred, body-checked, ground-height measured,
+         * preferring floor over any perch it has to climb.
+         *
+         * The overworld used to hand-roll its own ring search for this, with its
+         * own idea of "free" (cell 1 empty, cell 0 solid — the flat-floor
+         * question), and the two answers drifted apart the moment terraces
+         * existed. One search.
+         */
+        safeSpot(x, z, maxR = 8) {
+            const room = def.rooms[currentRoomId];
+            if (!room) return null;
+            const c = cellCentre(x, z);
+            const found = nearestFreeEntry(c.x, c.z, maxR, room, currentRoomId);
+            if (!found) return null;
+            return { x: found.x, z: found.z, y: groundY(found.x, found.z) ?? SAFE_DROP_Y };
+        },
+        /**
+         * The exact spot walking from `fromRoomId` into `toRoomId` puts you.
+         * Exposed for `tests/qa/entry-safety.mjs`, which sweeps every door in the
+         * campaign — calling the real function rather than re-deriving it is the
+         * only version of that sweep worth running.
+         */
+        arrivalPoint,
         enterRoom,
         bakedRooms: () => [...baked.keys()],
         def,
@@ -1596,13 +1754,16 @@ export function createDungeon(ctx, def, opts = {}) {
             const room = def.rooms[currentRoomId];
             if (!room) return null;
             const o = roomOrigin(room);
-            const x = o.x + (room.spawn?.x || 0);
-            const z = o.z + (room.spawn?.z || 0);
-            if (standable(x, z)) return { roomId: currentRoomId, x, y: 1.95, z };
+            // `standable` already scanned for this room's real surface; returning
+            // a constant 1.95 next to it threw the answer away and buried anyone
+            // who died on a terrace. Ask once, use what it said.
+            const c = cellCentre(o.x + (room.spawn?.x || 0), o.z + (room.spawn?.z || 0));
+            const here = standable(c.x, c.z) ? groundY(c.x, c.z) : null;
+            if (here != null) return { roomId: currentRoomId, x: c.x, y: here, z: c.z };
             const found = nearestStandable(room, o);
             return found
-                ? { roomId: currentRoomId, x: found.x, y: 1.95, z: found.z }
-                : { roomId: currentRoomId, x, y: 1.95, z };
+                ? { roomId: currentRoomId, x: found.x, y: groundY(found.x, found.z) ?? SAFE_DROP_Y, z: found.z }
+                : { roomId: currentRoomId, x: c.x, y: SAFE_DROP_Y, z: c.z };
         },
         /**
          * The puzzle layout a room actually BAKED, settled against its real
@@ -1655,5 +1816,18 @@ export function createDungeon(ctx, def, opts = {}) {
         for (const roomId of Object.keys(def.rooms)) bakeRoom(roomId);
     }
     enterRoom(def.start, null);
+
+    // The start room is baked now, so the spawn can be measured instead of
+    // assumed. `index.js` hands this straight to `player.setSpawn`, and
+    // `setSpawn` respawns immediately — so a wrong y here is not a bad first
+    // frame, it is the height every death in the first room returns you to.
+    {
+        const c = cellCentre(api.spawn.x, api.spawn.z);
+        const safe = nearestFreeEntry(c.x, c.z, Math.max(6, startRoom.half || 6),
+            startRoom, def.start) || c;
+        api.spawn.x = safe.x;
+        api.spawn.z = safe.z;
+        api.spawn.y = groundY(safe.x, safe.z) ?? SAFE_DROP_Y;
+    }
     return api;
 }

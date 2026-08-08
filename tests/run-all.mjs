@@ -35,6 +35,7 @@ import { run as runPlayerMoves } from './game/player-moves.spec.mjs';
 import { run as runEncounterDirector } from './game/encounter-director.spec.mjs';
 import { run as runElites } from './game/elites.spec.mjs';
 import { run as runPuzzleKit } from './game/puzzle-kit.spec.mjs';
+import { run as runEntrySafety } from './game/entry-safety.spec.mjs';
 import { run as runWorldLife } from './game/world-life.spec.mjs';
 import { run as runKitChannels } from './game/kit-channels.spec.mjs';
 import { run as runPhaseG } from './game/phase-g.spec.mjs';
@@ -136,6 +137,7 @@ async function main() {
     runNamed('encounter-director', runEncounterDirector);
     runNamed('elites', runElites);
     runNamed('puzzle-kit', runPuzzleKit);
+    runNamed('entry-safety', runEntrySafety);
     runNamed('world-life', runWorldLife);
     runNamed('kit-channels', runKitChannels);
     runNamed('phase-g', runPhaseG);

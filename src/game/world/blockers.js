@@ -193,7 +193,12 @@ export function createBlockerRuntime(ctx, level, b, origin = { x: 0, z: 0 }) {
                         const d = Math.hypot(p.x - e.x, p.z - e.z);
                         if (d < bestD) { bestD = d; best = e; }
                     }
-                    player.rig.position.set(best.x, 1.95, best.z);
+                    // The rim is not always at floor height — several of these
+                    // gaps are cut through terraced ground, and fishing the
+                    // player out at a flat 1.95 dropped them from the chasm
+                    // straight into the ledge beside it.
+                    player.rig.position.set(
+                        best.x, level.groundY?.(best.x, best.z) ?? 1.95, best.z);
                     player.physics.resetVelocity();
                     player.physics.grounded = true;
                     player.health.damage(1, 0.6, 'environment');
@@ -312,7 +317,12 @@ export function createBlockerRuntime(ctx, level, b, origin = { x: 0, z: 0 }) {
                     local, player.state.facingVec
                 );
                 if (hop) {
-                    player.rig.position.set(origin.x + hop.x, 2.6, origin.z + hop.z);
+                    // Clear of the far side's ground, not of a floor at y=1.
+                    // 2.6 was "one cell of air above the only floor there was";
+                    // over a terrace it is a cell of rock.
+                    const hx = origin.x + hop.x, hz = origin.z + hop.z;
+                    const gy = level.groundY?.(hx, hz);
+                    player.rig.position.set(hx, Math.max(2.6, (gy ?? 1.95) + 0.65), hz);
                     player.physics.resetVelocity();
                     player.physics.grounded = false; // land on the far side
                     player.dashTimer = 0;

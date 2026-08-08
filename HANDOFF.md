@@ -71,8 +71,8 @@ assertion before changing it.
 ## State
 
 Everything below is green in the working tree. `npm test` — unit + full browser
-E2E — **4467/4467**, run end to end after the spawn-clearance fix.
-`npm run test:unit` alone: **3603/3603**.
+E2E — **4480/4480**, run end to end after the arrival sweep.
+`npm run test:unit` alone: **3616/3616**.
 
 Every one of those nine fixes has been reverted and the suite re-run to confirm
 something fails without it (`HANDOFF` trap 10). The first pass of that found
@@ -676,6 +676,34 @@ suite could have. Traps 3 and 5 in this file are the same lesson about
 different statistics. **When you change how the game looks, open the captures.
 Then change the number.**
 
+**31. One function, two questions: "is there ground" is not "may I be here".**
+`surfaceTop` finds a solid with head room above it. `CollisionWorld.blocked` says
+whether the body may occupy an (x,z) **at any height — it is height-blind by
+design and has no Y in it at all**. The roof of a perimeter wall answers yes to
+the first and no to the second, and for a long time only the first was asked: 30
+arrival points across the campaign stood the hero somewhere every horizontal move
+is refused. Ask both, always, and keep them as separate functions (`groundY` and
+`canStand`) so a caller cannot accidentally ask only the cheap one — the overworld
+did exactly that mid-fix and put the player on a rock's roof, and `world-e2e`
+caught it.
+
+Two riders, both of which cost a debugging round:
+
+* **A search that accepts any standable cell will accept the roof of the thing it
+  is escaping.** The overworld monolith is three cells tall with no XZ solid, so
+  "nearest free cell" stepped one across and landed on top of it. Rank by ground
+  height first, distance second.
+* **Placement lands on cell seams unless you snap.** Cells are corner-anchored,
+  `doorWorldCenter` sits on a half-cell, and the step inward is a whole 2.5 — so
+  every door in the game arrived on a `.0` coordinate with the body half in each
+  neighbour. 526 of 528. `resolveMove`'s already-overlapping branch then ejects
+  toward opposite faces on alternate frames, which reads as being stuck rather
+  than as being blocked.
+
+The seam snap has **no failing counterfactual of its own** once the body test is
+in: `nearestFreeEntry` relocates the harmful cases anyway. It is kept as
+prophylaxis and is labelled as such rather than claimed as a fix.
+
 **30. Three rooms spawn the player inside the world. Still true.**
 `beat-05-citadel/monolith`'s spawn column reads `111111111` — solid rock top to
 bottom, because the room's centre *is* the monolith. `beat-12-pyre/ashgallery`
@@ -703,6 +731,15 @@ transitions fired **0 of 188** (placement lives in `startTransition`, behind a
 door trigger and a camera the harness did not supply). It was deleted rather than
 shipped, because a probe reporting "0 buried" while driving nothing is worse than
 no probe. Finishing it is the obvious next job.
+
+**Update — that job is done, and it was not enough on its own.** Splitting the
+arrival maths out as `level.arrivalPoint(to, from)` let `tests/qa/entry-safety.mjs`
+sweep all 528 arrival points across 14 dungeons and the overworld by calling the
+real function, and the owner's case was walked in the browser through the real
+door trigger. See trap 31 for what the sweep found. `level.spawn`'s hardcoded
+`y: 1.95` named above is gone — it is measured after the start room bakes — but
+**the three authored `spawn` coordinates are still inside geometry**, so the rest
+of this trap stands.
 
 **29. A fixture that cannot fail is not a fixture.**
 The fix: the soft-occupancy predicate `settle` consults knew about pickups and

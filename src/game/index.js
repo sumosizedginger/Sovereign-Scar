@@ -1604,7 +1604,11 @@ function frame() {
                         && !player.physics.getVoxelAt(sp.x, sp.y - 1.0, sp.z)) {
                         const ls = game.level?.spawn;
                         if (ls) {
-                            player.rig.position.set(ls.x, ls.y != null ? ls.y : 1.95, ls.z);
+                            // Ask the level where its ground is. `ls.y` is
+                            // measured now, but a level with no room graph has
+                            // neither, and dropping in beats burying.
+                            const gy = game.level?.groundY?.(ls.x, ls.z);
+                            player.rig.position.set(ls.x, gy ?? ls.y ?? 9.95, ls.z);
                             player.physics.resetVelocity();
                             player.physics.grounded = true;
                         }

@@ -5,6 +5,95 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Standing on a roof is not standing anywhere — arrival, swept
+
+The owner, fourth report on this: *"I spawned under the ground due to the raised
+land right next to the entrance"* and *"I became stuck on a raised area when I
+entered the room from the east side."* The previous entry below fixed one of
+these paths and reported itself as suite-green but not play-verified. It was not
+enough, and this time the reason is measured rather than reasoned.
+
+**Two questions were being answered by one function.** `surfaceTop` asks *is
+there a solid here with head room above it?* It never asks *may the player's body
+be at this (x,z) at all?* `CollisionWorld` answers that one and is **height-blind
+by design** — `blocked()` has no Y in it — so a column registered as an XZ solid
+stops the body at every height, including standing on its roof. The top of a
+perimeter wall and the top of an authored slab both sailed through `standable()`,
+`nearestFreeEntry` returned them, and the hero was placed somewhere every
+horizontal move is refused. Worse, a door's landing point is `doorWorldCenter`
+(a half-cell) minus a whole 2.5, so **every door in the game landed on a cell
+seam**: body half in each neighbour, and when one was solid the two collision
+boxes ejected it toward opposite faces on alternate frames. That fight is what
+"stuck" felt like.
+
+Terraces were never implicated and are untouched: `terraceRoom` writes into the
+platform map, which `bakeRoom` meshes with a null collision world, so no terrace
+of any height is ever a solid.
+
+**And the other half — seven placement sites, one of them fixed.** The hero's
+rest height was spelled out at seven places. Last session fixed `startTransition`
+and left six saying `1.95`, including `respawnPoint`, which called `standable()`,
+computed a real surface top, and then threw it away. There is now one `groundY`
+and one `canStand`, both on the level, and every site calls them.
+
+Measured across all 14 dungeons **and the overworld** by `tests/qa/entry-safety.mjs`:
+
+    arrival points 528        before -> after
+    body inside a solid    30 -> 0
+    buried in geometry     33 -> 0
+    wrong height           33 -> 0
+    landed on a cell seam 526 -> 0
+
+    save-and-return, 49 overworld screens, all with raised ground
+    buried on return       49 -> 0
+
+That last row is the owner's first report, driven end to end: stand on raised
+ground, walk into a dungeon, walk back out. `overworld.js` restored x and z
+exactly and forced y to 1.95 — **11,034 standable cells across the 49 screens
+buried you**, and the ones beside a dungeon arch are the cells you leave from.
+
+Three further things fell out of it:
+
+* **`nearestFreeEntry` preferred any perch to the floor.** Every standable
+  surface is a legal answer, including the roof of the thing being escaped — the
+  overworld's monolith is three cells tall and carries no XZ solid, so a mirror
+  swap that returned the player inside it stepped one cell sideways onto its own
+  roof. It now ranks candidates by ground height first and distance second.
+* **The overworld hand-rolled a second search** with its own idea of "free"
+  (cell 1 empty, cell 0 solid — the flat-floor question). It calls the room
+  graph's `safeSpot` now. One search.
+* **`world-e2e`'s own trap assertion was the same stale assumption**, asking
+  `getVoxelAt(p.x, 1.5, p.z)` — which since Phase E2 means "standing on a step"
+  exactly as often as "buried in a wall". It measures the two cells the body
+  occupies, from the feet, and it now carries a detail message; it had been
+  debugged twice from a bare true/false.
+
+Play-verified, which the previous attempt was not: walked west out of
+`brinepocket`, the real door trigger fired at frame 18, landed in `drownedway` at
+**y = 1.95 on the floor** (was 4.95 on the slab roof) and then moved 2.7 units in
+each of the four directions. Not stuck.
+
+`beat-07-sluice`'s east slab was left alone: the plan assumed it walled its door
+off, and measurement says row z=4 is clear from x=4 to x=8 and `door-reach.mjs`
+still reports 0 doors that lock you in. The stuck report was the placement bug,
+not the geometry.
+
+### A green gate because the camera was looking away
+
+Fixing the above turned `visual-sanity`'s overworld sweep red, and the number was
+right. The `sink` screen's centre slab is nine by nine, you stand on it, and it
+was built in the **shared** `build` in `CRUST_COLORS.clayDark` (0x9a8b78, ~140/255)
+in *both* states — so in the Abyss a crust-clay platform sat under the Abyss light
+multiplier, the exact compounding `OVERWORLD_BASE_TUNE`'s comment warns about. On
+the slab it measures **175** against a ceiling of 130; ten cells away on real
+Abyss ground the same screen reads **88**.
+
+It had been invisible for the life of the screen because the old spawn code
+shoved the player off the slab, so the sampler never stood on the bright thing.
+The slab moved into per-mood `crust`/`abyss` variants (`ABYSS_COLORS.basalt` in
+the Abyss), geometry identical in both. **The gate was green because the camera
+was somewhere else, not because the picture was good.**
+
 ### Room entry still believed the floor was at y=1
 
 Chasing the three rooms the door sweep could not seed found something bigger than

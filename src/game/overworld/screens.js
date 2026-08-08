@@ -72,8 +72,31 @@ export const CRUST_REGION = {
             grid: [11, 11],
             edges: [{ to: 'flats', side: 'W', at: 0, width: 10 }],
             build(map, h) {
-                h.fillBox(map, -4, 4, 1, 1, -4, 4, CRUST_COLORS.clayDark);
                 h.fillBox(map, 10, 14, 1, 2, -12, -8, CRUST_COLORS.rust);
+            },
+            // THE CENTRE SLAB IS NINE BY NINE AND YOU STAND ON IT, so it fills
+            // the middle of the frame — which is exactly what the luminance
+            // gate samples. It used to be built in the shared `build` in
+            // `CRUST_COLORS.clayDark` (0x9a8b78, ~140/255) in BOTH states, so
+            // in the Abyss a crust-clay platform sat under the Abyss light
+            // multiplier — the compounding that `OVERWORLD_BASE_TUNE`'s comment
+            // warns about — and measured 175 against a ceiling of 130. Ten
+            // cells away, on real Abyss ground, the same screen reads 88.
+            //
+            // It went unseen because the old spawn code shoved the player OFF
+            // this slab (its "is cell 1 empty" test read the raised ground as a
+            // wall), so the sampler never stood on the bright thing. A green
+            // gate is not a good picture; this one was green because the camera
+            // was looking somewhere else.
+            crust: {
+                build(map, h) {
+                    h.fillBox(map, -4, 4, 1, 1, -4, 4, CRUST_COLORS.clayDark);
+                },
+            },
+            abyss: {
+                build(map, h) {
+                    h.fillBox(map, -4, 4, 1, 1, -4, 4, ABYSS_COLORS.basalt);
+                },
             },
             blockers: [
                 {
