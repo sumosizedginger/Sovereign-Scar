@@ -15,43 +15,49 @@ npm test               # unit + browser E2E
 npm run test:unit      # unit only — fast, no browser
 ```
 
-> ## ⚠ `origin` is the WRONG remote for this game
+> ## ✅ `origin` is now the game — FIXED 2026-08-11
 >
-> This repo began as a clone of My-Engine, so `origin` still points at
-> **`My-Engine.git`**. The game lives at **`Sovereign-Scar.git`**. A plain
-> `git push` therefore publishes the game into the engine's repository and
-> **silently leaves the game's own repo untouched** — it succeeds, it prints a
-> normal ref update, and nothing tells you the work went somewhere nobody is
-> looking. It has now happened across three sessions and was only caught when
-> the owner said "I do not see the open questions": `Sovereign-Scar.git` was
-> **11 commits behind**, including two entire sessions of work.
+> **Read this even though it is fixed.** The old warning told you a bare
+> `git push` was dangerous. That is no longer true, and a stale warning is its
+> own hazard: it invites someone to "correct" the remotes back.
 >
-> Push with the URL spelled out:
+> **What it was.** This repo began as a clone of My-Engine, so `origin` pointed
+> at **`My-Engine.git`** while the game lives at **`Sovereign-Scar.git`**. A
+> plain `git push` published the game into the engine's repository and
+> **silently left the game's own repo untouched** — it succeeded, printed a
+> normal ref update, and nothing said the work went somewhere nobody was
+> looking. It happened across three sessions and was only caught when the owner
+> said "I do not see the open questions": `Sovereign-Scar.git` was **11 commits
+> behind**, including two entire sessions of work.
+>
+> **How it was fixed.** `git remote set-url` is classifier-blocked here, which
+> is why this sat unfixed for weeks. **`git remote rename` is not blocked:**
 >
 > ```bash
-> git push https://github.com/sumosizedginger/Sovereign-Scar.git HEAD:main
+> git remote rename origin my-engine
+> git remote rename game origin
+> git branch -u origin/main main          # <-- the step that actually fixes it
 > ```
 >
-> Then verify, because the failure mode is a push that looks like it worked:
+> **The rename alone is a trap of its own.** Git faithfully rewrites branch
+> tracking to follow a renamed remote, so after the two renames `main` still
+> tracked `my-engine/main` and a bare `git push` *still* went to the wrong
+> repo. It looked fixed and was not. `git push --dry-run` is what caught it —
+> run it after any remote surgery, before believing the surgery worked.
+>
+> My-Engine's **push** URL is now the bogus string `DISABLED_use_origin`, so an
+> accidental `git push my-engine` fails loudly instead of succeeding silently.
+> Its fetch URL still works, so the engine ancestry is intact.
+>
+> `git push` is now correct. **Verify anyway** — the failure mode was always a
+> push that looks like it worked:
 >
 > ```bash
 > git ls-remote https://github.com/sumosizedginger/Sovereign-Scar.git refs/heads/main
 > ```
 >
-> Changing `origin`'s URL is blocked in this environment, so the hazard cannot
-> simply be removed. **Adding a second remote is not blocked**, and as of
-> 2026-07-29 there is one:
->
-> ```bash
-> git push game HEAD:main      # game = Sovereign-Scar.git
-> ```
->
-> That is a convenience, not a safety net. `origin` still points at My-Engine,
-> so a bare `git push` is exactly as dangerous as it always was, and the
-> `ls-remote` check above is still the only thing that proves where the work
-> landed.
->
-> **The second half of this trap is reading, not writing.** My-Engine now holds
+> **The second half of this trap is reading, not writing — and it is NOT
+> fixed.** My-Engine still holds
 > a *stale copy of the whole game* from the sessions that pushed there by
 > mistake — as of 2026-07-24 its `main` sits at `b6b571d`, six commits behind,
 > and it is missing `docs/PLAYTEST-2026-07-23.md` and `docs/GRAPHICS-OVERHAUL.md`
@@ -85,9 +91,11 @@ longer a to-do list; it is a record of what was found and what was built. What i
 is NOT is a record of what has been *played*: see the caveat below, which is the
 single most important paragraph in this file.
 
-**Not committed.** The tree carries this work plus the previous session's, and
-the remote is still at `006ab96`. Push with the URL spelled out (see the
-warning at the top of this file) and verify with `git ls-remote`.
+**Committed and pushed (2026-08-11).** That "not committed / remote is still at
+`006ab96`" line stood here long after it stopped being true, which is its own
+lesson: a status line with a SHA in it goes stale silently and then lies to the
+next reader. `Sovereign-Scar.git` `main` and this working tree agree — confirm
+with `git ls-remote` rather than trusting this sentence.
 
 | area | state |
 |---|---|

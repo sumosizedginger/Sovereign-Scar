@@ -56,8 +56,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/sumosizedginger/My-Engine.git"
+    "url": "https://github.com/sumosizedginger/Sovereign-Scar.git"
   },
+  "bugs": {
+    "url": "https://github.com/sumosizedginger/Sovereign-Scar/issues"
+  },
+  "homepage": "https://github.com/sumosizedginger/Sovereign-Scar#readme",
   "author": "sumosizedginger",
   "license": "MIT",
   "devDependencies": {

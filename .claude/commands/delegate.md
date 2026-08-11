@@ -41,9 +41,10 @@ Always pass a timeout — a stalled agent should not eat the session.
 
 ## Hard rules — these exist because of real incidents
 
-1. **They never commit and never push.** `origin` here points at **My-Engine**, not this
-   game. A stray `git push` publishes Sovereign Scar to the wrong repo — that has
-   happened, for three sessions. I do all commits, with the URL spelled out.
+1. **They never commit and never push.** `origin` now points at Sovereign-Scar
+   (fixed 2026-08-11; it was My-Engine for three sessions and published the game to
+   the wrong repo every time). The rule stands anyway — an external agent committing
+   into this tree is a review-bypass, not a remote problem. I do all commits.
 2. **They never write into the live working tree while I am editing it.** Concurrent
    edits clobber silently. Either give read-only tasks, or isolate with
    `git worktree add` and merge the result deliberately.

@@ -641,8 +641,8 @@ Standing rules from `HANDOFF.md` that apply throughout:
 3. **Assert directions in world space**, never as the sign of an angle (trap 1).
 4. **Measure before tuning** — `tests/qa/*` are print-only probes for exactly this.
 5. **A green gate is not a good picture** (traps 3, 8).
-6. **Push with the URL spelled out**, then `git ls-remote` to verify — `origin` is
-   My-Engine, not this game.
+6. **Verify where a push landed** with `git ls-remote`. (`origin` used to be
+   My-Engine; fixed 2026-08-11, so a bare `git push` is now correct.)
 
 ---
 

@@ -6,8 +6,9 @@ This document is about how the game *looks*.
 Read `HANDOFF.md` first for the project's traps. One that applies here more than
 anywhere else:
 
-> **`origin` is the wrong repo.** `git push` sends this game to My-Engine.
-> Push with the URL spelled out and verify with `git ls-remote`.
+> ~~**`origin` is the wrong repo.** `git push` sends this game to My-Engine.~~
+> **Fixed 2026-08-11** — `origin` is Sovereign-Scar now and a bare `git push`
+> is correct. Still verify with `git ls-remote`; see `HANDOFF.md`.
 
 Everything below was measured against commit `acd8138`, either by running the
 project's own modules in node or by reading the 44 certification captures in
