@@ -50,6 +50,8 @@ import {
 import { MenuOverlay } from './ui/menu.js';
 import { MapScreen } from './ui/map-screen.js';
 import { EndingSequence } from './ui/credits.js';
+import { ScreenFade } from './ui/fade.js';
+import { CutsceneDirector } from './narrative/cutscene.js';
 import { Inventory, MEMORY_VIAL_CAP } from './kernel/inventory.js';
 import { bossHeartMax } from './kernel/health.js';
 import {
@@ -276,6 +278,26 @@ function applyUpgradeStats() {
 applyUpgradeStats();
 
 // Shared game context
+/**
+ * The controls, held still.
+ *
+ * Exactly the surface `Player.update` reads — attackHeld, guardHeld,
+ * moveVector, padAim and the five consume* latches — and nothing else, so a
+ * new input the player starts reading will fail loudly here rather than
+ * quietly staying live through a cutscene.
+ */
+const CINEMATIC_INPUT = {
+    attackHeld: false,
+    guardHeld: false,
+    moveVector: () => ({ x: 0, z: 0 }),
+    padAim: null, // a property on Input, not a call — right-stick facing
+    consumeAttack: () => false,
+    consumeDash: () => false,
+    consumeLockCycle: () => false,
+    consumeLockToggle: () => false,
+    consumeWeaponCycle: () => false,
+};
+
 const game = {
     scene,
     camera,
@@ -290,6 +312,11 @@ const game = {
     levelId: 'beat-01-crypt',
     paused: false,
     atTitle: false,
+    // Control gate for scripted scenes. CutsceneDirector is the only thing that
+    // sets it, and `_release` is the only thing that clears it — a stuck
+    // `cinematic` is a softlock whose only exit is a reload, so it has exactly
+    // one owner. Read in frame() where the player is stepped.
+    cinematic: false,
     playTime: 0,
     anchorThread: null,
     witnessScore: null,
@@ -406,6 +433,13 @@ dev.init(game, { loadLevel, LEVELS, DEV_LEVELS, applyUpgradeStats, input });
 
 // ── Level lifecycle ───────────────────────────────────────────────────────
 function unloadLevel() {
+    // A scene must never outlive the level it was playing in. `stop` runs the
+    // director's single release path, which clears `cinematic`, eases the
+    // camera home and wipes the fade — so a level change during a cutscene
+    // cannot strand the player behind a black screen with no controls, which
+    // is the one failure this whole subsystem is written around.
+    cutscene.stop(game);
+    screenFade.clear();
     if (deathEcho) {
         deathEcho.dispose();
         deathEcho = null;
@@ -648,6 +682,22 @@ function goToTitle() {
 }
 
 const mapScreen = new MapScreen(); // W6
+
+// The full-screen wash and the scene clock. Both were written, complete, and
+// imported by nothing — `ScreenFade` replaced three hardcoded lines inside
+// EndingSequence that never got deleted, and `CutsceneDirector` had no caller
+// at all. They are wired here rather than left as a promise: `game.fade` is
+// what a beat's `fade` step drives, and `game.cutscene` owns `game.cinematic`.
+const screenFade = new ScreenFade();
+const cutscene = new CutsceneDirector();
+game.fade = screenFade;
+game.cutscene = cutscene;
+game.sfx = gsfx; // a beat's `sfx: 'name'` step resolves against this
+/**
+ * Play a scripted scene. Returns false if refused — mid-boss, sealed room, or
+ * one already running. Beats: { at, camera, story, fade, sfx, fn }.
+ */
+game.playCutscene = (scene) => cutscene.play(game, scene);
 
 const menu = new MenuOverlay({
     ctx: {
@@ -1196,6 +1246,10 @@ function frame() {
 
     if (!game.paused && !ending.isActive) {
         game.playTime += dt;
+        // Before the player is stepped, so a beat that takes the controls this
+        // frame takes them this frame. Pausing still works during a scene —
+        // consumePause is deliberately not drained by the director.
+        cutscene.update(dt, game);
         anchorThread?.update?.(dt);
         witnessScore?.update?.(dt);
         const scoreBand = Math.floor((witnessScore?.state?.total || 0) / 10000);
@@ -1296,7 +1350,14 @@ function frame() {
                     + 'instead of backing away. Y switches target.');
             }
         }
-        player.update(sdt, input, enemies, destructibles, camera, renderer);
+        // During a scripted scene the player is stepped with a NEUTRAL input,
+        // not skipped. Skipping the update would freeze physics and animation
+        // mid-stride; this keeps gravity, the gait and every timer running
+        // while the hands come off the controls. CutsceneDirector already
+        // drains the action latches, but movement is polled (`moveVector`),
+        // not latched, so draining alone would leave WASD live.
+        player.update(sdt, game.cinematic ? CINEMATIC_INPUT : input,
+            enemies, destructibles, camera, renderer);
         lockReticle.update(sdt, player.lockOn.target);
 
         if (input.consumeVial()) {
@@ -1530,6 +1591,10 @@ function frame() {
 
                 const resolved = consumeDeath(before.lives, before.runMode);
                 deathOutcome = resolved.outcome;
+                // Dying mid-scene ends the scene. Same reason as unloadLevel:
+                // the death flow takes the controls itself, and two owners of
+                // `cinematic` is how it gets stuck on.
+                cutscene.stop(game);
                 const loss = deathShardLoss(player.inventory.scarShards, before.runMode);
                 let nextEcho = before.deathEcho || null;
                 // Hard never preserves an earlier Echo (spec 6.5): each death

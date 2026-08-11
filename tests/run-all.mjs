@@ -91,6 +91,7 @@ import { run as runGodModeCombat } from './game/god-mode-combat.spec.mjs';
 import { run as runCredits } from './game/credits.spec.mjs';
 import { run as runPlaytest0723 } from './game/playtest-2026-07-23.spec.mjs';
 import { run as runCasterDark } from './game/caster-dark.spec.mjs';
+import { run as runCutsceneWiring } from './game/cutscene-wiring.spec.mjs';
 
 const unitOnly = process.argv.includes('--unit-only');
 
@@ -200,6 +201,7 @@ async function main() {
     // back silently. It has been passing standalone the whole time.
     runNamed('playtest-2026-07-23', runPlaytest0723);
     runNamed('caster-dark', runCasterDark);
+    runNamed('cutscene-wiring', runCutsceneWiring);
 
     if (!unitOnly) {
         const { run: runSmoke } = await import('./smoke.spec.mjs');

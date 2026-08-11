@@ -13,9 +13,28 @@ Built on **[My-Engine](https://github.com/sumosizedginger/My-Engine) 0.2.0** (pi
 
 ```bash
 npm run serve          # http://127.0.0.1:8799/
-npm test               # unit + browser E2E (3013 assertions)
-npm run test:unit      # unit only
+npm test               # unit + browser E2E (4826 assertions)
+npm run test:unit      # unit only (3939 assertions, ~90s)
 ```
+
+### Desktop (Windows)
+
+```bash
+npm run desktop        # run the native app
+npm run desktop:build  # build installer + portable .exe into dist-desktop/
+```
+
+The desktop shell is `electron/main.cjs` and it changes nothing about the game:
+same files, no build step, no bundler. It starts the project's own
+`scripts/serve.mjs` on a loopback port and points a window at it, because
+`loadFile` over `file://` makes Chromium apply CORS to every ES-module import
+and the game will not load. The port is OS-assigned, so the app never collides
+with a dev server you already have open.
+
+`npm run desktop:build` produces two x64 artifacts in `dist-desktop/`:
+`SovereignScar-<version>-x64-setup.exe` (installer) and
+`…-portable.exe` (no install). Both are unsigned — Windows SmartScreen will
+warn on first run until they are code-signed.
 
 Open the URL, click once to unlock audio, then explore with WASD. **B** (or
 right mouse) guards — hold to block, tap to parry — and **T** locks on. Press **Enter** to advance story lines,

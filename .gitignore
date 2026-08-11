@@ -7,3 +7,4 @@ node_modules/
 # on one afternoon and is not maintained.
 tmp/
 tests/qa/_*.mjs
+dist-desktop/

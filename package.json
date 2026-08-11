@@ -3,11 +3,56 @@
   "version": "0.3.0",
   "type": "module",
   "description": "Sovereign Scar — a 14-beat Zelda-like 3D WebGL voxel labyrinth on My-Engine 0.2.0. Zero-build, offline-first.",
+  "main": "electron/main.cjs",
   "scripts": {
     "serve": "node scripts/serve.mjs 8799",
     "test": "node tests/run-all.mjs",
     "test:unit": "node tests/run-all.mjs --unit-only",
-    "test:game": "node tests/run-all.mjs --unit-only"
+    "test:e2e": "node tests/run-all.mjs",
+    "desktop": "electron .",
+    "desktop:build": "electron-builder --win --publish never",
+    "postinstall": "node -e \"try{require('fs').accessSync('node_modules/electron/dist')}catch(e){require('child_process').execSync('node node_modules/electron/install.js',{stdio:'inherit'})}\""
+  },
+  "build": {
+    "appId": "com.sumosizedginger.sovereignscar",
+    "productName": "Sovereign Scar",
+    "copyright": "Copyright © sumosizedginger",
+    "directories": {
+      "output": "dist-desktop"
+    },
+    "files": [
+      "electron/**",
+      "index.html",
+      "src/**",
+      "lib/**",
+      "scripts/serve.mjs",
+      "!**/*.map"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Sovereign Scar",
+      "artifactName": "SovereignScar-${version}-${arch}-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "SovereignScar-${version}-${arch}-portable.${ext}"
+    }
   },
   "repository": {
     "type": "git",
@@ -16,6 +61,8 @@
   "author": "sumosizedginger",
   "license": "MIT",
   "devDependencies": {
+    "electron": "^43.3.0",
+    "electron-builder": "^26.15.3",
     "puppeteer-core": "^25.3.0",
     "three": "0.185.1"
   },
