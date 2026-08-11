@@ -85,9 +85,12 @@ import { run as runBodies } from './game/bodies.spec.mjs';
 import { run as runRoomLights } from './game/room-lights.spec.mjs';
 import { run as runBossBodies } from './game/boss-bodies.spec.mjs';
 import { run as runRoomSeal } from './game/room-seal.spec.mjs';
+import { run as runSealHolds } from './game/seal-holds.spec.mjs';
 import { run as runReflectArmor } from './game/reflect-armor.spec.mjs';
 import { run as runGodModeCombat } from './game/god-mode-combat.spec.mjs';
 import { run as runCredits } from './game/credits.spec.mjs';
+import { run as runPlaytest0723 } from './game/playtest-2026-07-23.spec.mjs';
+import { run as runCasterDark } from './game/caster-dark.spec.mjs';
 
 const unitOnly = process.argv.includes('--unit-only');
 
@@ -187,9 +190,16 @@ async function main() {
     runNamed('room-lights', runRoomLights);
     runNamed('boss-bodies', runBossBodies);
     runNamed('room-seal', runRoomSeal);
+    runNamed('seal-holds', runSealHolds);
     runNamed('reflect-armor', runReflectArmor);
     runNamed('god-mode-combat', runGodModeCombat);
     runNamed('credits', runCredits);
+    // The regression gate for docs/PLAYTEST-2026-07-23.md. It was written, its
+    // 29 assertions were each proven to fail on the pre-fix code, and then it
+    // was never imported here — so all seven of those bugs were free to come
+    // back silently. It has been passing standalone the whole time.
+    runNamed('playtest-2026-07-23', runPlaytest0723);
+    runNamed('caster-dark', runCasterDark);
 
     if (!unitOnly) {
         const { run: runSmoke } = await import('./smoke.spec.mjs');

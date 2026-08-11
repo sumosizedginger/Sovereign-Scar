@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { sfx } from '../../audio/synth.js';
+import { gsfx } from '../audio/sfx-bank.js';
 import { getActiveRunMode } from '../kernel/run-mode.js';
 
 const HEART_COLOR = 0xff3b5c;
@@ -95,7 +96,9 @@ export class HeartDrop {
                 // A full-health player leaves the heart on the ground for later.
                 if (player.health.hp >= player.health.max) return true;
                 player.health.heal(this.amount);
-                sfx.pickup?.();
+                // gsfx.heartGet was written for exactly this and never called;
+                // healing used the generic engine one-shot instead.
+                gsfx.heartGet?.();
                 this.taken = true;
                 return false;
             }

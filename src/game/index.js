@@ -25,7 +25,7 @@ import { prewarmLevel } from './render/prewarm.js';
 import { bossSubtitle } from './bosses/subtitles.js';
 import { Player } from './player.js';
 import { HUD } from './ui/hud.js';
-import { coach, setCoachSink, setCoachStore } from './ui/coach.js';
+import { coach, setCoachSink, setCoachStore, resetCoach } from './ui/coach.js';
 import { MoodController } from './fx/mood-controller.js';
 import { refreshScoreVolume, setIntensity as setMusicIntensity } from './audio/score.js';
 import { gsfx } from './audio/sfx-bank.js';
@@ -609,6 +609,16 @@ function startNewGame(mode = 'medium') {
         },
     });
     const fresh = resetSovereignProgress(mode);
+    // A NEW GAME MUST BE NEW. resetSovereignProgress only rewrites the
+    // Sovereign store; the onboarding ledgers live one level up in engine
+    // progress (`hintsSeen`, `storySeen`, wired near the top of this file), so
+    // a second campaign on the same browser profile used to start with all 18
+    // coach hints and every story panel already marked as seen — including the
+    // opening line queued twelve lines below, which was filtered out before it
+    // could be shown. resetCoach() has existed the whole time and was called
+    // only from a spec.
+    resetCoach();
+    hud.story?.resetSeen?.();
     activateCampaignServices(fresh);
     player.inventory = new Inventory();
     player.health.max = 6;
@@ -772,6 +782,29 @@ const menu = new MenuOverlay({
             case 'quitTitle':
                 goToTitle();
                 break;
+            // Replay the roll from the title. Deliberately NOT startEnding():
+            // that awards the campaign score, stamps campaignComplete and
+            // submits a leaderboard entry, none of which may happen twice. This
+            // reads the run that was already recorded and just plays it back.
+            case 'credits': {
+                const p = loadSovereignProgress();
+                if (!p.campaignComplete) break;
+                const fs = p.finalScore || {};
+                menu.close();
+                game.paused = true;
+                ending.start({
+                    playTime: fs.playTime != null ? fs.playTime : (p.playTime || 0),
+                    deaths: fs.deaths != null ? fs.deaths : (p.deaths || 0),
+                    bosses: fs.bosses != null ? fs.bosses : (p.bossesDefeated || []).length,
+                    shards: fs.shards || 0,
+                    keys: fs.keys || 0,
+                    score: fs.score || 0,
+                    ledger: fs.ledger || {},
+                    events: fs.events || 0,
+                    runMode: fs.runMode || p.runMode,
+                });
+                break;
+            }
             case 'buy': {
                 const ups = { ...(loadSovereignProgress().upgrades || {}) };
                 let banked = loadSovereignProgress().bankedShards || 0;
@@ -1044,7 +1077,14 @@ function frame() {
     }
 
     if (input.consumePause()) {
-        if (menu.isOpen) {
+        // The map is modal and outranks the pause menu here. This drain is
+        // unconditional, so the map's own `consumePause` check further down
+        // could never see the flag: Esc stacked the pause menu on top of the
+        // map instead of closing it, and quitting to title from that state
+        // left the map undismissable (the Tab toggle is gated on !atTitle).
+        if (mapScreen.isOpen) {
+            mapScreen.close(game);
+        } else if (menu.isOpen) {
             menu.back(); // pops a submenu; resumes from pause root; inert on title root
         } else {
             game.paused = true;
@@ -1084,7 +1124,7 @@ function frame() {
         input.consumeStoryAdvance();
         input.consumeVial();
         input.consumeDust();
-        if (input.consumePause()) mapScreen.close(game); // Esc closes
+        // Esc is handled by the pause block above, which closes the map first.
     }
 
     // Dev mode (Phase D): one gate — when disabled every dev key is a no-op
@@ -1200,8 +1240,13 @@ function frame() {
             else if (game._hbAcc >= 1.15) { game._hbAcc = 0; gsfx.lowHealth(); }
         }
         {
-            const reach = grappleRange(progress.upgrades);
-            const owns = player.inventory.has?.('magnetic_grapple');
+            // Both of these must match the grapple-throw block below (the
+            // `consumeGrapple` branch): `hasItem` is the Inventory method —
+            // there is no `has`, and the optional call hid that — and
+            // `player.grappleRange` is refreshed by applyUpgradeStats, where
+            // the boot-time `progress` snapshot never sees an altar purchase.
+            const reach = player.grappleRange || 8;
+            const owns = player.inventory.hasItem('magnetic_grapple');
             const pp = player.root.position;
             const inRange = owns
                 ? (game.level?.grappleAnchors?.() || []).filter((a) =>
@@ -1729,6 +1774,17 @@ window.__sovereignScar = {
     loadLevel,
     requestLevel,
     isLevelUnlocked,
+    // Begin a run explicitly, so a test never has to MIME one.
+    //
+    // The visual specs used to leave the title with `click, ArrowDown, Enter`
+    // and that quietly coupled every luminance and contrast reading in the
+    // certification gate to the title menu's exact row order and to which rows
+    // happened to be disabled. Adding one row (Credits) moved what ArrowDown
+    // selected: the same three keystrokes that started a run before now opened
+    // Settings, the sweep ran with no run ever started, and sandbox-combat's
+    // contrast read 7 instead of 14-62 — a "rendering regression" that was
+    // nothing of the kind. A fixture should say what it wants.
+    startNewGame,
     applyQualitySetting,
     cameraRig: camRig,
     progress: loadSovereignProgress,

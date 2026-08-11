@@ -81,7 +81,15 @@ export function writeStepSummary(sinks, extraNotes = []) {
     if (!file) return;
     const all = sinks.flatMap((s) => s.results.map((r) => ({ ...r, suite: s.label })));
     const failed = all.filter((r) => !r.pass);
-    let md = '## Test results: ' + (all.length - failed.length) + '/' + all.length + ' passed\n\n';
+    const skipped = all.filter((r) => r.skip);
+    const ran = all.length - skipped.length;
+    let md = '## Test results: ' + (ran - failed.length) + '/' + ran + ' passed';
+    if (skipped.length) md += ' — :warning: **' + skipped.length + ' suite(s) skipped**';
+    md += '\n\n';
+    if (skipped.length) {
+        md += '### Skipped (did not run)\n\n'
+            + skipped.map((s) => '- `' + s.suite + '` — ' + s.detail).join('\n') + '\n\n';
+    }
     if (failed.length) {
         md += '### Failures\n\n| Suite | Assertion | Detail |\n|---|---|---|\n';
         for (const f of failed) {
@@ -126,7 +134,23 @@ export function createSink(label) {
             console.log((pass ? 'PASS' : 'FAIL') + '  [' + label + '] ' + name
                 + (detail ? ' — ' + detail : ''));
             return !!pass;
-        }
+        },
+        /**
+         * Record that a whole suite did NOT run.
+         *
+         * Every browser spec used to announce a missing Chrome as
+         * `t.ok('chrome available (skipped)', true)` — a PASSING assertion. On a
+         * machine with no Chrome the run printed a clean green while seventeen
+         * suites and roughly 860 assertions never executed, and nothing in the
+         * output could tell you the difference between "the campaign works" and
+         * "no browser was installed". A skip is not a pass. It is not a failure
+         * either — the exit code stays 0 so a no-browser box can still run the
+         * unit half — but it must be impossible to miss in the summary.
+         */
+        skip(reason = 'skipped') {
+            results.push({ name: label + ' did not run', pass: true, skip: true, detail: reason });
+            console.log('SKIP  [' + label + '] suite did not run — ' + reason);
+        },
     };
 }
 
@@ -134,10 +158,21 @@ export function createSink(label) {
 export function summarize(sinks) {
     const all = sinks.flatMap((s) => s.results);
     const failed = all.filter((r) => !r.pass);
-    console.log('\n=== SUMMARY: ' + (all.length - failed.length) + '/' + all.length + ' passed ===');
+    const skipped = all.filter((r) => r.skip);
+    const ran = all.length - skipped.length;
+    const suiteWord = skipped.length === 1 ? 'SUITE' : 'SUITES';
+    console.log('\n=== SUMMARY: ' + (ran - failed.length) + '/' + ran + ' passed'
+        + (skipped.length ? ', ' + skipped.length + ' ' + suiteWord + ' SKIPPED' : '') + ' ===');
     if (failed.length) {
         console.log('Failed:');
         failed.forEach((f) => console.log(' - ' + f.name + ': ' + f.detail));
+    }
+    if (skipped.length) {
+        // Loud on purpose. This is the line that stops a partial run from being
+        // mistaken for a full one.
+        console.log('\n!!! ' + skipped.length + ' ' + suiteWord
+            + ' DID NOT RUN — THIS IS NOT A FULL PASS !!!');
+        skipped.forEach((s) => console.log(' - ' + s.name + ': ' + s.detail));
     }
     return failed.length;
 }

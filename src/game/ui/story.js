@@ -52,6 +52,22 @@ export class StoryPanel {
         for (const id of this.store.load() || []) this.shownIds_.add(id);
     }
 
+    /**
+     * Forget every line ever heard. The counterpart to coach.js's resetCoach,
+     * and for the same reason: a NEW GAME must be new.
+     *
+     * `clear()` above deliberately does not do this, and correctly so — but it
+     * meant nothing did. `resetSovereignProgress` rewrites the Sovereign store
+     * while `storySeen` lives one level up in engine progress, so a second
+     * campaign on the same browser profile opened with every story panel
+     * already marked heard, including the opening line startNewGame queues for
+     * itself. Silent, and indistinguishable from the panels being broken.
+     */
+    resetSeen() {
+        this.shownIds_.clear();
+        try { this.store?.save([]); } catch (_) { /* storage is optional */ }
+    }
+
     /** Drop current + pending lines (used on level load). */
     clear() {
         this.queue_ = [];

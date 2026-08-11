@@ -75,22 +75,69 @@ export function atmosphereFor(tag) {
  * Slow-drifting dust field centred on a room origin. Call setCenter when the
  * player changes rooms so the field follows the camera subject.
  */
+/**
+ * The largest density any profile asks for. The buffer is allocated once at
+ * this size and each profile simply draws a prefix of it (see setProfile), so
+ * `count` costs allocation once and nothing per room.
+ */
+const MAX_COUNT = Math.max(
+    COUNT,
+    ...Object.values(ATMOSPHERES).map((p) => p.count || 0)
+);
+
+/**
+ * A tiny deterministic PRNG (mulberry32) for the mote field.
+ *
+ * The field used to be laid out with Math.random(), so every page load got a
+ * different dust cloud. Nobody can see that — but the certification gate can,
+ * and it was the largest uncontrolled variable in the frame. `visual-sanity`
+ * measures centre-crop contrast (p90 − p10), and on an OPEN level the centre
+ * crop is mostly flat floor: the bright tail of that distribution is largely
+ * where the additive motes happen to be sitting. Measured on sandbox-combat,
+ * identical code produced contrast readings from 11 to 59 across runs, and the
+ * reading moved by 3 when an UNUSED import was added to an unrelated file —
+ * proof the number was tracking module-load timing and RNG draw order rather
+ * than anything about the build.
+ *
+ * That gate's own header already says a randomly-failing gate is worse than no
+ * gate because it trains you to re-run; it says so about the max-vs-median bug
+ * that was fixed in the same file. This is the remaining half of that disease,
+ * and it is fixed at the source rather than by widening the floor.
+ *
+ * Gameplay is unaffected: the field still drifts, and one fixed starting layout
+ * is no more noticeable than a random one at seventeen units up.
+ */
+function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function rand() {
+        a = (a + 0x6D2B79F5) >>> 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
 export class DustMotes {
     constructor(scene, opts = {}) {
         this.scene = scene;
-        this.count = opts.count || COUNT;
+        // Allocate for the densest profile, not for the default. `this.count`
+        // is the CAPACITY; how many are actually drawn is per-profile.
+        this.capacity = opts.count || MAX_COUNT;
+        this.count = this.capacity;
         this.enabled = opts.enabled !== false;
+        const rand = mulberry32(opts.seed != null ? opts.seed : 0x5CA12ED);
+        this._rand = rand;
         const positions = new Float32Array(this.count * 3);
         const speeds = new Float32Array(this.count);
         const scales = new Float32Array(this.count);
         for (let i = 0; i < this.count; i++) {
-            positions[i * 3] = (Math.random() - 0.5) * SPREAD;
-            positions[i * 3 + 1] = Math.random() * HEIGHT + 1.0;
-            positions[i * 3 + 2] = (Math.random() - 0.5) * SPREAD;
-            speeds[i] = 0.15 + Math.random() * 0.35;
+            positions[i * 3] = (rand() - 0.5) * SPREAD;
+            positions[i * 3 + 1] = rand() * HEIGHT + 1.0;
+            positions[i * 3 + 2] = (rand() - 0.5) * SPREAD;
+            speeds[i] = 0.15 + rand() * 0.35;
             // Cubed, so most motes are small and a few are near full size —
             // a uniform distribution still reads as "all the same".
-            const u = Math.random();
+            const u = rand();
             scales[i] = 0.35 + u * u * u * 1.5;
         }
         this._speeds = speeds;
@@ -98,6 +145,15 @@ export class DustMotes {
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         geo.setAttribute('moteScale', new THREE.BufferAttribute(scales, 1));
+        // The buffer is now sized for the DENSEST profile, so the default
+        // draw range ("all of it") is no longer the default DENSITY. Left
+        // unset, a level whose atmosphere resolves to the fallback drew all
+        // 520 instead of 420 — measured on sandbox-combat as contrast 14 → 7,
+        // straight through the visual-sanity floor, at identical luminance.
+        // A haze that fails a contrast gate is the exact thing this field is
+        // supposed to stay out of the way of.
+        this.drawn = Math.min(this.capacity, COUNT);
+        geo.setDrawRange(0, this.drawn);
         const mat = new THREE.PointsMaterial({
             color: opts.color != null ? opts.color : 0xd8c8a0,
             size: 0.055,
@@ -173,6 +229,23 @@ gl_FragColor.a *= vMoteFade;
         mat.color.setHex(p.color);
         mat.size = p.size != null ? p.size : 0.055;
         mat.opacity = p.opacity != null ? p.opacity : 0.22;
+
+        // DENSITY, the sixth field — and until now the only one of the six
+        // that did nothing. Every profile has carried a `count` since the
+        // table was written, the header justifies the design with "the Mire
+        // can afford four times the density where bubbles want it", and
+        // setProfile read the other five and never this one. `this.count` was
+        // fixed at construction and index.js builds `new DustMotes(scene)`
+        // with no options, so all fourteen dungeons and every region ran the
+        // same 420 motes.
+        //
+        // Drawn as a prefix of the full buffer rather than by rebuilding it.
+        // The comment above is right that rebuilding pops every particle to a
+        // new position on the one frame the player is looking at the whole
+        // screen; a draw-range change costs nothing and pops nothing.
+        const want = Math.min(this.capacity, p.count || this.capacity);
+        this.drawn = want;
+        this.points.geometry.setDrawRange(0, want);
     }
 
     /** Adopt an atmosphere by its kit tag. */
@@ -197,8 +270,12 @@ gl_FragColor.a *= vMoteFade;
             // would drain the room and then be empty.
             if (rise >= 0 ? arr[i * 3 + 1] > top : arr[i * 3 + 1] < 1.0) {
                 arr[i * 3 + 1] = rise >= 0 ? 1.0 : top;
-                arr[i * 3] = (Math.random() - 0.5) * SPREAD;
-                arr[i * 3 + 2] = (Math.random() - 0.5) * SPREAD;
+                // Recycled from the same seeded stream as the initial layout.
+                // Math.random() here would put the nondeterminism straight back
+                // in through the wrap path a few seconds after load, which is
+                // exactly when a capture is taken.
+                arr[i * 3] = (this._rand() - 0.5) * SPREAD;
+                arr[i * 3 + 2] = (this._rand() - 0.5) * SPREAD;
             }
         }
         pos.needsUpdate = true;

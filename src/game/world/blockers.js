@@ -89,7 +89,8 @@ export function applyBlockerToMap(map, b) {
         fillBox(map, b.rect.x0, b.rect.x1, 1, 2, b.rect.z0, b.rect.z1,
             b.color || CRUST_COLORS.slateDark);
     }
-    // wedge_crack builds its own destructible mesh; caster_dark is runtime-only.
+    // wedge_crack builds its own destructible mesh; caster_dark builds its own
+    // barrier at runtime too (it has to be droppable when the Caster is out).
     //
     // Every Phase E1 piece is runtime-only too, INCLUDING the vault's three
     // permanent walls, and that is not an implementation convenience. Puzzles
@@ -343,6 +344,66 @@ export function createBlockerRuntime(ctx, level, b, origin = { x: 0, z: 0 }) {
         shroud.rotation.x = -Math.PI / 2;
         shroud.position.set((rectW.x0 + rectW.x1) / 2, 2.4, (rectW.z0 + rectW.z1) / 2);
         ctx.scene.add(shroud);
+
+        // THE SHROUD HAS TO STOP YOU, or the Light Caster gates nothing.
+        //
+        // This was a plane and an opacity lerp: no solid, no signal, and
+        // `applyBlockerToMap` skips the type, so all eight authored instances
+        // were decoration. Beat 04's `aerie` shroud is the clearest cost — the
+        // Scar Suture behind it is collected by the room-graph proximity check
+        // whether or not you own the Caster, so a permanent health upgrade was
+        // free, and the item text promises the opposite: "burns back the dark
+        // patches that block the way."
+        //
+        // So the dark is a real 2-high barrier, raised and dropped exactly like
+        // `timed_gate`'s, and the Caster is what drops it.
+        // A SHELL, NOT A PLUG. Filling the rect solid is the obvious reading of
+        // "the dark blocks the way" and it is wrong: every authored shroud has
+        // the reward sitting INSIDE its rect, so a solid fill buries the thing
+        // the shroud exists to guard. pickup-reachability and world-life both
+        // called it immediately — four rewards entombed across beats 04, 06,
+        // 09 and 12. Wall the perimeter and leave the middle hollow: you cannot
+        // reach in while it stands, and the prize is untouched when it drops.
+        const darkMap = new Map();
+        const { x0, x1, z0, z1 } = b.rect;
+        const darkColor = b.color || 0x0a0a12;
+        fillBox(darkMap, x0, x1, 1, 2, z0, z0, darkColor); // north face
+        fillBox(darkMap, x0, x1, 1, 2, z1, z1, darkColor); // south face
+        fillBox(darkMap, x0, x0, 1, 2, z0, z1, darkColor); // west face
+        fillBox(darkMap, x1, x1, 1, 2, z0, z1, darkColor); // east face
+        let built = null;
+        let unsub = null;
+        const raise = () => {
+            if (built) return;
+            built = meshAndCollide(darkMap, ctx.scene, ctx.collisionWorld, {
+                origin: { x: origin.x, y: 0, z: origin.z },
+                solidPrefix: `blk:${b.id}:dark`,
+            });
+            unsub = level.addVoxelQuery?.(built.getVoxelAt) || null;
+        };
+        const drop = () => {
+            if (!built) return;
+            try { unsub?.(); } catch (_) {}
+            unsub = null;
+            built.dispose();
+            built = null;
+        };
+        raise();
+
+        // And the same net the timed gate carries: never re-raise into someone.
+        // Walking in lit and then cycling off the Caster must not close a
+        // 2-high wall on top of the player — that is the softlock this file
+        // has already paid for once. The signal decides when the dark MAY
+        // return; the player's position decides whether it does.
+        const PAD = 0.55;
+        const inTheWay = (game) => {
+            const p = game?.player?.root?.position;
+            if (!p) return false;
+            const lx = p.x - origin.x, lz = p.z - origin.z;
+            return lx >= b.rect.x0 - PAD && lx <= b.rect.x1 + 1 + PAD
+                && lz >= b.rect.z0 - PAD && lz <= b.rect.z1 + 1 + PAD;
+        };
+
         return {
             update(dt, game) {
                 const p = game.player.root.position;
@@ -352,8 +413,17 @@ export function createBlockerRuntime(ctx, level, b, origin = { x: 0, z: 0 }) {
                 const target = lit ? 0 : 0.85;
                 shroud.material.opacity += (target - shroud.material.opacity)
                     * Math.min(1, dt * 5);
+                if (lit) {
+                    if (built) {
+                        drop();
+                        gsfx.secretFound?.();
+                    }
+                } else if (!built && !inTheWay(game)) {
+                    raise();
+                }
             },
             dispose() {
+                drop();
                 if (shroud.parent) shroud.parent.remove(shroud);
                 shroud.geometry.dispose();
                 shroud.material.dispose();

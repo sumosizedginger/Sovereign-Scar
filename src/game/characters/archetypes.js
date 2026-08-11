@@ -100,6 +100,36 @@ export const ARCHETYPES = {
         sway: 0.13,
         rest: { bodyPitch: 0.3, armLx: 0.45, armRx: 0.45 },
     },
+    // Phase D3's two kinds shipped with a palette and a body and no archetype,
+    // so archetypeFor() handed both of them the sentinel's gait: a guard's
+    // slow deliberate stride on two back-line kiters that never close. Both
+    // are written here against what their AI actually does.
+    weaver: {
+        // Kites sideways and lays strands ACROSS your path (_aiWeave backs off
+        // inside 4.5 and drifts back in past 9). The gait is a busy sidelong
+        // shuffle, arms held wide and low where the work happens, head down —
+        // the body says "occupied with the room", not "coming for you".
+        gaitFreqMin: 2.0, gaitFreqMax: 2.8,
+        legAmp: 0.18,
+        armAmp: 0.26,
+        bobAmp: 0.03,
+        strideLean: 0.04,
+        sway: 0.14,
+        rest: { armLx: 0.30, armRx: 0.30, armLz: 0.52, armRz: -0.52, bodyPitch: 0.12, torsoYaw: 0.22 },
+    },
+    censer: {
+        // The support you are meant to kill first, so it must be pickable out
+        // of a crowd while moving. Big head, narrow frame, and a slow hovering
+        // drift with almost no leg travel — nothing else in the bestiary moves
+        // like this, which is the same job its gold palette is doing.
+        gaitFreqMin: 1.0, gaitFreqMax: 1.4,
+        legAmp: 0.10,
+        armAmp: 0.12,
+        bobAmp: 0.10,
+        strideLean: 0.02,
+        sway: 0.07,
+        rest: { armLx: 0.20, armRx: 0.20, armLz: 0.30, armRz: -0.30, torsoPitch: -0.10 },
+    },
 };
 
 export function archetypeFor(kind) {

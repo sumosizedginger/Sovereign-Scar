@@ -71,8 +71,8 @@ assertion before changing it.
 ## State
 
 Everything below is green in the working tree. `npm test` — unit + full browser
-E2E — **4480/4480**, run end to end after the arrival sweep.
-`npm run test:unit` alone: **3616/3616**.
+E2E — **4743/4743**, run end to end after the room-seal fix.
+`npm run test:unit` alone: **3879/3879**.
 
 Every one of those nine fixes has been reverted and the suite re-run to confirm
 something fails without it (`HANDOFF` trap 10). The first pass of that found
@@ -703,6 +703,39 @@ Two riders, both of which cost a debugging round:
 The seam snap has **no failing counterfactual of its own** once the body test is
 in: `nearestFreeEntry` relocates the harmful cases anyway. It is kept as
 prophylaxis and is labelled as such rather than claimed as a fix.
+
+**32. A rule enforced by reaction is not enforced. A cooldown is not a wall.**
+The room seal held the player in by *reacting* — walk into the doorway, get
+shoved 1.1 units back — and then went quiet for 0.7 seconds so the bounce could
+not become a cage. At a **locked** door that is right, because a solid plug is
+doing the actual holding and the shove is only manners. At a **sealed** door
+there is no plug; the doorway is an open hole and the shove was the whole
+barrier, so every 0.7 seconds there was a window with nothing in it. 0.7s at 5.5
+units/second is four times what it takes to walk back through. All 26 sealed
+rooms, every door: you walked out, fell (the neighbour is 47 units away and not
+baked until you transition), and died on the `y < -12` void kill — while
+`currentRoomId()` still said you were inside.
+
+Three things to carry out of it:
+
+* **Ask what is behind the reaction.** The cooldown's own comment reasons
+  carefully about geometry stopping the player, and is entirely correct — for
+  the door it was written against. It was then reused at the one door type with
+  no geometry at all. A guard that assumes a backstop must name the backstop.
+* **Separate "stop them" from "tell them".** Those want opposite cadences: one
+  must run every frame and gate on nothing, the other must be rate-limited or it
+  spams. Fusing them meant the rate limit silently applied to the wall. They are
+  now `holdSeal` and the `tryDoor` toast.
+* **Clamp, do not teleport.** The shove was also the owner's *"bumping me back"*
+  complaint: it threw them 1.1 units into the enemies they were retreating from
+  and zeroed their velocity. A clamp holds the same line and takes nothing away.
+
+The suite could not have seen any of it. `room-seal.spec.mjs` has 26 rooms of
+assertions and every one is about the player getting **out** — see trap 26 on
+testing both directions of a rule. `tests/game/seal-holds.spec.mjs` is the other
+direction: walk at every sealed door for five seconds through the real
+`level.update` and assert you do not pass the wall plane. It fails 79 times
+without the clamp.
 
 **30. Three rooms spawn the player inside the world. Still true.**
 `beat-05-citadel/monolith`'s spawn column reads `111111111` — solid rock top to

@@ -1,24 +1,23 @@
 // src/engine/quality.js
 // Purpose: Graphics quality tiers — gates every effect added in Graphics.md
 // (Phases A-F) so "max" fidelity is opt-in rather than the forced default.
-// Dependencies: ./renderer.js, ./lights.js, ./environment.js, ../context.js
+// Dependencies: ./renderer.js, ./lights.js, ./environment.js
 
 import {
     renderer, composer,
     bloomPass, vignettePass, filmPass, smaaPass, rgbShiftPass
 } from './renderer.js';
 import { setShadowMapSize } from './lights.js';
-import { applyEnvironmentForTheme, clearEnvironment } from './environment.js';
-import { world } from '../context.js';
+import { clearEnvironment } from './environment.js';
 
 export const TIERS = {
     low: {
         pixelRatio: 1, bloom: false, bloomStrength: 0, shadowMap: 1024,
-        env: false, postExtras: false, aberration: false, reflections: false
+        postExtras: false, aberration: false
     },
     med: {
         pixelRatio: 1.5, bloom: true, bloomStrength: 0.7, shadowMap: 2048,
-        env: true, postExtras: false, aberration: false, reflections: false
+        postExtras: false, aberration: false
     },
     high: {
         // 4096: 2048 across a ±30 frustum is 2048/60 = ~34 texels per world
@@ -27,11 +26,11 @@ export const TIERS = {
         // either way for blocky geometry (graphics overhaul ticket 2), and the
         // penumbra is derived from this number, so it had to be right.
         pixelRatio: 2, bloom: true, bloomStrength: 0.9, shadowMap: 4096,
-        env: true, postExtras: true, aberration: false, reflections: false
+        postExtras: true, aberration: false
     },
     ultra: {
         pixelRatio: 2, bloom: true, bloomStrength: 1.2, shadowMap: 4096,
-        env: true, postExtras: true, aberration: true, reflections: true
+        postExtras: true, aberration: true
     }
 };
 
@@ -78,24 +77,35 @@ export function setQuality(name) {
 
     setShadowMapSize(t.shadowMap);
 
-    // Apply/clear immediately rather than waiting for the next level load —
-    // works in both directions (dropping a tier clears it now; raising a
-    // tier re-applies from the env cache now, if that theme's texture has
-    // already loaded).
-    if (t.env && world.level) {
-        applyEnvironmentForTheme(world.level.theme);
-    } else {
-        clearEnvironment();
-    }
+    // `env` and `reflections` are GONE from the tier table, and this is the
+    // tombstone — same reason `unlockedEndings` has one in settings.js.
+    //
+    // Both were gated on `world.level`, which is never assigned: context.js
+    // exports a bare {} and game/index.js sets `world.game`, `world.player`
+    // and `world.collision` and nothing else. So the env arm could not run,
+    // and this branch reached `clearEnvironment()` on EVERY tier change
+    // including ultra. `_reflector` was worse — zero producers anywhere in the
+    // codebase, so ULTRA's headline flag read a field nothing has ever
+    // written. (GRAPHICS-OVERHAUL noted `reflections` "reads nothing"; it was
+    // then wired to a condition that is never true, which is not the same as
+    // fixing it.)
+    //
+    // Do not restore these by assigning `world.level`. The live IBL path is
+    // game/render/mood-environment.js, driven from MoodController; the engine
+    // cache here has no producer at all (its only filler was skybox.js, which
+    // is unreachable and loads from a directory that does not exist). Making
+    // this branch run would null out the environment the mood system just set.
+    //
+    // The unconditional clear is kept because that is exactly what shipped:
+    // MoodController.reapplyVisual() re-applies immediately after every
+    // setQuality() call, and removing the clear would be a real visual change
+    // hiding inside a cleanup.
+    clearEnvironment();
 
     vignettePass.enabled = t.postExtras;
     filmPass.enabled = t.postExtras;
     smaaPass.enabled = t.postExtras;
     rgbShiftPass.enabled = t.aberration;
-
-    if (world.level && world.level._reflector) {
-        world.level._reflector.visible = t.reflections;
-    }
 
     try {
         if (window.localStorage) window.localStorage.setItem('gfxQuality', tier);

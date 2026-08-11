@@ -41,7 +41,7 @@ import {
     resolveTrack, BASE_TRACKS, BEAT_TRACKS, REGION_TRACKS,
 } from '../../src/game/audio/tracks.js';
 import { noteToMidi, scaleNote } from '../../src/game/audio/theory.js';
-import { getSetting, setSetting } from '../../src/engine/settings.js';
+import { getSetting, setSetting, SETTING_DEFAULTS } from '../../src/engine/settings.js';
 
 /** A frame 20 units wide (±10), centred on the origin unless told otherwise. */
 function listenAtOrigin() {
@@ -103,6 +103,25 @@ function placedAt(src, x, z) {
 }
 
 export function run(t) {
+    // MONO IS NOW THE SHIPPED DEFAULT (settings.js explains the asymmetry), and
+    // almost everything below is testing the PANNING MECHANISM — which mono is
+    // designed to switch off. Those assertions were silently riding on the old
+    // default, so flipping it turned ten of them red for the right reason and
+    // the wrong one: the panner works fine, it was just correctly disabled.
+    //
+    // So the mechanism runs explicitly in stereo, and the DEFAULT is asserted
+    // against SETTING_DEFAULTS rather than against live state. A spec that
+    // reads the live setting to learn the default cannot tell the two apart.
+    const _monoBefore = getSetting('monoAudio');
+    setSetting('monoAudio', false);
+    try {
+        runPanningAndIntegration(t);
+    } finally {
+        setSetting('monoAudio', _monoBefore);
+    }
+}
+
+function runPanningAndIntegration(t) {
     // ── Unplaced is the default, and it must cost nothing ──────────────────
     {
         clearListener();
@@ -314,9 +333,16 @@ export function run(t) {
             setSetting('monoAudio', wasMono);
         }
 
-        // ...and it is off by default, so the feature is on for everyone else.
-        t.ok('stereo is the default', getSetting('monoAudio') === false);
-        t.ok('and pans again once mono is off',
+        // ...and it is ON by default. This assertion used to read "stereo is
+        // the default", which pinned a hole in place: a player with hearing in
+        // one ear had to find this toggle on every fresh profile, and could not
+        // know to look, because the cues they were missing never arrived to be
+        // missed. Mono costs a two-eared player the DIRECTION of a wind-up and
+        // nothing else; stereo costs a one-eared player the wind-up. The safe
+        // default is the one whose failure mode is recoverable.
+        t.ok('mono is the SHIPPED default', SETTING_DEFAULTS.monoAudio === true,
+            'read from the schema, not from live state a test may have moved');
+        t.ok('and pans again once mono is turned off',
             at({ x: -8, z: 0 }, () => placement()).pan < 0);
     }
 

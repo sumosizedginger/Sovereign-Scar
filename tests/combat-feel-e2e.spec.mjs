@@ -17,7 +17,7 @@ export async function run(t) {
     }
     const chrome = findChromeVerbose();
     if (!chrome.path) {
-        t.ok('chrome available (skipped)', true, 'no chrome');
+        t.skip('Chrome not found');
         return;
     }
 

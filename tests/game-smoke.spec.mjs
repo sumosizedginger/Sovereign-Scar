@@ -8,7 +8,7 @@ import {
 export async function run(t) {
     const chrome = findChromeVerbose();
     if (!chrome.path) {
-        t.ok('chrome available (skipped)', true, 'no chrome — unit-only CI path');
+        t.skip('Chrome not found — unit-only CI path');
         return;
     }
 

@@ -28,7 +28,17 @@ export const SETTING_DEFAULTS = {
     // easier to locate for most players and deletes them for that one, so the
     // feature ships with its own off switch. Distance rolloff is kept — it
     // carries the same information in one channel.
-    monoAudio: false,
+    //
+    // DEFAULTED ON, and the asymmetry is the whole argument. A two-eared
+    // player running mono loses the direction of a wind-up and keeps its
+    // distance, timing and existence: the fight is still completely playable.
+    // A one-eared player running stereo loses roughly half the wind-ups in the
+    // game outright, and cannot discover why, because a cue that never arrives
+    // leaves nothing to notice. When one default is a downgrade and the other
+    // is a silent hole, you do not put the hole on by default and wait for the
+    // player to find the menu — especially not on a game whose own controls
+    // doc claims most of combat is readable with your eyes shut.
+    monoAudio: true,
     alwaysShowDialogue: false,   // replay intro/boss intros even when seen
     keybindings: null,           // null = input.js defaults; else {action: code}
     lastHero: 0

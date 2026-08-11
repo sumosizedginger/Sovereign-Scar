@@ -5,6 +5,76 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### The seal was a shove with a cooldown, and you could walk out of the world
+
+The owner: *"rooms are supposed to stop you from leaving if you try while
+enemies are still up, and I have died twice to the room bumping me back."*
+
+Both halves of that sentence are one bug. The bump **was** the seal, and it did
+not work.
+
+A locked door bakes a solid plug into its gap. A sealed door bakes nothing — the
+doorway stays an open hole — so the entire barrier was `refuseDoor` shoving the
+player 1.1 units back, zeroing their velocity, and then going **completely
+quiet for 0.7 seconds**. That cooldown is correct where it was written: at a
+plugged door, geometry does the holding and the cooldown only stops the bounce
+becoming a cage. At a sealed door there is no geometry, and 0.7 seconds at a
+walk speed of 5.5 is four times what it takes to cover the 1.1 and step through.
+
+Measured in the running game, beat-01 `antechamber`, holding south into its
+`open` door — no key, no trick, one direction on the stick:
+
+| | before | after |
+|---|---|---|
+| shoves in 5s | 7 | 0 (clamped) |
+| final z | **-171.63** (14 units past the wall at -183.5) | **-183.50** |
+| final y | **-29.34** | **1.95** |
+| `currentRoomId()` | `antechamber` the whole way | `antechamber` |
+
+Past the wall there is no floor — the neighbouring room is 47 units away and is
+not baked until you transition — so the player fell until `index.js` fired its
+`y < -12` void kill, toast *"Fell into the Scar…"*. The room that would not let
+them leave is what killed them. Twice.
+
+**All 26 sealed rooms had it, on every door.** 18 have an `open` door and need
+no key at all; the other 8 are plugged only until you unlock them, and the
+`keyStore` outlives the bake, so they open up on the next visit too. The
+counterfactual run failed **79** assertions across every one of them.
+
+The fix separates two jobs the shove was doing badly at once:
+
+* **Holding the player in** is now `holdSeal`, a per-frame positional clamp to
+  the door's wall plane. It gates on nothing, so there is no frame on which the
+  wall is not there. Being a clamp and not a teleport, it also cannot fling the
+  player back into the enemies they were retreating from, and it takes away no
+  velocity and no input — you slide along the doorway instead of being launched
+  through the pack. That is the *"bumping me back"* half, gone as a side effect
+  of fixing the escape.
+* **Telling the player no** keeps the 0.7s cooldown, which is the only thing a
+  cooldown was ever the right tool for. You may still stand in the doorway and
+  get *"Sealed — 2 still standing"* and the locked-door sound.
+
+`refuseDoor` is untouched and still used by locked, boss and exit doors, where
+a plug is behind it. (Checked: all 14 dungeons define `onExit`, so the
+exit-door fallback into `refuseDoor` — the one case with a gap and no plug — is
+unreachable.)
+
+**What the suite was asking.** `room-seal.spec.mjs` has 26 rooms' worth of
+assertions and every one of them is about the player getting *out*: are there
+enemies, are they reachable, is there a stalemate valve, is there a ceiling
+under the valve. Not one asked whether the room could keep the player *in*. The
+same shape as the boss specs that asked fourteen times whether the player could
+kill each boss and never whether a boss could kill the player.
+
+New `tests/game/seal-holds.spec.mjs` drives the real `level.update` for every
+sealed room and every door: line up on the door, walk at it for five seconds,
+assert you never pass the wall plane, never transition, and the seal is still
+on afterwards. 26 rooms, 78 doors. Play-verified in both directions — held at
+the wall with the toast firing, then cleared the room and walked out the same
+door into `predecessor`.
+
+Suite: **4743/4743** (unit **3879/3879**).
+
 ### Standing on a roof is not standing anywhere — arrival, swept
 
 The owner, fourth report on this: *"I spawned under the ground due to the raised

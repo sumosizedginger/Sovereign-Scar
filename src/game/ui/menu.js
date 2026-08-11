@@ -6,6 +6,11 @@ import { MenuState } from './menu-state.js';
 import { UPGRADES, nextCost } from '../kernel/upgrades.js';
 import { RUN_MODES, runModeSummary } from '../kernel/run-mode.js';
 import { SCORE_VERSION } from '../kernel/score.js';
+// sfx-bank has had menuMove/menuConfirm/menuBack since it was written. Nothing
+// in src/game/ui/ imported any audio module, so all three were defined,
+// exported, and never once played: every menu in the game was silent.
+import { gsfx } from '../audio/sfx-bank.js';
+import { controlSheet, padSheet } from '../input.js';
 
 const PANEL_BG = 'rgba(8,10,18,0.92)';
 const BORDER = '1px solid #3a4058';
@@ -86,13 +91,22 @@ export function buildScreens() {
         return items;
     };
 
+    // BUILT FROM THE BINDING TABLE, not typed out again.
+    //
+    // These were six hand-written lines and they had drifted exactly the way
+    // input.js's preamble says this class of list always does: no guard/parry,
+    // no lock-on, no switch-target, no Memory Vial, no Entropy Dust, no map —
+    // six real bindings a player could not discover from the pause menu — and
+    // it called M "mood shift" where the table, the HUD and the docs all call
+    // it Mirror travel. The keyboard and pad sheets were unified into
+    // controlSheet()/padSheet() precisely so this could not happen; menu.js
+    // was the one consumer that never got converted, and controls.spec.mjs
+    // audits input.js against the docs, not against this file.
     const controlsItems = () => ([
-        { type: 'text', label: 'WASD / arrows — move' },
-        { type: 'text', label: 'You face the way you walk · Space / J — attack' },
-        { type: 'text', label: 'Shift — dash · G — grapple · E — interact' },
-        { type: 'text', label: 'Q / R — cycle weapon · M — mood shift' },
-        { type: 'text', label: 'N — mute · P / Esc — pause · Enter — story' },
-        { type: 'text', label: '[ ] — previous / next beat (unlocked)' },
+        ...controlSheet().split('\n').map((label) => ({ type: 'text', label })),
+        { type: 'text', label: '' },
+        { type: 'text', label: 'Gamepad' },
+        ...padSheet().split('\n').map((label) => ({ type: 'text', label })),
         { type: 'text', label: '' },
         { type: 'action', id: 'back', label: 'Back' },
     ]);
@@ -142,6 +156,18 @@ export function buildScreens() {
                     { type: 'submenu', id: 'settings', label: 'Settings', screen: 'settings' },
                     { type: 'submenu', id: 'scores', label: 'Witness Scores', screen: 'scores' },
                     { type: 'submenu', id: 'controls', label: 'Controls', screen: 'controls' },
+                    // The roll had exactly one entry point in the whole game —
+                    // beat-14 calling game.startEnding() — so a player could
+                    // not re-watch it, and could not watch it at all without
+                    // finishing fourteen dungeons. It names a real person as
+                    // the author of every discipline in this project; it should
+                    // not be the least reachable screen in it. Unlocked once
+                    // the campaign has been finished at least once.
+                    {
+                        type: 'action', id: 'credits', label: 'Credits',
+                        disabled: !prog.campaignComplete,
+                        note: prog.campaignComplete ? '' : 'Finish the campaign',
+                    },
                 ],
             };
         },
@@ -243,14 +269,17 @@ export class MenuOverlay {
     handleCode(code) {
         if (!this.isOpen) return false;
         switch (code) {
-            case 'ArrowUp': case 'KeyW': this.state.move(-1); break;
-            case 'ArrowDown': case 'KeyS': this.state.move(1); break;
-            case 'ArrowLeft': case 'KeyA': this._emit(this.state.adjust(-1)); break;
-            case 'ArrowRight': case 'KeyD': this._emit(this.state.adjust(1)); break;
+            case 'ArrowUp': case 'KeyW': this.state.move(-1); gsfx.menuMove?.(); break;
+            case 'ArrowDown': case 'KeyS': this.state.move(1); gsfx.menuMove?.(); break;
+            case 'ArrowLeft': case 'KeyA':
+                this._emit(this.state.adjust(-1)); gsfx.menuMove?.(); break;
+            case 'ArrowRight': case 'KeyD':
+                this._emit(this.state.adjust(1)); gsfx.menuMove?.(); break;
             case 'Enter': case 'NumpadEnter': case 'Space':
                 this._emit(this.state.activate());
+                gsfx.menuConfirm?.();
                 break;
-            case 'Backspace': this.back(); break;
+            case 'Backspace': this.back(); gsfx.menuBack?.(); break;
             default: return false;
         }
         this.render();

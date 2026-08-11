@@ -20,7 +20,7 @@ import { Enemy, attachSplit } from '../../src/game/enemy.js';
 import { applyHit, inFrontArc } from '../../src/game/combat/combat-sweeper.js';
 import { hitboxCheck } from '../../src/combat/hitbox.js';
 import { ENEMY_PALETTES } from '../../src/game/assets/palettes.js';
-import { ARCHETYPES } from '../../src/game/characters/archetypes.js';
+import { ARCHETYPES, archetypeFor } from '../../src/game/characters/archetypes.js';
 import { WEAPONS, getWeapon } from '../../src/game/combat/weapons.js';
 import { HealthPool } from '../../src/game/kernel/health.js';
 import { GuardController, PARRY_WINDOW, POISE_MAX } from '../../src/game/combat/guard.js';
@@ -28,7 +28,24 @@ import { HeartDropManager, dropSite } from '../../src/game/world/heart-drops.js'
 import { BEAT_DEFS } from './_beat-defs.mjs';
 
 const NEW_KINDS = ['bulwark', 'mote', 'lancer', 'brood'];
-const ALL_KINDS = ['sentinel', 'scarab', 'frost', ...NEW_KINDS];
+
+// ALL_KINDS is DERIVED, not listed. It was a hardcoded array of seven, and the
+// weaver and censer were later added to three data tables and six beat files
+// without an entry in ARCHETYPES — so archetypeFor() silently handed both the
+// sentinel's gait and every assertion below kept passing, because the list the
+// spec iterated was the one place that was still correct. Read the kinds the
+// campaign actually spawns; then a kind cannot enter the game without also
+// entering these checks.
+const SPAWNED_KINDS = (() => {
+    const kinds = new Set();
+    for (const def of Object.values(BEAT_DEFS)) {
+        for (const room of Object.values(def.rooms || {})) {
+            for (const e of room.enemies || []) if (e.kind) kinds.add(e.kind);
+        }
+    }
+    return [...kinds].sort();
+})();
+const ALL_KINDS = SPAWNED_KINDS;
 
 function spawn(kind, at = { x: 0, y: 1, z: 0 }, opts = {}) {
     return new Enemy(new THREE.Scene(), null, at, { kind, ...opts });
@@ -45,16 +62,29 @@ function attackerAt(x, z) {
 
 export function run(t) {
     // --- the kinds exist and are visually distinct -------------------------
-    for (const k of NEW_KINDS) {
+    t.ok('the campaign spawns every kind this spec knows about',
+        NEW_KINDS.every((k) => SPAWNED_KINDS.includes(k)), SPAWNED_KINDS.join(','));
+    // Every kind the campaign spawns — not a list maintained by hand.
+    for (const k of ALL_KINDS) {
         t.ok(`${k} has its own palette`, !!ENEMY_PALETTES[k]);
         t.ok(`${k} has its own animation archetype`, !!ARCHETYPES[k]);
     }
     {
-        const skins = new Set(ALL_KINDS.map((k) => ENEMY_PALETTES[k].skin));
+        const skins = new Set(ALL_KINDS.map((k) => ENEMY_PALETTES[k]?.skin));
         t.ok('every kind reads as a different colour', skins.size === ALL_KINDS.length,
             `${skins.size}/${ALL_KINDS.length}`);
-        const gaits = new Set(ALL_KINDS.map((k) => ARCHETYPES[k].gaitFreqMin));
+        // Optional-chained on purpose: a kind with no archetype must report a
+        // missing GAIT here, not crash the spec before the rest of it runs.
+        const gaits = new Set(ALL_KINDS.map((k) => ARCHETYPES[k]?.gaitFreqMin));
         t.ok('kinds do not all walk at the same cadence', gaits.size >= 6, `${gaits.size}`);
+        // The sentinel fallback in archetypeFor() is a safety net, not a
+        // costume. If a kind resolves to it without ASKING to be a sentinel,
+        // that kind is walking as something else and nothing else will say so.
+        for (const k of ALL_KINDS) {
+            if (k === 'sentinel') continue;
+            t.ok(`${k} does not silently fall back to the sentinel gait`,
+                archetypeFor(k) !== ARCHETYPES.sentinel);
+        }
     }
     {
         // Each new kind picks its own AI without the level having to say so.

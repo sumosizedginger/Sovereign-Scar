@@ -386,6 +386,22 @@ export function keyGet() {
     arp([784, 1046], 0.075, 'square', 0.1, 0.4);
 }
 
+/**
+ * The boss key is not a small key.
+ *
+ * The pickup dispatch matched /key/i before it checked anything else, so the
+ * one item that opens a dungeon's last door played the same two-note blip as
+ * the fourth small key you found in a side room. The shape was already
+ * correct — pickup-shapes builds it larger and distinct — only the sound was
+ * borrowed. Same intervals an octave down and a fifth higher on top, so it
+ * reads as the small key's big brother rather than an unrelated noise.
+ */
+export function bossKeyGet() {
+    const t = now();
+    noise(0.09, 0.22, 'bandpass', 2200, 1600, 3.0, t, 0.45);
+    arp([392, 523, 784, 1175], 0.095, 'square', 0.16, 0.55);
+}
+
 /** A Scar Suture — a heart piece. This has to feel like it was worth finding. */
 export function sutureGet() {
     arp([523, 659, 784, 1046], 0.085, 'triangle', 0.14, 0.5);
@@ -459,7 +475,7 @@ export const gsfx = {
     hitFlesh, hitArmor, weakPoint, guardBlock, parry, guardBreak, guardUp, guardDown,
     enemyDie, lockOn, lockOff, footstep, dash, land,
     grappleFire, grappleHit, grapplePull,
-    shardGet, heartGet, keyGet, sutureGet, secretFound, itemGet,
+    shardGet, heartGet, keyGet, bossKeyGet, sutureGet, secretFound, itemGet,
     doorOpen, doorLocked, bossDoor, lowHealth,
     menuMove, menuConfirm, menuBack,
 };

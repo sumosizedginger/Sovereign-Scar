@@ -31,7 +31,7 @@ import { terraceRoom } from './terracing.js';
 import { stampKitProps, shapeBossArena } from './kit-props.js';
 import { SignalBus } from './puzzle-kit.js';
 import { gsfx } from '../audio/sfx-bank.js';
-import { buildPickupMesh, disposePickupMesh } from '../assets/pickup-shapes.js';
+import { buildPickupMesh, disposePickupMesh, pickupKind } from '../assets/pickup-shapes.js';
 
 export const ROOM_STRIDE = 64;
 
@@ -1315,6 +1315,65 @@ export function createDungeon(ctx, def, opts = {}) {
         return true;
     }
 
+    /**
+     * Hold the player inside a sealed room. Runs every frame, gates on nothing.
+     *
+     * The seal used to be enforced by `refuseDoor` alone: walk into the doorway,
+     * get shoved back, velocity zeroed, and a 0.7s cooldown before the shove
+     * could fire again. That cooldown is right for a LOCKED door — there is a
+     * solid plug in the gap, geometry does the holding, and the cooldown only
+     * stops the bounce becoming a cage. A SEALED door has no plug. It is an open
+     * hole, the shove was the entire barrier, and for 0.7 seconds after each one
+     * there was nothing there at all. 0.7s at 5.5 units/second is four times what
+     * it takes to walk the 1.1 back and step through.
+     *
+     * Measured on beat-01 `antechamber`, holding south into its `open` door:
+     * seven shoves in five seconds, and the player ends 14 units past the wall
+     * at y = -29.34, still reported as inside the room. There is no floor out
+     * there — the neighbour is 47 units away and is not baked until you
+     * transition — so `index.js` fires its `y < -12` void kill. The room that
+     * would not let the player leave is what killed them.
+     *
+     * All 26 sealed rooms had it. 18 have an `open` door and need no key; the
+     * other 8 are plugged only until you unlock them, and `keyStore` outlives
+     * the bake, so they open up too on the next visit.
+     *
+     * So the shove is gone and this is a clamp. Having no cooldown, there is no
+     * frame on which the wall is not there. Being a clamp and not a teleport, it
+     * cannot fling the player back into the enemies they were trying to get away
+     * from, and it takes no velocity and no input away — you slide along the
+     * doorway instead of being launched through the pack. `tryDoor` keeps the
+     * cooldown for the toast and the sound, which is the only thing a cooldown
+     * was ever the right tool for.
+     */
+    function holdSeal(game) {
+        if (!sealedBy(currentRoomId)) return;
+        const room = def.rooms[currentRoomId];
+        const o = roomOrigin(room);
+        const p = game.player.rig.position;
+        for (const door of room.doors || []) {
+            const w = (door.width || DOOR_WIDTH) / 2 + 0.5;
+            const c = doorWorldCenter(currentRoomId, door);
+            if (door.side === 'N' || door.side === 'S') {
+                if (Math.abs(p.x - c.x) >= w) continue;
+                const wallZ = door.side === 'N'
+                    ? o.z - room.half + 0.5
+                    : o.z + room.half + 0.5;
+                // The wall PLANE, not the trigger line: the player may stand in
+                // the doorway and be told no, they may just not pass through it.
+                if (door.side === 'N') p.z = Math.max(p.z, wallZ);
+                else p.z = Math.min(p.z, wallZ);
+            } else {
+                if (Math.abs(p.z - c.z) >= w) continue;
+                const wallX = door.side === 'W'
+                    ? o.x - room.half + 0.5
+                    : o.x + room.half + 0.5;
+                if (door.side === 'W') p.x = Math.max(p.x, wallX);
+                else p.x = Math.min(p.x, wallX);
+            }
+        }
+    }
+
     function tryDoor(door, game) {
         const type = door.type || 'open';
         // The seal outranks the door's own type — including `exit`. A room that
@@ -1323,7 +1382,12 @@ export function createDungeon(ctx, def, opts = {}) {
         // way", which is not a rule.
         const held = sealedBy(currentRoomId);
         if (held) {
-            if (refuseDoor(door, game)) {
+            // Announcement only. `holdSeal` is what keeps the player in, so
+            // this must not move them: the shove that used to live here threw
+            // them 1.1 units back into the fight they were retreating from, and
+            // it was never the thing holding the door.
+            if (doorRefusedT <= 0) {
+                doorRefusedT = DOOR_REFUSE_COOLDOWN;
                 gsfx.doorLocked();
                 game.hud?.toast?.(
                     held === 1 ? 'Sealed — one still standing' : `Sealed — ${held} still standing`,
@@ -1446,6 +1510,9 @@ export function createDungeon(ctx, def, opts = {}) {
             }
         } else {
             if (doorRefusedT > 0) doorRefusedT = Math.max(0, doorRefusedT - dt);
+            // Before the triggers, so a door that is about to say "sealed" has
+            // already stopped the player rather than reporting on them leaving.
+            holdSeal(game);
             checkDoorTriggers(game);
             tickSealStalemate(dt, game);
         }
@@ -1512,11 +1579,17 @@ export function createDungeon(ctx, def, opts = {}) {
                 // onPickup may re-arm (taken=false) to reject, e.g. the
                 // keyless Wedge monolith.
                 if (p.taken) {
-                    const kind = p.reward?.type
-                        || (/suture/i.test(p.label || '') ? 'suture' : null)
-                        || (/key/i.test(p.label || '') ? 'key' : null);
+                    // Ask pickupKind — the same function that chose this
+                    // pickup's SHAPE. The dispatch used to re-derive the kind
+                    // from its own regex chain, and that chain tested /key/i
+                    // before anything else, so 'Boss key' matched the small-key
+                    // arm and the most important pickup in a dungeon played the
+                    // small key's blip. Two readings of one label is how they
+                    // drifted apart; now there is one.
+                    const kind = pickupKind(p);
                     if (kind === 'suture') gsfx.sutureGet();
                     else if (kind === 'vial' || kind === 'lore') gsfx.itemGet();
+                    else if (kind === 'bosskey') gsfx.bossKeyGet();
                     else if (kind === 'key') gsfx.keyGet();
                     else if (p.scoreType === 'secret') gsfx.secretFound();
                     else gsfx.shardGet();

@@ -95,7 +95,12 @@ export function createOverworld(ctx, screensDef, opts = {}) {
         }
         const next = nextScreenToward(screensDef.screens, sid, destination);
         const edge = (s.edges || []).find((candidate) => candidate.to === next);
-        if (!edge) return;
+        // No route (or no edge for it) must hide the ring, not leave the last
+        // frame's marker sitting on a border it no longer points along.
+        if (!edge) {
+            if (threadPulse) threadPulse.visible = false;
+            return;
+        }
         if (!threadPulse) {
             threadPulse = new THREE.Mesh(
                 new THREE.TorusGeometry(0.7, 0.10, 8, 24),
@@ -109,9 +114,16 @@ export function createOverworld(ctx, screensDef, opts = {}) {
         }
         const ox = room.grid[0] * 64, oz = room.grid[1] * 64;
         const at = edge.at || 0;
-        const pos = edge.side === 'n' ? [ox + at, oz - SCREEN_HALF + 1]
-            : edge.side === 's' ? [ox + at, oz + SCREEN_HALF - 1]
-                : edge.side === 'e' ? [ox + SCREEN_HALF - 1, oz + at]
+        // Edge sides are authored uppercase ('E'/'W'/'S'/'N') by world7.js and
+        // screens.js. Comparing them raw against lowercase failed every test
+        // and fell through to the west arm, so the hint that exists to point a
+        // lost player at their objective pointed west from every screen.
+        // Normalize instead of matching one casing: the door path in
+        // room-graph.js compares uppercase, so both spellings are in the wild.
+        const side = String(edge.side || '').toLowerCase();
+        const pos = side === 'n' ? [ox + at, oz - SCREEN_HALF + 1]
+            : side === 's' ? [ox + at, oz + SCREEN_HALF - 1]
+                : side === 'e' ? [ox + SCREEN_HALF - 1, oz + at]
                     : [ox - SCREEN_HALF + 1, oz + at];
         threadPulse.position.set(pos[0], 1.18, pos[1]);
         threadPulse.visible = true;

@@ -113,11 +113,51 @@ export class CameraRig {
         this._focus = { t: 0, dur: duration, toH: height, toB: back, target };
     }
 
+    /**
+     * Go somewhere and STAY there, until `releaseHold` lets go.
+     *
+     * Deliberately not `focus()`, for the same reason `kick()` is not: `focus`
+     * is a `sin()` dip that always comes home, which is exactly right for a boss
+     * card and useless for a cutscene. A scripted shot has to point at a thing
+     * and remain pointed at it for as long as the beat lasts.
+     *
+     * It also takes the look-at all the way to the target rather than `focus`'s
+     * 0.8 — a held shot that only mostly looks at the thing is a mistake, not a
+     * style. `bounds` still clamps: a cutscene must not be the one place in the
+     * game that shows the void past a room wall.
+     */
+    hold({ target = null, height = null, back = null, duration = 1.2 } = {}) {
+        this._hold = {
+            t: 0,
+            dur: Math.max(0.01, duration),
+            toH: height != null ? height : this.height,
+            toB: back != null ? back : this.back,
+            target,
+            releasing: false,
+        };
+    }
+
+    /** Ease back to the player. Safe to call when nothing is held. */
+    releaseHold(duration = 0.8) {
+        const h = this._hold;
+        if (!h || h.releasing) return;
+        h.releasing = true;
+        h.t = 0;
+        h.dur = Math.max(0.01, duration);
+    }
+
     /** Cancel an in-flight push-in — call on level change so a boss-intro
-     * dip can never bleed its height/back blend into the next level. */
+     * dip can never bleed its height/back blend into the next level.
+     *
+     * Drops a held shot too, and that is not tidiness. A hold survives by
+     * design until something releases it, so a level change or room transition
+     * during a cutscene would otherwise leave the camera parked on a point in a
+     * world that no longer exists, with no one left holding the reference to
+     * let go of it. The camera's version of a stuck flag. */
     clearFocus() {
         this._focus = null;
         this._kick = null;
+        this._hold = null;
     }
 
     /**
@@ -164,6 +204,24 @@ export class CameraRig {
             effH -= k.depth * dip;
             effB -= k.depth * 0.35 * dip;
             if (u >= 1) this._kick = null;
+        }
+
+        // A held shot (cutscene). Eases in and then STAYS at full weight — no
+        // `u >= 1` teardown here on purpose, that is what `releaseHold` is for.
+        if (this._hold) {
+            const h = this._hold;
+            h.t += dt;
+            const u = Math.min(1, h.t / h.dur);
+            const w = h.releasing ? 1 - u : u;
+            const k = w * w * (3 - 2 * w); // smoothstep, both directions
+            effH = this.height + (h.toH - this.height) * k;
+            effB = this.back + (h.toB - this.back) * k;
+            if (h.target) {
+                x += (h.target.x - x) * k;
+                y += ((h.target.y || 0) - y) * k;
+                z += (h.target.z - z) * k;
+            }
+            if (h.releasing && u >= 1) this._hold = null;
         }
 
         // Two-subject framing (Ticket D): weight eases toward 1 while a
