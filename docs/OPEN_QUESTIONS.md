@@ -115,13 +115,55 @@ calls per dungeon, against a renderer that will take several hundred thousand.
 
 ---
 
-## 4. Frame rate and the playthrough — needs hardware
+## 4. Frame rate and the playthrough — FRAME RATE RESOLVED 2026-08-11
 
 Headless Chrome here runs software GL at **~1.5 fps**, so nothing automated can
 certify frame rate or feel. Outstanding since Phase R:
 
-- a by-hand fresh-save, dev-off playthrough
-- an overlays-on ≥60 FPS pass on a real GPU
+- a by-hand fresh-save, dev-off playthrough — **still open**
+- an overlays-on ≥60 FPS pass on a real GPU — **DONE, see below**
+
+### The frame-rate half is answered, and the answer is "there is no problem"
+
+Measured 2026-08-11 with headed Chrome on a real GPU (`headless: false`, no
+`--use-gl=swiftshader`), 1280×720, sampling ~320 rAF deltas per location:
+
+```
+GPU: ANGLE (NVIDIA GeForce RTX 3060 Ti, D3D11)
+
+overworld (start screen)   mean 16.67ms (60fps)  p95 16.8  p99 16.9  | 46 calls  61168 tris
+overworld (moving)         mean 16.67ms (60fps)  p95 16.8  p99 16.8  | 46 calls  61168 tris
+beat-01-crypt entry        mean 16.67ms (60fps)  p95 16.8  p99 16.9  | 48 calls  37920 tris
+beat-07-sluice entry       mean 16.67ms (60fps)  p95 16.8  p99 16.8  | 48 calls  37328 tris
+beat-14-leviathan entry    mean 16.67ms (60fps)  p95 16.8  p99 16.9  | 49 calls  37961 tris
+```
+
+Every location is pinned to vsync. p99 never left 16.9 ms — **not one dropped
+frame across five locations**, and 0 page errors over the whole session.
+
+**The important number is not 60. It is 46.** Forty-six draw calls and 37k
+triangles against a card that will take a thousand calls and several hundred
+thousand triangles. The game is using on the order of **2% of the budget it
+has.**
+
+So the standing "budget is not the constraint" claim in `ROAD-TO-TEN.md` E2 is
+now measured rather than assumed, and it is true by a much larger margin than
+that section estimated. Verticality, props, atmosphere systems, an outline pass
+on actors, and shaped boss arenas are all affordable — nothing in
+`docs/VISUAL_PLAN.md` or `AAA.md` is gated on performance.
+
+Two caveats, so this is not over-read:
+
+- **One machine, one resolution.** An RTX 3060 Ti is a comfortable card. This
+  says the *content* is cheap; it does not establish a low-end floor. Re-measure
+  on the weakest machine you care about before promising anything.
+- **This measures an idle scene.** Combat with several enemies, a boss, and live
+  particles was not sampled. Re-run after Tier 2 of `AAA.md`, since verticality
+  and props will be the first things in this project's history that actually
+  cost frame time.
+
+Reproduce with `node tests/qa/frame-rate-real-gpu.mjs` (print-only, not in the
+suite — it opens a real browser window, which is the whole point).
 
 Note for whoever picks this up: the 44 certification **captures** were held back
 for a session on the mistaken belief they needed a GPU too. They do not —

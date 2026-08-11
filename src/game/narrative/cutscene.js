@@ -6,7 +6,7 @@
 // sticks the only exit is a reload. Every exit path — natural end, skip, stop, a
 // beat `fn` that throws — goes through `_release`, and nothing else clears it.
 //
-// First draft written by the Grok Build CLI against `CUTSCENE_SPEC.md`; the
+// First draft written by the Grok Build CLI against `docs/CUTSCENE_SPEC.md`; the
 // beat-dispatch shape and the single-release rule are its work. Reviewed and
 // changed here on four counts, all noted at the point they apply.
 
