@@ -87,6 +87,10 @@ export const BEAT13_DEF = {
             enemies: [
                 { x: -4, z: 2, kind: 'bulwark', hp: 5 },
                 { x: 4, z: -4, kind: 'lancer', hp: 5 },
+                // CENSER + BULWARK again, one beat later and with a lancer
+                // applying pressure while you decide which one to kill first.
+                // NOT (0,5): `build()` raises a slate slab across x -3..3, z 3..6.
+                { x: 0, z: -6, kind: 'censer', hp: 4 },
             ],
             doors: [
                 { to: 'towergate', side: 'S', at: 0, type: 'open' },
@@ -201,7 +205,13 @@ export const BEAT13_DEF = {
             enemies: [
                 { x: -3, z: -3, kind: 'lancer', hp: 5 },
                 { x: 3, z: -3, kind: 'mote', hp: 5 },
-                { x: 0, z: 4, kind: 'censer', hp: 4 },
+                // WAS (0,4) — 7.62 units from both the lancer and the mote,
+                // against a CENSE_R of 7.0. This censer has been unable to heal
+                // or shield ANYONE since the day it was authored: the "harmless
+                // hovering lamp" its own source calls the correct failure, but
+                // delivered by accident. Found by the specialist-company gate,
+                // not by me.
+                { x: 0, z: 2, kind: 'censer', hp: 4 },
             ],
             platforms(map, h) {
                 spiral(map, h, 0, -3, 5, ABYSS_COLORS.violet);

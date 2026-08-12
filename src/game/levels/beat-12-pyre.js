@@ -136,11 +136,27 @@ export const BEAT12_DEF = {
                 level.addPickup({ x: origin.x, y: 1.2, z: origin.z + 4 }, {
                     color: 0xffa040,
                     label: 'Vector Staff',
+                    // THIS USED TO GRANT NOTHING. It handed out `vector_staff`,
+                    // which nothing ever checked, plus `line_caster` — an id one
+                    // letter from the real `light_caster` and belonging to no
+                    // weapon, no item and no reader, so `grantItem` set a flag
+                    // and stopped. Then it told the narrative
+                    // `markProgress('item_acquired', 'line_caster')`, and that
+                    // function takes both arguments as unused underscore params.
+                    //
+                    // Meanwhile the light-line it advertises fired for anyone
+                    // holding the Light Caster whether they had found this or
+                    // not. Proven in the running game: with neither id held, one
+                    // swing took the line count 0 → 1.
+                    //
+                    // So the staff now GATES the beam (see `level.onEnter`),
+                    // which is what the pickup always claimed to do.
                     onPickup(game) {
                         game.player.inventory.grantItem('vector_staff');
-                        game.player.inventory.grantItem('line_caster');
-                        game.hud?.toast?.('Vector Staff and Line Caster — light lines now hold');
-                        game.anchorThread?.markProgress?.('item_acquired', 'line_caster');
+                        game.hud?.toast?.(
+                            'Vector Staff recovered — the Light Caster now leaves a standing line.',
+                            3000);
+                        game.anchorThread?.markProgress?.('item_acquired', 'vector_staff');
                     },
                 });
             },
@@ -157,6 +173,13 @@ export const BEAT12_DEF = {
             enemies: [
                 { x: -4, z: 4, kind: 'lancer', ai: 'chase', hp: 4 },
                 { x: 4, z: 4, kind: 'mote', hp: 5 },
+                // WEAVER, and the Pyre is where the floor is already the enemy.
+                // NOT (0,-5): `build()` stamps a magma vent on that exact cell.
+                // And not (-6,-4) either — dodging the vent put it 8.2 from the
+                // nearest ally against a WEB_LEN of 8, so its strands could never
+                // land between the player and anything. `bestiary.spec.mjs`
+                // caught that on the gate's first run.
+                { x: 0, z: 2, kind: 'weaver', hp: 4 },
             ],
             doors: [
                 { to: 'pyreterrace', side: 'S', at: 0, type: 'locked' },
@@ -301,7 +324,12 @@ export function loadBeat12(ctx) {
         originalTryAttack = game.player.tryAttack.bind(game.player);
         game.player.tryAttack = (enemies, destructibles) => {
             const hits = originalTryAttack(enemies, destructibles);
-            if (game.player.inventory.activeWeapon === 'light_caster' && lines) {
+            // THE STAFF IS THE GATE. Without this test the Pyre's own reward
+            // pickup changed nothing about the game, which made it a prop.
+            // Purely additive — the line is cosmetic plus a hit test, so a
+            // player who never finds the staff loses a flourish, never a route.
+            if (game.player.inventory.activeWeapon === 'light_caster'
+                && game.player.inventory.hasItem('vector_staff') && lines) {
                 try {
                     lines.fire(game.player.root.position, game.player.state.facingVec, {
                         range: 10, life: 1.8, color: 0xffa040,

@@ -181,6 +181,10 @@ export const BEAT09_DEF = {
             enemies: [
                 { x: -4, z: 0, kind: 'sentinel', hp: 4, ai: 'ranged' },
                 { x: 4, z: 0, kind: 'scarab', hp: 5, ai: 'charge' },
+                // WEAVER into the room with TWO closers — a charging scarab and
+                // a ranged sentinel pinning you. Strands across the floor are
+                // worst exactly here, which is the point of the kind.
+                { x: 0, z: -5, kind: 'weaver', hp: 3 },
             ],
             doors: [
                 { to: 'townsquare', side: 'S', at: 0, type: 'locked' },

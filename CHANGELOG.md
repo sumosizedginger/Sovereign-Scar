@@ -5,6 +5,50 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### The Pyre's reward is a reward, and the two specialist enemies get used
+
+**The Vector Staff now gates the light-line.** It used to grant `vector_staff`
+(checked by nothing) and `line_caster` (an id one letter from the real
+`light_caster`, belonging to no weapon, no item and no reader), then tell the
+narrative `markProgress('item_acquired', …)` — whose parameters are both unused.
+The beam it advertised fired for anyone holding the Light Caster regardless.
+Proven fixed in the running game: **no staff → 0 lines; staff → 1 line.** The
+phantom id is gone. Purely additive, so a player who never finds it loses a
+flourish and never a route.
+
+**The weaver and the censer go from 3 spawns each to 6.** They are the only two
+kinds whose design is entirely about the OTHER enemies in the room, and they
+appeared in 6 of 47 combat rooms.
+
+The obvious plan — "fill the empty cells in the kind × AI matrix" — turned out
+to be **exactly wrong**, and measuring first is what caught it: the web and the
+cense are implemented INSIDE `_aiWeave` and `_aiCenser`, so writing
+`ai: 'chase'` on a weaver deletes its web and leaves it looking identical. Their
+empty matrix row is correct by design, not a gap.
+
+What was actually missing was company. **No censer had ever been placed in a
+room with a bulwark** — the "a room with a live Censer cannot be ground down"
+puzzle its own source describes was never once posed against something armoured.
+Three now are. Verified by driving it: the bulwark healed 11 → 13 and was
+shielded for 332 frames.
+
+**And the new gate found a bug older than this session.** `bestiary.spec.mjs`
+now pins that no specialist is alone, that each is within its real working
+radius (`CENSE_R`, `WEB_LEN`, imported not restated), and that its AI is never
+overridden. On its first run it failed two placements: one of mine, and
+**beat-13's censer, authored 7.62 units from both allies against a 7.0 radius —
+unable to heal or shield anyone since the day it was written.** Both fixed. All
+three break-modes counterfactually proven.
+
+**A coin-flip certification gate, fixed.** Tombfields' Abyss screens measured
+129.8 / 129.9 / 130.1 against a band ceiling of exactly 130 — whether the suite
+passed was decided by ±0.2 of noise. Trimmed to a stable 126 (the first sub-1.0
+entry in `ABYSS_REGION_MULT`) rather than widening the band, which would have
+been moving the goalposts to wherever the ball landed.
+
+Encounters 125 → 131; rooms holding 4+ enemies 12 → 13, all in beats 8–14.
+Suite: 4930/4930.
+
 ### The cape is gone, and the bug it found is fixed
 
 **The cape is removed.** Owner's verdict: it "does not flow like a cape, and

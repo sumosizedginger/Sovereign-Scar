@@ -176,6 +176,12 @@ export const BEAT08_DEF = {
             enemies: [
                 { x: -4, z: 0, kind: 'bulwark', hp: 4 },
                 { x: 4, z: 0, kind: 'lancer', hp: 3 },
+                // WEAVER. Its own comment calls it a force multiplier that is
+                // "nearly harmless" alone and "the reason you could not get
+                // away" beside anything that closes. A lancer closes. It sits
+                // back at z:-5 because the weave AI already retreats below 4.5
+                // units — spawning it in your face would just make it walk away.
+                { x: 0, z: -5, kind: 'weaver', hp: 3 },
             ],
             doors: [
                 { to: 'bonegrove', side: 'S', at: 0, type: 'locked' },

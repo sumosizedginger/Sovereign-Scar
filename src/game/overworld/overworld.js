@@ -49,6 +49,13 @@ const OVERWORLD_BASE_TUNE = {
 const ABYSS_REGION_MULT = {
     quarry: 1.12,
     spindle: 1.06,
+    // A TRIM, not a lift — the first sub-1.0 entry here. Tombfields' Abyss
+    // screens measured 129.8 / 129.9 / 130.1 across three runs against a band
+    // ceiling of exactly 130, so whether the certification gate passed was
+    // decided by run-to-run noise of ±0.2. A gate that is a coin flip is not a
+    // gate, and widening the band to swallow it would be moving the goalposts
+    // to wherever the ball landed. The room needed margin instead.
+    tombfields: 0.94,
 };
 
 /** The floor each base trim was tuned against; compensation is relative to it. */

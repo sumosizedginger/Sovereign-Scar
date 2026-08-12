@@ -16,7 +16,7 @@
 // starts working on them, both kinds silently collapse back into a sentinel.
 
 import * as THREE from 'three';
-import { Enemy, attachSplit } from '../../src/game/enemy.js';
+import { Enemy, attachSplit, CENSE_R, WEB_LEN } from '../../src/game/enemy.js';
 import { applyHit, inFrontArc } from '../../src/game/combat/combat-sweeper.js';
 import { hitboxCheck } from '../../src/combat/hitbox.js';
 import { ENEMY_PALETTES } from '../../src/game/assets/palettes.js';
@@ -60,6 +60,74 @@ const ALL_KINDS = SPAWNED_KINDS;
  * `ENEMY_PALETTES` is what the probe derives from now, so pinning that it
  * matches what the campaign actually spawns keeps both honest.
  */
+/**
+ * A SPECIALIST NEEDS COMPANY, and the campaign has to actually give it some.
+ *
+ * The weaver and the censer are the only two kinds whose entire design is about
+ * the OTHER enemies in the room. Their own source says so:
+ *
+ *   weaver  "nearly harmless [alone] and next to anything that closes it is the
+ *            reason you could not get away… it is a force multiplier"
+ *   censer  "a room with a live Censer in it cannot be ground down… the only
+ *            reading that works is to go through the Censer first". And, on
+ *            having nobody to support: "a harmless hovering lamp, which is the
+ *            correct failure".
+ *
+ * So placing one alone is not a small authoring slip — it silently converts the
+ * kind into a worse version of an ordinary enemy. Worse, both abilities live
+ * INSIDE their AI branches (`_aiWeave`, `_aiCenser`), so writing `ai: 'chase'`
+ * on one deletes its signature move while leaving it looking identical. Both
+ * failure modes are invisible in play and invisible to every other spec.
+ *
+ * RADIUS, not just room membership. A censer heals and shields within `CENSE_R`
+ * of itself; one authored in the far corner from everything else is a lamp with
+ * extra steps. Read the real constants rather than restating them.
+ */
+function checkSpecialistCompany(t) {
+    const rooms = [];
+    for (const [beat, def] of Object.entries(BEAT_DEFS)) {
+        for (const [rid, room] of Object.entries(def.rooms || {})) {
+            const es = (room.enemies || []).filter((e) => e.kind);
+            if (es.length) rooms.push({ beat, rid, es });
+        }
+    }
+    const gap = (a, b) => Math.hypot((a.x || 0) - (b.x || 0), (a.z || 0) - (b.z || 0));
+    const alone = [];
+    const outOfReach = [];
+    const overridden = [];
+    let censerWithArmour = 0;
+
+    for (const { beat, rid, es } of rooms) {
+        for (const e of es) {
+            if (e.kind !== 'censer' && e.kind !== 'weaver') continue;
+            // Overriding the AI removes the ability the kind exists for.
+            if (e.ai) overridden.push(`${beat}/${rid} ${e.kind} ai:${e.ai}`);
+            const others = es.filter((o) => o !== e);
+            if (!others.length) { alone.push(`${beat}/${rid} ${e.kind}`); continue; }
+            const reach = e.kind === 'censer' ? CENSE_R : WEB_LEN;
+            if (!others.some((o) => gap(e, o) <= reach)) {
+                outOfReach.push(`${beat}/${rid} ${e.kind} nearest `
+                    + `${Math.min(...others.map((o) => gap(e, o))).toFixed(1)} > ${reach}`);
+            }
+            if (e.kind === 'censer' && others.some((o) => o.kind === 'bulwark')) censerWithArmour++;
+        }
+    }
+
+    t.ok('no weaver or censer is authored alone in a room',
+        alone.length === 0, alone.join(', ') || 'none');
+    t.ok('and each one is within its own working radius of somebody',
+        outOfReach.length === 0, outOfReach.join(', ') || 'none');
+    // The trap that would silently gut them: their abilities live inside their
+    // AI branches, so an `ai:` override removes the ability and nothing else.
+    t.ok('and none has had its AI overridden, which would delete its whole move',
+        overridden.length === 0, overridden.join(', ') || 'none');
+    // The design's peak pairing. This was ZERO for the life of the project —
+    // every censer stood beside motes and lancers, which die anyway, so the
+    // "choose your target" puzzle the kind exists for was never once posed.
+    t.ok('at least three censers guard something armoured',
+        censerWithArmour >= 3, `${censerWithArmour} censer(s) beside a bulwark`);
+}
+
 function checkRosterAgreement(t) {
     const palette = Object.keys(ENEMY_PALETTES).sort();
     const spawned = SPAWNED_KINDS;
@@ -89,6 +157,7 @@ function attackerAt(x, z) {
 
 export function run(t) {
     checkRosterAgreement(t);
+    checkSpecialistCompany(t);
 
     // --- the kinds exist and are visually distinct -------------------------
     t.ok('the campaign spawns every kind this spec knows about',

@@ -190,6 +190,14 @@ export const BEAT11_DEF = {
             enemies: [
                 { x: -4, z: 0, kind: 'bulwark', hp: 5 },
                 { x: 4, z: 0, kind: 'brood', ai: 'lunge', hp: 4 },
+                // CENSER BESIDE A BULWARK — the pairing this game was built for
+                // and had never once authored. The censer's own comment: a room
+                // with a live one in it "cannot be ground down... the only
+                // reading that works is to go through the Censer first". Put it
+                // next to the armoured enemy and that sentence becomes a puzzle
+                // instead of a paragraph. Every censer in the campaign used to
+                // stand beside motes and lancers, which die anyway.
+                { x: 0, z: -5, kind: 'censer', hp: 3 },
             ],
             doors: [
                 { to: 'mirefloor', side: 'S', at: 0, type: 'locked' },

@@ -74,6 +74,10 @@ export const BEAT14_DEF = {
                 { x: -5, z: 3, kind: 'brood', hp: 5 },
                 { x: 5, z: 3, kind: 'bulwark', hp: 5 },
                 { x: 0, z: -5, kind: 'mote', hp: 5 },
+                // The last dungeon gets the full statement: a bulwark that
+                // cannot be ground down while the censer lives, and two others
+                // keeping you honest about the time it takes to reach it.
+                { x: -5, z: -4, kind: 'censer', hp: 4 },
             ],
             doors: [
                 { to: 'threshold', side: 'S', at: 0, type: 'open' },
