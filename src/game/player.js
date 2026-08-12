@@ -35,6 +35,47 @@ import { INPUT_BUFFER } from './input.js';
  */
 export const RAY_LATERAL = 0.7;
 
+/**
+ * How the hero is built, EXPORTED so a spec can check the real thing.
+ *
+ * These lived inline in the constructor, and `hero-readability.spec.mjs` kept
+ * its own copy of them under a comment saying "exactly the options player.js
+ * passes". It was not exactly anything — it was a copy, and a copy cannot
+ * notice that the original changed. Proved the expensive way: deleting the
+ * cloak here, and dropping the rim to the default, and handing the hero the
+ * frost faction's colour, all left that spec at 15/15. It was pinning its own
+ * constant with great rigour.
+ *
+ * One object, one owner, imported by whoever needs to know.
+ */
+export const HERO_RIG = {
+    palette: HERO_PALETTE,
+    torsoProfileScale: 0.72,
+    headProfileScale: 0.9,
+    meshScale: 0.39,
+    clothingMode: 'casual',
+    groundOffset: -0.95,
+    // RESERVED TO THE HERO — and "reserved" is a claim a test checks, not a
+    // hope. The first pick was a cold cyan, and `hero-readability.spec.mjs`
+    // failed it on sight: the frost faction's accent is #60e0ff, near enough the
+    // same colour that in a frost room the player would have been marked out in
+    // exactly the shade worn by the things trying to kill them.
+    //
+    // Azure is what is actually free. The bestiary's nine accents run red,
+    // orange, amber, two yellow-greens, a pale violet, a near-white and that one
+    // cyan; a saturated blue is the only cool region nobody occupies, and it
+    // sits opposite both the tan Crust and the red Pyre. Unlike a black outline
+    // it ADDS light to the character rather than taking the character away.
+    rimColor: 0x4a86ff,
+    rimStrength: 0.9,
+    // The shape nobody else has. Same reserved blue as the rim, so the hero
+    // reads as one idea rather than two decorations.
+    cloak: { color: 0x24509e, width: 0.66, length: 0.86 },
+    // If the hard outline is ever turned back on (see actor-rig.js), the hero's
+    // is thicker than everyone else's. It is off by default.
+    outlineWidth: 0.11,
+};
+
 export class Player {
     constructor(scene, collisionWorld, getVoxelAt) {
         this.scene = scene;
@@ -43,14 +84,7 @@ export class Player {
         // Ticket F: named-pivot rig + procedural animator replace the old
         // single welded figure. Same frozen part builders, same grounding
         // (feet at the physics body's bottom face, rig.y - 0.95).
-        this.actor = createActorRig({
-            palette: HERO_PALETTE,
-            torsoProfileScale: 0.72,
-            headProfileScale: 0.9,
-            meshScale: 0.39,
-            clothingMode: 'casual',
-            groundOffset: -0.95,
-        });
+        this.actor = createActorRig(HERO_RIG);
         this.rig = this.actor.root;
         this._inner = this.actor.inner;
         this._eyes = this.actor.eyes;

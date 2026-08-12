@@ -22,6 +22,7 @@ import path from 'node:path';
 // the real placer.
 import { BEAT_LIST } from '../game/_beat-defs.mjs';
 import { puzzlesForDungeon } from '../../src/game/world/puzzles.js';
+import { censusFile } from './lib/boss-actions.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const LEVELS = path.join(ROOT, 'src/game/levels');
@@ -101,32 +102,46 @@ console.log(`    → ${filled} of ${KINDS.length * AIS.length} cells authored `
     + `(${Math.round((filled / (KINDS.length * AIS.length)) * 100)}%)`);
 
 // ── 3. Bosses ──────────────────────────────────────────────────────────────
-// `startAction` is the ONLY way a boss commits to a telegraphed attack, so
-// counting the call sites per class counts the moveset. Anything a boss does
-// outside an action is passive movement or contact damage — real, but not a
-// thing the player reads and answers.
-console.log('\n▸ BOSS MOVESETS   committed actions per boss (startAction call sites)');
+// A boss commits to a telegraphed attack through one of TWO mechanisms now, and
+// counting only the older one is how this probe came to report the Crypt Warden
+// — the boss that teaches the game's core lesson — as having zero moves:
+//
+//   staged     a direct `this.startAction({ name: … })` in the class body
+//   declared   an entry in `this.defineActions([ … ])`, committed for the boss
+//              by `actIfReady` inside base.js, so the class body contains no
+//              `startAction` call at all
+//
+// Both are object literals carrying a `name:`, so both are counted and the
+// moveset is the union. See `lib/boss-actions.mjs` for why this is a rule about
+// action DEFINITIONS rather than a special case for one boss.
+console.log('\n▸ BOSS MOVESETS   committed actions per boss (declared + staged)');
 const bossFiles = ['src/game/bosses/roster.js', 'src/game/bosses/sand-spur.js',
     'src/game/bosses/kinetic-core.js'];
 let bossTotal = 0, bossCount = 0;
+const unmeasurable = [];
 for (const bf of bossFiles) {
-    const src = rd(bf);
-    const classes = [...src.matchAll(/^export class (\w+)/gm)];
-    for (let i = 0; i < classes.length; i++) {
-        const from = classes[i].index;
-        const to = i + 1 < classes.length ? classes[i + 1].index : src.length;
-        const body = src.slice(from, to);
-        if (!/extends BossBase/.test(classes[i][0] + body.slice(0, 80))) continue;
-        const n = (body.match(/this\.startAction\(/g) || []).length;
-        const phases = (body.match(/phaseThresholds:\s*\[([^\]]*)\]/) || [])[1];
-        const nPhase = phases ? phases.split(',').filter((s) => s.trim()).length + 1 : 3;
+    for (const b of censusFile(rd(bf), bf)) {
+        // A boss that is not a BossBase subclass has no action list to read.
+        // It is NOT dropped: the old probe silently omitted the Tri-Compiler
+        // and then printed "across 13 bosses" for a fourteen-fight campaign.
+        if (!b.isBossBase) {
+            if (/Boss|Warden|Compiler|Core|Spur|Wyrm|Golem|Cloud|Mantis|Witness|Arachnid/.test(b.name)) {
+                unmeasurable.push(b.name);
+            }
+            continue;
+        }
+        const n = b.names.length;
         bossTotal += n; bossCount++;
-        console.log(`    ${classes[i][1].padEnd(18)} ${bar(n, 4, 8)} ${n} action(s)`
-            + `   ${nPhase} phases`);
+        console.log(`    ${b.name.padEnd(18)} ${bar(n, 4, 8)} ${n} action(s)`
+            + `   ${b.phases} phases   ${b.mechanism}`);
     }
 }
 console.log(`    → ${bossTotal} committed attacks across ${bossCount} bosses `
     + `(mean ${(bossTotal / bossCount).toFixed(2)})`);
+if (unmeasurable.length) {
+    console.log(`    ⚠ not countable from source (no BossBase action list): `
+        + `${unmeasurable.join(', ')} — driven instead by tests/game/boss-movesets.spec.mjs`);
+}
 
 // ── 4. Puzzles ─────────────────────────────────────────────────────────────
 //

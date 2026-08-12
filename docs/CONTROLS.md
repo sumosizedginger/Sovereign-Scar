@@ -26,6 +26,7 @@ or lock-on, and this file never mentioned the Vial or the Dust.
 | **N** | Mute |
 | **P** / **Esc** | Pause |
 | **Enter** | Advance story (skip the current line) |
+| **?** (hold) | Hold for controls — this list, on screen. It also shows itself for the first few seconds of a new game, and lives in the pause menu |
 
 Facing follows movement (A Link to the Past style), so attacking while standing
 still swings in the direction you last walked — unless you are locked on, in

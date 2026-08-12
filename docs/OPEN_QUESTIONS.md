@@ -166,6 +166,14 @@ Two caveats, so this is not over-read:
 Reproduce with `node tests/qa/frame-rate-real-gpu.mjs` (print-only, not in the
 suite — it opens a real browser window, which is the whole point).
 
+**Re-measured after the player-facing finishing pass, same day.** The hero's
+cloak and its stronger separation light cost **two draw calls and one shader
+program**: 46–49 → 47–51 calls, 37,920 → 37,944 triangles, still vsync-locked at
+60 fps with p99 between 16.9 and 17.0 ms. The margin is unchanged in any way
+that matters. The rejected inverted-hull outline would have cost six extra
+meshes per actor, which is the one thing in this pass that would have shown up
+here — worth knowing if it is ever reconsidered.
+
 Note for whoever picks this up: the 44 certification **captures** were held back
 for a session on the mistaken belief they needed a GPU too. They do not —
 `CERTIFICATION.md` says they are headless captures by design, and they are now

@@ -107,6 +107,15 @@ hud.story?.setStore?.({
     load: () => getProgress().storySeen || [],
     save: (ids) => setProgress({ storySeen: ids }),
 });
+/**
+ * Seconds the control legend shows itself at the start of a brand-new run.
+ *
+ * Long enough to read four lines twice; short enough that it is gone before the
+ * player reaches anything worth looking at. It is not restored on load — a
+ * returning save has already had it, and `?` brings it back on demand.
+ */
+const HELP_ONBOARDING_S = 14;
+
 const mood = new MoodController();
 mood.bindLights({
     keySun: gameLights?.keySun,
@@ -658,6 +667,12 @@ function startNewGame(mode = 'medium') {
     player.health.max = 6;
     player.health.fullRestore();
     game.playTime = 0;
+    // Onboarding, not furniture. The control legend shows itself for the first
+    // stretch of a brand-new run and then gets out of the way; `?` brings it
+    // back, and the pause menu has always had a Controls screen. A permanent
+    // cheat sheet is the same information delivered forever to a player who
+    // stopped reading it in the first minute.
+    game.helpUntil = HELP_ONBOARDING_S;
     shardIncomeRemainder = 0;
     menu.close();
     game.atTitle = false;
@@ -1246,6 +1261,7 @@ function frame() {
 
     if (!game.paused && !ending.isActive) {
         game.playTime += dt;
+        if (game.helpUntil > 0) game.helpUntil -= dt;
         // Before the player is stepped, so a beat that takes the controls this
         // frame takes them this frame. Pausing still works during a scene —
         // consumePause is deliberately not drained by the director.
@@ -1741,9 +1757,17 @@ function frame() {
 
     const wpn = getWeapon(player.inventory.activeWeapon);
     const prog = loadSovereignProgress();
+    // The legend appears while `?` is held, and on its own for the opening
+    // stretch of a new run. Both, never permanently — see `HUD.setHelpVisible`.
+    hud.setHelpVisible(!game.atTitle && !game.paused
+        && (input.helpHeld() || game.helpUntil > 0));
+
     hud.update({
         hidden: game.atTitle,
         pad: input.padActive,
+        // Developer-facing fields render into their own element, and only when
+        // this is true. They used to sit in the middle of the player's panel.
+        dev: dev.enabled,
         showTimer,
         playTime: game.playTime,
         hp: player.health.hp,
@@ -1852,6 +1876,11 @@ window.__sovereignScar = {
     startNewGame,
     applyQualitySetting,
     cameraRig: camRig,
+    // The camera itself, not just the rig that drives it. Probes that need to
+    // know WHERE ON SCREEN something is have to project it; the silhouette probe
+    // was assuming the player lands at frame centre and sampling a disc that
+    // actually straddled their head and the floor above it.
+    camera,
     progress: loadSovereignProgress,
     LEVELS,
     mood,

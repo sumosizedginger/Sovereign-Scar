@@ -14,11 +14,18 @@ const PORT = Number(process.env.PORT) || 8765;
 // rendered" beyond "no console errors" (index.html has the hitbox/collision
 // proof panel; examples get the same treatment once Phase 3 adds them).
 const PAGES = [
-    // Product entry is Sovereign Scar (not the kit demo HUD)
+    // Product entry is Sovereign Scar (not the kit demo HUD).
+    //
+    // This used to look for the string "SOVEREIGN SCAR" in the HUD, because the
+    // HUD printed the game's own title over the top of itself every frame. That
+    // is exactly the kind of thing that went when the debug panel became a
+    // player HUD, so the proof-of-render moved to something a PLAYER would
+    // expect to see: the health hearts. The `renderHook` check below is what
+    // actually distinguishes this page from the kit demo.
     {
         path: 'index.html',
         hudSelector: '#ss-hud',
-        mustContain: ['SOVEREIGN SCAR'],
+        mustContain: ['♥'],
         renderHook: '__sovereignScar',
         waitMs: 4000,
         waitUntil: 'domcontentloaded',

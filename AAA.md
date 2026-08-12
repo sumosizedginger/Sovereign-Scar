@@ -133,6 +133,29 @@ mean across 5 places: 7.2
 
 **In the last dungeon of your game, your character has 0.4 lightness difference
 from the ground they are standing on.** They are, in value terms, invisible.
+
+> **UPDATE 2026-08-11 — and the probe above was aimed at the wrong pixel.**
+>
+> It sampled a fixed (640, 360), on the reasoning that the camera centres the
+> player. The rig looks at a point ABOVE the feet and the camera is pitched 56
+> degrees, so the player's body actually renders around y = 395: the disc was
+> straddling their head and a lot of open floor. Every number in the table is
+> diluted by that. Re-measured with the player PROJECTED through the live
+> camera, the same build reads:
+>
+> ```
+> overworld crust      ΔL*  2.1     (not 10.1 — worse than reported)
+> beat-01 crypt        ΔL*  4.3
+> beat-09 town         ΔL* 14.6
+> beat-12 pyre         ΔL*  4.5
+> beat-14 leviathan    ΔL* 21.8
+> mean: 9.5
+> ```
+>
+> The verdict does not change — the hero was unreadable in the Crust, the Crypt
+> and the Pyre — but the shape of it does, and the honest lesson is the one this
+> project keeps re-learning: a constant in an instrument is a hypothesis. See
+> the finishing-pass report for what was done about the readability itself.
 The only thing separating them from the floor is the dark contact disc drawn
 underneath them — which is why in every screenshot the player reads as *a
 smudge with something on it* rather than as a person.
@@ -341,7 +364,7 @@ and 4 combined**, which is the whole point of ranking them this way.
 13. **Fix the density probe before trusting it again** — see below.
 14. A proper ending sequence and credits.
 
-#### A measurement tool that has quietly started lying
+#### A measurement tool that has quietly started lying — FIXED 2026-08-11
 
 `content-density.mjs` prints `CryptWarden ········ 0 action(s)` — the tutorial
 boss, the first fight in the game, apparently empty.
@@ -363,6 +386,16 @@ someone will eventually "fix" a boss that was already finished.
 
 Nothing about the game is broken here. But this project's whole method is
 *measure, don't cite*, and one of the measuring instruments has drifted.
+
+> **Fixed.** The counter now reads action DEFINITIONS rather than one call site,
+> so both architectures count and the union is the moveset — a boss migrating
+> from one to the other no longer changes its number. `CryptWarden` reads 3, the
+> roster total went 32 → 35, and the census surfaced a second omission nobody
+> had noticed: `TriCompiler` is not a `BossBase` subclass, so the old probe
+> filtered it out silently and then printed *"across 13 bosses"* for a
+> fourteen-fight campaign. It is now named as unmeasurable instead of vanishing.
+> `tests/game/boss-action-census.spec.mjs` is the alarm, and it has been shown
+> to fail in both directions.
 Re-point it at `defineActions` as well, and correct the comment.
 
 Two small things in the same family, found while running all this:

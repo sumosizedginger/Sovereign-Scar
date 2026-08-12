@@ -5,6 +5,53 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Player-facing finishing pass — the debug HUD became a game HUD
+
+Full report: `docs/FINISHING-PASS-2026-08-11.md`. Suite 4826 → 4906.
+
+**The HUD.** Eleven lines of monospace `label: value` in a bordered black panel,
+plus a control sheet nailed permanently to the corner, became hearts, guard
+pips, a weapon name, coloured chips for what you are actually carrying, and one
+objective line. `Beat:`, `Mood:`, `Bosses: 0/14`, the raw `(6/6)` behind the
+hearts, and the game's own title printed over the game all moved into
+`#ss-hud-dev`, which renders only in dev mode — none of it deleted. The controls
+now appear for the first 14 seconds of a new run and while `?` is held.
+`tests/game/hud-player.spec.mjs` gates the split, including a deliberate check
+that narrative prose containing those same words is still shippable.
+
+Two layout bugs surfaced by looking at real frames rather than at the code: the
+toast sat at `bottom: 48px` under a story panel at `bottom: 96px` that is
+routinely taller than 48px — three overlapping boxes of text on the first frame
+of the game — and the boss bar's phase line overlapped the bar it describes.
+
+**The hero.** Measured, the player separated from the floor by ΔL\* 2.1 in the
+Crust and 4.5 in the Pyre. Three changes, in the order readability actually
+works: a cloak (nothing else in the game has one), a separation light with a
+fixed key that survives the 56° camera where the old `pow(1 − n·v, 3.2)` fresnel
+was geometrically defeated by it, and a reserved azure accent. Mean ΔL\* 9.5 →
+15.1 on the same corrected probe, at a cost of two draw calls and still 60 fps.
+
+**An inverted-hull outline was built, measured, and rejected.** It improved every
+number it touched (7.2 → 14.3 on the then-current probe) and made the game
+visibly worse — at thirty pixels tall the outline is a quarter of the
+character's width and the hero becomes a black blob. Kept behind `outline: true`.
+Trap 35.
+
+**Instruments.** `content-density.mjs` counted `this.startAction(` call sites and
+reported the Crypt Warden — which had migrated to `defineActions()` — as having
+**zero** moves; it now counts action definitions in both architectures and also
+stops silently dropping the Tri-Compiler from a "13 bosses" total in a
+fourteen-fight campaign. `silhouette-contrast.mjs` sampled a hardcoded frame
+centre while the player renders 35 pixels lower, and its edge test straddled the
+boundary by twelve pixels while measuring a two-pixel band; both fixed, so its
+historical figures — including the table in `AAA.md` — were diluted. And the
+boss E2E stopped screenshotting over a committed PNG, so a test run no longer
+leaves the tree dirty.
+
+**Still open, deliberately.** In greyscale the player is legible against the
+floor and still not distinguishable from the other figures in a crowded room.
+Section D5 of the report; not guessed at.
+
 ### The seal was a shove with a cooldown, and you could walk out of the world
 
 The owner: *"rooms are supposed to stop you from leaving if you try while

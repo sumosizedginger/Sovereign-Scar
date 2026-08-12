@@ -8,3 +8,9 @@ node_modules/
 tmp/
 tests/qa/_*.mjs
 dist-desktop/
+
+# Player-facing capture sets: the HUD frames and the greyscale twins are the
+# record and are committed. The `-clean` (HUD-hidden) twins are a working
+# convenience — 20 MB of them — and the certification set already covers
+# HUD-free frames. Regenerate with `node tests/qa/player-captures.mjs --set=…`.
+docs/media/player/*/*-clean.png

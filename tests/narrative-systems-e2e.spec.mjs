@@ -55,8 +55,15 @@ export async function run(t) {
         });
         t.ok('Survival begins with one living charge',
             living.mode === 'survival' && living.charges === 1 && living.status === 'living', JSON.stringify(living));
+        // The objective is asserted by its TEXT, not by the label `Thread:`
+        // that used to precede it. The label was the internal name of the
+        // system that produced the sentence, and it went with the rest of the
+        // developer vocabulary when the debug panel became a player HUD. What
+        // matters to this spec is unchanged: the player can see they are in
+        // Survival, and can see what they are supposed to be doing.
         t.ok('HUD exposes mode and active Thread',
-            living.hud.includes('SURVIVAL') && living.hud.includes('Thread:'), living.hud);
+            living.hud.includes('SURVIVAL') && /Crypt|north|name/i.test(living.hud),
+            living.hud);
 
         await page.keyboard.press('Tab');
         await sleep(100);

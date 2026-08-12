@@ -1,8 +1,14 @@
 // Browser E2E: every story beat loads a boss; simulate damage/defeat; story HUD.
 
+import fs from 'node:fs';
 import {
     startServer, findChromeVerbose, sleep, disableGamepads,
 } from './harness.mjs';
+
+// Gitignored, and created here rather than assumed: a fresh clone has no `tmp/`,
+// and `page.screenshot` on a missing directory rejects into the `.catch(() => {})`
+// below — i.e. it would quietly stop taking the picture and nothing would say so.
+const SHOT_DIR = new URL('../tmp/', import.meta.url).pathname.replace(/^\//, '');
 
 const BEAT_BOSSES = [
     ['beat-01-crypt', 'crypt_warden'],
@@ -126,13 +132,28 @@ export async function run(t) {
             t.ok(`${r.levelId} defeat path`, r.defeatOk, JSON.stringify(r));
         }
 
-        // Screenshot showcase of leviathan
+        // Screenshot showcase of leviathan.
+        //
+        // Written into `tmp/` — which is gitignored — and NOT into
+        // `assets/screenshots/`, where it used to go. That path is committed, so
+        // every single run of the suite left the working tree dirty with a
+        // one-pixel-different PNG. Two costs, and the second is the real one:
+        //
+        //  1. `git status` after a test run stopped meaning anything, so a
+        //     genuinely modified file had to be spotted inside expected noise.
+        //  2. The suite normalised "dirty tree" as the resting state, which is
+        //     exactly the condition under which a half-finished change gets
+        //     committed by accident.
+        //
+        // A test may WRITE whatever it likes. It may not write over something
+        // the repository is tracking.
         await page.evaluate(() => window.__sovereignScar.loadLevel('beat-14-leviathan'));
         await sleep(800);
-        await page.screenshot({
-            path: new URL('../assets/screenshots/leviathan-boss.png', import.meta.url).pathname.replace(/^\//, ''),
-            type: 'png',
-        }).catch(() => {});
+        fs.mkdirSync(SHOT_DIR, { recursive: true });
+        const shot = `${SHOT_DIR}leviathan-boss.png`;
+        await page.screenshot({ path: shot, type: 'png' }).catch(() => {});
+        t.ok('showcase capture lands outside version control',
+            fs.existsSync(shot) && !shot.includes('assets'), shot);
 
         // Load all 14 without pageerror storm
         const loadAll = await page.evaluate(async () => {

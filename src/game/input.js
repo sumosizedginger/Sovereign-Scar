@@ -55,6 +55,11 @@ export const CONTROLS = [
     { codes: ['KeyN'], label: 'N', action: 'Mute', group: 'meta' },
     { codes: ['KeyP', 'Escape'], label: 'P / Esc', action: 'Pause', group: 'meta',
         pad: 'Start', padButtons: [9] },
+    // HELD, not pressed. The control legend used to be nailed permanently to
+    // the bottom-right corner; this is what replaced its permanence. Keyboard
+    // only on purpose — a pad player has the same sheet in the pause menu, and
+    // there is no spare face button that is not already a combat verb.
+    { codes: ['Slash'], label: '?', action: 'Hold for controls', group: 'meta' },
     // Dev-only: documented, but kept off the player's cheat sheet.
     { codes: ['F1'], label: 'F1', action: 'God mode', dev: true },
     { codes: ['F2'], label: 'F2', action: 'Defeat current boss', dev: true },
@@ -272,6 +277,11 @@ export class Input {
      * never fight because they read different things about it — one asks "was
      * there a press", the other "is it still down".
      */
+    /** Is the player asking to see the control legend right now? */
+    helpHeld() {
+        return this.keys.has('Slash');
+    }
+
     attackHeld() {
         return this.keys.has('Space') || this.keys.has('KeyJ') || this._padAttack;
     }

@@ -77,8 +77,13 @@ assertion before changing it.
 ## State
 
 Everything below is green in the working tree. `npm test` — unit + full browser
-E2E — **4743/4743**, run end to end after the room-seal fix.
-`npm run test:unit` alone: **3879/3879**.
+E2E — **4906/4906**, run end to end after the player-facing finishing pass.
+`npm run test:unit` alone: **4041/4041**.
+
+That full run also left `git status` showing **only deliberate edits**, which it
+had not done for the life of the project: the boss E2E used to screenshot over a
+committed PNG. See trap 32-adjacent notes and
+`docs/FINISHING-PASS-2026-08-11.md` section B2.
 
 Every one of those nine fixes has been reverted and the suite re-run to confirm
 something fails without it (`HANDOFF` trap 10). The first pass of that found
@@ -117,6 +122,10 @@ with `git ls-remote` rather than trusting this sentence.
 | Room seals (26 rooms, 24%) | **built** (`tests/game/room-seal.spec.mjs` guards the softlock rules) |
 | Coach hints | **3 → 13** |
 | Luminance gate | **now bands CENTRE-CROP mean; full-frame was measuring the vignette** |
+| **Player HUD** | **built** — the debug panel's developer fields moved to `#ss-hud-dev` (dev mode only); `tests/game/hud-player.spec.mjs` gates the split. See `docs/FINISHING-PASS-2026-08-11.md`. |
+| Permanent controls cheat sheet | **gone** — 14 s on a new run, or hold `?` |
+| Hero readability | **partly done.** Cloak + fixed-key separation light + reserved azure. Actor/floor ΔL\* 9.5 → 15.1. **In greyscale the hero is still not distinguishable from other actors** — report section D5, and the one thing to decide before more art work |
+| Actor inverted-hull outline | **built, measured, rejected on sight.** Off behind `outline: true`; trap 35 |
 | Abyss vs Crust brightness | **unified — owner decision, see `docs/OPEN_QUESTIONS.md` Q1** |
 | Boss-room luminance | **tuned to match each dungeon — see Q2** |
 | Enemy AI colliding with a wall it's already touching | **fixed** (`src/engine/collision.js`) |
@@ -1279,6 +1288,54 @@ its shoulder pivot, so arm direction is
 because `player.js` sets `rig.rotation.y = atan2(fv.x, fv.z)`. The arm therefore
 points forward only when `rx` is **negative**, and only `rz` carries lateral
 motion — a swing with `rz = 0` is a vertical chop and cannot read as an arc.
+
+**33. A spec that declares its own copy of the thing under test cannot fail.**
+`tests/game/hero-readability.spec.mjs` shipped with a `HERO_OPTS` constant under
+a comment reading *"exactly the options `player.js` passes"*. It was a copy, and
+a copy cannot notice the original changed. The counterfactual proved it the
+expensive way: deleting the hero's cloak from `player.js`, dropping the rim to
+the default, and handing the hero an enemy faction's colour each left the spec
+passing **15 of 15**. It was pinning its own constant with great rigour.
+`player.js` now exports `HERO_RIG` and the spec imports it. Whenever a spec
+needs to know how something is configured, **import the configuration**; if it
+is not exported, export it. This is trap 5 ("wire the alarm to the building")
+wearing a different hat, and it got past me anyway because the copy was
+*correct* — it was the right values, so everything was green and nothing looked
+wrong.
+
+**34. An instrument's constants are hypotheses too.**
+`tests/qa/silhouette-contrast.mjs` sampled a hardcoded `(640, 360)` because "the
+camera centres the player". The rig looks at a point *above* the feet and the
+camera is pitched 56°, so the player's body renders around `y = 395`: the disc
+straddled their head and a lot of open floor, and every figure the probe ever
+printed — including the ones quoted in `AAA.md` — was diluted by it. It now
+projects the player through the live camera and derives its radii from their
+measured on-screen height. Its edge test had the same disease in miniature: it
+compared `r − 4` against `r + 8`, a twelve-pixel straddle, and therefore could
+not see the one-to-two-pixel band it was added to measure. **Count, do not
+cite** applies to your own probes.
+
+**35. Numbers up, game worse — an inverted-hull outline at 30 px.**
+The actor outline improved every measurement it touched (mean ΔL\* 7.2 → 14.3)
+and made the game visibly worse; the owner's verdict was *"it was better
+before"*. The player is about **thirty pixels tall** at this camera, so an
+outline wide enough to register is roughly a quarter of the character's width and
+the figure becomes a black blob. Two consequences worth carrying: a metric that
+prefers a rejected build is not a metric to gate on, and **screen size is a
+design constraint, not a detail** — an effect measured in world units has to be
+converted to pixels before you can have an opinion about it. Kept behind
+`outline: true` in `actor-rig.js`; it would be the right answer if the camera
+ever came closer.
+
+**36. A rendering decoration must never be inside the measurement that grounds
+the body.** `createActorRig` computes one `Box3` and uses it for three things:
+the feet's ground offset, `height`, and the `radius` combat reads to derive
+enemy hit radii. Adding the hero's cloak before that box would have lifted the
+hero off the floor by however far the cape overhangs the heels; adding the
+outline shells before it would have fattened **every enemy's hurtbox** by the
+outline width. Both are now added after it, and `hero-readability.spec.mjs`
+pins that all three numbers are identical with and without them. When you add
+anything to a rig, ask what else measures that rig.
 
 ## Map
 

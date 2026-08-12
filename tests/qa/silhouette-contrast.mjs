@@ -22,9 +22,18 @@ const puppeteer = await import('puppeteer-core');
 const server = await startServer(8793);
 let browser;
 
-// Where the character sits on a 1280x720 frame: the rig centres the look-at on
-// the player, so they land at frame centre, slightly above it (lookY 0.5).
-const CX = 640, CY = 360;
+// Where the character sits on a 1280x720 frame.
+//
+// This used to be a hardcoded (640, 360) with the reasoning "the rig centres the
+// look-at on the player, so they land at frame centre". The rig looks at a point
+// ABOVE the player's feet and the camera is pitched 56 degrees, so the player's
+// body actually renders around y = 395 — and a 26-pixel disc at 360 straddles
+// their head and a lot of the floor beyond it. Every number this probe has ever
+// printed was diluted by that, and in the crowded rooms it was measuring more
+// floor than character.
+//
+// So the player is PROJECTED now, per frame, per level. `measure` fills these in.
+let CX = 640, CY = 360;
 
 try {
     browser = await puppeteer.default.launch({
@@ -51,9 +60,42 @@ try {
         // Hide HUD so no DOM chrome lands in the crop.
         await page.evaluate(() => window.__sovereignScar.hud?.setHidden?.(true));
         await sleep(400);
+
+        // Ask the renderer where the player is, rather than assuming.
+        const at = await page.evaluate(() => {
+            const s = window.__sovereignScar;
+            const cam = s.camera;
+            const p = s.player.root.position;
+            const h = s.player.actor?.height || 1.9;
+            // Mid-torso, which is the part of the body a disc should sit on —
+            // the feet are half in shadow and the head is a sixth of the figure.
+            const world = [p.x, p.y - 0.95 + h * 0.55, p.z];
+            cam.updateMatrixWorld();
+            const project = (v) => {
+                const m = cam.projectionMatrix.elements;
+                const iv = cam.matrixWorldInverse.elements;
+                const e = (M, i, x, y, z) => M[i] * x + M[i + 4] * y + M[i + 8] * z + M[i + 12];
+                const vx = e(iv, 0, ...v), vy = e(iv, 1, ...v), vz = e(iv, 2, ...v);
+                const cx = m[0] * vx + m[4] * vy + m[8] * vz + m[12];
+                const cy = m[1] * vx + m[5] * vy + m[9] * vz + m[13];
+                const cw = m[3] * vx + m[7] * vy + m[11] * vz + m[15];
+                return [cx / cw, cy / cw];
+            };
+            const [ndcX, ndcY] = project(world);
+            // …and how big they are, so the sampling radii scale with the figure
+            // instead of being three more magic numbers.
+            const top = project([p.x, p.y - 0.95 + h, p.z]);
+            const bot = project([p.x, p.y - 0.95, p.z]);
+            const px = (ndcX * 0.5 + 0.5) * 1280;
+            const py = (-ndcY * 0.5 + 0.5) * 720;
+            const heightPx = Math.abs((top[1] - bot[1]) * 0.5 * 720);
+            return { px: +px.toFixed(1), py: +py.toFixed(1), heightPx: +heightPx.toFixed(1) };
+        });
+        CX = at.px; CY = at.py;
+
         const b64 = await page.screenshot({ encoding: 'base64' });
 
-        const res = await page.evaluate(async (dataB64, cx, cy) => {
+        const res = await page.evaluate(async (dataB64, cx, cy, bodyPx) => {
             const img = new Image();
             await new Promise((r) => { img.onload = r; img.src = 'data:image/png;base64,' + dataB64; });
             const cv = document.createElement('canvas');
@@ -61,9 +103,13 @@ try {
             const ctx = cv.getContext('2d', { willReadFrequently: true });
             ctx.drawImage(img, 0, 0);
             const sx = img.width / 1280, sy = img.height / 720;
-            const R_BODY = 26 * sy;      // the character occupies roughly this radius
-            const R_IN = 34 * sy;        // floor annulus starts outside the body
-            const R_OUT = 58 * sy;
+            // Sized from the character's MEASURED on-screen height instead of
+            // three constants tuned once against one room. The figure is about
+            // 30 px tall at 720p, so the old 26/34/58 disc was roughly twice the
+            // body and mostly floor.
+            const R_BODY = Math.max(6, bodyPx * 0.36) * sy;
+            const R_IN = Math.max(9, bodyPx * 0.52) * sy;
+            const R_OUT = Math.max(16, bodyPx * 0.95) * sy;
             const d = ctx.getImageData(0, 0, img.width, img.height).data;
 
             const srgb = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
@@ -86,17 +132,46 @@ try {
             const bA = avg(body), fA = avg(floor);
             const bL = Lstar(lum(...bA)), fL = Lstar(lum(...fA));
 
-            // Edge test: the strongest single step anywhere on the body boundary.
-            let bestEdge = 0;
+            // Edge test, on every bearing around the body.
+            //
+            // TWO numbers, because the MAX on its own is a liar. It reports the
+            // single luckiest bearing out of 120 — one bright prop behind one
+            // shoulder scores 66 while the other 119 bearings score nothing, and
+            // the character is still invisible. It read 51 on average across a
+            // campaign whose characters dissolve into the floor.
+            //
+            // The MEDIAN is the honest one: half the outline is at least this
+            // strong. It is also the number an outline exists to move, which the
+            // body-vs-floor ΔL* above is nearly blind to — a black band lives at
+            // the boundary, and a mean over a disc barely notices it.
+            //
+            // And it walks the ray one pixel at a time rather than sampling two
+            // fixed radii. The first version compared r-4 against r+8, which
+            // straddles the boundary by twelve pixels — an outline is one or two
+            // pixels wide, so that version could not see the thing it was added
+            // to measure. It reported no change at all from a band that is
+            // plainly visible in the frame.
+            const inP = (yy, xx) => {
+                const i = (Math.round(yy) * img.width + Math.round(xx)) * 4;
+                return [d[i], d[i + 1], d[i + 2]];
+            };
+            const edges = [];
             for (let a = 0; a < 360; a += 3) {
                 const rad = a * Math.PI / 180;
-                const inP = (yy, xx) => { const i = (Math.round(yy) * img.width + Math.round(xx)) * 4; return [d[i], d[i + 1], d[i + 2]]; };
-                const p1 = inP(py + Math.sin(rad) * (R_BODY - 4), px + Math.cos(rad) * (R_BODY - 4));
-                const p2 = inP(py + Math.sin(rad) * (R_BODY + 8), px + Math.cos(rad) * (R_BODY + 8));
-                const dl = Math.abs(Lstar(lum(...p1)) - Lstar(lum(...p2)));
-                if (dl > bestEdge) bestEdge = dl;
+                let step = 0;
+                let prev = null;
+                for (let r = R_BODY - 12; r <= R_BODY + 14; r += 1) {
+                    const L = Lstar(lum(...inP(py + Math.sin(rad) * r, px + Math.cos(rad) * r)));
+                    if (prev != null) step = Math.max(step, Math.abs(L - prev));
+                    prev = L;
+                }
+                edges.push(step);
             }
+            const sorted = edges.slice().sort((a, b) => a - b);
+            const bestEdge = sorted[sorted.length - 1];
+            const medEdge = sorted[Math.floor(sorted.length / 2)];
             return {
+                medEdgeL: +medEdge.toFixed(1),
                 bodyRGB: bA.map((v) => Math.round(v)), floorRGB: fA.map((v) => Math.round(v)),
                 bodyL: +bL.toFixed(1), floorL: +fL.toFixed(1),
                 dL: +Math.abs(bL - fL).toFixed(1),
@@ -104,12 +179,13 @@ try {
                 bestEdgeL: +bestEdge.toFixed(1),
                 samples: { body: body.length, floor: floor.length },
             };
-        }, b64, CX, CY);
+        }, b64, CX, CY, at.heightPx);
 
         await page.evaluate(() => window.__sovereignScar.hud?.setHidden?.(false));
         console.log(
             `${label.padEnd(22)} body L*${String(res.bodyL).padStart(5)}  floor L*${String(res.floorL).padStart(5)}  ` +
-            `ΔL* ${String(res.dL).padStart(5)}  ΔRGB ${String(res.dRGB).padStart(5)}  strongest edge ΔL* ${res.bestEdgeL}`
+            `ΔL* ${String(res.dL).padStart(5)}  ΔRGB ${String(res.dRGB).padStart(5)}  ` +
+            `edge ΔL* median ${String(res.medEdgeL).padStart(5)} / max ${res.bestEdgeL}`
         );
         return res;
     }
