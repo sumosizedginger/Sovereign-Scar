@@ -90,6 +90,16 @@ const REFLECT_STAGGER = 0.7;
  * a mote cannot be answered with a sword. With chip damage now zero, standing
  * your ground and facing it is a genuine second answer.
  */
+// Idle look-around, for enemies outside aggro range. Kept slow and narrow on
+// purpose: this must read as a creature noticing the room, never as a patrol,
+// and it must never sweep so far that a player reads it as "it has seen me".
+/** How far either side of its spawn facing an idle enemy will glance. */
+export const IDLE_ARC = 1.15;          // radians, ~66 degrees
+/** Rough seconds between glances; jittered per enemy either side of this. */
+const IDLE_DWELL = 2.6;
+/** Radians per second while glancing — a look, not a snap. */
+const IDLE_TURN_RATE = 1.05;
+
 const MOTE_HOLD = 2.0;
 const MOTE_BURST = 2.6;
 const MOTE_WINDUP = 0.85;
@@ -831,7 +841,13 @@ export class Enemy {
             return;
         }
 
-        if (dist >= this.aggroRange) return;
+        // Out of aggro range this used to be a bare `return` — the enemy ran
+        // no branch at all. Measured (`tests/qa/ambient-motion.mjs`): across
+        // four levels, enemy BODIES idle-animated on 87-94% of their parts, but
+        // **0 of 31 enemy roots ever changed facing.** They breathed, and they
+        // never looked anywhere. That is the difference between a prop and a
+        // creature, and it is the whole of this branch.
+        if (dist >= this.aggroRange) { this._idleLook(dt); return; }
 
         this._faceToward(dx, dz, dt);
 
@@ -1185,6 +1201,69 @@ export class Enemy {
      * An infinite turn rate takes the snap path so the arithmetic below cannot
      * perturb the kinds that never needed it.
      */
+    /**
+     * Look around while nothing is happening.
+     *
+     * Deliberately NOT a sine sweep. A continuously rotating enemy reads as a
+     * radar dish, not as something alive — a creature turns, then holds, then
+     * turns somewhere else. So this picks a new heading, spends `turn` seconds
+     * getting there at a slow rate, and then dwells before choosing again.
+     *
+     * The heading is drawn from a per-enemy seeded sequence rather than
+     * `Math.random()`, so a room full of enemies does not scan in unison and a
+     * replay of the same room looks the same twice — the certification captures
+     * include rooms with enemies standing in them.
+     *
+     * It sweeps around the facing the enemy SPAWNED with, not around whatever
+     * it happens to be looking at, or the arc walks: each new offset would
+     * compound on the last and an idle enemy would slowly rotate on the spot
+     * forever, which was the first version and looked drunk.
+     */
+    _idleLook(dt) {
+        if (this._idleSeed === undefined) {
+            const p = this.rig?.position || { x: 0, z: 0 };
+            // Position-derived so it is stable for this spawn without needing
+            // anything threaded through the constructor.
+            let h = Math.imul((p.x * 73856093) ^ (p.z * 19349663) | 0, 2654435761);
+            this._idleSeed = () => {
+                h = Math.imul(h ^ (h >>> 15), 2246822507);
+                h = Math.imul(h ^ (h >>> 13), 3266489909);
+                return ((h ^= h >>> 16) >>> 0) / 4294967296;
+            };
+            // Anchor to the RIG's rotation — what the player can actually see —
+            // not to `state.facingVec`. The two are not guaranteed to agree at
+            // spawn, and when they disagree, reading the vector makes the very
+            // first glance snap the body through the difference. The spec
+            // caught exactly that: a 2.72 rad jump against a 1.15 rad arc.
+            // Syncing the vector to the rig here means the glance starts from
+            // where the enemy is already pointing, whatever built it.
+            this._idleHome = this.rig.rotation.y;
+            this.state.setFacing(Math.sin(this._idleHome), Math.cos(this._idleHome));
+            this._idleYaw = this._idleHome;
+            this._idleT = 0.4 + this._idleSeed() * IDLE_DWELL;
+        }
+
+        this._idleT -= dt;
+        if (this._idleT <= 0) {
+            this._idleT = IDLE_DWELL * (0.6 + this._idleSeed() * 0.9);
+            this._idleYaw = this._idleHome + (this._idleSeed() * 2 - 1) * IDLE_ARC;
+        }
+
+        // Turn at a slow fixed rate, not `turnRate` — combat turn speeds are
+        // tuned for tracking a running player and make a glance look like a
+        // snap. Everything else about facing still goes through the same
+        // `state.setFacing` + `rig.rotation.y` pair, so nothing downstream has
+        // to know this branch exists.
+        const have = Math.atan2(this.state.facingVec.x, this.state.facingVec.z);
+        let delta = this._idleYaw - have;
+        while (delta > Math.PI) delta -= Math.PI * 2;
+        while (delta < -Math.PI) delta += Math.PI * 2;
+        const step = IDLE_TURN_RATE * dt;
+        const a = Math.abs(delta) <= step ? this._idleYaw : have + Math.sign(delta) * step;
+        this.state.setFacing(Math.sin(a), Math.cos(a));
+        this.rig.rotation.y = Math.atan2(this.state.facingVec.x, this.state.facingVec.z);
+    }
+
     _faceToward(dx, dz, dt) {
         if (this.turnRate === Infinity) {
             this.state.setFacing(dx, dz);

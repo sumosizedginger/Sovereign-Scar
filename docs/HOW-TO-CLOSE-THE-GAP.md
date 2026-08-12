@@ -146,11 +146,20 @@ written cannot be started.
    named non-actor objects in a baked room are `contact-shadow`, `room-lights`
    and `void-plane`; the scenery from `props.js` is anonymous meshes. Step one
    is naming or tagging them, and that is a different (larger) job.
-4. **Enemy idle before aggro.** Still open, and now stated exactly: enemy
-   *bodies* already idle-animate (87–94% of parts move), but **no enemy root
-   ever changes facing** — 0 of 31 turned across four levels. What is missing is
-   not animation, it is a slow look-around. That is the difference between a
-   prop and a creature, and it is the next thing to do here.
+4. ~~**Enemy idle before aggro.**~~ **DONE 2026-08-12.** Stated exactly, because
+   the original wording was imprecise: enemy *bodies* already idle-animated
+   (87–94% of parts moving), but **no enemy root ever changed facing** — 0 of 31
+   across four levels. `if (dist >= this.aggroRange) return;` ran no branch at
+   all. It now runs `_idleLook(dt)`: pick a heading, turn to it slowly, hold,
+   pick another — a creature turns and holds; a sine sweep reads as a radar
+   dish. Headings come from a position-seeded sequence, so a room does not scan
+   in unison and the same spawn idles the same way twice. Measured after:
+   **0 → 3-of-12 and 4-of-13 turning in any given second**, max 0.98 rad.
+
+   The spec caught a real bug on its first run: anchoring the arc to
+   `state.facingVec` snapped the body **2.72 rad** on the first glance, because
+   the rig's rotation and the logical facing are not guaranteed to agree at
+   spawn. It anchors to the rig — what the player can actually see — instead.
 
 *Gate:* `tests/game/ambient-life.spec.mjs` (17 assertions) — registration and
 de-registration, motion over time, fixtures out of phase, the zero-mean

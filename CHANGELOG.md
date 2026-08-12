@@ -47,7 +47,23 @@ order** — every other assertion in it stays green if the loop never calls it.
 Eleven break modes proven, including freezing the update, moving it after the
 pool, and giving the wave a DC offset.
 
-Suite: **5009/5009**.
+**And the enemies look around now.** `if (dist >= this.aggroRange) return;` ran
+no branch at all — the bodies idle-animated the whole time, which is why this
+never looked obviously broken, but **not one enemy root had ever changed
+facing.** `_idleLook(dt)` picks a heading, turns to it slowly, holds, then picks
+another; a sine sweep would read as a radar dish rather than as a creature.
+Headings come from a position-seeded sequence, so a room does not scan in unison
+and the same spawn idles identically twice. Measured: 0 → 3-of-12 and 4-of-13
+turning in any given second.
+
+Its spec caught a real bug on the first run: anchoring the glance to
+`state.facingVec` snapped the body **2.72 rad** against a 1.15 rad arc, because
+a rig's rotation and its logical facing are not guaranteed to agree at spawn. It
+anchors to the rig — what the player can actually see — instead. Seven more
+break modes proven, including letting the offsets compound and giving every
+enemy one seed.
+
+Suite: **5014/5014**.
 
 ### The app has its own icon, and three documents stop giving bad advice
 

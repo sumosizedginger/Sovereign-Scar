@@ -38,6 +38,7 @@ import {
     MOTIFS, buildRoomLights, disposeRoomLights,
     updateRoomLightFlicker, liveFixtureCount,
 } from '../../src/game/world/room-lights.js';
+import { Enemy, IDLE_ARC } from '../../src/game/enemy.js';
 
 /** A kit that lights its rooms with the named motif. */
 const kitFor = (emissive, name = 'test-kit') => ({ name, emissive });
@@ -141,6 +142,63 @@ export function run(t) {
     const phq = q.rec.flickers.map((f) => f.phase);
     t.ok('but a different room does not', phq.some((v, i) => v !== ph1[i]));
     disposeRoomLights(q.rec, null);
+
+    // ── 5b. Enemies look around when nothing is happening ──────────────────
+    // Measured before this existed: enemy BODIES idle-animated on 87-94% of
+    // their parts while **0 of 31 roots ever changed facing**. The animator was
+    // never the problem — the branch outside aggro range was a bare `return`.
+    {
+        const far = { x: 0, y: 1, z: 0 };
+        const e = new Enemy(new THREE.Scene(), null, far, { kind: 'sentinel' });
+        // A player far outside aggro range: this is the branch under test.
+        const player = { root: { position: new THREE.Vector3(500, 1, 500) } };
+        const yaw = () => e.rig.rotation.y;
+
+        const y0 = yaw();
+        let turned = false;
+        let maxOff = 0;
+        const home = y0;
+        for (let i = 0; i < 900; i++) {                 // 15 s at 60 fps
+            e.update(1 / 60, player, []);
+            if (Math.abs(yaw() - y0) > 1e-4) turned = true;
+            let d = yaw() - home;
+            while (d > Math.PI) d -= Math.PI * 2;
+            while (d < -Math.PI) d += Math.PI * 2;
+            maxOff = Math.max(maxOff, Math.abs(d));
+        }
+        t.ok('an enemy out of aggro range changes facing at all', turned,
+            `yaw ${y0.toFixed(3)} -> ${yaw().toFixed(3)}`);
+
+        // The arc must stay bounded around the SPAWN facing. The first version
+        // offset from current facing, so the offsets compounded and an idle
+        // enemy slowly span on the spot forever.
+        t.ok('and it glances around its spawn facing rather than spinning',
+            maxOff <= IDLE_ARC + 0.05, `max offset ${maxOff.toFixed(3)} rad vs arc ${IDLE_ARC}`);
+        t.ok('the glance is a real look, not a twitch',
+            maxOff > 0.15, `max offset ${maxOff.toFixed(3)} rad`);
+
+        // Two enemies spawned in different places must not scan in lockstep —
+        // a room of enemies turning as one reads as a cutscene, not a room.
+        const a2 = new Enemy(new THREE.Scene(), null, { x: 7, y: 1, z: -3 }, { kind: 'sentinel' });
+        const b2 = new Enemy(new THREE.Scene(), null, { x: -4, y: 1, z: 9 }, { kind: 'sentinel' });
+        let apart = 0;
+        for (let i = 0; i < 600; i++) {
+            a2.update(1 / 60, player, []);
+            b2.update(1 / 60, player, []);
+            apart = Math.max(apart, Math.abs(a2.rig.rotation.y - b2.rig.rotation.y));
+        }
+        t.ok('two enemies do not glance in unison', apart > 0.1,
+            `max divergence ${apart.toFixed(3)} rad`);
+
+        // Same spawn, same look — the certification captures include rooms
+        // with enemies standing in them.
+        const seeded = () => {
+            const g = new Enemy(new THREE.Scene(), null, { x: 2, y: 1, z: 5 }, { kind: 'sentinel' });
+            for (let i = 0; i < 300; i++) g.update(1 / 60, player, []);
+            return g.rig.rotation.y;
+        };
+        t.ok('the same spawn produces the same idle every run', seeded() === seeded());
+    }
 
     // ── 6. The building is wired to the alarm ──────────────────────────────
     // Everything above tests `room-lights.js` in isolation, and every one of
