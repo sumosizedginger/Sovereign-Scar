@@ -47,6 +47,33 @@ const SPAWNED_KINDS = (() => {
 })();
 const ALL_KINDS = SPAWNED_KINDS;
 
+/**
+ * The same drift, one file over — and it survived the fix above by a year.
+ *
+ * When the weaver and the censer were added, the hardcoded seven in THIS spec
+ * was found and replaced with the derivation above. The identical hardcoded
+ * seven in `tests/qa/content-density.mjs` was not, so the bestiary matrix went
+ * on reporting a 7×6 grid for a 9-kind game — and printed a coverage
+ * PERCENTAGE against it, "37 of 42 (88%)", when the truth was 39 of 54 (72%).
+ * A probe cannot go red on its own; this is the alarm for it.
+ *
+ * `ENEMY_PALETTES` is what the probe derives from now, so pinning that it
+ * matches what the campaign actually spawns keeps both honest.
+ */
+function checkRosterAgreement(t) {
+    const palette = Object.keys(ENEMY_PALETTES).sort();
+    const spawned = SPAWNED_KINDS;
+    const noPalette = spawned.filter((k) => !palette.includes(k));
+    const neverSpawned = palette.filter((k) => !spawned.includes(k));
+    t.ok('every kind the campaign spawns has a palette to be built from',
+        noPalette.length === 0, noPalette.join(',') || 'none');
+    t.ok('and every palette in the bestiary is a kind the campaign spawns',
+        neverSpawned.length === 0, neverSpawned.join(',') || 'none');
+    t.ok('the bestiary is the size the density probe reports on',
+        palette.length === spawned.length,
+        `${palette.length} palettes vs ${spawned.length} spawned`);
+}
+
 function spawn(kind, at = { x: 0, y: 1, z: 0 }, opts = {}) {
     return new Enemy(new THREE.Scene(), null, at, { kind, ...opts });
 }
@@ -61,6 +88,8 @@ function attackerAt(x, z) {
 }
 
 export function run(t) {
+    checkRosterAgreement(t);
+
     // --- the kinds exist and are visually distinct -------------------------
     t.ok('the campaign spawns every kind this spec knows about',
         NEW_KINDS.every((k) => SPAWNED_KINDS.includes(k)), SPAWNED_KINDS.join(','));

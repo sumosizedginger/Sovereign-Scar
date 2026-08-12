@@ -5,6 +5,44 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Wiring audit, pass 2 — content this time, and the Pyre's reward is a prop
+
+Full findings: `docs/WIRING-AUDIT-2026-08-12-PASS2.md`. Pass 1 checked modules;
+this checked authored data against the code meant to consume it.
+
+**The Pyre hands you a reward that grants nothing.** Beat 12's "Vector Staff"
+pickup grants an item nothing checks, a second id (`line_caster`) that is not a
+weapon, not in the items map, has no hint and no reader, and calls
+`markProgress('item_acquired', …)` — whose parameters are both unused. The
+light-line ability it advertises fires on `activeWeapon === 'light_caster'`
+alone, with no staff test anywhere. Proven in the running game: with neither
+item held, one swing takes the line count 0 → 1. Left unfixed on purpose —
+which of the three repairs to make is a design call.
+
+**Fixed: the density probe was reporting on seven of the game's nine enemy
+types.** A hardcoded roster in `content-density.mjs` omitted the weaver and the
+censer entirely — both of which ship with palettes, AI branches and six
+authored spawns — and printed a coverage percentage against the short grid:
+"37 of 42 (88%)" where the truth is 39 of 54 (72%). The identical hardcoded
+seven had already been found and fixed one file over in `bestiary.spec.mjs`;
+the probe was never swept. Now derived from `ENEMY_PALETTES`, with three
+assertions in `bestiary.spec.mjs` pinning the two lists together
+(counterfactually proven).
+
+That fix exposed a content fact nothing could previously see: the weaver and
+censer are each authored three times and **only ever on default AI**.
+
+Also found: `tectonic_glove` declared in the inventory and appearing exactly
+once in the repo (its own declaration); `gumoi_sigil` set by beat 13 and read
+by nothing; five real items riding the `hasItem` flags fallback because they
+are absent from the `items` map.
+
+Clean bills: all 110 spec files registered and running, all 34 sound effects
+wired both ways, all 11 score events awarded, every level-authoring call
+provided, and the desktop build packaging everything the game loads.
+
+Suite: 4911/4911.
+
 ### Wiring audit — everything checked from both ends
 
 Full findings: `docs/WIRING-AUDIT-2026-08-12.md`. One regression fixed, the

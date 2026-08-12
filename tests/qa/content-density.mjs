@@ -23,6 +23,7 @@ import path from 'node:path';
 import { BEAT_LIST } from '../game/_beat-defs.mjs';
 import { puzzlesForDungeon } from '../../src/game/world/puzzles.js';
 import { censusFile } from './lib/boss-actions.mjs';
+import { ENEMY_PALETTES } from '../../src/game/assets/palettes.js';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const LEVELS = path.join(ROOT, 'src/game/levels');
@@ -83,7 +84,23 @@ for (const [b, v] of Object.entries(enc.perBeat)) {
 // Trap 9 in HANDOFF.md is about a kind trait meeting an AI trait. That trap is
 // only worth the ink if the campaign actually authors the combinations — so
 // count how much of the grid is ever built.
-const KINDS = ['sentinel', 'scarab', 'frost', 'bulwark', 'mote', 'lancer', 'brood'];
+//
+// THE ROSTER IS DERIVED, NOT TYPED. This line used to read:
+//
+//     const KINDS = ['sentinel','scarab','frost','bulwark','mote','lancer','brood'];
+//
+// — seven kinds, hardcoded, against a game that has NINE. `weaver` and `censer`
+// shipped with palettes, bodies, AI branches, held props and six authored
+// spawns across beats 07, 09, 11, 12, 13 and 14, and this matrix has never once
+// mentioned them. Worse, it printed a coverage PERCENTAGE — "37 of 42 cells
+// (88%)" — computed against a grid that was two whole rows short, so the number
+// most likely to be quoted into a content plan was the most wrong thing here.
+//
+// Same disease as the boss counter this probe had in its other half, same cure:
+// ask the thing that knows. `ENEMY_PALETTES` is what `createActorRig` builds a
+// kind from, so a kind that exists is a key in it, and a tenth kind added
+// tomorrow appears here without anyone remembering to come back.
+const KINDS = Object.keys(ENEMY_PALETTES);
 const AIS = ['(default)', 'chase', 'charge', 'ranged', 'lunge', 'drift'];
 console.log(`\n▸ BESTIARY MATRIX   ${KINDS.length} kinds × ${AIS.length - 1} AI behaviours`);
 let filled = 0;
