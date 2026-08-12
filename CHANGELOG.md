@@ -5,6 +5,50 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Every lamp in the game was a painted rectangle
+
+**Measured first, and the measurement rewrote the plan.**
+`tests/qa/ambient-motion.mjs` is new: it holds the player perfectly still,
+samples the whole scene twice a second apart, and reports what moved, bucketed
+by what it is. Across four levels it found that of the four systems
+`HOW-TO-CLOSE-THE-GAP.md` item 3 wanted built, **one was dead, one was already
+working, one was half-right, and one was aimed at objects that do not exist.**
+
+| the plan said | measured |
+|---|---|
+| lights do not flicker | **true** — 24 lights, max Δintensity **0.0000** |
+| enemies "stand perfectly still" | bodies idle-animate; **0 of 31 roots ever turn** |
+| motes need turning up | already drifting, 520 live particles |
+| banners/chains/vents need sway | **no such objects** — scenery is anonymous meshes |
+
+**The lights now breathe.** All 14 motifs declare `live: flame | machine |
+water`; each fixture takes a phase from the same seeded rng that placed it, so a
+room breathes identically every run and its captures stay reproducible.
+`updateRoomLightFlicker(t)` runs immediately **before** `localLights.update()` —
+the pool already copied `source.intensity` onto the real light every frame, so
+the feature needed no change to the pool at all. Δintensity 0.0000 → **0.47**.
+
+**The waves are sums of pure sines about zero**, so each light's time average is
+exactly its old constant value (worst drift <0.5%). That is load-bearing, not
+tidiness: the certification gate bands mean frame luminance and one region sits
+4 under its ceiling, so any DC offset would have started failing screens for
+being alive. All luminance gates still pass.
+
+The probe was wrong twice before it was right, and both are recorded in it: it
+sampled the Points object's transform (which never moves) and called a
+520-particle field "still", and it bucketed by guessed `userData` flags that do
+not exist, so the player control silently never ran and an enemy's held plate
+counted as scenery.
+
+`tests/game/ambient-life.spec.mjs` (17 assertions) pins registration AND
+de-registration, motion over time, fixtures out of phase, the zero-mean
+property, seeded reproducibility, and **the frame-loop call site including its
+order** — every other assertion in it stays green if the loop never calls it.
+Eleven break modes proven, including freezing the update, moving it after the
+pool, and giving the wave a DC offset.
+
+Suite: **5009/5009**.
+
 ### The app has its own icon, and three documents stop giving bad advice
 
 **The desktop build shipped the stock Electron diamond.** `electron-builder`

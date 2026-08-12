@@ -105,27 +105,61 @@ and cannot make anywhere unreachable, so it needs no traversal re-audit.
 
 ---
 
-## 3. Nothing moves that you did not move (days — best value on the list)
+## 3. Nothing moves that you did not move (partly DONE 2026-08-12)
+
+**Measured before building, and the measurement rewrote the list.**
+`tests/qa/ambient-motion.mjs` holds the player still, samples the whole scene
+twice a second apart, and reports what moved. Across four levels:
+
+| this section claimed | measured |
+|---|---|
+| lights do not flicker | **true** — 24 lights, max Δintensity **0.0000**, everywhere |
+| enemies "stand perfectly still" | **half true** — bodies idle-animate, but **0 of 31 roots ever turn** |
+| motes need turning up | **already drifting** — the 520-particle field moves every frame |
+| banners, chains and vents need sway | **no such objects exist** — the only named scenery is `contact-shadow`, `room-lights`, `void-plane` |
+
+So one of the four was dead, one was half-right, one was already done, and one
+was aimed at props that were never built. Item 1 below is closed and item 3 as
+written cannot be started.
 
 *Method:* four small systems, each independent, each revertible.
 
-1. **Drifting motes.** A hundred slow particles per room, tinted by the kit's
-   own atmosphere colour. `fx/atmosphere.js` and `fx/soul-motes.js` both exist;
-   this is mostly turning them up and binding them to the room's palette.
-2. **Light flicker on emissive fixtures.** `world/room-lights.js` already places
-   real lights at kit motifs. Give each a slow sine with a per-fixture phase
-   offset. Torches breathe; machines pulse. One number each.
-3. **Idle animation on props.** Banners, chains and vents get a 2-second sway.
-   The actor animator already does procedural motion; the same approach applies
-   to a prop group.
-4. **Enemy idle before aggro.** Enemies currently stand perfectly still until
-   you enter their radius. A slow look-around costs nothing and turns a prop
-   into a creature.
+1. ~~**Drifting motes.**~~ **Already working.** The `dust-motes` field is 520
+   live particles and its vertices move every frame (Δ3.6–40.4 per second,
+   measured). Nothing to turn up. Binding its tint to the room palette is a
+   separate, much smaller job than this entry implied.
+2. ~~**Light flicker on emissive fixtures.**~~ **DONE 2026-08-12.** Each of the
+   14 motifs in `MOTIFS` now declares `live: 'flame' | 'machine' | 'water'`,
+   and each fixture gets a phase from the same seeded rng that placed it.
+   `updateRoomLightFlicker(t)` runs in the frame loop immediately **before**
+   `localLights.update()`, which already copied `source.intensity` onto the real
+   light every frame — so the feature needed no change to the pool at all.
+   Measured after: Δintensity 0.0000 → **0.47**.
 
-*Gate:* a spec that a room's ambient systems produce non-zero motion over one
-second of simulated time. *Counterfactual:* freeze the update and watch it fail.
+   The waves are sums of pure sines about zero, so **each light's time average
+   is exactly its old constant value** (worst drift measured: <0.5%). That is
+   not decoration — the certification gate bands mean frame luminance and one
+   region already sits 4 under its ceiling, so a wave with any DC offset would
+   start failing screens for being alive. All 44 luminance gates still pass.
+3. **Idle animation on props.** ~~Banners, chains and vents get a 2-second
+   sway.~~ **Cannot be started as written: those props do not exist.** The only
+   named non-actor objects in a baked room are `contact-shadow`, `room-lights`
+   and `void-plane`; the scenery from `props.js` is anonymous meshes. Step one
+   is naming or tagging them, and that is a different (larger) job.
+4. **Enemy idle before aggro.** Still open, and now stated exactly: enemy
+   *bodies* already idle-animate (87–94% of parts move), but **no enemy root
+   ever changes facing** — 0 of 31 turned across four levels. What is missing is
+   not animation, it is a slow look-around. That is the difference between a
+   prop and a creature, and it is the next thing to do here.
 
-*Order:* 2, then 4, then 1, then 3 — cheapest and most visible first.
+*Gate:* `tests/game/ambient-life.spec.mjs` (17 assertions) — registration and
+de-registration, motion over time, fixtures out of phase, the zero-mean
+property, seeded reproducibility, and **the frame-loop call site including its
+order**, because every other assertion stays green if the loop never calls it.
+*Counterfactual:* eleven break modes, all caught, including freezing the update,
+moving it after the pool, and giving the wave a DC offset.
+
+*Order:* ~~2~~, then 4, then ~~1~~, then 3 — cheapest and most visible first.
 
 ---
 

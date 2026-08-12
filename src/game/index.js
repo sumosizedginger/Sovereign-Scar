@@ -64,6 +64,7 @@ import { dev } from './dev/dev-mode.js';
 import { HeartDropManager, dropSite } from './world/heart-drops.js';
 import { patchOverworld } from './world/keys.js';
 import { DeathEcho } from './world/death-echo.js';
+import { updateRoomLightFlicker } from './world/room-lights.js';
 import { AnchorThread } from './narrative/anchor-thread.js';
 import { getRunMode, setActiveRunMode } from './kernel/run-mode.js';
 import {
@@ -1078,6 +1079,10 @@ let deathOutcome = null;
 let saveAcc = 0;
 let shardIncomeRemainder = 0;
 let titleDrift = 0;
+// Ambient clock, accumulated from the same scaled dt the world uses so the
+// lamps stop breathing when the world stops. Not `clock.getElapsedTime()`:
+// that would keep running through a pause and through the death overlay.
+let ambientT = 0;
 
 function frame() {
     requestAnimationFrame(frame);
@@ -1547,6 +1552,14 @@ function frame() {
             occlusion.setSubjects([player.root.position, bRoot ? bRoot.position : null]);
             occlusion.update(sdt);
         }
+        // Breathe the room's fixtures, then let the pool copy their intensities
+        // onto the real lights. Order is the whole trick: the pool already does
+        // `light.intensity = source.intensity` every frame, so animating the
+        // source here needs no change to the pool at all. Move this below and
+        // the flicker is a frame late; delete it and every lamp goes back to
+        // being a painted rectangle.
+        ambientT += sdt;
+        updateRoomLightFlicker(ambientT);
         localLights.update(player.root.position); // Ticket G: budget nearest lights
         camRig.update(sdt, player.root.position);
 

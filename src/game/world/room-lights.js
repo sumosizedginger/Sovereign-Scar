@@ -47,22 +47,87 @@ import { markShadowRoles } from '../render/shadow-roles.js';
 // capture came back as a pale grey-blue wash with no shadow left in it. A
 // motivated light is supposed to describe form, which means it has to leave
 // somewhere dark to describe it against.
+// `live` says how the fixture moves. Measured before this was added
+// (`tests/qa/ambient-motion.mjs`): across four levels and 24 lights, the
+// maximum change in intensity over a second of standing still was **0.0000**.
+// Every lamp in the game was a painted rectangle. The kind is declared here
+// rather than sniffed from the motif's name, because a name is a label and
+// this is a behaviour — see the `legacy` roster note in elites.spec.mjs for
+// what guessing from names costs.
+//
+//   flame    — fire and hot rock: irregular, three incommensurate sines
+//   machine  — powered fixtures: a steadier, shallower pulse
+//   water    — reflected and bubbling light: slow and wide
 export const MOTIFS = {
-    cold_shaft:      { color: 0x7fe0ff, intensity: 3.0, distance: 16, place: 'high',  size: [0.5, 2.6, 0.5] },
-    capacitor_arc:   { color: 0xffd060, intensity: 2.8, distance: 13, place: 'walls', size: [0.7, 0.7, 0.35] },
-    trench_glow:     { color: 0xc8a060, intensity: 2.2, distance: 14, place: 'floor', size: [2.2, 0.14, 0.9] },
-    vertical_shaft:  { color: 0xbfe0ff, intensity: 3.3, distance: 18, place: 'high',  size: [0.6, 3.2, 0.6] },
-    seam_gold:       { color: 0xd4a84b, intensity: 2.5, distance: 14, place: 'walls', size: [0.28, 2.0, 0.3] },
-    mineral_seam:    { color: 0xff6030, intensity: 2.5, distance: 13, place: 'walls', size: [0.4, 1.4, 0.35] },
-    wet_reflection:  { color: 0x4a9fd4, intensity: 2.0, distance: 15, place: 'floor', size: [2.6, 0.12, 1.2] },
-    marrow_glow:     { color: 0xe8e0d0, intensity: 2.3, distance: 14, place: 'walls', size: [0.45, 1.1, 0.35] },
-    window_glow:     { color: 0xb0a890, intensity: 2.4, distance: 13, place: 'walls', size: [1.0, 0.9, 0.3] },
-    condenser_glow:  { color: 0xa0e8ff, intensity: 2.8, distance: 15, place: 'walls', size: [0.6, 1.2, 0.4] },
-    bubble_glow:     { color: 0x8fb060, intensity: 1.9, distance: 12, place: 'floor', size: [1.1, 0.12, 1.1] },
-    ember_pool:      { color: 0xff5520, intensity: 3.6, distance: 15, place: 'floor', size: [1.8, 0.12, 1.8] },
-    scan_line:       { color: 0xff40c8, intensity: 2.5, distance: 14, place: 'high',  size: [3.0, 0.16, 0.22] },
-    seam_violet:     { color: 0x8b5cf6, intensity: 2.8, distance: 16, place: 'walls', size: [0.3, 2.4, 0.32] },
+    cold_shaft:      { color: 0x7fe0ff, intensity: 3.0, distance: 16, place: 'high',  size: [0.5, 2.6, 0.5],  live: 'machine' },
+    capacitor_arc:   { color: 0xffd060, intensity: 2.8, distance: 13, place: 'walls', size: [0.7, 0.7, 0.35], live: 'machine' },
+    trench_glow:     { color: 0xc8a060, intensity: 2.2, distance: 14, place: 'floor', size: [2.2, 0.14, 0.9], live: 'flame' },
+    vertical_shaft:  { color: 0xbfe0ff, intensity: 3.3, distance: 18, place: 'high',  size: [0.6, 3.2, 0.6],  live: 'machine' },
+    seam_gold:       { color: 0xd4a84b, intensity: 2.5, distance: 14, place: 'walls', size: [0.28, 2.0, 0.3], live: 'flame' },
+    mineral_seam:    { color: 0xff6030, intensity: 2.5, distance: 13, place: 'walls', size: [0.4, 1.4, 0.35], live: 'flame' },
+    wet_reflection:  { color: 0x4a9fd4, intensity: 2.0, distance: 15, place: 'floor', size: [2.6, 0.12, 1.2], live: 'water' },
+    marrow_glow:     { color: 0xe8e0d0, intensity: 2.3, distance: 14, place: 'walls', size: [0.45, 1.1, 0.35], live: 'flame' },
+    window_glow:     { color: 0xb0a890, intensity: 2.4, distance: 13, place: 'walls', size: [1.0, 0.9, 0.3],  live: 'water' },
+    condenser_glow:  { color: 0xa0e8ff, intensity: 2.8, distance: 15, place: 'walls', size: [0.6, 1.2, 0.4],  live: 'machine' },
+    bubble_glow:     { color: 0x8fb060, intensity: 1.9, distance: 12, place: 'floor', size: [1.1, 0.12, 1.1], live: 'water' },
+    ember_pool:      { color: 0xff5520, intensity: 3.6, distance: 15, place: 'floor', size: [1.8, 0.12, 1.8], live: 'flame' },
+    scan_line:       { color: 0xff40c8, intensity: 2.5, distance: 14, place: 'high',  size: [3.0, 0.16, 0.22], live: 'machine' },
+    seam_violet:     { color: 0x8b5cf6, intensity: 2.8, distance: 16, place: 'walls', size: [0.3, 2.4, 0.32], live: 'machine' },
 };
+
+/**
+ * How far each kind swings, as a fraction of its base intensity.
+ *
+ * These are deliberately small. The certification gate bands mean frame
+ * luminance, and one region already sits 4 units under its ceiling, so a lamp
+ * that swings hard would fail a screen for being alive. Every wave below is a
+ * sum of pure sines about zero, so the TIME AVERAGE of each light is exactly
+ * its old constant value — the rooms cannot get brighter on average, only
+ * restless.
+ */
+const LIVE = {
+    flame:   { amp: 0.13, speed: 1.00 },
+    machine: { amp: 0.06, speed: 0.75 },
+    water:   { amp: 0.09, speed: 0.42 },
+};
+
+/** Fixtures currently in the world, so one call can animate all of them. */
+const liveFixtures = new Set();
+
+/**
+ * Zero-mean wave for a fixture. Three incommensurate sines never repeat on a
+ * period a player can spot, which is the whole difference between "a torch"
+ * and "a blinking light".
+ */
+function waveAt(kind, t, phase) {
+    if (kind === 'machine') {
+        return 0.72 * Math.sin(t * 2.20 + phase) + 0.28 * Math.sin(t * 5.90 + phase * 2.1);
+    }
+    if (kind === 'water') {
+        return 0.62 * Math.sin(t * 0.90 + phase) + 0.38 * Math.sin(t * 1.53 + phase * 1.6);
+    }
+    return 0.50 * Math.sin(t * 1.70 + phase)
+        + 0.30 * Math.sin(t * 2.90 + phase * 1.7)
+        + 0.20 * Math.sin(t * 4.70 + phase * 2.3);
+}
+
+/**
+ * Breathe every live fixture. Must run BEFORE `LocalLightPool.update()`, which
+ * copies `source.intensity` onto the real light each frame — that copy is the
+ * only reason this works without touching the pool at all.
+ *
+ * @param {number} t seconds; any monotonic clock
+ */
+export function updateRoomLightFlicker(t) {
+    for (const f of liveFixtures) {
+        f.source.intensity = f.base * (1 + f.amp * waveAt(f.kind, t * f.speed, f.phase));
+    }
+}
+
+/** Test seam: how many fixtures are currently animated. */
+export function liveFixtureCount() {
+    return liveFixtures.size;
+}
 
 /**
  * Emissive intensity for a fixture.
@@ -119,6 +184,7 @@ export function buildRoomLights(kit, room, roomId, origin, scene, pool) {
     const group = new THREE.Group();
     group.name = `room-lights:${roomId}`;
     const sources = [];
+    const flickers = [];
 
     const mat = new THREE.MeshStandardMaterial({
         color: motif.color,
@@ -189,8 +255,27 @@ export function buildRoomLights(kit, room, roomId, origin, scene, pool) {
             // shadow itself into a dark box with a bright rim.
             registered.x = src.x; registered.y = src.y; registered.z = src.z;
         }
-        sources.push(registered || src);
+        const source = registered || src;
+        sources.push(source);
         mesh.userData.localLightSource = registered || null;
+
+        // Give the fixture its own life. The phase comes from the SAME seeded
+        // rng that placed it, so a room breathes identically on every run and
+        // a capture of it is still reproducible — the certification PNGs
+        // depend on that.
+        const live = LIVE[motif.live];
+        if (live) {
+            const rec = {
+                source,
+                base: source.intensity,
+                kind: motif.live,
+                amp: live.amp,
+                speed: live.speed,
+                phase: rand() * Math.PI * 2,
+            };
+            liveFixtures.add(rec);
+            flickers.push(rec);
+        }
     }
 
     // A lamp is a light, not an occluder: casting shadow from the thing the
@@ -200,12 +285,17 @@ export function buildRoomLights(kit, room, roomId, origin, scene, pool) {
         if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; }
     });
     scene.add(group);
-    return { group, sources, material: mat };
+    return { group, sources, material: mat, flickers };
 }
 
 /** Free a room's fixtures and unregister their lights. */
 export function disposeRoomLights(rec, pool) {
     if (!rec) return;
+    // Unregister BEFORE anything else. A flicker record left in the set keeps
+    // writing an intensity onto a source belonging to a room that no longer
+    // exists — the set would grow for the life of the session and the pool
+    // would be handed values by a ghost.
+    for (const f of (rec.flickers || [])) liveFixtures.delete(f);
     rec.group?.traverse?.((o) => {
         if (!o.isMesh) return;
         // Unregister through the pool so its dedupe map is cleaned too — a
