@@ -35,6 +35,7 @@
 
 import * as THREE from 'three';
 import { createActorRig } from '../../src/game/characters/actor-rig.js';
+import { ContactShadows } from '../../src/game/fx/contact-shadow.js';
 import { ENEMY_PALETTES } from '../../src/game/assets/palettes.js';
 // THE REAL OPTIONS THE REAL PLAYER IS BUILT FROM, imported rather than copied.
 //
@@ -57,47 +58,76 @@ function partMaterials(rig) {
 
 export function run(t) {
     const hero = createActorRig(HERO_OPTS);
-    const plainOpts = { ...HERO_OPTS };
-    delete plainOpts.rimColor;
-    delete plainOpts.rimStrength;
-    delete plainOpts.cloak;
-    const plain = createActorRig(plainOpts);
 
-    // ── 1. Silhouette ──────────────────────────────────────────────────────
-    const cloak = hero.torso.getObjectByName('cloak');
-    t.ok('the hero has a cloak', !!cloak, cloak ? 'found' : 'missing');
-    t.ok('it hangs off the waist pivot, so it swings with the run',
-        !!cloak && cloak.parent === hero.torso, cloak?.parent?.name);
-    // Behind the torso's own back face. The torso geometry is not centred on
-    // its origin (it runs z -0.23 to +0.37), so "behind" has to be measured.
-    const torsoBB = hero.torsoMesh.geometry.boundingBox;
-    const backZ = torsoBB.min.z * hero.torsoMesh.scale.z + hero.torsoMesh.position.z;
-    t.ok('and it sits BEHIND the body, not through it',
-        !!cloak && cloak.position.z < backZ, `cloak z=${cloak?.position.z.toFixed(3)} back=${backZ.toFixed(3)}`);
-    // The first build hung it centred near the shoulder, so its top edge cleared
-    // the shoulder — and because the camera looks down at 56 degrees, that
-    // overhang projected up-screen over the hero's own head. Walking toward the
-    // camera showed a blue slab across the hero's chest.
-    const cloakTop = cloak ? cloak.position.y + HERO_OPTS.cloak.length * 0.5 : 0;
-    const shoulderLocal = hero.armR.position.y;
-    t.ok('the cloak never rises above the shoulder it hangs from',
-        cloakTop <= shoulderLocal + 1e-6,
-        `top=${cloakTop.toFixed(3)} shoulder=${shoulderLocal.toFixed(3)}`);
+    // ── 1. The hero carries no bolted-on accessory ─────────────────────────
+    // Two were built this pass and both were rejected on sight by the owner: a
+    // hard inverted-hull outline (a black blob at thirty pixels) and a cloak (a
+    // rigid slab, because nothing here simulates cloth). Pinned OFF so neither
+    // returns by accident, and so the next person reads WHY before rebuilding
+    // one of them.
+    t.ok('the hero has no cloak', !hero.torso.getObjectByName('cloak'), 'cloak present');
+    let shells0 = 0;
+    hero.root.traverse((o) => { if (o.userData.ssOutline) shells0++; });
+    t.ok('and no hard outline', shells0 === 0, `${shells0} shells`);
 
-    // ── 2. It is a rendering treatment, not a hitbox change ────────────────
-    // The cloak and the outline shells are both added AFTER the bounding box
-    // that grounds the feet and feeds `radius` to combat. A cloak that reached
-    // past the heels would otherwise have lifted the hero off the floor by its
-    // own overhang, and nobody would ever have traced that back to a cape.
-    t.ok('the cloak does not change how tall the rig measures',
-        Math.abs(hero.height - plain.height) < 1e-9,
-        `${hero.height.toFixed(4)} vs ${plain.height.toFixed(4)}`);
-    t.ok('or how wide, which is what combat reads for hit radii',
-        Math.abs(hero.radius - plain.radius) < 1e-9,
-        `${hero.radius.toFixed(4)} vs ${plain.radius.toFixed(4)}`);
-    t.ok('or where the feet land',
-        Math.abs(hero.inner.position.y - plain.inner.position.y) < 1e-9,
-        `${hero.inner.position.y.toFixed(4)} vs ${plain.inner.position.y.toFixed(4)}`);
+    // ── 2. A rig knows where its own feet are ──────────────────────────────
+    // This is what the cloak was worth: it exposed that the player's contact
+    // shadow had been drawn at CHEST height since contact shadows shipped.
+    // Enemy rigs sit their origin on the floor, so their discs were right by
+    // luck; the player's origin is the centre of the physics body, 0.95 above
+    // the feet, and the disc followed the origin. Invisible inside the player's
+    // own silhouette — until a wide flat surface gave it something to cut
+    // across.
+    t.ok('the hero rig reports its foot offset',
+        hero.groundOffset === HERO_OPTS.groundOffset,
+        `${hero.groundOffset} vs ${HERO_OPTS.groundOffset}`);
+    t.ok('and publishes it where a consumer handed the Object3D can read it',
+        hero.root.userData.ssGroundOffset === HERO_OPTS.groundOffset,
+        String(hero.root.userData.ssGroundOffset));
+    t.ok('the hero origin really is above its feet, which is why this matters',
+        HERO_OPTS.groundOffset < -0.5, String(HERO_OPTS.groundOffset));
+    const enemyRig0 = createActorRig({ palette: ENEMY_PALETTES.sentinel });
+    t.ok('an enemy rig sits its origin on the floor, so its disc needs no shift',
+        enemyRig0.root.userData.ssGroundOffset === 0,
+        String(enemyRig0.root.userData.ssGroundOffset));
+
+    // AND THE CONSUMER, not just the producer. The first version of this
+    // section asserted only that the rig PUBLISHES its foot offset — so
+    // deleting the line in `contact-shadow.js` that READS it left the spec at
+    // 14/14 while the disc went straight back to chest height. Half a wire is
+    // half an alarm; drive the real ContactShadows against both rigs.
+    {
+        const scene = new THREE.Scene();
+        const shadows = new ContactShadows(scene);
+        const heroRoot = hero.root;
+        const foeRoot = enemyRig0.root;
+        heroRoot.position.set(0, 1.95, 0);   // origin at the physics centre
+        foeRoot.position.set(6, 1.0, 0);     // origin on the floor
+        scene.add(heroRoot, foeRoot);
+        shadows.sync(0.016, {
+            player: { rig: heroRoot },
+            enemies: [{ rig: foeRoot, hitRadius: 0.5, state: { current: 'IDLE' } }],
+        });
+        const discs = [];
+        scene.traverse((o) => { if (o.name === 'contact-shadow') discs.push(o); });
+        const near = (x) => discs
+            .slice().sort((a, b) => Math.abs(a.position.x - x) - Math.abs(b.position.x - x))[0];
+        const heroDisc = near(0);
+        const foeDisc = near(6);
+        const heroFeet = 1.95 + HERO_OPTS.groundOffset;
+        t.ok('a disc is placed for each actor', discs.length === 2, `${discs.length} discs`);
+        t.ok('the hero disc sits on the FEET, not on the origin',
+            heroDisc && Math.abs(heroDisc.position.y - heroFeet) < 0.1,
+            `disc ${heroDisc?.position.y.toFixed(3)} vs feet ${heroFeet.toFixed(3)}`);
+        t.ok('and it is nowhere near the chest it used to be drawn at',
+            heroDisc && heroDisc.position.y < 1.95 - 0.5,
+            String(heroDisc?.position.y.toFixed(3)));
+        t.ok('the enemy disc is unmoved by the fix',
+            foeDisc && Math.abs(foeDisc.position.y - 1.0) < 0.1,
+            String(foeDisc?.position.y.toFixed(3)));
+        shadows.dispose();
+    }
+    enemyRig0.dispose();
 
     // ── 3. The separation light is on, and turned up for the hero ──────────
     const mats = partMaterials(hero);
@@ -163,7 +193,6 @@ export function run(t) {
         onShells === 6, `${onShells} shells`);
 
     hero.dispose();
-    plain.dispose();
     enemyRig.dispose();
     outlined.dispose();
 }

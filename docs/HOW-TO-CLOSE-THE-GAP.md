@@ -21,68 +21,53 @@ few hours), **days** (2–5), **week**, **weeks**.
 
 ---
 
-## 1. "Which one is me" — DONE THIS SESSION, and here is what actually worked
+## 1. "Which one is me" — WITHDRAWN, and here is what it cost to learn
 
-You said you did not know how to fix this, so I picked and built it rather than
-ask again.
+I built three things against this: a black inverted-hull outline, then a cloak,
+then a bigger cloak. **All three were rejected on sight by the owner, and the
+premise was wrong from the start.**
 
-**What I did:** the hero's cloak went from 0.66 × 0.86 to **0.92 × 1.15** — wide
-enough to be the widest part of the outline from every bearing, long enough to
-break the round blob into a shape with a direction. Then the cloak was given the
-same separation rim the body already had, so it is a dark shape *with a lit
-edge* — it reads against a pale floor because it is dark and against a dark
-floor because its edge is bright.
+> *"The cape is pointless, and I guarantee you a player can tell the difference
+> between the player and the enemies."*
 
-**Why the size and not the colour:** enemies are rounded lozenges built from the
-same six parts. Anything that changes the hero's *outline* separates them;
-anything that changes only their colour does not survive greyscale.
+They have played the game. I had screenshots. **The figure that answers the
+controller is the player** — every frame, unmistakably — and no still image can
+contain that cue. I spent three builds optimising a photograph.
 
-**What I learned doing it, which changes how you should read my numbers:**
+The cloak was also just bad as an object: a `BoxGeometry` that never moved,
+because nothing in this project simulates cloth. *"It does not flow like a cape,
+and looks more like a massive shield on his back."* Correct, and unfixable by
+resizing.
 
-- The dark navy cloak dropped average-brightness separation (ΔL\*) hard, for the
-  same reason the rejected black outline did: a big dark mass pulls the average
-  toward the floor. **The same trap, in a second costume.**
-- Then the probe itself turned out to be unreliable for this comparison. Its
-  "floor" sample is a ring at a radius derived from the character's *height* —
-  and a cloak that grows sideways spills into that ring, so the floor reads
-  brighter every time the cloak gets bigger. **ΔL\* cannot be used to A/B cloak
-  sizes at all.** Documented in the probe.
-- It also only ever took **one sample**, and the same build measured three times
-  gave floor readings of 27.8, 30.7 and 34.5. It now takes **five and reports
-  the median plus the spread**, which is the identical fix the luminance gate
-  needed two sessions ago.
+**What was kept:** the separation light, because it is a lighting repair rather
+than an accessory — the old fresnel was geometrically defeated by the 56° camera
+and did nothing in the rooms that needed it most.
 
-So the trustworthy evidence is the **edge metric** (measured on rays that cross
-the boundary, so the ring problem does not touch it) and the pictures:
+**What it bought:** one real bug. See §1b.
 
-| | before | after |
-|---|---|---|
-| edge ΔL\* — Ruined Town | 32.5 | **42.8** |
-| edge ΔL\* — Leviathan | 32.9 | **40.1** |
-| edge ΔL\* — Crypt | 31.6 | 31.4 |
+### 1b. The contact shadow fix (done)
 
-The crowded rooms — exactly where you get lost — improved most.
+Player's shadow disc sat **0.98 units above their feet** — mid-chest — and had
+since the feature shipped. Enemy discs were correct by luck (`groundOffset: 0`).
+Now every rig publishes where its feet are and the shadow reads it. Gated at
+both the producing and consuming end, both counterfactually proven.
 
-**Honest limit:** the hero now has a hard shape no enemy has, and in greyscale
-you can point at them. It is better, not solved. If you want it *unmistakable*,
-the next lever is item 1b.
+### 1c. If it ever DOES need more: change the model, not the wardrobe
 
-### 1b. If that is still not enough — the value rule (afternoon)
+The owner's direction, and the right one. Not another object bolted on — the
+hero's **proportions**. Concretely, and in order of cheapness:
 
-Right now hero and enemies are lit identically, so the only differences are hue
-and shape. The rule that fixes it permanently: **the hero is light, enemies are
-dark** — or the reverse, consistently, campaign-wide.
+1. **Make the hero taller and narrower than every enemy.** `bodyScale` already
+   exists as a per-axis knob on `createActorRig` and is how enemy kinds get
+   different silhouettes today. One line, no new art.
+2. **Give the hero a distinct head shape.** `headProfileScale` is already a
+   parameter; enemies all sit near one value.
+3. **Change the stance.** The animator supports per-archetype gait; a hero who
+   stands with more weight forward reads as a protagonist.
 
-*Method:* one multiplier on the actor material, set per rig from the same
-`HERO_RIG` / enemy palette path that already carries `rimStrength`. Hero ×1.25,
-enemies ×0.8. Then re-shoot the greyscale town frame; if you cannot instantly
-point at yourself, revert it — it is one number.
-
-*Gate:* extend `hero-readability.spec.mjs` — it already imports the real hero
-options — to assert the hero's multiplier is strictly greater than every enemy
-palette's. Break it by equalising them and watch it go red.
-
----
+*Rule for all three:* change **one**, shoot the crowded room, and — the part I
+skipped — **play it for two minutes** before deciding. That is the evidence this
+question actually needs.
 
 ## 2. Rooms have relief but not shape (weeks — the big one)
 
@@ -289,8 +274,7 @@ the project and it is the only item on this list I cannot do for you.
 
 # If you want a running order
 
-**This week:** finish item 1 by looking at the new greyscale frame and telling me
-yes or no (item 1b if no) · item 6 (afternoon, free content) · the Line Caster
+**This week:** item 6 (afternoon, free content) · the Line Caster
 fix from item 7 · the app icon.
 
 **Next:** item 3 (ambient life — best value), then item 4 (menus).

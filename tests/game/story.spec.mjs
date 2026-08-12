@@ -3,8 +3,18 @@
 import { StoryPanel } from '../../src/game/ui/story.js';
 
 export function run(t) {
-    // jsdom-less: StoryPanel needs document.body
+    // jsdom-less: StoryPanel needs document.body.
+    //
+    // AND IT HAS TO BE PUT BACK. This stub used to be installed and left on the
+    // global forever, so every spec that ran after this one inherited a fake
+    // `document` — which is worse than no document, because production code
+    // guards `typeof document === 'undefined'` for headless runs and a fake
+    // defeats that guard. `contact-shadow.js` does exactly that, and the first
+    // spec to build one crashed the entire suite with
+    // `c.getContext is not a function` while passing perfectly on its own.
+    let removeDomShim = () => {};
     if (typeof document === 'undefined') {
+        removeDomShim = () => { delete globalThis.document; };
         // Minimal stub
         globalThis.document = {
             body: {
@@ -55,4 +65,5 @@ export function run(t) {
     t.ok('stable story IDs do not repeat', !panel.queue_.some((line) => line.text === 'duplicate'));
     panel.dispose();
     t.ok('dispose ok', true);
+    removeDomShim();
 }

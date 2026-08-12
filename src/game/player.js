@@ -68,21 +68,29 @@ export const HERO_RIG = {
     // it ADDS light to the character rather than taking the character away.
     rimColor: 0x4a86ff,
     rimStrength: 0.9,
-    // The shape nobody else has. Same reserved blue as the rim, so the hero
-    // reads as one idea rather than two decorations.
+    // NO CLOAK. Built, measured, and cut — the second accessory this pass added
+    // to the hero and the second the owner rejected on sight.
     //
-    // WIDER AND LONGER THAN THE FIRST BUILD (0.66 × 0.86). That version made the
-    // hero findable against the FLOOR and still not against the eight other
-    // figures in a crowded room — the greyscale frame is the proof, and colour
-    // was doing all the work, which is the cue that fails first for a
-    // colour-blind player and fails always in a room lit the hero's own hue.
+    // It was a `BoxGeometry`: a rigid slab that never moved, because nothing
+    // here simulates cloth. The owner's words: it "does not flow like a cape,
+    // and looks more like a massive shield on his back." Both true, and no
+    // amount of resizing fixes either — a cape that does not move is a board.
     //
-    // The number comes off the silhouette, not off taste: the body is ~0.58
-    // wide, so at 0.92 the cloak is the WIDEST part of the outline from every
-    // bearing, and at 1.15 it breaks the round blob into a shape with a
-    // direction. Enemies remain rounded and cloakless, so at thirty pixels the
-    // hero is the only figure in the room that is not a lozenge.
-    cloak: { color: 0x5f9ae0, width: 0.92, length: 1.15 },
+    // It also, to its credit, exposed a real rendering bug that predates it by
+    // months: the player's contact shadow was being drawn at CHEST height (see
+    // `fx/contact-shadow.js`), invisible inside their own silhouette until a
+    // wide flat surface gave it something to cut across. That fix stays.
+    //
+    // AND THE PREMISE IT WAS BUILT ON WAS WRONG. I argued the hero was hard to
+    // tell from the enemies, entirely from static greyscale screenshots. The
+    // owner, who has played it: "I guarantee you a player can tell the
+    // difference." A still frame cannot show the one cue that dominates in
+    // play — the figure that answers the controller is the player, every frame,
+    // unmistakably. Optimising a photograph is not optimising a game.
+    //
+    // If hero readability ever does need more, the direction is the one the
+    // owner gave: change the player MODEL — proportions, stance, head shape —
+    // not another object bolted to its back.
     // If the hard outline is ever turned back on (see actor-rig.js), the hero's
     // is thicker than everyone else's. It is off by default.
     outlineWidth: 0.11,

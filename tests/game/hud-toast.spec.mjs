@@ -22,18 +22,33 @@ function fakeEl() {
     };
 }
 
+/**
+ * Install the shim, and RETURN THE UNDO.
+ *
+ * This used to install a fake `document` on the global and walk away. The next
+ * spec to run that genuinely touched the DOM inherited it: `hero-readability`
+ * builds a real `ContactShadows`, which builds a real canvas, and got
+ * `c.getContext is not a function` — passing on its own and crashing the whole
+ * run in suite order. A spec that writes a global owns putting it back.
+ */
 function installDomShim() {
+    const prev = Object.getOwnPropertyDescriptor(globalThis, 'document');
     globalThis.document = {
         createElement: () => fakeEl(),
         body: fakeEl(),
         getElementById: () => null,
+    };
+    return () => {
+        if (prev) Object.defineProperty(globalThis, 'document', prev);
+        else delete globalThis.document;
     };
 }
 
 import { HUD } from '../../src/game/ui/hud.js';
 
 export function run(t) {
-    installDomShim();
+    const removeDomShim = installDomShim();
+    try {
     const hud = new HUD();
 
     // First message: emits, sets text, turns the toast on.
@@ -74,4 +89,7 @@ export function run(t) {
     hud.toast('Muted', 900);
     t.ok('short message repeat deduped', hud._toastEmits === 4);
     t.ok('dwell length tracked', hud._toastMs === 900, `ms=${hud._toastMs}`);
+    } finally {
+        removeDomShim();
+    }
 }

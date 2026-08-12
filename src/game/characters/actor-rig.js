@@ -447,10 +447,23 @@ export function createActorRig(opts = {}) {
 
     const root = new THREE.Group();
     root.add(inner);
+    // WHERE THIS RIG'S FEET ARE, relative to its own origin.
+    //
+    // Not cosmetic bookkeeping — it is the difference between a shadow on the
+    // floor and a shadow across the chest. An enemy's origin sits ON the floor
+    // (`groundOffset: 0`), so anything anchoring to `root.position.y` is right
+    // by luck. The PLAYER's origin is the centre of the physics body, 0.95
+    // above the feet, so the same code put their contact shadow at chest
+    // height — where it was invisible inside their own silhouette until a wide
+    // flat cloak gave it a surface to visibly slice across.
+    //
+    // On `userData` because consumers are handed the Object3D, not this record.
+    root.userData.ssGroundOffset = opts.groundOffset ?? 0;
 
     return {
         root,
         inner,
+        groundOffset: opts.groundOffset ?? 0,
         body,
         torso,
         torsoMesh,

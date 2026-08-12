@@ -44,11 +44,25 @@ function fakeEl() {
     };
 }
 
+/**
+ * Install the shim, and RETURN THE UNDO.
+ *
+ * This used to install a fake `document` on the global and walk away. The next
+ * spec to run that genuinely touched the DOM inherited it: `hero-readability`
+ * builds a real `ContactShadows`, which builds a real canvas, and got
+ * `c.getContext is not a function` — passing on its own and crashing the whole
+ * run in suite order. A spec that writes a global owns putting it back.
+ */
 function installDomShim() {
+    const prev = Object.getOwnPropertyDescriptor(globalThis, 'document');
     globalThis.document = {
         createElement: () => fakeEl(),
         body: fakeEl(),
         getElementById: () => null,
+    };
+    return () => {
+        if (prev) Object.defineProperty(globalThis, 'document', prev);
+        else delete globalThis.document;
     };
 }
 
@@ -115,7 +129,8 @@ function frame(over = {}) {
 }
 
 export function run(t) {
-    installDomShim();
+    const removeDomShim = installDomShim();
+    try {
     const hud = new HUD();
 
     // ── 1. Normal play ─────────────────────────────────────────────────────
@@ -220,4 +235,7 @@ export function run(t) {
     hud.update(frame({ hidden: true }));
     t.ok('the title screen takes the legend down with the rest of the chrome',
         hud.helpEl.style.opacity === '0', hud.helpEl.style.opacity);
+    } finally {
+        removeDomShim();
+    }
 }

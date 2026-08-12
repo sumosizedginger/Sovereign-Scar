@@ -24,6 +24,26 @@ const RADIUS_SCALE = 1.35;
 const FADE_HEIGHT = 4.0;
 /** Lift above the floor, to stay out of z-fighting range. */
 const LIFT = 0.03;
+
+/**
+ * How far below a target's ORIGIN its feet are.
+ *
+ * A contact shadow belongs on the floor, and "the floor" is not `target.y` for
+ * every target. Enemy rigs are built with `groundOffset: 0`, so their origin is
+ * already on the floor and this returns 0 — which is why every enemy shadow in
+ * the game has always looked correct. The PLAYER's rig is built with
+ * `groundOffset: -0.95`, because its origin is the centre of the physics body,
+ * so their disc was drawn 0.95 units up: a dark ellipse at chest height, hidden
+ * inside their own silhouette and therefore never noticed, until a wide flat
+ * cloak gave it something to visibly cut across.
+ *
+ * Read off the rig rather than special-cased here, so a future actor with a
+ * different origin is right without anyone remembering this function exists.
+ * Pickups and bosses are plain meshes with no rig, and fall through to 0.
+ */
+function footOf(target) {
+    return target?.userData?.ssGroundOffset || 0;
+}
 /** How long the actor's Y must hold steady before it counts as new ground. */
 const SETTLE_TIME = 0.15;
 
@@ -109,7 +129,7 @@ export class ContactShadows {
         mesh.frustumCulled = true;
         mesh.name = 'contact-shadow';
         const pos = target.position;
-        mesh.position.set(pos.x, pos.y + LIFT, pos.z);
+        mesh.position.set(pos.x, pos.y + footOf(target) + LIFT, pos.z);
         this.scene.add(mesh);
         const entry = {
             target,
@@ -197,7 +217,7 @@ export class ContactShadows {
         const t = height / FADE_HEIGHT;
         const s = e.radius * (1 + t * 0.55);
         e.mesh.scale.set(s, 1, s);
-        e.mesh.position.set(p.x, e.groundY + LIFT, p.z);
+        e.mesh.position.set(p.x, e.groundY + footOf(e.target) + LIFT, p.z);
     }
 
     clear() {

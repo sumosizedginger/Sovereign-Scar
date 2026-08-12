@@ -5,6 +5,46 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### The cape is gone, and the bug it found is fixed
+
+**The cape is removed.** Owner's verdict: it "does not flow like a cape, and
+looks more like a massive shield on his back" — correct, it was a `BoxGeometry`
+that never moved, because nothing here simulates cloth. It is the third thing
+this pass bolted onto the hero and the third rejected on sight.
+
+**The premise was wrong too.** I argued the hero was hard to tell from the
+enemies entirely from static greyscale screenshots. The owner, who has played
+it: "I guarantee you a player can tell the difference." They are right — the
+figure that answers the controller is the player, every frame, and no still
+image can contain that cue. The separation LIGHT stays (a lighting repair, not
+an accessory); both accessories are pinned off by spec.
+
+**The cape's one contribution was a real bug, and it is a good one.** The
+player's contact shadow disc has been drawn at CHEST height since the feature
+shipped:
+
+```
+player feet   y = 1.001     player disc  y = 1.981   ← 0.98 up
+enemy  feet   y = 1.000     enemy  disc  y = 1.030   ← correct
+```
+
+Enemy rigs are built with `groundOffset: 0`, so their origin sits on the floor
+and their discs were right by luck. The player's origin is the centre of the
+physics body. The disc was invisible inside the player's own silhouette until a
+wide flat surface gave it something to slice across. Every rig now publishes
+where its feet are (`root.userData.ssGroundOffset`) and the shadow field reads
+it. Gated at BOTH ends — the first spec only checked the producer, and deleting
+the consumer left it green.
+
+**And a suite-wide harness bug fell out of it.** `hud-player`, `hud-toast` and
+`story` each installed a fake global `document` and never removed it, so every
+spec running after them inherited one. That is worse than no document: code like
+`contact-shadow.js` guards `typeof document === 'undefined'` for headless runs,
+and a fake defeats the guard. The first spec to build a real canvas crashed the
+entire run while passing perfectly on its own. All three now restore the global.
+
+Suite: 4914/4914.
+
 ### The hero gets a real silhouette, and two more instruments stop lying
 
 **The cloak is now 0.92 × 1.15** (was 0.66 × 0.86) — wide enough to be the

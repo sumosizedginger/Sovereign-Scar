@@ -24,19 +24,63 @@ engineering, and none of it is blocked by performance. The frame budget is at
 
 # TIER 1 — the first ninety seconds
 
-### 1. You still cannot tell which figure is you
+### 1. ~~You still cannot tell which figure is you~~ — WITHDRAWN
 
-The only item from the finishing pass that did not close. In greyscale, in a
-crowded room, the hero is legible against the *floor* and not against the eight
-other figures. Colour is currently the only thing separating you, and colour is
-the weakest of the three cues and the one that fails for colour-blind players.
+**I was wrong about this, and it was the premise for three separate builds.**
 
-*Measured:* `docs/media/player/after/09-town-grey.png`.
-*Cost:* an afternoon. Three costed options in
-`docs/FINISHING-PASS-2026-08-11.md` §D5 — bigger cloak first, it is free and
-reversible.
-**Nothing else on this list should start before this one.** Every remaining
-item puts *more* things on screen to lose yourself among.
+The claim came entirely from **static greyscale screenshots**. The owner, who
+has actually played the game: *"I guarantee you a player can tell the difference
+between the player and the enemies."*
+
+They are right, and the reason is not subtle once said out loud: **the figure
+that answers the controller is the player.** Every frame, unmistakably, for
+free. A still frame cannot contain that cue, so a still frame is the wrong
+evidence for this question — and I built an inverted-hull outline and then a
+cloak on the strength of it, and both were rejected on sight.
+
+What survives from the three attempts:
+
+- **The separation light stays.** It is genuinely better than the old fresnel,
+  which was geometrically defeated by the camera, and it lifts the hero off the
+  floor in the rooms that measured worst. It is a lighting fix, not an
+  accessory.
+- **A real rendering bug got found**, which is the only thing the cloak was
+  actually worth — see below.
+- **Both accessories are gone**, pinned off by spec so neither returns by
+  accident.
+
+**If hero readability ever does need more**, the direction is the owner's, not
+mine: **change the player model** — proportions, stance, head shape, so the hero
+is a different silhouette rather than a normal one wearing something. That is
+art work on the frozen part builders' output and it is a real project, not an
+afternoon.
+
+### 1b. The player's contact shadow was drawn at chest height — FIXED
+
+The cloak's one contribution. A wide flat surface finally gave the shadow disc
+something to visibly cut across, and the owner spotted it immediately: *"the
+shadow circle literally goes over the cape."*
+
+Measured in the running game:
+
+```
+player feet          y = 1.001
+player shadow disc   y = 1.981     ← 0.98 above the feet, i.e. mid-chest
+enemy feet           y = 1.000
+enemy shadow disc    y = 1.030     ← correct
+```
+
+Enemy rigs are built with `groundOffset: 0`, so their origin is already on the
+floor and their discs were right **by luck**. The player's origin is the centre
+of the physics body, 0.95 above the feet, and the disc followed the origin.
+It has been like that since contact shadows shipped, invisible because it sat
+inside the player's own silhouette.
+
+Fixed by having every rig publish where its own feet are
+(`root.userData.ssGroundOffset`) and having the shadow field read it, so a
+future actor with a different origin is right without anyone remembering.
+Gated at **both** ends — the first version of the spec only checked that the rig
+published the value, and deleting the line that *reads* it left the suite green.
 
 ### 2. Rooms are LOW, not flat — I got this wrong and the owner caught it
 
