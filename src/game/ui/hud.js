@@ -428,6 +428,18 @@ export class HUD {
                 ? `<div style="margin-top:9px;display:flex;flex-wrap:wrap;align-items:center;`
                     + `row-gap:5px">${chips.join('')}</div>`
                 : '')
+            // The play timer — PLAYER-FACING, because Settings has a "Show play
+            // timer" toggle (menu.js) and a setting a player can switch on is a
+            // promise the screen has to keep. The HUD rewrite filed the timer
+            // under developer clutter and moved it into the dev panel, which
+            // silently broke that toggle for anyone not in dev mode; the wiring
+            // audit (docs/WIRING-AUDIT-2026-08-12.md) caught it. No label — a
+            // bare mm:ss reads as a timer, "Time:" reads as a dashboard.
+            + (state.showTimer
+                ? `<div style="margin-top:8px;color:#9fb0c8;font-size:11px;`
+                    + `letter-spacing:0.12em;font-variant-numeric:tabular-nums;`
+                    + `text-shadow:${SHADOW}">${Math.floor((state.playTime || 0) / 60)}:${String(Math.floor((state.playTime || 0) % 60)).padStart(2, '0')}</div>`
+                : '')
             // The objective, as an objective — not as `Thread: <string>`. The
             // marker replaces the label: a player does not need to be told the
             // internal name of the system that produced the sentence.

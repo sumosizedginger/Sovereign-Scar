@@ -164,6 +164,18 @@ export function run(t) {
     t.ok('but health and weapon never go away',
         lean.includes('Bulwark Shield') && /♥/.test(hud.el.innerHTML), lean);
 
+    // ── 2b. The Settings promises are kept ─────────────────────────────────
+    // "Show play timer" is a toggle in the Settings menu, which makes the timer
+    // PLAYER-FACING by contract — whatever the debug-vs-player classification
+    // says about raw counters. The first HUD rewrite filed it under developer
+    // clutter and the toggle silently did nothing outside dev mode.
+    hud.update(frame({ showTimer: true, playTime: 754 }));
+    t.ok('the play timer shows when the Settings toggle is on',
+        strip(hud.el.innerHTML).includes('12:34'), strip(hud.el.innerHTML));
+    hud.update(frame({ showTimer: false, playTime: 754 }));
+    t.ok('and stays hidden when it is off',
+        !strip(hud.el.innerHTML).includes('12:34'), strip(hud.el.innerHTML));
+
     // ── 3. Dev mode keeps every one of them ────────────────────────────────
     hud.update(frame({ dev: true }));
     const devText = String(hud.devEl.textContent);

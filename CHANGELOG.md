@@ -5,6 +5,30 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Wiring audit — everything checked from both ends
+
+Full findings: `docs/WIRING-AUDIT-2026-08-12.md`. One regression fixed, the
+rest catalogued for decisions rather than touched.
+
+**Fixed: "Show play timer" did nothing outside dev mode.** The HUD rewrite had
+filed the timer under developer clutter; the Settings toggle (`ui/menu.js`)
+kept firing into a panel players never see. The timer now renders in the player
+HUD when the toggle is on — proven by spec (counterfactually failed, restored),
+and end-to-end in a running loop via the real menu event.
+
+**The five findings that matter most, unfixed by design:** the destructible
+flood-fill exists twice and the spec tests the copy the game does not run
+(`destructible-voxel-mesh.js:74` vs `:244`); `KEEPOUT` is pinned by the
+terracing spec while `terraceRoom` uses literal `2`s; `onChargeStrike` fires on
+every released charge and nothing anywhere listens; `lastRun` is archived on
+every New Game and read by nothing; and `validateDungeonDef` guards the test
+suite but not the actual loader. Plus seven ghost features (a music-ducker, an
+objective-destination query, an unplaced key pedestal…), ten dead imports, and
+a table of doc citations pointing at renamed files.
+
+Clean bills: zero orphan modules, zero probe↔hook drift, every Settings toggle
+wired (post-fix), every save field read except `lastRun`.
+
 ### Player-facing finishing pass — the debug HUD became a game HUD
 
 Full report: `docs/FINISHING-PASS-2026-08-11.md`. Suite 4826 → 4906.
