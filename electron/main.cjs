@@ -83,6 +83,11 @@ async function createWindow() {
         backgroundColor: '#04060c', // matches the boot overlay, so no white flash
         show: false,
         title: 'Sovereign Scar',
+        // Packaged builds take the window icon from the .exe, which
+        // electron-builder stamps from `build.win.icon`. This line is what
+        // `npm run desktop` needs: unpackaged, the window would otherwise wear
+        // electron.exe's own default icon.
+        icon: path.join(__dirname, '..', 'assets', 'icon.png'),
         webPreferences: {
             // The game is ordinary browser code and wants no Node at all.
             // Keeping the renderer sandboxed means a bug in game code cannot

@@ -20,9 +20,12 @@ that keep it that way:
 
 ```
 npm i
-npm test           # full suite: unit specs + browser smoke test (needs Chrome)
-npm run test:unit  # unit specs only, <1s, no Chrome required
+npm test           # full suite: unit specs + browser E2E (needs Chrome)
+npm run test:unit  # unit specs only, ~90s, no Chrome required
 ```
+
+Counts move every session, so treat any number written in a document as a
+hypothesis and run the thing. `npm test` prints the only figure that counts.
 
 Set `CHROME_PATH` if `tests/harness.mjs`'s `findChrome()` doesn't locate your
 browser automatically.

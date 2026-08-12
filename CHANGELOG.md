@@ -5,6 +5,66 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### The app has its own icon, and three documents stop giving bad advice
+
+**The desktop build shipped the stock Electron diamond.** `electron-builder`
+logged *"default Electron icon is used"* on every run and exited 0, which is the
+project's recurring shape: a thing that is wrong, says so quietly, and fails
+nothing.
+
+`scripts/make-icon.mjs` now generates `assets/icon.ico` (16/32/64/128/256) and
+`assets/icon.png` with **no dependency beyond Node's own zlib** — a PNG encoder,
+a CRC32, and a Vista-era ICO container. `build.win.icon` points at it and
+`electron/main.cjs` wears the PNG so un-packaged `npm run desktop` stops
+borrowing electron.exe's.
+
+The art is the game's own title — the world split, two masses of rock with light
+in the gap. Authored **once** on a 32×32 voxel grid, with every exported size a
+whole-number rescale of it, so it is still legible at 16px; a detailed icon
+downsampled to 16 is a grey smudge, and 16 is the size that actually gets looked
+at. Colours are read out of `ui/menu.js` rather than invented, so the icon and
+the title screen are the same object. The first two drafts read as a river and
+then as a brass squiggle, which is recorded in the script because the reason
+(the rock sat too near the backdrop, and the gold lip was four columns wide) is
+the useful part.
+
+**"The build stopped warning" is not "the icon shipped."** The 256px entry's
+PNG payload was searched for, and found, inside all three artefacts —
+`win-unpacked`, portable, and the NSIS installer.
+
+**A committed binary with no proof it matches its generator drifts.**
+`tests/game/app-icon.spec.mjs` (45 assertions) regenerates from the real script
+and compares bytes, checks the ICO is well-formed rather than merely present —
+every entry's IHDR agreed against its directory record, offsets contiguous and
+in-bounds, a 256 entry present — and pins that `package.json` and
+`electron/main.cjs` still point at it. Ten break modes proven to fail it,
+restoration hash-verified.
+
+**And it found a real trap.** `.gitattributes` opens `* text=auto` and declares
+`*.png binary` but had **no rule for `.ico`**, leaving byte-exactness to git's
+binary sniffing. It sniffs correctly today; had it ever not, the byte comparison
+would have failed on someone else's clone for a reason invisible from inside the
+checkout. Now stated explicitly, and pinned.
+
+**Three documents were telling the next engineer to do something harmful.**
+`ROAD-TO-AAA.md` §6 and `HOW-TO-CLOSE-THE-GAP.md` §6 both called filling the
+weaver/censer rows of the kind × behaviour matrix *"the single cheapest content
+on the list"*. It would have **deleted the abilities it was meant to showcase** —
+the web and the cense live inside `_aiWeave`/`_aiCenser`, so an `ai:` override
+removes a specialist's only trick. Both sections now lead with that, because a
+plan that is confidently wrong is worse than no plan. The Line Caster and app
+icon items are marked done, and the running order with them.
+
+Also corrected: `README.md` and `HANDOFF.md` said **seven** enemy kinds. There
+are nine — and the two they omitted are exactly the two this project had been
+under-using. `assets/README.md` now says which files in that folder the build
+reads and which are historical captures that nothing loads.
+
+The new spec is pure Node, so it lands in the half CI actually runs.
+
+Suite: **4992/4992** (unit-only **4115/4115**). A full run still leaves
+`git status` showing nothing but the deliberate edits.
+
 ### The Pyre's reward is a reward, and the two specialist enemies get used
 
 **The Vector Staff now gates the light-line.** It used to grant `vector_staff`

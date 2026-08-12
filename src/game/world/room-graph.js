@@ -1164,7 +1164,7 @@ export function createDungeon(ctx, def, opts = {}) {
      * Nothing in this game used to seal. You could walk into a room, ignore
      * every enemy in it, and leave through the far door — which means the whole
      * combat system was optional. That is a strange thing to build a guard, a
-     * parry, a poise pool, directional armour and seven enemy kinds for: the
+     * parry, a poise pool, directional armour and nine enemy kinds for: the
      * player who never fights is never wrong, and the systems that took the
      * longest to build are the ones they never meet.
      *

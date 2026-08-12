@@ -171,21 +171,35 @@ the fourteen beats. It will fail today, which is the point.
 
 ---
 
-## 6. A third of the bestiary runs at a third of its depth (afternoon)
+## 6. ~~A third of the bestiary runs at a third of its depth~~ (DONE 2026-08-12)
 
-The weaver and the censer are each authored **three times, always on default
-AI**, out of nine kinds. Everything they need is already built.
+**The method this section gave was wrong. Read this before trusting any other
+"cheapest item on the list" in this document.**
 
-*Method:* pure authoring — add `ai:` variants to existing enemy entries in the
-level files. No new code. Aim to fill perhaps ten of the fifteen empty cells in
-the matrix; leave some empty, because a matrix that is 100% full usually means
-combinations were added that nobody designed.
+It said: *add `ai:` variants to the weaver and censer entries in the level
+files.* Doing that **deletes the ability it was meant to showcase.** The web and
+the cense live inside `_aiWeave` and `_aiCenser`, so an `ai:` override does not
+give a specialist a second behaviour — it takes away the only one it had, and
+leaves a monster that looks the same and does nothing. Their empty row in the
+matrix is correct by design; the matrix could not tell the difference between
+"combination not authored" and "combination is nonsense", so it was the wrong
+instrument and this document read it as gospel.
 
-*Gate:* the probe now derives its roster from `ENEMY_PALETTES` (fixed today) and
-`bestiary.spec.mjs` pins the two lists together, so a tenth kind cannot be added
-without appearing in both.
+*What the gap actually was:* **company.** These two are the only kinds whose
+design is about the other things in the room, and the sharpest case had never
+been authored at all — **no censer had ever shared a room with a bulwark**, so
+the "you cannot grind this down, kill the healer" puzzle its own source
+describes had never once been posed against armour.
 
-*This is the single cheapest content on the list.*
+*What was done:* weaver and censer 3 → 6 spawns each, sited beside closers and
+armour. Verified by driving the game, not by reading it — the bulwark healed
+11 → 13 and was shielded for 332 frames.
+
+*Gate:* `bestiary.spec.mjs` pins that no specialist is alone, that each is
+within its **real** working radius (`CENSE_R`, `WEB_LEN`, imported not
+restated), and that its AI is never overridden. It failed on its first run
+against a beat-13 censer authored 7.62 units from both allies against a 7.0
+radius — dead weight since the day it was written.
 
 ---
 
@@ -205,8 +219,12 @@ a mechanic becomes a language instead of a gimmick.
 - **Fluid:** beat 11 has fluid to wade through. The second should make the level
   *rise*, so a room changes while you are in it.
 
-*Do first, and it is a five-minute job:* fix or delete the phantom Line Caster
-(audit pass 2 §A) so the Pyre stops advertising a reward it does not give.
+~~*Do first, and it is a five-minute job:* fix or delete the phantom Line
+Caster (audit pass 2 §A) so the Pyre stops advertising a reward it does not
+give.~~ **Done 2026-08-12.** The phantom `line_caster` id is deleted and the
+beam is gated on the Vector Staff, proven by driving the game: no staff → 0
+lines, staff → 1 line. It is purely additive, so a player who never finds it
+loses a flourish and never a route. The reprise work above is still open.
 
 *Gate:* each system already has a spec; extend it to assert the mechanic is
 exercised in more than one level file, from the real level defs.
@@ -249,8 +267,15 @@ boss room differs structurally from its dungeon's ordinary rooms.
 
 ## 10–11. Release credibility (afternoon each)
 
-- **App icon:** electron-builder logs *"default Electron icon is used"*. Point
-  `build.win.icon` at a 256×256 `.ico`. This is where Blender earns its keep.
+- ~~**App icon**~~ **— DONE 2026-08-12.** `scripts/make-icon.mjs` generates
+  `assets/icon.ico` (16/32/64/128/256) and `assets/icon.png` with nothing but
+  Node's zlib, and `build.win.icon` points at it. The art is authored once on a
+  32×32 voxel grid and every export is a whole-number rescale of that, so it is
+  still legible at 16px — which is the only size that gets looked at daily.
+  Colours are lifted from `ui/menu.js`, so the icon and the title screen are the
+  same object. Blender turned out not to be needed. `tests/game/app-icon.spec.mjs`
+  regenerates from the script and compares bytes, so the committed binary cannot
+  drift from its source; verified present in all three shipped `.exe`s.
 - **Signing:** costs money, not time. A certificate removes the "unknown
   publisher" warning. Nothing in this repo can substitute for it.
 - **Key art and a store page:** the only images this project has of itself are
@@ -274,8 +299,8 @@ the project and it is the only item on this list I cannot do for you.
 
 # If you want a running order
 
-**This week:** item 6 (afternoon, free content) · the Line Caster
-fix from item 7 · the app icon.
+**Done 2026-08-12:** ~~item 6~~ (and its stated method was wrong — read it) ·
+~~the Line Caster fix from item 7~~ · ~~the app icon~~.
 
 **Next:** item 3 (ambient life — best value), then item 4 (menus).
 

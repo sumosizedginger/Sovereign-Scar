@@ -414,6 +414,14 @@ export function run(t) {
                 }
             }
         }
+        // The seven kinds that can legitimately wear ANY behaviour. The weaver
+        // and the censer are deliberately NOT here and must not be added: their
+        // web and their heal/shield are implemented inside `_aiWeave` and
+        // `_aiCenser`, so writing `ai: 'chase'` on one does not add a behaviour,
+        // it DELETES the only one it had and leaves a monster that looks
+        // identical and does nothing. Requiring their rows to be filled would
+        // make this spec demand that damage be authored. They are checked below
+        // on their own signature AI instead.
         const legacy = ['sentinel', 'scarab', 'frost', 'bulwark', 'mote', 'lancer', 'brood'];
         const missing = [];
         for (const k of legacy) {

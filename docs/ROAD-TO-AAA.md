@@ -171,21 +171,38 @@ difficulty curve rises through *statistics* (HP, damage) rather than through
 *Cost:* days, and it is authoring, not engineering. The encounter director,
 the elites and the arena seals are all already built.
 
-### 6. A third of the bestiary runs at a third of its depth
+### 6. ~~A third of the bestiary runs at a third of its depth~~ — DONE, and the fix in this section was wrong
 
-*Measured:* the matrix in the same probe — **and it was lying until today**, see
-`docs/WIRING-AUDIT-2026-08-12-PASS2.md` §B.
+**Do not do what this section originally said.** It read:
 
-```
-39 of 54 kind × behaviour combinations authored (72%)
-weaver:  3 spawns, default AI only
-censer:  3 spawns, default AI only
-```
+> Seven enemy types get five behaviours between them. Two get one. […] **This
+> is free content already paid for** — fill the empty cells in the kind ×
+> behaviour matrix.
 
-Seven enemy types get five behaviours between them. Two get one. The weaver's
-web and the censer's heal/shield are fully implemented — constants, AI branches,
-coach lines and all — and the campaign asks for neither more than three times.
-**This is free content already paid for.**
+Writing `ai: 'chase'` on a weaver **deletes its web**. The web and the cense are
+implemented *inside* `_aiWeave` and `_aiCenser`, so an `ai:` override does not
+add a behaviour to a specialist — it removes the only one it had, and leaves a
+monster that looks identical and does nothing special. Their empty matrix row is
+**correct by design**, and the matrix was the wrong instrument for the question.
+
+Measuring before implementing is the only reason this was caught, and it is the
+whole argument for the rule: *this document was the source of the bad advice.*
+
+**What was actually missing was company.** These two are the only kinds whose
+design is about the *other* things in the room, so a specialist alone is a
+specialist switched off. In particular:
+
+> **No censer had ever been placed in a room with a bulwark.** The "a room with
+> a live censer cannot be ground down" puzzle its own source describes had never
+> once been posed against something armoured, in fourteen dungeons.
+
+Fixed 2026-08-12: weavers and censers 3 → 6 spawns each, sited beside closers
+and armour respectively. `bestiary.spec.mjs` now pins that no specialist is
+alone, that each is inside its *real* working radius (`CENSE_R`, `WEB_LEN`,
+imported rather than restated), and that its AI is never overridden. On its
+first run that gate failed a pre-existing beat-13 censer authored **7.62 units
+from both allies against a 7.0 radius** — unable to heal or shield anything
+since the day it was written.
 
 ### 7. Three world systems each appear in exactly one dungeon
 
@@ -199,7 +216,9 @@ Each was built, tested, and used once. A mechanic a player meets once is a
 curiosity; a mechanic that returns, changed, is a *language*. This is the
 cheapest content-per-hour on the entire list because the hard part is done.
 
-(And the light-line one currently rewards you with nothing — audit pass 2 §A.)
+(The light-line one used to reward you with nothing — audit pass 2 §A. Fixed
+2026-08-12: the Vector Staff now gates the beam, proven in the running game as
+no staff → 0 lines, staff → 1 line. The system still appears in one dungeon.)
 
 ### 8. One attack button, no combo, no reaction
 
@@ -225,14 +244,19 @@ the Wyrm — does more for a fight than another attack would.
 
 # TIER 3 — release credibility
 
-### 10. The installer is unsigned and has no icon
+### 10. The installer is unsigned ~~and has no icon~~
 
-Windows shows an "unknown publisher" warning to everyone who downloads it, and
-the taskbar entry is the stock Electron diamond. This is the first impression
-*before the game runs*, and it currently says "hobby project" as loudly as
-anything in Tier 1.
+**The icon is done (2026-08-12).** `npm run icon` builds `assets/icon.ico` at
+16/32/64/128/256 from `scripts/make-icon.mjs`, `build.win.icon` points at it,
+and its bytes were confirmed embedded in all three shipped `.exe`s rather than
+merely "the build stopped warning". `tests/game/app-icon.spec.mjs` regenerates
+from the script and compares, so the binary cannot drift from its source.
 
-*Cost:* the icon is an afternoon. Signing costs money, not time.
+**Signing is still open, and it is the bigger half.** Windows shows an "unknown
+publisher" warning to everyone who downloads it. Nothing in this repo can
+substitute for a certificate.
+
+*Cost:* signing costs money, not time.
 
 ### 11. There is no store page, and the screenshots would not sell it
 

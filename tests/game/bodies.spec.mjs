@@ -1,11 +1,15 @@
-// tests/game/bodies.spec.mjs — the bestiary has seven bodies, and every one of
-// them agrees with its own hitbox.
+// tests/game/bodies.spec.mjs — every body in the bestiary agrees with its own
+// hitbox.
 //
-// Before `bodies.js`, all seven enemy kinds were built at the same two numbers,
-// because no level ever passed anything else. The README promised "seven enemy
-// kinds that ask different questions"; the eye was shown one enemy in seven
+// Before `bodies.js`, every enemy kind was built at the same two numbers,
+// because no level ever passed anything else. The README promised enemy kinds
+// "that ask different questions"; the eye was shown one enemy in several
 // colours. These specs pin BOTH halves of the fix, and the second half is the
 // one that matters:
+//
+// The roster is `Object.keys(BODIES)` and never a list written here — it is
+// nine today and was seven when this was authored, and a hardcoded copy is
+// how the density probe silently stopped covering two kinds for months.
 //
 //   1. the silhouettes are actually distinct — measured, pairwise
 //   2. the HITBOX FOLLOWS THE BODY, for every kind, by construction

@@ -17,15 +17,21 @@ jobs:
           node-version: 22
           cache: npm
 
+      # This job runs pure-Node specs and never launches Electron, so there is
+      # no reason to pull ~350 MB of Electron binary on every run. The repo's
+      # own postinstall calls `electron/install.js` directly, which bypasses
+      # Electron's usual guard, so the skip has to be honoured by that script —
+      # see the `postinstall` entry in package.json.
       - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
       # CI runs the full pure-node unit suite via --unit-only (engine
       # collision/hitbox/settings — incl. the vectorized-vs-classic-cone
       # equivalence proof — plus every src/game unit spec: health, inventory,
-      # weapons, bosses, world-graph, motifs, and the rest; 480 assertions,
-      # fast and fully deterministic). The browser E2E half (smoke, boss-e2e,
-      # boss-combat-e2e, visual-sanity, campaign/world-e2e — 995 assertions
-      # total under local `npm test`) is left to local runs: GitHub's hosted
+      # weapons, bosses, world-graph, motifs, and the rest; ~90s and fully
+      # deterministic). The browser E2E half (smoke, boss-e2e, boss-combat-e2e,
+      # visual-sanity, campaign/world-e2e) is left to local runs: GitHub's hosted
       # runners have no GPU, and headless Chrome + SwiftShader software
       # rendering proved unreliable here across several attempts (a GPU-less
       # runner refusing WebGL under --use-gl=angle, then hanging on repeated

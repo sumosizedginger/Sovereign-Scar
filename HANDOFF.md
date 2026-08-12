@@ -76,9 +76,13 @@ assertion before changing it.
 
 ## State
 
+**Reviewing rather than continuing? Read [REVIEW.md](REVIEW.md) instead of this
+file.** It says what is and is not under review, how to check the claims here
+yourself, and what this project's known weaknesses are.
+
 Everything below is green in the working tree. `npm test` — unit + full browser
-E2E — **4906/4906**, run end to end after the player-facing finishing pass.
-`npm run test:unit` alone: **4041/4041**.
+E2E — **4992/4992** in about 8.5 minutes. `npm run test:unit` alone:
+**4115/4115** in about 90 seconds, no browser.
 
 That full run also left `git status` showing **only deliberate edits**, which it
 had not done for the life of the project: the boss E2E used to screenshot over a
@@ -96,7 +100,7 @@ longer a to-do list; it is a record of what was found and what was built. What i
 is NOT is a record of what has been *played*: see the caveat below, which is the
 single most important paragraph in this file.
 
-**Committed and pushed (2026-08-11).** That "not committed / remote is still at
+**Committed and pushed (2026-08-12).** That "not committed / remote is still at
 `006ab96`" line stood here long after it stopped being true, which is its own
 lesson: a status line with a SHA in it goes stale silently and then lies to the
 next reader. `Sovereign-Scar.git` `main` and this working tree agree — confirm
@@ -105,7 +109,7 @@ with `git ls-remote` rather than trusting this sentence.
 | area | state |
 |---|---|
 | Overworld, 14 dungeons, 14 bosses, items, saves | built |
-| Combat: guard / parry / lock-on / 7-enemy bestiary | built |
+| Combat: guard / parry / lock-on / 9-enemy bestiary | built |
 | Difficulty curve (`world/threat-curve.js`) | built, measured |
 | Generated score, no drone | built, proved by offline render |
 | Melee swing direction + weapon mount | fixed |
@@ -592,7 +596,7 @@ node tests/qa/room-map.mjs <beat> <room>   # draw a room; LOOK at it (trap 26)
 `content-density.mjs` is the odd one out and worth calling out: every other
 probe here asks whether something is **correct**, and it asks whether there is
 **enough of it**. The campaign can be entirely correct and still be thin, and
-nothing in a green 3544 would say so — the suite can confirm that seven enemy
+nothing in a green 3544 would say so — the suite can confirm that nine enemy
 kinds behave as designed while the campaign only ever puts two of them in a
 room. It reads authored source only, so it is exact and needs no browser.
 `docs/ROAD-TO-TEN.md` is built on its output.

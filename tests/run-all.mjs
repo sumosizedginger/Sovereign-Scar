@@ -58,6 +58,7 @@ import { run as runActorAnim } from './game/actor-anim.spec.mjs';
 import { run as runHudToast } from './game/hud-toast.spec.mjs';
 import { run as runHudPlayer } from './game/hud-player.spec.mjs';
 import { run as runHeroReadability } from './game/hero-readability.spec.mjs';
+import { run as runAppIcon } from './game/app-icon.spec.mjs';
 import { run as runOcclusion } from './game/occlusion.spec.mjs';
 import { run as runOverworldGrammar } from './game/overworld-grammar.spec.mjs';
 import { run as runMaterialHierarchy } from './game/material-hierarchy.spec.mjs';
@@ -167,6 +168,7 @@ async function main() {
     runNamed('hud-toast', runHudToast);
     runNamed('hud-player', runHudPlayer);
     runNamed('hero-readability', runHeroReadability);
+    runNamed('app-icon', runAppIcon);
     runNamed('occlusion', runOcclusion);
     runNamed('overworld-grammar', runOverworldGrammar);
     runNamed('material-hierarchy', runMaterialHierarchy);

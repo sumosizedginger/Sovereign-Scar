@@ -4,3 +4,9 @@ lib/three/*.min.js linguist-vendored
 lib/three/addons/**/*.js linguist-vendored
 docs/media/* binary
 *.png binary
+# `* text=auto` would otherwise leave the app icon to git's binary sniffing.
+# It sniffs correctly today, but a single CRLF rewrite would corrupt the
+# container outright — `tests/game/app-icon.spec.mjs` parses this file and
+# compares its decoded art, so it would fail on someone else's clone for a
+# reason invisible from inside the checkout. Say it out loud instead.
+*.ico binary

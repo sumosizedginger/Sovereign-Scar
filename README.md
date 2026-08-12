@@ -13,8 +13,8 @@ Built on **[My-Engine](https://github.com/sumosizedginger/My-Engine) 0.2.0** (pi
 
 ```bash
 npm run serve          # http://127.0.0.1:8799/
-npm test               # unit + browser E2E (4826 assertions)
-npm run test:unit      # unit only (3939 assertions, ~90s)
+npm test               # unit + browser E2E (4992 assertions, ~8.5 min)
+npm run test:unit      # unit only (4115 assertions, ~90s, no browser)
 ```
 
 ### Desktop (Windows)
@@ -56,10 +56,13 @@ lies north.
   first dungeon — before it, telegraphs have to be read and dodged), plus
   **lock-on** so you can circle what you are fighting instead of only backing
   away from it
-- **Seven enemy kinds that ask different questions** — the bulwark's front
+- **Nine enemy kinds that ask different questions** — the bulwark's front
   plate must be flanked or parried, the mote must be answered at range, the
   lancer's lunge must be dodged sideways, the brood splits when it dies. No two
-  dungeons share a roster
+  dungeons share a roster. Two of the nine are about the *rest* of the room:
+  the weaver webs the ground you were going to stand on, and the censer heals
+  and shields whatever it is standing next to — so a room with a live censer
+  cannot be ground down, it has to be prioritised
 - **A measured difficulty curve** — enemy and boss HP scale with the beat they
   spawn in, so an enemy still lives long enough for its behaviour to happen
   after your weapon damage has tripled
@@ -110,6 +113,11 @@ Design sources (parent folder):
 **Picking this up cold?** Start with [HANDOFF.md](HANDOFF.md) — current state,
 what to do next, and the traps that have each already produced a green suite
 that was lying.
+
+**Reviewing rather than continuing?** Start with [REVIEW.md](REVIEW.md) — what
+is and is not under review, how to verify the claims here yourself, and an
+unflattering list of this project's known weaknesses written by the person who
+built it.
 
 Implementation log: [BUILD_LOG.md](BUILD_LOG.md) · Controls: [docs/CONTROLS.md](docs/CONTROLS.md) · Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Design audit: [ZeldaLevel.md](ZeldaLevel.md) · Rendering roadmap: [docs/VISUAL_PLAN.md](docs/VISUAL_PLAN.md) · Open questions: [docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md)
 

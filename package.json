@@ -9,9 +9,10 @@
     "test": "node tests/run-all.mjs",
     "test:unit": "node tests/run-all.mjs --unit-only",
     "test:e2e": "node tests/run-all.mjs",
+    "icon": "node scripts/make-icon.mjs",
     "desktop": "electron .",
     "desktop:build": "electron-builder --win --publish never",
-    "postinstall": "node -e \"try{require('fs').accessSync('node_modules/electron/dist')}catch(e){require('child_process').execSync('node node_modules/electron/install.js',{stdio:'inherit'})}\""
+    "postinstall": "node -e \"if(process.env.ELECTRON_SKIP_BINARY_DOWNLOAD)process.exit(0);try{require('fs').accessSync('node_modules/electron/dist')}catch(e){require('child_process').execSync('node node_modules/electron/install.js',{stdio:'inherit'})}\""
   },
   "build": {
     "appId": "com.sumosizedginger.sovereignscar",
@@ -26,9 +27,11 @@
       "src/**",
       "lib/**",
       "scripts/serve.mjs",
+      "assets/icon.png",
       "!**/*.map"
     ],
     "win": {
+      "icon": "assets/icon.ico",
       "target": [
         {
           "target": "nsis",

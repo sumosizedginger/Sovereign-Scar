@@ -3,7 +3,7 @@
 // Every other probe in this directory measures whether a thing is CORRECT.
 // This one measures whether there is ENOUGH of it, because the campaign can be
 // entirely correct and still be thin, and nothing in the suite would say so.
-// A green 3544 tells you the seven enemy kinds behave as designed; it cannot
+// A green suite tells you the nine enemy kinds behave as designed; it cannot
 // tell you that the campaign only ever puts two of them in a room at once.
 //
 // Everything here is read off the authored source, so it is exact and needs no
