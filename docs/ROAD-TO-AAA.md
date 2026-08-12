@@ -38,20 +38,52 @@ reversible.
 **Nothing else on this list should start before this one.** Every remaining
 item puts *more* things on screen to lose yourself among.
 
-### 2. Rooms are boxes
+### 2. Rooms are LOW, not flat — I got this wrong and the owner caught it
 
-Ninety-nine rooms, and every one is a flat floor inside a rectangular wall. It
-is the single largest visual difference between this and a commercial
-top-down game, and it is visible in literally every screenshot.
+**The original claim in this document was that "every room is a flat floor
+inside a rectangular wall." That is false, and I never measured it before
+writing it.** Measured now, across all 108 rooms, by walking the baked voxel
+world and finding the standable height of every cell:
 
-The verticality work exists — `world/terracing.js` is written, tested, and
-applied. It is just quiet: raised steps and pits, no ledges you climb to, no
-sightlines that hide a room's second half until you walk in.
+```
+rooms with raised floor        100 of 108   (93%)
+mean raised area per room                    17%
+heights reaching 3 cells or more   34 rooms
+tallest single room     beat-13 indexspire — six distinct levels (0/1/2/3/4/5)
+```
 
-*Cost:* real, per-dungeon design work plus a traversal re-audit (this is
+Reproduce: `node tmp/measure-flat.mjs` (the probe is in `tmp/`, not committed —
+the numbers above are the record).
+
+So the terracing is real, it is everywhere, and it is doing work. What is
+actually true is narrower and it is worth stating precisely, because the
+imprecise version would have sent weeks in the wrong direction:
+
+- **The steps are one or two cells.** `terracing.js` says so in its own header
+  and explains why — it may only ADD, one cell at a time, so that nothing it
+  generates can make anywhere unreachable. That constraint is correct and it is
+  what made the feature safe to apply campaign-wide. It also caps how much
+  drama it can produce.
+- **They are ledges, never pits.** Again, the file says so. A sunken middle
+  would read far better and needs a per-room traversal audit by hand.
+- **Three shapes, chosen by hashing the room name** — dais, rim, steps. Varied
+  enough that no two neighbours match; not authored, so no room's shape means
+  anything about that room.
+- **The perimeter is still a rectangle** in every room. The elevation varies
+  inside a box whose outline never does.
+
+So the honest version of this item is: *the floors have relief; the SPACES do
+not have shape.* The fix is not "add verticality" — that shipped. It is
+authored rooms: an L, a room you enter on a balcony above, a pit you drop into
+and climb out the far side.
+
+*Cost:* real, per-dungeon design work plus a traversal re-audit — this is
 `docs/OPEN_QUESTIONS.md` §3, still open and correctly identified there as the
-one thing that cannot be applied globally). Weeks, not days — but it is the
-highest-value week on this list.
+one thing that cannot be applied globally. Weeks, not days.
+
+*Lesson, logged:* I wrote a confident sentence about 99 rooms from looking at
+about six screenshots. "Count, do not cite" applies to my own prose hardest of
+all, and the owner having played the game beat my having read it.
 
 ### 3. Nothing moves that you did not move
 

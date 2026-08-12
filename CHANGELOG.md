@@ -5,6 +5,48 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### The hero gets a real silhouette, and two more instruments stop lying
+
+**The cloak is now 0.92 × 1.15** (was 0.66 × 0.86) — wide enough to be the
+widest part of the outline from every bearing, long enough to break the round
+blob into a shape with a direction. Enemies stay rounded and cloakless, so at
+thirty pixels the hero is the only figure in a room that is not a lozenge. The
+cloak also takes the separation rim now, so it is a dark shape with a lit edge:
+readable against a pale floor because it is dark, against a dark floor because
+its edge is bright. Edge contrast in the crowded rooms — where you actually get
+lost — went 32.5 → 42.8 (Town) and 32.9 → 40.1 (Leviathan).
+
+Getting there caught the same trap twice more. The first, dark version of the
+bigger cloak **dropped** average-brightness separation for exactly the reason
+the rejected black outline did: a big dark mass pulls the average toward the
+floor. Numbers down, picture better.
+
+**And then ΔL\* turned out not to measure this at all.** The probe's "floor"
+ring sits at a radius derived from the character's HEIGHT, so a cloak that grows
+sideways spills into the ring and the floor reads brighter every time the cloak
+gets bigger — the floor climbed 30.7 → 34.5 → 36.9 across three cloak sizes of
+the same room. ΔL\* cannot A/B a silhouette change. Documented in the probe;
+the edge metric, measured on rays that cross the boundary, is unaffected.
+
+**The probe also only ever took one sample.** The same build measured three
+times gave floor readings of 27.8, 30.7 and 34.5 — a spread wider than most
+differences worth testing. It now takes five and prints the median plus the
+spread, which is the identical fix the luminance gate needed two sessions ago.
+
+**Correction, owner-caught: rooms are not flat.** `ROAD-TO-AAA.md` claimed "every
+room is a flat floor inside a rectangular wall". Measured across all 108 rooms
+by walking the baked voxel world: **100 of 108 have raised floor**, averaging
+17% of their area, 34 rooms reaching three or more levels, one reaching six. The
+real gap is narrower and is now stated precisely — the steps are one or two
+cells by design, they are ledges rather than pits, the three shapes are chosen
+by hashing the room name, and the perimeter is always a rectangle. Floors have
+relief; spaces do not have shape.
+
+New: `docs/HOW-TO-CLOSE-THE-GAP.md` — the method for every item on the AAA list,
+with sizes, gates and a running order.
+
+Suite: 4911/4911.
+
 ### Wiring audit, pass 2 — content this time, and the Pyre's reward is a prop
 
 Full findings: `docs/WIRING-AUDIT-2026-08-12-PASS2.md`. Pass 1 checked modules;

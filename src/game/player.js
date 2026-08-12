@@ -70,7 +70,19 @@ export const HERO_RIG = {
     rimStrength: 0.9,
     // The shape nobody else has. Same reserved blue as the rim, so the hero
     // reads as one idea rather than two decorations.
-    cloak: { color: 0x24509e, width: 0.66, length: 0.86 },
+    //
+    // WIDER AND LONGER THAN THE FIRST BUILD (0.66 × 0.86). That version made the
+    // hero findable against the FLOOR and still not against the eight other
+    // figures in a crowded room — the greyscale frame is the proof, and colour
+    // was doing all the work, which is the cue that fails first for a
+    // colour-blind player and fails always in a room lit the hero's own hue.
+    //
+    // The number comes off the silhouette, not off taste: the body is ~0.58
+    // wide, so at 0.92 the cloak is the WIDEST part of the outline from every
+    // bearing, and at 1.15 it breaks the round blob into a shape with a
+    // direction. Enemies remain rounded and cloakless, so at thirty pixels the
+    // hero is the only figure in the room that is not a lozenge.
+    cloak: { color: 0x5f9ae0, width: 0.92, length: 1.15 },
     // If the hard outline is ever turned back on (see actor-rig.js), the hero's
     // is thicker than everyone else's. It is off by default.
     outlineWidth: 0.11,

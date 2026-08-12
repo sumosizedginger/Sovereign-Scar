@@ -52,7 +52,7 @@ try {
     await page.evaluate(() => window.__sovereignScar.startNewGame());
     await sleep(3000);
 
-    async function measure(label, levelId) {
+    async function measureOnce(label, levelId, quiet = false) {
         if (levelId) {
             await page.evaluate(async (l) => { await window.__sovereignScar.loadLevel(l); }, levelId);
             await sleep(2600);
@@ -182,6 +182,7 @@ try {
         }, b64, CX, CY, at.heightPx);
 
         await page.evaluate(() => window.__sovereignScar.hud?.setHidden?.(false));
+        if (quiet) return res;
         console.log(
             `${label.padEnd(22)} body L*${String(res.bodyL).padStart(5)}  floor L*${String(res.floorL).padStart(5)}  ` +
             `ΔL* ${String(res.dL).padStart(5)}  ΔRGB ${String(res.dRGB).padStart(5)}  ` +
@@ -190,6 +191,46 @@ try {
         return res;
     }
 
+    /**
+     * MEDIAN OF FIVE, not one sample — the fix the luminance gate already needed.
+     *
+     * This probe re-aims itself at the player every run, which is correct (a
+     * fixed pixel was the old bug). But the player is not standing in exactly
+     * the same spot run to run, so the FLOOR annulus lands on slightly
+     * different ground each time. Measured across three consecutive runs of the
+     * SAME build, the overworld floor read 27.8, 30.7 and 34.5 — a spread of
+     * nearly seven points, wider than most differences anyone would want to
+     * A/B with it.
+     *
+     * One sample was good enough to say "this room is bad" and not good enough
+     * to say "this change helped", which is exactly the question it was being
+     * asked. `spread` is printed so a noisy reading cannot be quoted as a
+     * precise one.
+     */
+    async function measure(label, levelId) {
+        const runs = [];
+        for (let i = 0; i < 5; i++) {
+            runs.push(await measureOnce(label, i === 0 ? levelId : null, true));
+            await sleep(160);
+        }
+        const med = (k) => {
+            const v = runs.map((r) => r[k]).sort((a, b) => a - b);
+            return +v[Math.floor(v.length / 2)].toFixed(1);
+        };
+        const dLs = runs.map((r) => r.dL);
+        const res = {
+            ...runs[0],
+            bodyL: med('bodyL'), floorL: med('floorL'), dL: med('dL'),
+            dRGB: med('dRGB'), bestEdgeL: med('bestEdgeL'), medEdgeL: med('medEdgeL'),
+            spread: +(Math.max(...dLs) - Math.min(...dLs)).toFixed(1),
+        };
+        console.log(
+            `${label.padEnd(22)} body L*${String(res.bodyL).padStart(5)}  floor L*${String(res.floorL).padStart(5)}  `
+            + `ΔL* ${String(res.dL).padStart(5)} (spread ${res.spread})  `
+            + `edge ΔL* median ${String(res.medEdgeL).padStart(5)} / max ${res.bestEdgeL}`
+        );
+        return res;
+    }
     console.log('\n=== CHARACTER / GROUND SEPARATION (shipped frames) ===\n');
     const out = [];
     out.push({ ...await measure('overworld crust', null), label: 'overworld crust' });

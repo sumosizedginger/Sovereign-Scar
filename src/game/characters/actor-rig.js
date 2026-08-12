@@ -34,10 +34,15 @@ import { S } from '../../voxel/palette.js';
  * whole body (bloom wraps every actor in a ghost shell). Rim is edge-only,
  * tinted via a shader uniform so eyes stay the only intentional glow.
  */
-function makeActorMaterial(rimHex, strength = 0.28) {
+function makeActorMaterial(rimHex, strength = 0.28, opts = {}) {
     const mat = new THREE.MeshStandardMaterial({
-        vertexColors: true,
-        roughness: 0.85,
+        // The body parts are voxel meshes and carry their colour per vertex.
+        // The cloak is a plain box with a flat colour and NO colour attribute —
+        // leaving vertexColors on for it renders it black, because the shader
+        // multiplies by an attribute that is not there.
+        vertexColors: opts.vertexColors !== false,
+        color: opts.color != null ? opts.color : 0xffffff,
+        roughness: opts.roughness != null ? opts.roughness : 0.85,
         emissive: 0x000000,
         emissiveIntensity: 0,
     });
@@ -99,7 +104,8 @@ void main() {`
     // The cache key has to carry the strength, or three.js reuses one compiled
     // program for every actor and the hero's stronger rim silently becomes
     // whatever the first actor compiled asked for.
-    mat.customProgramCacheKey = () => `ss-actor-rim-v3-${strength.toFixed(2)}`;
+    mat.customProgramCacheKey = () =>
+        `ss-actor-rim-v3-${strength.toFixed(2)}-${mat.vertexColors ? 'vc' : 'flat'}`;
     return mat;
 }
 
@@ -371,12 +377,25 @@ export function createActorRig(opts = {}) {
         const w = cl.width ?? 0.66;
         const len = cl.length ?? 0.85;
         const th = cl.thickness ?? 0.09;
+        // THE CLOAK GETS THE SEPARATION LIGHT TOO, and that is not decoration.
+        //
+        // Built without it, the cloak was a flat dark navy slab. It gave the
+        // hero a shape no enemy has — which is what it is for — but it also
+        // pulled the hero's average lightness DOWN toward the floor, and the
+        // measurement said so: mean ΔL* fell 15.1 → 10.1 the moment it got
+        // bigger. That is the black-outline mistake in a second costume: a dark
+        // mass improves the OUTLINE and worsens the VALUE, and against a dark
+        // floor it loses both at once.
+        //
+        // With the rim, the cloak is a dark shape with a lit edge. It reads
+        // against a pale floor because it is dark, and against a dark floor
+        // because its edge is bright, and it still is not a shape any enemy has.
         const cloakMesh = new THREE.Mesh(
             new THREE.BoxGeometry(w, len, th),
-            new THREE.MeshStandardMaterial({
+            makeActorMaterial(rim, rimK, {
+                vertexColors: false,
                 color: cl.color ?? 0x1d5f7a,
                 roughness: 0.72,
-                metalness: 0,
             })
         );
         cloakMesh.castShadow = true;
