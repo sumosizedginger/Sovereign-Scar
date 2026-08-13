@@ -44,6 +44,36 @@ export function insideRect(p, r) {
     return p.x >= r.x0 && p.x <= r.x1 && p.z >= r.z0 && p.z <= r.z1;
 }
 
+/**
+ * Does the straight line from `a` to `b` pass through the axis-aligned rect?
+ *
+ * Standard slab clip, exact — no sampling, so a thin chasm cannot be stepped
+ * over by a coarse loop. Used to ask the only question that matters when
+ * choosing a grapple peg: WOULD GOING THERE ACTUALLY CROSS THE GAP.
+ */
+export function segmentCrossesRect(a, b, r) {
+    let t0 = 0;
+    let t1 = 1;
+    const axes = [
+        [b.x - a.x, r.x0, r.x1, a.x],
+        [b.z - a.z, r.z0, r.z1, a.z],
+    ];
+    for (const [d, lo, hi, o] of axes) {
+        if (Math.abs(d) < 1e-9) {
+            // Parallel to this slab: inside it for all t, or never.
+            if (o < lo || o > hi) return false;
+            continue;
+        }
+        let ta = (lo - o) / d;
+        let tb = (hi - o) / d;
+        if (ta > tb) { const s = ta; ta = tb; tb = s; }
+        if (ta > t0) t0 = ta;
+        if (tb < t1) t1 = tb;
+        if (t0 > t1) return false;
+    }
+    return true;
+}
+
 /** Is the player aiming close enough at the anchor to grapple it? */
 export function grappleAimOk(playerPos, facingVec, anchor, reach) {
     const dx = anchor.x - playerPos.x;
@@ -211,6 +241,7 @@ export function createBlockerRuntime(ctx, level, b, origin = { x: 0, z: 0 }) {
                 const hasGrapple = player.inventory.hasItem('magnetic_grapple');
                 let bestTarget = null;
                 let bestDot = 0.7;
+                let bestDist = Infinity;
                 for (const post of posts) {
                     // Land short of the post solid so the pull is not cancelled.
                     const raw = {
@@ -222,6 +253,34 @@ export function createBlockerRuntime(ctx, level, b, origin = { x: 0, z: 0 }) {
                     const dz0 = raw.z - p.z;
                     const d0 = Math.hypot(dx0, dz0) || 1;
                     if (d0 < 1.6 || d0 > reach + 1.5) continue;
+                    // A PEG ON YOUR OWN SIDE IS NOT A DESTINATION.
+                    //
+                    // Owner report: "standing next to the gold pillar in the
+                    // wall and hitting G locks onto the gold pillar in the
+                    // wall, not the one across the gap." Measured in windworks
+                    // — chasm at world z −70..−66, authored peg at z −65 and a
+                    // mirrored one at z −72 — standing at z −74 facing south
+                    // and pressing G moved the player 1.60 units, to z −72.4.
+                    // Onto the peg they were already stood beside.
+                    //
+                    // The selection only asked WHICH PEG AM I AIMED MOST
+                    // SQUARELY AT. Both pegs sit on the same axis, so both
+                    // scored a dot of 1.0, and `dot >= bestDot` handed the tie
+                    // to whichever was last in the array — the mirrored one,
+                    // which on the return trip is the near one. Tuning the
+                    // 1.6 minimum would only move the distance at which the
+                    // wrong answer starts being given.
+                    //
+                    // The right question is geometric and needs no constant: a
+                    // grapple across a chasm exists to put you on the OTHER
+                    // SIDE, so the line to the peg must pass through the
+                    // chasm. That is symmetric, so the return trip works by
+                    // the same rule, and it cannot be fooled by facing.
+                    //
+                    // Falls through when the blocker declares no rect: there is
+                    // then no gap to be on the wrong side of, and refusing
+                    // every peg would make such a blocker uncrossable.
+                    if (rectW && !segmentCrossesRect(p, raw, rectW)) continue;
                     const target = {
                         x: p.x + dx0 * ((d0 - 1.2) / d0),
                         y: p.y,
@@ -233,8 +292,19 @@ export function createBlockerRuntime(ctx, level, b, origin = { x: 0, z: 0 }) {
                     const d = Math.hypot(dx, dz) || 1;
                     const dot = (dx / d) * player.state.facingVec.x
                         + (dz / d) * player.state.facingVec.z;
-                    if (dot >= bestDot) {
-                        bestDot = dot;
+                    // Ties are decided by DISTANCE, not by array order.
+                    //
+                    // `dot >= bestDot` let the last post in the list win any
+                    // tie, and on a straight two-peg gap every candidate scores
+                    // 1.0 — so the choice was made by the order `anchorsLocal`
+                    // happened to be built in. With the crossing test above,
+                    // every survivor is genuinely across; the nearest of them is
+                    // the near edge of the far side, which is where a player
+                    // aiming across a gap means to land.
+                    if (dot > bestDot + 1e-6
+                        || (Math.abs(dot - bestDot) <= 1e-6 && d0 < bestDist)) {
+                        bestDot = Math.max(bestDot, dot);
+                        bestDist = d0;
                         bestTarget = target;
                     }
                 }
