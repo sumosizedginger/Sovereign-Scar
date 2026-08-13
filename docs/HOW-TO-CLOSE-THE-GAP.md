@@ -142,10 +142,30 @@ written cannot be started.
    region already sits 4 under its ceiling, so a wave with any DC offset would
    start failing screens for being alive. All 44 luminance gates still pass.
 3. **Idle animation on props.** ~~Banners, chains and vents get a 2-second
-   sway.~~ **Cannot be started as written: those props do not exist.** The only
-   named non-actor objects in a baked room are `contact-shadow`, `room-lights`
-   and `void-plane`; the scenery from `props.js` is anonymous meshes. Step one
-   is naming or tagging them, and that is a different (larger) job.
+   sway.~~ **Re-diagnosed twice, and the real blocker is neither of the first
+   two answers.**
+
+   First reading: "those props do not exist" — because the only NAMED objects in
+   a baked room are `contact-shadow`, `room-lights` and `void-plane`. That was a
+   fact about names, not about objects.
+
+   Second reading, from the source: every prop that goes through
+   `meshAndCollide()` **does** get its own `THREE.Mesh`. They are anonymous, not
+   absent. So a prop is animatable in principle.
+
+   **The actual blocker:** that same call also registers the prop's **collision
+   columns** into the world. Move the mesh and the solid stays behind — a
+   swaying banner you can still walk into, or a vent whose collider has drifted
+   off it. Sway is therefore only safe for props that register no collision, or
+   for a purely decorative child mesh split off from the colliding body.
+
+   *Method, if it is picked up:* add an opt-in `sway` flag at the
+   `meshAndCollide` call site that (a) refuses to apply when the caller also
+   registered solids, and (b) drives only a child mesh. Gate it on the
+   collision world, not on the mesh — `ambient-life.spec.mjs` already shows the
+   shape, and the failure to guard against is silent desync, which no
+   screenshot will ever show.
+
 4. ~~**Enemy idle before aggro.**~~ **DONE 2026-08-12.** Stated exactly, because
    the original wording was imprecise: enemy *bodies* already idle-animated
    (87–94% of parts moving), but **no enemy root ever changed facing** — 0 of 31
