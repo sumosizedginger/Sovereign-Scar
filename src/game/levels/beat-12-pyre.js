@@ -12,7 +12,7 @@
 import { createDungeon } from '../world/room-graph.js';
 import { addKeyPickup } from '../world/keys.js';
 import { ABYSS_COLORS } from '../assets/palettes.js';
-import { LightLineSystem } from '../world/light-line-system.js';
+import { attachLightLinesOnCast } from '../world/light-lines-on-cast.js';
 import { buildMagmaVent, stampMap } from '../assets/props.js';
 import { MagmaWyrm, attachBoss } from '../bosses/index.js';
 import { addAltar } from '../world/altar.js';
@@ -300,51 +300,15 @@ export function loadBeat12(ctx) {
         { speaker: 'SYSTEM', text: 'Do not stand in fire trails. Aim for the head of the chain.' },
     ];
 
-    // Vector Staff light-lines: Light Caster casts also fire a light line
-    const lines = new LightLineSystem(ctx.scene, ctx.collisionWorld);
-    let patched = false;
-    let originalTryAttack = null;
-    let gameRef = null;
-
-    function restoreAttack() {
-        if (patched && gameRef?.player && originalTryAttack) {
-            gameRef.player.tryAttack = originalTryAttack;
-            patched = false;
-            originalTryAttack = null;
-        }
-    }
-
-    level.addSystem({
-        update(dt) { lines.update(dt); },
-        dispose() {
-            restoreAttack();
-            lines.dispose();
-        },
+    // Vector Staff light-lines. The patch-and-restore this used to inline here
+    // now lives in `world/light-lines-on-cast.js`, because beat 14 reprises it
+    // and duplicating a monkey-patch of `player.tryAttack` across two level
+    // files is two chances to leak it into every level visited afterwards.
+    attachLightLinesOnCast(level, ctx, {
+        weapon: 'light_caster',
+        requires: ['vector_staff'],
+        range: 10, life: 1.8, color: 0xffa040,
     });
-    level.lightLines = lines;
-
-    level.onEnter = (game) => {
-        gameRef = game;
-        restoreAttack();
-        originalTryAttack = game.player.tryAttack.bind(game.player);
-        game.player.tryAttack = (enemies, destructibles) => {
-            const hits = originalTryAttack(enemies, destructibles);
-            // THE STAFF IS THE GATE. Without this test the Pyre's own reward
-            // pickup changed nothing about the game, which made it a prop.
-            // Purely additive — the line is cosmetic plus a hit test, so a
-            // player who never finds the staff loses a flourish, never a route.
-            if (game.player.inventory.activeWeapon === 'light_caster'
-                && game.player.inventory.hasItem('vector_staff') && lines) {
-                try {
-                    lines.fire(game.player.root.position, game.player.state.facingVec, {
-                        range: 10, life: 1.8, color: 0xffa040,
-                    });
-                } catch (_) {}
-            }
-            return hits;
-        };
-        patched = true;
-    };
 
     return level;
 }

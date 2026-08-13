@@ -304,31 +304,43 @@ radius — dead weight since the day it was written.
 
 ---
 
-## 7. Three systems used once each (days)
+## 7. ~~Three systems used once each~~ — ALL THREE REPRISED 2026-08-12
 
-Gears (beat 02), light-lines (beat 12), fluid (beat 11). Each built, tested,
-used once.
+Each of `gear-system.js`, `fluid-plane.js` and `light-line-system.js` was built,
+tested, and used in exactly one dungeon. All three now return, **changed** — a
+mechanic met once is a curiosity; one that returns different is a language.
 
-*Method:* give each a **second appearance that changes the rule**, which is how
-a mechanic becomes a language instead of a gimmick.
+| system | first use | reprise |
+|---|---|---|
+| gears | beat 02 — a timing puzzle you stand still and read | beat 13 stairworks — one faster gear between two spirals, an obstacle you cross while climbing |
+| fluid | beat 11 — sludge that **slows** you (drag 0.35, wind 1.5) | beat 10 crystalgarden — meltwater that makes you **slide** (drag 0.96, wind 0.35) |
+| light lines | beat 12 — fires only with the Light Caster equipped | beat 14 — fires with the staff and **any** weapon, longer, colder, cyan |
 
-- **Gears:** beat 02 teaches "turn the gear to open the way". The second
-  appearance should make a gear something an enemy can turn *back*.
-- **Light-lines:** beat 12 fires a beam. The second should need the beam
-  *reflected* — and `reflector_plate` already exists as an item and is granted
-  by a cache, which suggests this was the original plan.
-- **Fluid:** beat 11 has fluid to wade through. The second should make the level
-  *rise*, so a room changes while you are in it.
+**The fluid reprise is deliberately not what this section asked for.** It wanted
+a second fluid that makes the level *rise* while the player stands in it. That
+moves a surface underneath them and needs every traversal probe re-run against a
+moving floor. Changing how the floor *feels* rather than where it *is* cannot
+strand anyone — the same "cheaper 80% first" trade this document already
+recommends for room shapes.
 
-~~*Do first, and it is a five-minute job:* fix or delete the phantom Line
-Caster (audit pass 2 §A) so the Pyre stops advertising a reward it does not
-give.~~ **Done 2026-08-12.** The phantom `line_caster` id is deleted and the
-beam is gated on the Vector Staff, proven by driving the game: no staff → 0
-lines, staff → 1 line. It is purely additive, so a player who never finds it
-loses a flourish and never a route. The reprise work above is still open.
+**The light-line reprise needed a refactor first, and that refactor found a
+bug.** Beat 12 wired it by monkey-patching `player.tryAttack` in `onEnter` and
+restoring in `dispose` — the single most dangerous shape in this codebase to
+copy, and the exact bug already suffered once when three specs installed a fake
+`document` and never removed it. It now lives once, in
+`world/light-lines-on-cast.js`, which restores **only if the installed function
+is still its own** (an unconditional restore would delete a later level's patch).
 
-*Gate:* each system already has a spec; extend it to assert the mechanic is
-exercised in more than one level file, from the real level defs.
+Writing its spec caught a real defect inherited from the original: `.bind()`
+returns a *new* function, so "restore the original" restored a copy, identity
+was lost, and every enter/dispose cycle wrapped another bind layer around the
+chain. `tests/game/light-lines.spec.mjs` (21 assertions) pins patch, restore,
+non-stacking, out-of-order teardown, both gates, and — because the sweep found
+this hole — **that the two call sites are not the same call**. Seven break
+modes, all caught.
+
+*Verified after each:* key-reachability 0 issues, door-reach 0 doors that lock
+you in, enemy-ground 143 walking with 0 buried.
 
 ---
 

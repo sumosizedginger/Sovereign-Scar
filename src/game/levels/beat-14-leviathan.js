@@ -9,6 +9,7 @@
 //                    [threshold]     start; S exit → overworld
 
 import { createDungeon } from '../world/room-graph.js';
+import { attachLightLinesOnCast } from '../world/light-lines-on-cast.js';
 import { addKeyPickup } from '../world/keys.js';
 import { ABYSS_COLORS } from '../assets/palettes.js';
 import { abyssTint } from '../world/level-builder.js';
@@ -277,6 +278,27 @@ export const BEAT14_DEF = {
 
 export function loadBeat14(ctx) {
     const level = createDungeon(ctx, BEAT14_DEF);
+
+    // SYSTEM REPRISE — the light lines return for the finale, with the GATE
+    // changed rather than the effect.
+    //
+    // In the Pyre the line only fires with the Light Caster equipped: the staff
+    // tunes that one weapon. Here it fires with the staff held and ANY weapon
+    // drawn, longer and colder. The staff has stopped being an attachment to a
+    // tool and become something the player carries.
+    //
+    // Two dungeons, one implementation. The patch of `player.tryAttack` this
+    // needs lives in `world/light-lines-on-cast.js` precisely so this call site
+    // cannot get the restore wrong — see that file's header for what a leaked
+    // patch costs.
+    attachLightLinesOnCast(level, ctx, {
+        weapon: null,                    // the Pyre requires the Light Caster
+        requires: ['vector_staff'],
+        range: 14,                       // was 10
+        life: 2.4,                       // was 1.8
+        color: 0x7fe0ff,                 // the title's cyan, not the Pyre's ember
+    });
+
     level.suppressBossIntro = true;
     level.musicBed = 'leviathan';
     level.story = [
