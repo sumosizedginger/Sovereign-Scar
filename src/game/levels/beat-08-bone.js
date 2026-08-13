@@ -185,6 +185,10 @@ export const BEAT08_DEF = {
                 // Mirrors the weaver across the room so its web has a second
                 // approach to cover, rather than adding a body to one side.
                 { x: 0, z: 5, kind: 'lancer', hp: 3 },
+                // Encounter shape: this was the beat's biggest fight at 4;
+                // the campaign target is 5 by here. Placed at the same radius
+                // from the room centre as a spawn already proven walkable.
+                { x: 0, z: -4, kind: 'bulwark', hp: 4 },
             ],
             doors: [
                 { to: 'bonegrove', side: 'S', at: 0, type: 'locked' },

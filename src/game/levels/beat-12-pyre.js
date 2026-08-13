@@ -234,6 +234,11 @@ export const BEAT12_DEF = {
                 { x: 3, z: -3, kind: 'mote', ai: 'lunge', hp: 4 },
                 { x: 0, z: 3, kind: 'lancer', hp: 5 },
                 { x: 4, z: -4, kind: 'censer', hp: 4 },
+                // Encounter shape: this was the beat's biggest fight at 4;
+                // the campaign target is 6 by here. Placed at the same radius
+                // from the room centre as a spawn already proven walkable.
+                { x: 3, z: -3, kind: 'lancer', hp: 5 },
+                { x: 3, z: 3, kind: 'mote', hp: 4, ai: 'lunge' },
             ],
             doors: [
                 { to: 'ventfield', side: 'S', at: 0, type: 'locked' },

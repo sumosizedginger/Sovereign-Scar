@@ -257,6 +257,10 @@ export const BEAT07_DEF = {
                 { x: 3, z: -3, kind: 'frost', hp: 3, ai: 'ranged' },
                 { x: 0, z: 3, kind: 'lancer', hp: 4 },
                 { x: 5, z: 5, kind: 'weaver', hp: 3 },
+                // Encounter shape: this was the beat's biggest fight at 4;
+                // the campaign target is 5 by here. Placed at the same radius
+                // from the room centre as a spawn already proven walkable.
+                { x: 3, z: -3, kind: 'lancer', hp: 3 },
             ],
             doors: [
                 { to: 'drownedway', side: 'S', at: 0, type: 'locked' },

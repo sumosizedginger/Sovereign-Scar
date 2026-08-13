@@ -214,11 +214,24 @@ bigger than the tutorial, and no dungeon is without a real fight. Two break
 modes proven. Everything else in that spec scales HP — none of it could ever
 have said the campaign asks the same question every time.
 
-**Still open: the ceiling.** The target below (early 3, middle 5, late 7) is not
-met — the curve is monotonic but tops out at 4, and raising it is the authoring
-job this section originally described. The sealed rooms and the encounter
-director's token budget (1 attacker in beats 01-04, 2 through 10, 3 in the
-finale) are both already built and waiting for it.
+**The ceiling is raised too (same day).** Final curve:
+
+```
+2 3 3 3 3 2 4 3 4 3 4 4 3 4      <- at the start of the day
+3 3 3 4 4 4 5 5 5 6 6 6 6 7      <- now
+```
+
+Five distinct peak values instead of three, 124 -> 153 authored enemies, and it
+matches this section's own target (early 3, middle 5, late 7) everywhere the
+game allows it. New spawns were placed at the same radius from the room centre
+as a spawn already proven walkable; `enemy-ground.mjs` reports 143 walking
+enemies, **0 buried at spawn, 0 after walking**.
+
+**One target was refused, and correctly.** Beat 13's peak room is SEALED, and
+`room-seal.spec.mjs` caps a sealed fight at 6 — *"a fight, not a hunt"*. That is
+a considered design rule and it outranks the number in this document, so beat 13
+stops at 6. The rule found the conflict on the first full run; the doc did not
+know the rule existed.
 
 
 *Method:* do not raise every count. Build a **shape** per dungeon.

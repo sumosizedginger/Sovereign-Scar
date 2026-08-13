@@ -93,6 +93,15 @@ export const BEAT13_DEF = {
                 { x: 0, z: -6, kind: 'censer', hp: 4 },
                 // Second-to-last dungeon, and it peaked lower than beat 07.
                 { x: 4, z: 4, kind: 'lancer', hp: 5 },
+                // Encounter shape: this was the beat's biggest fight at 4.
+                // The campaign target was 7 by here, but this room is SEALED and
+                // `room-seal.spec.mjs` caps a sealed fight at 6 — "a fight, not
+                // a hunt". That cap is a considered design rule and it outranks
+                // the target curve in `HOW-TO-CLOSE-THE-GAP.md`, which is why
+                // this stops at 6. Placed at the same radius from the room
+                // centre as a spawn already proven walkable.
+                { x: -2, z: -4, kind: 'bulwark', hp: 5 },
+                { x: 4, z: 4, kind: 'lancer', hp: 5 },
             ],
             doors: [
                 { to: 'towergate', side: 'S', at: 0, type: 'open' },

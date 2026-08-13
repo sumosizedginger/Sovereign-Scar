@@ -78,6 +78,12 @@ export const BEAT14_DEF = {
                 // cannot be ground down while the censer lives, and two others
                 // keeping you honest about the time it takes to reach it.
                 { x: -5, z: -4, kind: 'censer', hp: 4 },
+                // Encounter shape: this was the beat's biggest fight at 4;
+                // the campaign target is 7 by here. Placed at the same radius
+                // from the room centre as a spawn already proven walkable.
+                { x: -3, z: -5, kind: 'brood', hp: 5 },
+                { x: -3, z: 5, kind: 'bulwark', hp: 5 },
+                { x: 5, z: 0, kind: 'mote', hp: 5 },
             ],
             doors: [
                 { to: 'threshold', side: 'S', at: 0, type: 'open' },

@@ -238,6 +238,11 @@ export const BEAT10_DEF = {
                 { x: 0, z: 3, kind: 'brood', hp: 4 },
                 // The cold store sagged to 3 between two beats that peak at 4.
                 { x: -4, z: 4, kind: 'frost', hp: 4, ai: 'lunge' },
+                // Encounter shape: this was the beat's biggest fight at 4;
+                // the campaign target is 6 by here. Placed at the same radius
+                // from the room centre as a spawn already proven walkable.
+                { x: 3, z: -3, kind: 'brood', hp: 4 },
+                { x: 3, z: 3, kind: 'frost', hp: 4, ai: 'lunge' },
             ],
             doors: [
                 { to: 'glacierhall', side: 'S', at: 0, type: 'locked' },

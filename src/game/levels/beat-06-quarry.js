@@ -115,6 +115,10 @@ export const BEAT06_DEF = {
                 // Beat 06 peaked at 2 — the same as beat 01, a third of the
                 // way through the game. Measured curve was 2 3 3 3 3 **2** …
                 { x: 5, z: 5, kind: 'brood', hp: 4 },
+                // Encounter shape: this was the beat's biggest fight at 3;
+                // the campaign target is 4 by here. Placed at the same radius
+                // from the room centre as a spawn already proven walkable.
+                { x: -4, z: -5, kind: 'brood', hp: 4 },
             ],
             doors: [
                 { to: 'pitgate', side: 'S', at: 0, type: 'open' },

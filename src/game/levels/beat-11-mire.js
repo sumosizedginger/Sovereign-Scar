@@ -259,6 +259,11 @@ export const BEAT11_DEF = {
                 { x: 3, z: -3, kind: 'brood', hp: 4 },
                 { x: 0, z: 3, kind: 'bulwark', ai: 'drift', hp: 4 },
                 { x: -5, z: 4, kind: 'weaver', hp: 4 },
+                // Encounter shape: this was the beat's biggest fight at 4;
+                // the campaign target is 6 by here. Placed at the same radius
+                // from the room centre as a spawn already proven walkable.
+                { x: 3, z: -3, kind: 'bulwark', hp: 4 },
+                { x: 3, z: 3, kind: 'brood', hp: 4 },
             ],
             doors: [
                 { to: 'readingroom', side: 'S', at: 0, type: 'locked' },

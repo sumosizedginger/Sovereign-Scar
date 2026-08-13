@@ -210,6 +210,10 @@ export const BEAT04_DEF = {
                 { x: -3, z: -3, kind: 'frost', hp: 3, ai: 'drift' },
                 { x: 3, z: -3, kind: 'mote', hp: 3 },
                 { x: 0, z: 3, kind: 'sentinel', hp: 3, ai: 'charge' },
+                // Encounter shape: this was the beat's biggest fight at 3;
+                // the campaign target is 4 by here. Placed at the same radius
+                // from the room centre as a spawn already proven walkable.
+                { x: 3, z: -3, kind: 'frost', hp: 3, ai: 'drift' },
             ],
             platforms(map, h) {
                 steps(map, h, 0, -4, 3, CRUST_COLORS.limestone);

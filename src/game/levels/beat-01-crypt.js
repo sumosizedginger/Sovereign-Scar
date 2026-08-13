@@ -248,6 +248,10 @@ export const BEAT01_DEF = {
             enemies: [
                 { x: -3, z: -4, kind: 'sentinel', hp: 2 },
                 { x: 3, z: -4, kind: 'scarab', hp: 2, ai: 'charge' },
+                // Encounter shape: this was the beat's biggest fight at 2;
+                // the campaign target is 3 by here. Placed at the same radius
+                // from the room centre as a spawn already proven walkable.
+                { x: 4, z: -3, kind: 'sentinel', hp: 2 },
             ],
             doors: [
                 { to: 'predecessor', side: 'S', at: 0, type: 'open' },

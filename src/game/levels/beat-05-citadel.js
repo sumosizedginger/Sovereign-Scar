@@ -220,6 +220,10 @@ export const BEAT05_DEF = {
                 { x: -3, z: -3, kind: 'bulwark', hp: 4 },
                 { x: 3, z: -3, kind: 'sentinel', hp: 4, ai: 'charge' },
                 { x: 0, z: 3, kind: 'bulwark', hp: 3 },
+                // Encounter shape: this was the beat's biggest fight at 3;
+                // the campaign target is 4 by here. Placed at the same radius
+                // from the room centre as a spawn already proven walkable.
+                { x: 3, z: -3, kind: 'bulwark', hp: 4 },
             ],
             doors: [
                 { to: 'monolith', side: 'S', at: 0, type: 'locked' },

@@ -236,6 +236,10 @@ export const BEAT09_DEF = {
                 { x: 3, z: -3, kind: 'sentinel', hp: 4, ai: 'ranged' },
                 { x: 0, z: 3, kind: 'scarab', hp: 5, ai: 'charge' },
                 { x: -4, z: 4, kind: 'censer', hp: 3 },
+                // Encounter shape: this was the beat's biggest fight at 4;
+                // the campaign target is 5 by here. Placed at the same radius
+                // from the room centre as a spawn already proven walkable.
+                { x: 3, z: -3, kind: 'mote', hp: 5, ai: 'chase' },
             ],
             platforms(map, h) {
                 for (let lvl = 1; lvl <= 4; lvl++) {
