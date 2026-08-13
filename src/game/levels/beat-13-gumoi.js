@@ -10,6 +10,7 @@
 //                        [towergate]     start; S exit → overworld
 
 import { createDungeon } from '../world/room-graph.js';
+import { GearSystem } from '../world/gear-system.js';
 import { addKeyPickup } from '../world/keys.js';
 import { CRUST_COLORS, ABYSS_COLORS } from '../assets/palettes.js';
 import { GumoiWitness, attachBoss } from '../bosses/index.js';
@@ -143,7 +144,23 @@ export const BEAT13_DEF = {
                 spiral(map, h, 4, 2, 3, ABYSS_COLORS.violet);
             },
             doors: [{ to: 'towerfoot', side: 'W', at: 0, type: 'open' }],
-            onBake(level, origin) {
+            onBake(level, origin, ctx) {
+                // SYSTEM REPRISE. The gears are beat 02's mechanic, returning
+                // eleven dungeons later asking a different question. There they
+                // were a timing puzzle you stood still and read; here a single
+                // faster gear sits between the two spirals, so it is an obstacle
+                // you cross while climbing rather than a lock you solve.
+                //
+                // A mechanic a player meets once is a curiosity; one that
+                // returns, changed, is a language. `gear-system.js` was built,
+                // tested and used exactly once — this is the second use.
+                const gears = level.addSystem(new GearSystem(ctx.collisionWorld, ctx.scene));
+                gears.addGear({
+                    x: origin.x, z: origin.z - 1,
+                    radius: 2.0,
+                    speed: 0.9,      // beat 02's fastest is 0.7 — this one hurries
+                    id: 'b13-stair-gear',
+                });
                 level.addPickup({ x: origin.x - 4, y: 5.4, z: origin.z - 4 }, {
                     color: 0x7fe0ff,
                     label: 'Stair cache',

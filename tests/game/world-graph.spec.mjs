@@ -241,7 +241,15 @@ export function run(t) {
                 const picked = [];
                 const stubLevel = {
                     addPickup(pos, data) { picked.push(data || {}); return {}; },
-                    addSystem() {},
+                    // The real `addSystem` RETURNS the system (room-graph.js
+                    // line ~1722) and level files rely on that:
+                    //   const gears = level.addSystem(new GearSystem(...));
+                    //   gears.addGear(...)
+                    // A stub returning undefined makes every such level throw
+                    // here for a reason that has nothing to do with the level.
+                    // A test double that does not match the contract it doubles
+                    // fails the wrong things.
+                    addSystem(sys) { return sys; },
                     addVoxelQuery() { return () => {}; },
                     destructibles: [],
                     keyStore: {
