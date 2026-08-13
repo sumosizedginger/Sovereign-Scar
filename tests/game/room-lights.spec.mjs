@@ -20,6 +20,8 @@ import {
     MOTIFS, FIXTURE_EMISSIVE, fixtureCount, buildRoomLights, disposeRoomLights,
 } from '../../src/game/world/room-lights.js';
 import { KITS } from '../../src/game/levels/dungeon-kits.js';
+import { BEAT_LIST } from './_beat-defs.mjs';
+import { shapeBossArena } from '../../src/game/world/kit-props.js';
 import { LocalLightPool, selectActive } from '../../src/game/fx/local-light-pool.js';
 
 /** A pool with no GL behind it — the selection logic is pure. */
@@ -166,5 +168,34 @@ export function run(t) {
         t.ok('a boss glow outranks room fixtures for a pooled slot',
             picked.includes(bossSrc) && picked.includes(roomSrc),
             `picked ${picked.length}`);
+    }
+
+    // ── Boss arenas must not be ordinary rooms ─────────────────────────────
+    // `HOW-TO-CLOSE-THE-GAP.md` item 9 said the arena-shaping channel was
+    // "barely used". Measured, that was wrong twice over: all fourteen kits
+    // declare a `bossRule`, every boss room clears the `half >= 8` guard, and
+    // every one places voxels. What WAS true is that the placement was wildly
+    // uneven — `colonnade` put SIX single cells into a room 26 across while
+    // other rules placed up to 272, so the two dungeons using it were the only
+    // arenas a player could not tell from an ordinary room.
+    //
+    // A rule that is declared, reached, and then places nothing worth seeing is
+    // the same failure as one that is never called; only the symptom differs.
+    {
+        const thin = [];
+        for (const def of BEAT_LIST) {
+            const kit = KITS[def.id];
+            let room = null;
+            for (const r of Object.values(def.rooms || {})) {
+                if (typeof r.boss === 'function') room = r;
+            }
+            if (!room) continue;
+            const placed = shapeBossArena(new Map(), kit, room, 0x808080);
+            t.ok(`${def.id}: the boss arena is shaped at all`, placed > 0,
+                `${kit?.bossRule} placed ${placed}`);
+            if (placed < 16) thin.push(`${def.id} ${kit?.bossRule}=${placed}`);
+        }
+        t.ok('no boss arena is shaped so thinly it reads as an ordinary room',
+            thin.length === 0, thin.join(', ') || 'none under 16 voxels');
     }
 }

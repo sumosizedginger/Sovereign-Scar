@@ -409,8 +409,23 @@ export function shapeBossArena(pmap, kit, room, color) {
             for (let z = -r + 1; z <= r - 1; z++) { put(-r, z, h); put(r, z, h); }
         }
     } else if (rule === 'colonnade') {
-        for (let i = -1; i <= 1; i++) {
-            put(-5, i * 4, 2); put(5, i * 4, 2);
+        // Measured (tests/qa, arena census): this placed SIX single cells in a
+        // room 26 across — every other rule places 16 to 272 — so the Bone
+        // Cathedral and the Index Court were the only two boss arenas a player
+        // could not tell from an ordinary room. A colonnade is a row of columns;
+        // three lonely cells a side is a rounding error.
+        //
+        // Paired 2-wide columns marching down the long axis, spaced by room
+        // size so a bigger hall gets a longer nave rather than the same six
+        // stubs. Height 2, not 3: `platform-reachability` caught 3-tall columns
+        // stranding nine cells above the player's step height in the Index
+        // Court. Every other rule here tops out at 2 for the same reason.
+        const cx = Math.max(4, half - 5);
+        const step = Math.max(3, Math.floor(half / 3));
+        for (let i = -2; i <= 2; i++) {
+            const z = i * step;
+            if (Math.abs(z) > half - 3) continue;
+            for (const sx of [-cx, cx]) { put(sx, z, 2); put(sx + 1, z, 2); }
         }
     } else if (rule === 'ring') {
         const r = Math.max(4, Math.floor(half * 0.55));

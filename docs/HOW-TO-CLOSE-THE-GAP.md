@@ -375,18 +375,45 @@ because a backwards swing shipped green.
 
 ---
 
-## 9. Boss arenas are the same room as everything else (days per boss)
+## 9. ~~Boss arenas are the same room as everything else~~ — the premise was wrong
 
-`world/kit-props.js` already exports `ARENA_RULES` and `shapeBossArena` — the
-channel exists and is barely used.
+**Measured, and this section was wrong twice.** It said `ARENA_RULES` and
+`shapeBossArena` were "barely used". In fact **all fourteen** kits declare a
+`bossRule`, every boss room clears the `half >= 8` guard, and every one places
+voxels. The channel was fully wired.
 
-*Method:* one boss at a time. Give the arena a feature the fight uses — pillars
-the Arachnid can web between, vents the Wyrm surfaces from, a raised rim the
-ranged boss retreats to. **The arena should make one of the boss's existing
-moves better, not add a move.**
+What WAS true is that the placement was wildly uneven:
 
-*Gate:* `boss-bodies.spec.mjs` and the arena-shaping spec exist; assert each
-boss room differs structurally from its dungeon's ordinary rooms.
+```
+stepped_pit   272      basin_low      80      sunken_dais  64
+sunken_shelf   88      plaza          42      open_platform 38
+mirrored_hall  34      flooded_channel 34     vent_ring    24
+folded_core    24      central_machine 16     ice_atrium   16
+rib_cathedral   6  <-- index_court     6  <--
+```
+
+`colonnade` put **six single cells** into a room 26 units across, so the Bone
+Cathedral and the Index Court were the only two boss arenas a player could not
+tell from an ordinary room. A rule that is declared, reached, and then places
+nothing worth seeing fails exactly like one that is never called; only the
+symptom differs.
+
+Rebuilt as paired 2-wide columns marching down the long axis, spaced by room
+size so a bigger hall gets a longer nave: both now place 20.
+
+**Height 2, not 3 — and the suite is why.** The first version used 3-voxel
+columns and `platform-reachability` immediately flagged nine cells stranded
+above the player's step height in the Index Court. Every other rule here tops
+out at 2 for that reason.
+
+`room-lights.spec.mjs` now gates it: every boss arena is shaped, and none is
+shaped so thinly it reads as an ordinary room.
+
+**Still open, and it is the interesting half:** this section also asks that the
+arena *make one of the boss's existing moves better* — pillars the Arachnid webs
+between, vents the Wyrm surfaces from. That is per-boss design work and none of
+it is done; what is fixed here is that all fourteen arenas are now visibly
+arenas.
 
 ---
 
