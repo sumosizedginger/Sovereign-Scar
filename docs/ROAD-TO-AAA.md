@@ -186,6 +186,20 @@ difficulty curve rises through *statistics* (HP, damage) rather than through
 *Cost:* days, and it is authoring, not engineering. The encounter director,
 the elites and the arena seals are all already built.
 
+> **Superseded — the numbers above are the 2026-08-11 reading, kept because the
+> argument still holds.** The curve and the ceiling were both raised on
+> 2026-08-12: **153 enemies across 108 rooms**, peaks running
+> `3 3 3 4 4 4 5 5 5 6 6 6 6 7` instead of three distinct values. See
+> `HOW-TO-CLOSE-THE-GAP.md` §5 for the working.
+>
+> **And this section asked the wrong question first.** Every number in it is
+> about how BIG a fight is; none of them asks whether any fight is *mandatory*.
+> Two dungeons — 04 Sky Monument and 12 Pyre Peak — had no sealed room at all,
+> so nothing in them ever had to be fought, and the owner walked from the start
+> of dungeon 4 to its boss without killing anything. Fixed 2026-08-13; **28
+> sealed arenas, 0 dungeons without a mandatory fight**. §5b of the gap doc has
+> the detail, including the softlock the first attempt would have shipped.
+
 ### 6. ~~A third of the bestiary runs at a third of its depth~~ — DONE, and the fix in this section was wrong
 
 **Do not do what this section originally said.** It read:

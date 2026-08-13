@@ -64,6 +64,21 @@ not by the suite: the one recorded playthrough turned three reported symptoms
 into nine defects, two of them hard softlocks, over a suite that was 4343 green
 at the time. Treat any claim of the form "the tests pass" accordingly.
 
+> **2026-08-13 makes the point again, harder.** A single session of the owner
+> actually playing 04 Sky Monument produced five defects, **none of which any
+> assertion could see**, over a suite that was green throughout:
+>
+> - a boss two rooms away audible at full volume, from world z −256
+> - blocking a mote — the documented correct answer — playing the *wound* sound
+> - the grapple picking the peg you were standing beside over the one across the gap
+> - one `Enter` both closing the pause menu and eating a line of dialogue
+> - **two dungeons in which no fight was mandatory at all**, walkable start to boss
+>
+> Four of the five were reported in the owner's own words before anyone looked at
+> code, and in two cases my first diagnosis from reading the source was WRONG and
+> was killed by their next sentence. The suite's role here was real but secondary:
+> it caught the softlock my fix for the last one would have shipped.
+
 **4.2 Suite size is not coverage, and this repo has the receipt.** When twenty
 shipped fixes were each reverted one at a time, **six could be deleted with
 4426 assertions still green.** That audit is HANDOFF trap 23 and it is the

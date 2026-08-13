@@ -172,7 +172,13 @@ export const BEAT12_DEF = {
             },
             enemies: [
                 { x: -4, z: 4, kind: 'lancer', ai: 'chase', hp: 4 },
-                { x: 4, z: 4, kind: 'mote', hp: 5 },
+                // Carries `lunge` because the two motes that used to hold it were
+                // in `ashgallery`, and that room is now sealed — a sealed room
+                // may not contain a hovering enemy. `elites.spec` pins that
+                // every kind x AI cell is authored SOMEWHERE, and caught the
+                // deletion the moment the swap landed: mote/lunge existed
+                // nowhere else in fourteen dungeons.
+                { x: 4, z: 4, kind: 'mote', hp: 5, ai: 'lunge' },
                 // WEAVER, and the Pyre is where the floor is already the enemy.
                 // NOT (0,-5): `build()` stamps a magma vent on that exact cell.
                 // And not (-6,-4) either — dodging the vent put it 8.2 from the
@@ -223,6 +229,18 @@ export const BEAT12_DEF = {
             },
         },
         ashgallery: {
+            // Sealed: the doors hold until this room is clear.
+            //
+            // 04 Sky Monument and 12 Pyre Peak were the only two dungeons in the
+            // campaign with NO sealed room at all - 26 arenas across the other
+            // twelve, 0 here. Found by playing: "I ran all the way from the start
+            // of dungeon 4 to the boss, didn't kill anything, collected keys and
+            // continued."
+            //
+            // The boss-key room is the one worth making mandatory: you cannot
+            // reach the boss without the key, so this is the fight the dungeon
+            // now actually asks for.
+            seal: true,
             grid: [0, -3],
             half: 8,
             wallH: 4,
@@ -231,14 +249,19 @@ export const BEAT12_DEF = {
             },
             enemies: [
                 { x: -3, z: -3, kind: 'lancer', hp: 5 },
-                { x: 3, z: -3, kind: 'mote', ai: 'lunge', hp: 4 },
+                // Was a `mote` — see the note in 04 Sky Monument's galleria.
+                // A bulwark rather than another lancer, because it puts
+                // armour beside the censer below it: the "a room with a live
+                // censer cannot be ground down" puzzle needs something
+                // armoured to be posed against at all.
+                { x: 3, z: -3, kind: 'bulwark', hp: 4 },
                 { x: 0, z: 3, kind: 'lancer', hp: 5 },
                 { x: 4, z: -4, kind: 'censer', hp: 4 },
                 // Encounter shape: this was the beat's biggest fight at 4;
                 // the campaign target is 6 by here. Placed at the same radius
                 // from the room centre as a spawn already proven walkable.
                 { x: 3, z: -3, kind: 'lancer', hp: 5 },
-                { x: 3, z: 3, kind: 'mote', hp: 4, ai: 'lunge' },
+                { x: 3, z: 3, kind: 'lancer', hp: 4, ai: 'lunge' },
             ],
             doors: [
                 { to: 'ventfield', side: 'S', at: 0, type: 'locked' },

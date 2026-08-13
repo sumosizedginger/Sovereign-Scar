@@ -203,12 +203,32 @@ export const BEAT04_DEF = {
             },
         },
         galleria: {
+            // Sealed: the doors hold until this room is clear.
+            //
+            // 04 Sky Monument and 12 Pyre Peak were the only two dungeons in the
+            // campaign with NO sealed room at all - 26 arenas across the other
+            // twelve, 0 here. Found by playing: "I ran all the way from the start
+            // of dungeon 4 to the boss, didn't kill anything, collected keys and
+            // continued."
+            //
+            // The boss-key room is the one worth making mandatory: you cannot
+            // reach the boss without the key, so this is the fight the dungeon
+            // now actually asks for.
+            seal: true,
             grid: [0, -3],
             half: 8,
             wallH: 5,
             enemies: [
                 { x: -3, z: -3, kind: 'frost', hp: 3, ai: 'drift' },
-                { x: 3, z: -3, kind: 'mote', hp: 3 },
+                // Was a `mote`. A mote hovers above every melee gate, and
+                // `room-seal.spec` forbids one in a sealed room because a
+                // player with no ranged weapon cannot clear the room and is
+                // locked in it. This is the boss-key room and it is the only
+                // fight in the dungeon worth making mandatory, so the mote
+                // gives way rather than the seal. Swapped IN PLACE, not
+                // moved: `threat-curve.spec` pins the beat's peak concurrent
+                // enemies, and relocating one would shrink it.
+                { x: 3, z: -3, kind: 'sentinel', hp: 3 },
                 { x: 0, z: 3, kind: 'sentinel', hp: 3, ai: 'charge' },
                 // Encounter shape: this was the beat's biggest fight at 3;
                 // the campaign target is 4 by here. Placed at the same radius

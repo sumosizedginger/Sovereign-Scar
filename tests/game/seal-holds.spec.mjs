@@ -191,8 +191,18 @@ export function run(t) {
 
     // Coverage. A sweep that drives nothing reports clean, and this project has
     // shipped one that drove 0 of 188 doors.
-    t.ok('the sweep actually drove every sealed room', roomsDriven === 26,
-        `${roomsDriven} rooms, ${doorsDriven} doors`);
+    // Counted from the defs, not written down. A literal here has to be
+    // hand-edited whenever the campaign gains a sealed room, and the tempting
+    // edit is to change it to whatever just ran — which turns a coverage guard
+    // into a rubber stamp. Derived, it still fails loudly if the sweep skips a
+    // room, and needs no maintenance when one is authored.
+    const expectedSealed = BEAT_LIST.reduce(
+        (n, d) => n + Object.values(d.rooms || {}).filter((r) => r && r.seal === true).length,
+        0,
+    );
+    t.ok('the campaign has sealed rooms to drive', expectedSealed > 0, `${expectedSealed}`);
+    t.ok('the sweep actually drove every sealed room', roomsDriven === expectedSealed,
+        `${roomsDriven} of ${expectedSealed} rooms, ${doorsDriven} doors`);
     t.ok('and every door in them', doorsDriven >= 60, `${doorsDriven} doors`);
     t.ok('worst case is inside the doorway, not past it', worstOvershoot <= 0.01,
         `worst ${worstOvershoot.toFixed(3)} at ${worstWhere}`);

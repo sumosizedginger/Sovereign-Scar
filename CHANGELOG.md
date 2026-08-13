@@ -5,6 +5,97 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Two dungeons never asked you to fight anything
+
+Found by playing: *"you can literally run through grab keys and skip areas, I ran
+all the way from the start of dungeon 4 to the boss, didn't kill anything,
+collected keys and continued."*
+
+A sealed room is the only thing in this game that makes an encounter mandatory.
+**04 Sky Monument and 12 Pyre Peak had none** — 26 arenas across the other
+twelve dungeons, 0 in those two, and 0 of 3 keys behind a fight in each.
+
+Sealing the three key rooms — the pattern beats 02, 06, 07, 08, 10 and 11 all
+follow — **failed six rooms at once** on `room-seal.spec`'s *"nothing that lives
+out of melee reach"*: every key room in both dungeons holds a mote, motes hover
+above every melee gate, and a player without a ranged weapon would have been
+locked in a room they could not clear. The mote-free rooms then failed two more
+rules (a seal needs more than one door and more than one enemy). No room in
+either dungeon was legally sealable as authored.
+
+So one mote per dungeon was swapped **in place** — not moved, because
+`threat-curve.spec` pins peak concurrent enemies per beat — and the **boss-key
+room** sealed, since the boss cannot be reached without that key.
+`12 ashgallery`'s replacement is a **bulwark**, which puts armour beside that
+room's censer: the pairing the censer's puzzle needs to be posed against at all.
+
+**28 sealed arenas, 0 dungeons with no mandatory fight, 26 of 40 keys behind
+one.** Two further gates fired on the way: `elites.spec` caught that the swapped
+motes were the campaign's only `mote/lunge` (rehomed to `12 ventfield`), and
+`seal-holds.spec`'s hardcoded `roomsDriven === 26` now derives its expected count
+from the defs, so a new seal cannot quietly turn a coverage guard into a rubber
+stamp.
+
+### The grapple grabbed the peg you were standing beside
+
+*"standing next to the gold pillar in the wall and hitting G locks onto the gold
+pillar in the wall, not the one across the gap."*
+
+Peg choice only asked which peg you were aimed most squarely at. Both pegs in
+windworks sit on one axis, so both scored 1.0, and `dot >= bestDot` handed the
+tie to whichever came **last in the array** — on the return trip, the one you are
+standing beside. A peg must now be **across the chasm** to be a destination
+(`segmentCrossesRect`, an exact slab clip), which is symmetric and needs no
+tuned constant; ties break on distance rather than array order.
+
+**Still open:** the return pull now aims correctly and is then cancelled by the
+collision sweep one frame in, so the crossing back is not yet possible.
+
+### A boss two rooms away was audible at full volume
+
+*"it's like a sound of being hit, doot doot doot even while standing still …
+nothing giving any sign of what is causing me harm."* There was no sign because
+nothing was there: the beat-04 boss bounces around its arena and plays the metal
+guard-clang off every wall, from world z −256, while the player stood at z +4.5.
+
+`attachBoss` already computed `awake` and then updated the boss anyway with a
+`null` player — so a dormant boss kept moving and kept making noise, and only its
+targeting went blind. Dormant bosses now tick inside a `silenced()` mixer scope.
+Distance could not have fixed it: `MIN_DISTANCE_GAIN` is 0.35.
+
+### Blocking a mote correctly played the sound of being wounded
+
+The mote's burst played `hurt` whatever `damage()` answered — including when the
+hit was blocked, parried, absorbed by i-frames, or refused by god mode. Blocking
+a mote is the documented right answer, so the reward for reading one correctly
+was the wound sound every 2.65 seconds. Now: landed → `hurt`, blocked →
+`block`, parried → the guard's own parry ring, refused → silence. Fall damage
+had the same defect and is fixed with it.
+
+### The first frame of the game showed its own name three times
+
+`#boot` (still saying "loading…"), a HUD toast, and the title screen, stacked —
+the toast drawn straight through the `Credits` row. The toast is deleted, the
+splash now fades on a real first-frame signal instead of a 900ms guess, and the
+rule under both: **transient chrome does not paint over an open menu.**
+
+That rule surfaced a larger bug. `MenuOverlay` and `Input` bind separate keydown
+listeners, so **one Enter against the pause menu both closed it and ate a line of
+dialogue**. `[` / `]` warped dungeons and `M` fired mirror travel from behind an
+open menu; on a pad, `A` was attack *and* the menu's confirm. Gated at the latch
+in `input.js`, draining on both edges — a guard placed at the read sites did
+nothing, because the menu closes synchronously inside its own listener.
+
+### The title screen had painted out the scene behind it
+
+One flat wash served the title and the pause menu, and the title's backdrop
+metered at mean L\* 12.3 — the "rendered scene" was painted out and the hero sat
+behind the wordmark. The title now takes a vignette (p99 15.3 → 29.9, mean
+unchanged); pause takes a heavier flat scrim, because its backdrop peaks at
+L\* 85.6 against a p99 of 21 and a gradient would leave the bright corner exactly
+where it was.
+
+
 ### Every lamp in the game was a painted rectangle
 
 **Measured first, and the measurement rewrote the plan.**

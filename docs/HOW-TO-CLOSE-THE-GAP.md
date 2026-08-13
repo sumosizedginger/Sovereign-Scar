@@ -375,6 +375,61 @@ know the rule existed.
 assertion that peak concurrent enemies is monotonically non-decreasing across
 the fourteen beats. It will fail today, which is the point.
 
+### 5b. Two dungeons asked for no fight at all — fixed 2026-08-13
+
+Every number above is about how BIG the fights are. None of them asks the prior
+question: **is any fight mandatory?** Found by playing, not by measuring:
+
+> *"you can literally run through grab keys and skip areas, I ran all the way
+> from the start of dungeon 4 to the boss, didn't kill anything, collected keys
+> and continued."*
+
+Counted from the defs — `tests/qa/_seal-census.mjs`, and note that `grep seal`
+gives the wrong answer, because several levels carry three copies of the comment
+*explaining* sealing and would inflate the count by exactly the number of sealed
+rooms:
+
+```
+                    sealed rooms   keys behind a fight
+the other twelve       26              mostly 2/3 or 3/3
+04 Sky Monument         0              0 / 3
+12 Pyre Peak            0              0 / 3
+```
+
+A sealed room is the only thing that makes an encounter mandatory. Those two
+dungeons had none, so nothing in them ever had to be fought.
+
+**The obvious fix was a softlock and the suite caught it.** Sealing the three key
+rooms — which is what beats 02, 06, 07, 08, 10 and 11 all do — failed six rooms
+at once on `room-seal.spec`'s *"nothing that lives out of melee reach"*. Every
+key room in both dungeons holds a **mote**, motes hover above every melee gate,
+and a player with no ranged weapon would have been locked in a room they could
+not clear. The mote-free rooms then failed two further rules: a sealed room needs
+more than one door and more than one enemy.
+
+**Not one room in either dungeon was legally sealable as authored** — and the
+good candidates all failed on exactly one thing, the mote. So one mote per
+dungeon was swapped IN PLACE (not moved — `threat-curve` pins peak concurrent
+enemies per beat and relocating one would shrink it) and the boss-key room
+sealed, since you cannot reach the boss without that key:
+
+- `04 galleria`: mote → sentinel, `seal: true`
+- `12 ashgallery`: mote → **bulwark**, second mote → lancer, `seal: true`
+
+The bulwark is deliberate: it puts armour beside that room's censer, which is the
+pairing §6 says the censer's puzzle needs to be posed against at all.
+
+Result: **28 sealed arenas, 0 dungeons with no mandatory fight, 26 of 40 keys
+behind one.**
+
+*Two more gates earned their keep on the way through.* `elites.spec` failed with
+`missing: mote/lunge` — the two motes swapped out were the only place in
+fourteen dungeons that behaviour was authored; it now lives on `12 ventfield`.
+And `seal-holds.spec` asserted `roomsDriven === 26` as a literal, which any new
+seal breaks and which invites being "fixed" to whatever just ran; it now derives
+the expected count from the defs, so it stays a coverage guard instead of a
+rubber stamp.
+
 ---
 
 ## 6. ~~A third of the bestiary runs at a third of its depth~~ (DONE 2026-08-12)

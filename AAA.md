@@ -91,7 +91,7 @@ and that is the good news buried in a harsh report.
 | A full played session, boot → overworld → dungeon → combat → menus | **0 page errors, 0 console errors** |
 | Frame rate on a real GPU (RTX 3060 Ti, 1280×720) | **locked 60 fps**, p99 **16.9 ms** — vsync-capped, never missed a frame |
 | Draw calls / triangles | **46–49 calls, 37k–61k triangles** |
-| Content authored | 14 dungeons · 99 rooms · 49 overworld screens · 26 sealed arenas · 125 enemies · 42 puzzle beats · 21 item locks · 37 of 42 enemy-behaviour combinations · ~35 committed boss attacks |
+| Content authored | 14 dungeons · **108 rooms** · 49 overworld screens · **28 sealed arenas** · **153 enemies** · 42 puzzle beats · 21 item locks · 37 of 42 enemy-behaviour combinations · ~35 committed boss attacks |
 | Codebase | ~38,600 lines of game source across ~300 files, no build step, no bundler |
 
 Read that frame-rate line again, because it changes everything that follows.
