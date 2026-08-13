@@ -302,7 +302,28 @@ export class HUD {
             this.cardEl]) {
             el.style.visibility = vis;
         }
-        if (this.story?.el) this.story.el.style.visibility = vis;
+        this._applyStoryVisibility();
+    }
+
+    /**
+     * The dialogue panel hides behind a menu, and comes back after it.
+     *
+     * Two owners want to hide this element — the dev capture key and an open
+     * menu — so neither may write `visibility` directly, or whichever ran last
+     * decides and the other silently loses. Photographed before this existed:
+     * the pause menu drawn over a live conversation, with the panel below it
+     * reading "Enter / click — next" while Enter belonged to the menu. The
+     * prompt was telling the player to press a key that would do something
+     * else, which is worse than the panel simply stepping aside.
+     *
+     * Unlike a toast, this is NOT dropped. A toast is a notification about a
+     * moment and replaying it later is a ghost; a conversation is something the
+     * player is in the middle of, and it is still theirs when they resume.
+     */
+    _applyStoryVisibility() {
+        if (!this.story?.el) return;
+        this.story.el.style.visibility = (this._devHidden || this._menuOpen)
+            ? 'hidden' : 'visible';
     }
 
     /**
@@ -378,6 +399,7 @@ export class HUD {
             this._toastMsg = null;
             this._toastShownAt = -1e9;
         }
+        this._applyStoryVisibility();
     }
 
     toast(msg, ms = 2200) {

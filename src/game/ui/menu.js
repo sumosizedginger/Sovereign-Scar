@@ -14,6 +14,34 @@ import { controlSheet, padSheet } from '../input.js';
 
 const PANEL_BG = 'rgba(8,10,18,0.92)';
 const BORDER = '1px solid #3a4058';
+
+/**
+ * The two screens want opposite things from the world behind them.
+ *
+ * MEASURED, before this existed: one flat `rgba(4,6,12,0.72)` wash served both,
+ * and the title screen's backdrop metered at mean L* 12.3 with a p99 of 15.3.
+ * That is a near-black rectangle. The report's complaint that the title is
+ * "text on a rendered scene" was generous — the scene was not really there, it
+ * had been painted out, and the only subject in the frame (the hero, ~30px)
+ * sat dead centre directly behind the 44px wordmark.
+ *
+ * TITLE: a vignette, not a wash. Clear through the middle so the world is
+ * actually visible, crushed at the edges so the wordmark at the top and the
+ * rows below it both sit on solid ground. The band is off-centre — pulled up —
+ * because the menu occupies the lower half and text over busy geometry is the
+ * failure this is avoiding.
+ *
+ * PAUSE: the opposite job. Section 4 of the gap doc asks for the scene to be
+ * DIMMED rather than boxed over, and the measurement says why that is not free
+ * here: the backdrop behind a pause menu in the Crypt peaks at L* 85.6 while
+ * its p99 is 21 — one percent of the frame is far brighter than the rest, and a
+ * uniform wash that leaves an 85 highlight beside the text has not dimmed
+ * anything a reader notices. So this one is heavier than the title's and stays
+ * flat: a gradient here would leave the bright corner exactly where it was.
+ */
+const SCRIM_TITLE = 'radial-gradient(ellipse 78% 62% at 50% 42%, '
+    + 'rgba(4,6,12,0.30) 0%, rgba(4,6,12,0.74) 55%, rgba(2,3,7,0.94) 100%)';
+const SCRIM_PAUSE = 'rgba(4,6,12,0.78)';
 const GOLD = '#ffd060';
 const DIM = '#5a647a';
 const TEXT = '#d8e4f0';
@@ -257,7 +285,10 @@ export class MenuOverlay {
             alignItems: 'center',
             justifyContent: 'center',
             flexDirection: 'column',
-            background: 'rgba(4,6,12,0.72)',
+            // Set per-mode in `render` — the title screen wants the world to
+            // show through and the pause screen wants it pushed back. See
+            // SCRIM_TITLE / SCRIM_PAUSE.
+            background: SCRIM_PAUSE,
             // The same stack the player HUD uses. Monospace was the last thing
             // making this screen read as a developer tool: a fixed-width face
             // says "terminal" before a single word has been read, and it is the
@@ -358,6 +389,10 @@ export class MenuOverlay {
         if (!this.isOpen) return;
         const view = this.state.view();
         const isTitle = this.mode === 'title' && this.state.screenName === 'title';
+        // Only the title ROOT gets the vignette. A submenu opened from the
+        // title (Settings, Controls) is a panel being read, and wants the same
+        // quiet backdrop the pause menu's panels get.
+        this.el.style.background = isTitle ? SCRIM_TITLE : SCRIM_PAUSE;
 
         const rows = view.items.map((it, i) => {
             const selected = i === this.state.sel;

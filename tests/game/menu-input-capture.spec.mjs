@@ -202,6 +202,20 @@ export function run(t) {
         t.ok('opening a menu hides whatever toast is already on screen',
             /setMenuOpen\([\s\S]{0,600}?toastEl\.style\.opacity = '0'/.test(hudSrc),
             'a toast raised before the menu opened must not survive it');
+
+        // The dialogue panel too — and for a sharper reason than tidiness.
+        // Photographed: the pause menu over a live conversation, the panel
+        // below it reading "Enter / click — next" while Enter belonged to the
+        // menu. Once the capture above exists, that prompt is a lie.
+        t.ok('the dialogue panel is hidden behind a menu as well',
+            /_applyStoryVisibility\(\)[\s\S]{0,400}?this\._devHidden \|\| this\._menuOpen/.test(hudSrc),
+            'story.el visibility answers to both owners');
+        t.ok('…and neither owner writes story visibility directly',
+            (hudSrc.match(/story\.el\.style\.visibility/g) || []).length === 1,
+            'two writers means whichever ran last wins and the other loses silently');
+        t.ok('both owners go through the one place',
+            (hudSrc.match(/this\._applyStoryVisibility\(\)/g) || []).length === 2,
+            'setHidden and setMenuOpen');
     }
 
     // ── 9. The menu state machine is unchanged by any of this ───────────────
