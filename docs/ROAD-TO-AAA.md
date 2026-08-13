@@ -149,6 +149,21 @@ single frame.
 *Cost:* days. Same information-design job the HUD just had, and the pattern
 now exists to copy.
 
+> **Mostly closed 2026-08-13 — see `HOW-TO-CLOSE-THE-GAP.md` §4 for the detail
+> and the numbers.** The monospace went earlier. The rest went in two commits,
+> after photographing every screen: the first frame was showing the game's name
+> on **three** stacked layers, one of them a toast drawn through the last menu
+> row. Fixing the rule under it (transient chrome must not paint over a menu)
+> surfaced a bigger bug — a single Enter against the pause menu both closed it
+> and ate a line of dialogue, because `MenuOverlay` and `Input` bind separate
+> keydown listeners. Gated by `menu-input-capture.spec.mjs`.
+>
+> **Still open, and still the biggest item:** one piece of key art, and a
+> composed title camera. The title screen currently orbits the player with the
+> gameplay rig, so its only subject sits behind the wordmark. Those are art and
+> camera jobs, not information design — which is why this section, written
+> about information design, did not name them.
+
 ---
 
 # TIER 2 — the first hour

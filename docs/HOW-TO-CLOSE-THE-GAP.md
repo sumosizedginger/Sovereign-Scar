@@ -258,6 +258,65 @@ from `ui/hud.js`.
 *Gate:* extend `hud-player.spec.mjs`'s dev-string check to the menu screens —
 it already knows how to assert "this vocabulary never reaches a player".
 
+### Done 2026-08-13 — and the section missed the worst of it
+
+**1, 2 and 4 are done. 3 is not, and is still the biggest single item here.**
+
+Nothing in the suite can look at a menu, so `tests/qa/menu-captures.mjs` was
+written first and photographed all eight screens plus the untouched boot frame.
+**The first picture found something this section had not thought to look for.**
+
+At t=1.5s, no input, **three layers were drawing the game's own name at once**:
+
+```
+boot     z=5   [0,0 1280x720]     ...and still saying "loading..."
+div      z=25  [479,497 323x37]   a HUD toast
+ss-menu  z=40  [0,0 1280x720]     the title screen itself
+```
+
+The toast is a bordered box drawn through the last menu row, so on the literal
+first frame `Credits` was illegible under a duplicate of the title. Fixed three
+ways — the toast deleted, the splash re-pointed off a 900ms guess and onto an
+`ss:first-frame` event, and **the rule under both**: `toast()` has 35 call sites
+that know nothing about menus, so `HUD.setMenuOpen` suppresses the layer. The
+previous attempt at this had *moved* the box from `bottom: 48px` to `186px` to
+dodge the story panel, which traded one collision for another.
+
+**The same rule found a bug worth more than the picture.** `MenuOverlay` and
+`Input` bind separate `window` keydown listeners, so one Enter against an open
+pause menu both closed it *and* advanced the conversation behind it — a line
+spent unread. `[` / `]` reach `loadLevel`, `M` reaches Mirror travel, and on a
+pad `A` is attack *and* the menu's Enter. The gate is now in `input.js` at latch
+time; putting it at the four read sites in the frame loop did nothing, because
+the menu closes synchronously inside its own listener. Pinned by
+`menu-input-capture.spec.mjs` (45 assertions, both directions, five break modes
+proven), plus a vocabulary scan over all eight screens in `menu.spec.mjs`.
+
+**1 (inventory)** — clean. Dev levels were already filtered on an explicit flag,
+and the scan now proves no screen shows an internal id, a dev label, or an
+`undefined`. Worth a second look by a person: Altar Travel lists beats as
+`01 Crypt Breach`, `04 Sky Monument` — the numeric prefix is chapter numbering
+or a build artefact depending on who is reading it. Left alone; that is an
+authoring call, not a bug.
+
+**4 (pause)** — done, and **the measurement changed the instruction.** "Dim the
+scene rather than drawing a box" is right, but the backdrop behind a pause menu
+in the Crypt peaks at **L\* 85.6 while its p99 is 21** — one percent of the frame
+is far brighter than the rest, so a gradient would leave the bright corner
+exactly where it was. Pause takes a heavier *flat* scrim (0.72 → 0.78, p99
+21 → 16.8); the title takes the vignette.
+
+**3 (one image)** — **still open, and still the biggest item on this list.** The
+title's backdrop metered at mean L\* 12.3, p99 15.3: the "rendered scene" had
+been painted out by the shared wash, and the hero sat behind the wordmark. A
+vignette now lets the world through (p99 15.3 → **29.9**, mean unchanged), which
+is composition, **not art**. Two things remain and neither is CSS:
+
+- **Key art.** Genuinely the Blender job this section names. Nothing was made.
+- **A composed camera.** The title orbits the player at radius 5 with the
+  gameplay rig, so the only subject in the frame sits dead centre *behind* the
+  44px title. Framing the hero off-centre needs the camera, not the scrim.
+
 ---
 
 ## 5. Fights are small and the same size every time (curve fixed 2026-08-12; ceiling still low)
