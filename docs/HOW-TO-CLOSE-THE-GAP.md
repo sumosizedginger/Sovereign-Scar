@@ -142,29 +142,41 @@ written cannot be started.
    region already sits 4 under its ceiling, so a wave with any DC offset would
    start failing screens for being alive. All 44 luminance gates still pass.
 3. **Idle animation on props.** ~~Banners, chains and vents get a 2-second
-   sway.~~ **Re-diagnosed twice, and the real blocker is neither of the first
-   two answers.**
+   sway.~~ **Diagnosed three times today, each one wrong until the last. The
+   earlier two are left here because the sequence is the useful part.**
 
-   First reading: "those props do not exist" — because the only NAMED objects in
-   a baked room are `contact-shadow`, `room-lights` and `void-plane`. That was a
-   fact about names, not about objects.
+   *First:* "those props do not exist" — from the ambient-motion probe finding
+   that the only NAMED objects in a baked room are `contact-shadow`,
+   `room-lights` and `void-plane`. That was a fact about names, not objects.
 
-   Second reading, from the source: every prop that goes through
-   `meshAndCollide()` **does** get its own `THREE.Mesh`. They are anonymous, not
-   absent. So a prop is animatable in principle.
+   *Second:* "props get their own mesh, but `meshAndCollide` also registers
+   their collision columns, so animating one desyncs it from its own solid."
+   True of the things that call `meshAndCollide` directly — but those are
+   **blockers, gates and bridges**, i.e. functional geometry, not decoration.
 
-   **The actual blocker:** that same call also registers the prop's **collision
-   columns** into the world. Move the mesh and the solid stays behind — a
-   swaying banner you can still walk into, or a vent whose collider has drifted
-   off it. Sway is therefore only safe for props that register no collision, or
-   for a purely decorative child mesh split off from the colliding body.
+   *Correct:* decorative props are stamped through `opts.stamp` **into the
+   room's own voxel map** before it is meshed, and come out fused into a single
+   room mesh. There is no per-prop object to animate at all. Collision is built
+   from that same map, so nothing desyncs — the problem is that a banner is not
+   a thing, it is a handful of voxels in the middle of the wall geometry.
 
-   *Method, if it is picked up:* add an opt-in `sway` flag at the
-   `meshAndCollide` call site that (a) refuses to apply when the caller also
-   registered solids, and (b) drives only a child mesh. Gate it on the
-   collision world, not on the mesh — `ambient-life.spec.mjs` already shows the
-   shape, and the failure to guard against is silent desync, which no
-   screenshot will ever show.
+   *So the two honest routes are:*
+
+   a. **Split decorative props out of the room bake** into their own meshes
+      that register no solids. Clean model, but it changes the bake path every
+      room depends on, and it costs the draw-call saving that merging buys.
+   b. **Displace them in the vertex shader.** Mark swayable voxels with a
+      vertex attribute at stamp time and lean them in `makeLevelMaterial`'s
+      vertex stage. This is how foliage is done everywhere, it needs no new
+      meshes, and it cannot touch collision because collision reads the map and
+      never the mesh.
+
+   **(b) is the right one**, and it is the reason this is still open rather than
+   done: it means editing the shared level material, which has already been the
+   site of one expensive bug — CPU mottle multiplied the colour attribute and
+   corrupted the material classifier, and that is recorded in
+   `level-builder.js` at the `mottle` option. That edit wants a session with
+   room to measure, not the tail of one.
 
 4. ~~**Enemy idle before aggro.**~~ **DONE 2026-08-12.** Stated exactly, because
    the original wording was imprecise: enemy *bodies* already idle-animated
