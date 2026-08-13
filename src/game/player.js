@@ -712,7 +712,7 @@ export class Player {
             to: this.grapple.to,
             u: Math.min(1, this.grapple.t / this.grapple.duration),
         } : null);
-        if (g.active || g.cancelled) {
+        if (g.active || g.cancelled || g.arrived) {
             if (g.x != null) {
                 this.rig.position.x = g.x;
                 this.rig.position.z = g.z;

@@ -243,7 +243,17 @@ export function createBlockerRuntime(ctx, level, b, origin = { x: 0, z: 0 }) {
                         game.hud?.toast?.('Needs the Magnetic Grapple', 1200);
                         return;
                     }
-                    player.grapple.start(p, bestTarget, Math.max(14, reach + 2));
+                    // `stopShort: 0` — `bestTarget` above is ALREADY the landing
+                    // spot, trimmed 1.2 back from the post so the pull is not
+                    // cancelled against it. Letting the controller apply its own
+                    // 0.8 on top was the same correction twice, and it put the
+                    // player down inside the chasm they were crossing.
+                    player.grapple.start(p, bestTarget, Math.max(14, reach + 2), {
+                        stopShort: 0,
+                        canStand: level.canStand
+                            ? (x, z) => level.canStand(x, z)
+                            : undefined,
+                    });
                     sfx.whoosh?.();
                 }
             },

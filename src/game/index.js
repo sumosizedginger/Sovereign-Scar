@@ -1442,7 +1442,17 @@ function frame() {
                     y: player.root.position.y,
                     z: player.root.position.z + fv.z * reach,
                 };
-                player.grapple.start(player.root.position, target, 10);
+                // Same landing guarantee as the anchor-post pull in
+                // `blockers.js`: this one aims at nothing in particular — a
+                // fixed reach along the facing — so without a standing check it
+                // will happily set the player down over a chasm. Keeps the
+                // default `stopShort`, because unlike the blocker this target
+                // has not been trimmed by anyone.
+                player.grapple.start(player.root.position, target, 10, {
+                    canStand: game.level?.canStand
+                        ? (x, z) => game.level.canStand(x, z)
+                        : undefined,
+                });
                 sfx.whoosh();
             }
         }
