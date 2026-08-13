@@ -116,7 +116,23 @@ export class VoxelPhysicsBody {
         if (this.vy < TERMINAL_VY) this.vy = TERMINAL_VY;
         if (this.vy > -TERMINAL_VY) { /* allow upward */ }
 
-        // Track fall start
+        // Track fall start — the height a fall is measured DOWN FROM.
+        //
+        // This check alone is not enough, and for one specific reason: at the
+        // top of a frame `_wasGrounded` is always equal to `grounded`, because
+        // the last line of this method assigns one to the other and nothing in
+        // between the two frames changes `grounded`. So `!grounded &&
+        // _wasGrounded` reads `!g && g` and is false — UNLESS something outside
+        // this class cleared `grounded` between frames, which is exactly what
+        // `applyImpulse` and the blockers' hop/catch teleports do.
+        //
+        // That leaves the ordinary case uncovered: walking off a ledge clears
+        // `grounded` INSIDE the substep loop below, so the transition is
+        // consumed in the same frame and this line never sees it. The anchor
+        // then keeps whatever value it last held — measured, it survived a full
+        // level change — and every later landing is billed against a height the
+        // player left minutes ago, in a different dungeon. `_leaveGround()`
+        // below records the walk-off case where it actually happens.
         if (!this.grounded && this._wasGrounded) {
             this._fallStartY = this.position.y;
         }
@@ -170,11 +186,11 @@ export class VoxelPhysicsBody {
             } else if (this.vy > 0 && this._solidAt(gx, this.position.y + this.extents.y, gz)) {
                 // Hit ceiling
                 this.vy = 0;
-                this.grounded = false;
+                this._leaveGround();
             } else {
                 // Check still supported
                 if (!this._solidAt(gx, this.position.y - this.extents.y - 0.08, gz)) {
-                    this.grounded = false;
+                    this._leaveGround();
                 }
             }
         }
@@ -215,6 +231,18 @@ export class VoxelPhysicsBody {
 
         this._wasGrounded = this.grounded;
         return { landed, fallDistance, damage, grounded: this.grounded };
+    }
+
+    /**
+     * Leave the ground, remembering the height we left it at.
+     *
+     * Only the TRANSITION records. Calling this while already airborne must not
+     * move the anchor down to the current height, or a fall would re-datum
+     * itself every frame and always measure zero.
+     */
+    _leaveGround() {
+        if (this.grounded) this._fallStartY = this.position.y;
+        this.grounded = false;
     }
 
     _solidAt(wx, wy, wz) {

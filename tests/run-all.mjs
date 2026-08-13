@@ -11,6 +11,7 @@ import { run as runInventory } from './game/inventory.spec.mjs';
 import { run as runWeapons } from './game/weapons.spec.mjs';
 import { run as runCombatSweeper } from './game/combat-sweeper.spec.mjs';
 import { run as runVoxelPhysics } from './game/voxel-physics.spec.mjs';
+import { run as runFallAnchor } from './game/fall-anchor.spec.mjs';
 import { run as runDestructible } from './game/destructible.spec.mjs';
 import { run as runGrapple } from './game/grapple.spec.mjs';
 import { run as runFriction } from './game/friction.spec.mjs';
@@ -123,6 +124,7 @@ async function main() {
     runNamed('weapons', runWeapons);
     runNamed('combat-sweeper', runCombatSweeper);
     runNamed('voxel-physics', runVoxelPhysics);
+    runNamed('fall-anchor', runFallAnchor);
     runNamed('destructible', runDestructible);
     runNamed('grapple', runGrapple);
     runNamed('friction', runFriction);

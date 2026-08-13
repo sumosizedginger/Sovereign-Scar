@@ -29,11 +29,16 @@ export function run(t) {
     }
     t.ok('wall stop', pos.x < 2, `x=${pos.x}`);
 
+    // A body dropped from height takes fall damage.
+    //
+    // This used to hand-install `grounded = false`, `_wasGrounded = true` and
+    // `_fallStartY = pos2.y` before dropping. All three were the values the
+    // constructor already produces, so they changed nothing here — but they
+    // read as setup, and that hid the fact that the anchor was never maintained
+    // anywhere else. See `fall-anchor.spec.mjs`, which walks a body off a real
+    // ledge and touches neither field.
     const pos2 = { x: 0, y: FALL_DAMAGE_THRESHOLD + 8, z: 10 };
     const body2 = new VoxelPhysicsBody(pos2, { x: 0.4, y: 0.9, z: 0.4 }, getVoxel);
-    body2.grounded = false;
-    body2._wasGrounded = true;
-    body2._fallStartY = pos2.y;
     let dmg = 0;
     for (let i = 0; i < 200; i++) {
         const r = body2.update(new CollisionWorld(), 1 / 60, {});
