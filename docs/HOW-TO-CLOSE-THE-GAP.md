@@ -184,17 +184,33 @@ written cannot be started.
      solids at all**, so geometry living in `pmap` can be displaced with nothing
      to desync from. That is the natural home for swayable dressing.
 
-   *Remaining unknown, and it must be resolved first:* how platform geometry is
-   made standable if that mesh registers no solids — presumably through the
-   room's own `getVoxelAt`, in which case displacing a platform voxel WOULD
-   desync what the player stands on, and only non-standable dressing may sway.
-   Answer that before writing any shader.
+   **UNKNOWN NOW RESOLVED — and it rules (b) out on its own.**
 
-   The reason this is not done today is the level material has already been the
-   site of one expensive bug — CPU mottle multiplied the colour attribute and
-   corrupted the material classifier (`level-builder.js`, the `mottle` option) —
-   and verifying a change to it costs a full suite run plus the reachability
-   probes. It wants a session with room to measure, not the tail of one.
+   `room-graph.js:728` answers it:
+
+   ```js
+   !!built.getVoxelAt(x, y, z) || !!platformBuilt?.getVoxelAt?.(x, y, z)
+   ```
+
+   The platform mesh **is** the standing query, and `getVoxelAt` reads the voxel
+   **map**, never the mesh. So a vertex-shader displacement moves the picture
+   while physics keeps answering from the original cells: the player stands on
+   the banner's old position and the banner is somewhere else. Silent, and no
+   screenshot shows it.
+
+   Both baked meshes are queried this way, so **there is currently no geometry
+   in a room that may be displaced safely.** (b) alone is not a route.
+
+   *The real route is (a) AND (b), and it is now specific:* add a **third mesh**
+   for dressing only — built from its own map, registering no solids, and
+   excluded from both `getVoxelAt` branches — then sway that in the vertex
+   stage using the `onBeforeCompile` hook `render/materials.js` already
+   installs. The physics exclusion is the load-bearing half; the shader is the
+   easy half, which is the opposite of how this item has read all day.
+
+   *Gate it on the physics, not the picture:* a spec that displaced dressing is
+   never returned by the room's voxel query. The failure mode is standing on
+   something that is not there, and it is invisible in any still frame.
 
 4. ~~**Enemy idle before aggro.**~~ **DONE 2026-08-12.** Stated exactly, because
    the original wording was imprecise: enemy *bodies* already idle-animated
