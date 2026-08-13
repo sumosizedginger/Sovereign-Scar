@@ -953,10 +953,42 @@ export class Enemy {
             this.attackCd = (1.8 / this.actionFrequency) + this.windup;
             this._beginWindup((p, d) => {
                 if (d < MOTE_BURST) {
-                    p.health.damage(this.damage, 0.7, 'hostile', {
+                    // THE SOUND HAS TO ANSWER THE DAMAGE, NOT THE SWING.
+                    //
+                    // This played `hurt` unconditionally — the wound sound —
+                    // whatever `damage()` actually returned. It returns
+                    // `accepted: false` in four cases: the player is in
+                    // i-frames, the hit was blocked, the hit was parried, or
+                    // god mode is on. In every one of those NOTHING HAPPENED TO
+                    // THE PLAYER, and the game said otherwise.
+                    //
+                    // The worst of the four is the block, because blocking this
+                    // is the RIGHT ANSWER. The design note above these
+                    // constants says so outright: "with chip damage now zero,
+                    // standing your ground and facing it is a genuine second
+                    // answer." So the reward for reading a mote correctly was
+                    // the sound of being wounded, once every 2.65s, for as long
+                    // as the player stood their ground — reported as "like a
+                    // sound of being hit, doot doot doot even while standing
+                    // still", at 6/6 hearts.
+                    //
+                    // This file's two other attacks already gate on the result
+                    // (`enemy.js` melee, and the projectile below); the mote was
+                    // the one that never did. And `sfx-bank.js` records the
+                    // project having learned this exact lesson once already —
+                    // the parry used to share the block clang, "identical
+                    // feedback for its most and least skilful outcomes".
+                    const res = p.health.damage(this.damage, 0.7, 'hostile', {
                         from: this.rig.position, attacker: this,
                     });
-                    sfx.hurt();
+                    if (res.accepted) sfx.hurt();
+                    // A parry has its own sound already, played by the player's
+                    // own `guard.onParry`. Doubling it would flatten the best
+                    // sound in the game into a stack.
+                    else if (res.blocked && !res.parried) sfx.block();
+                    // Otherwise silent, and correctly so: i-frames and god mode
+                    // mean the burst did not land, and a burst that did not
+                    // land is not an event.
                 } else sfx.step();
             }, {
                 windup: MOTE_WINDUP * getActiveRunMode().telegraphDuration,

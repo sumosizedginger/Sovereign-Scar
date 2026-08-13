@@ -762,8 +762,14 @@ export class Player {
             if (result.landed) {
                 gsfx.land();
                 if (result.damage > 0) {
-                    this.health.damage(result.damage, 0.5, 'environment');
-                    vsfx.hurt();
+                    // Gated on the answer, for the same reason the mote's burst
+                    // is: `damage()` refuses during i-frames and under god mode,
+                    // and a landing that cost nothing must not sound like one
+                    // that did. The other half of this — a fall being MEASURED
+                    // against a height left minutes ago — is fixed in
+                    // `voxel-physics-body.js`; this is the sound half.
+                    const res = this.health.damage(result.damage, 0.5, 'environment');
+                    if (res.accepted) vsfx.hurt();
                 }
             }
 
