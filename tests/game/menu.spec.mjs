@@ -135,8 +135,17 @@ export function run(t) {
         ],
     });
     const labels = scoreScreen.items.map((item) => item.label || '');
-    t.ok('board heading states the live score version',
-        labels.some((l) => l.includes('MEDIUM · SCORE VERSION 1')));
+    // This used to require the heading to print "SCORE VERSION 1". The worry
+    // behind it — stated in the comment above — was a HARDCODED version drifting
+    // from `SCORE_VERSION`, which is a correctness concern about the code and
+    // not something a player needs read to them; "SCORE VERSION 1" is schema
+    // vocabulary on the screen a player reaches from the title. The isolation
+    // it actually cares about is pinned by the three assertions below, which is
+    // where it always belonged.
+    t.ok('board heading names the run mode', labels.some((l) => l.includes('MEDIUM')));
+    t.ok('and does not print the score schema number at the player',
+        !labels.some((l) => /SCORE VERSION/i.test(l)),
+        labels.filter((l) => /SCORE VERSION/i.test(l)).join(' | ') || 'none');
     t.ok('other-version entries are excluded from the board',
         !labels.some((l) => l.includes('99999')));
     t.ok('current-version entries rank',

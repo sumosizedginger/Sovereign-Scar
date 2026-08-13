@@ -66,6 +66,11 @@ function installDomShim() {
     };
 }
 
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { LEVELS } from '../../src/game/levels/registry.js';
+import { stripComments } from '../qa/lib/boss-actions.mjs';
 import { HUD } from '../../src/game/ui/hud.js';
 
 /** Visible text of a rendered panel: tags out, entities in. */
@@ -235,6 +240,48 @@ export function run(t) {
     hud.update(frame({ hidden: true }));
     t.ok('the title screen takes the legend down with the rest of the chrome',
         hud.helpEl.style.opacity === '0', hud.helpEl.style.opacity);
+
+    // ── The menus are a player surface too ─────────────────────────────────
+    // `docs/HOW-TO-CLOSE-THE-GAP.md` item 4: the HUD stopped being a debug
+    // readout, and the menus were still one. These pin the same standard on
+    // the screens the player actually reaches first — read from the real
+    // sources, not from copies kept here.
+    {
+        const root = path.dirname(fileURLToPath(import.meta.url));
+        // Comments stripped first. The very comment explaining why the
+        // schema number was removed contains the phrase, and matching
+        // raw source made this assertion fail on its own explanation —
+        // the same comment-eating-regex mistake this repo has made before.
+        const menuSrc = stripComments(fs.readFileSync(
+            path.join(root, '..', '..', 'src', 'game', 'ui', 'menu.js'), 'utf8'));
+
+        // A fixed-width face says "terminal" before a word has been read, and
+        // the title screen is the first thing anyone sees.
+        t.ok('the menu does not render in monospace',
+            !/fontFamily:\s*'ui-monospace/.test(menuSrc));
+        t.ok('and uses the same stack the player HUD uses',
+            /fontFamily:\s*'system-ui/.test(menuSrc));
+
+        // Schema numbers are not player vocabulary.
+        t.ok('no score-schema version is printed to the player',
+            !/SCORE VERSION/.test(menuSrc));
+
+        // Altar Travel maps the level registry. Unfiltered, it listed the
+        // combat sandbox to every player as a locked destination.
+        t.ok('Altar Travel filters dev levels out of the registry',
+            /ctx\.levels\(\)\.filter\(\(meta\) => !meta\.dev\)/.test(menuSrc));
+        const devLevels = LEVELS.filter((m) => m.dev);
+        t.ok('and the sandbox is actually flagged, or that filter is a no-op',
+            devLevels.some((m) => m.id === 'sandbox-combat'),
+            devLevels.map((m) => m.id).join(',') || 'nothing flagged dev');
+        // Both ends of the wire: a flag nobody reads, or a filter with nothing
+        // to filter, each leave the sandbox on the player's screen.
+        const shown = LEVELS.filter((m) => !m.dev).map((m) => m.name);
+        t.ok('no player-facing destination is named like a dev tool',
+            !shown.some((n) => /sandbox|test|debug|dummy/i.test(n || '')),
+            shown.filter((n) => /sandbox|test|debug/i.test(n || '')).join(',') || 'none');
+    }
+
     } finally {
         removeDomShim();
     }

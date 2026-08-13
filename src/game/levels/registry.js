@@ -36,7 +36,11 @@ import { WORLD7 } from '../overworld/world7.js';
  * room's contrast (measured: open 12-16, dungeon rooms 70-172).
  */
 export const LEVELS = [
-    { id: 'sandbox-combat', name: 'Combat Sandbox', load: loadSandboxCombat, mood: 'crust', bossId: null, space: 'open' },
+    // `dev: true` keeps this out of player-facing lists. It is a real level
+    // and must stay in LEVELS so dev mode and the probes can load it — the
+    // Altar Travel screen was listing "Combat Sandbox" to players, locked
+    // behind a padlock, because that screen mapped LEVELS unfiltered.
+    { id: 'sandbox-combat', name: 'Combat Sandbox', load: loadSandboxCombat, mood: 'crust', bossId: null, space: 'open', dev: true },
     // C1: the connected overworld — 7×7 screens, both mirror states
     { id: 'overworld', name: 'The Scarred Crust', load: (ctx) => createOverworld(ctx, WORLD7, { levelId: 'overworld' }), mood: 'crust', bossId: null, space: 'open' },
     { id: 'beat-01-crypt', name: '01 Crypt Breach', load: loadBeat01, mood: 'crust', bossId: 'crypt_warden' },

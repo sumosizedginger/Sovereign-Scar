@@ -74,7 +74,12 @@ export function buildScreens() {
         const defeated = new Set(prog.bossesDefeated || []);
         const forkOwned = ctx.hasItem ? ctx.hasItem('resonance_fork') : true;
         const flags = prog.inventory?.flags || {};
-        const items = ctx.levels().map((meta) => {
+        // Dev levels are not destinations. `ctx.levels()` is the whole
+        // registry, including the combat sandbox, and this screen used to map
+        // it straight through — so every player saw a locked row called
+        // "Combat Sandbox". Filtered on an explicit flag rather than on a
+        // name or an id pattern, so a second dev level cannot slip back in.
+        const items = ctx.levels().filter((meta) => !meta.dev).map((meta) => {
             const altarKnown = !ctx.hasItem || meta.id === 'overworld' || !!flags[`altar:${meta.id}`];
             const isOpenBeat = unlocked.has(meta.id) && forkOwned && altarKnown;
             const done = meta.bossId && defeated.has(meta.bossId);
@@ -121,7 +126,11 @@ export function buildScreens() {
             const board = scores.filter((entry) => entry.runMode === mode
                 && entry.eligible !== false
                 && (entry.scoreVersion ?? 1) === SCORE_VERSION).slice(0, 10);
-            rows.push({ type: 'text', label: `${mode.toUpperCase()} · SCORE VERSION ${SCORE_VERSION}` });
+            // "SCORE VERSION 3" is a schema number. It exists so old boards are
+            // not compared against new scoring, which is a real concern and not
+            // one the player has — they only need to know that runs before a
+            // rules change sit on a separate board.
+            rows.push({ type: 'text', label: mode.toUpperCase() });
             if (!board.length) rows.push({ type: 'text', label: 'No witnessed runs.' });
             board.forEach((entry, i) => rows.push({
                 type: 'text',
@@ -249,7 +258,13 @@ export class MenuOverlay {
             justifyContent: 'center',
             flexDirection: 'column',
             background: 'rgba(4,6,12,0.72)',
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+            // The same stack the player HUD uses. Monospace was the last thing
+            // making this screen read as a developer tool: a fixed-width face
+            // says "terminal" before a single word has been read, and it is the
+            // one property here that every player sees on the title screen
+            // before anything else in the game. `hud.js` kept monospace only
+            // for the dev overlay, which is exactly the right division.
+            fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
             color: TEXT,
             userSelect: 'none',
         });
