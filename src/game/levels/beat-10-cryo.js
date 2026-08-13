@@ -236,6 +236,8 @@ export const BEAT10_DEF = {
                 { x: -3, z: -3, kind: 'brood', hp: 4 },
                 { x: 3, z: -3, kind: 'frost', hp: 4, ai: 'lunge' },
                 { x: 0, z: 3, kind: 'brood', hp: 4 },
+                // The cold store sagged to 3 between two beats that peak at 4.
+                { x: -4, z: 4, kind: 'frost', hp: 4, ai: 'lunge' },
             ],
             doors: [
                 { to: 'glacierhall', side: 'S', at: 0, type: 'locked' },

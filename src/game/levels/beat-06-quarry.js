@@ -112,6 +112,9 @@ export const BEAT06_DEF = {
             enemies: [
                 { x: -5, z: 4, kind: 'brood', hp: 4 },
                 { x: 5, z: -5, kind: 'scarab', ai: 'drift', hp: 4 },
+                // Beat 06 peaked at 2 — the same as beat 01, a third of the
+                // way through the game. Measured curve was 2 3 3 3 3 **2** …
+                { x: 5, z: 5, kind: 'brood', hp: 4 },
             ],
             doors: [
                 { to: 'pitgate', side: 'S', at: 0, type: 'open' },

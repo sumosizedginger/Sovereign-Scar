@@ -91,6 +91,8 @@ export const BEAT13_DEF = {
                 // applying pressure while you decide which one to kill first.
                 // NOT (0,5): `build()` raises a slate slab across x -3..3, z 3..6.
                 { x: 0, z: -6, kind: 'censer', hp: 4 },
+                // Second-to-last dungeon, and it peaked lower than beat 07.
+                { x: 4, z: 4, kind: 'lancer', hp: 5 },
             ],
             doors: [
                 { to: 'towergate', side: 'S', at: 0, type: 'open' },

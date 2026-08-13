@@ -182,6 +182,9 @@ export const BEAT08_DEF = {
                 // back at z:-5 because the weave AI already retreats below 4.5
                 // units — spawning it in your face would just make it walk away.
                 { x: 0, z: -5, kind: 'weaver', hp: 3 },
+                // Mirrors the weaver across the room so its web has a second
+                // approach to cover, rather than adding a body to one side.
+                { x: 0, z: 5, kind: 'lancer', hp: 3 },
             ],
             doors: [
                 { to: 'bonegrove', side: 'S', at: 0, type: 'locked' },

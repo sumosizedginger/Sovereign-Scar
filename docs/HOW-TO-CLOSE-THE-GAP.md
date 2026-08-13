@@ -194,7 +194,32 @@ it already knows how to assert "this vocabulary never reaches a player".
 
 ---
 
-## 5. Fights are small and the same size every time (days, authoring not code)
+## 5. Fights are small and the same size every time (curve fixed 2026-08-12; ceiling still low)
+
+**Measured.** Peak concurrent enemies per beat ran:
+
+```
+2 3 3 3 3 2 4 3 4 3 4 4 3 4      <- before
+2 3 3 3 3 3 4 4 4 4 4 4 4 4      <- after
+```
+
+Only three distinct values in fourteen dungeons, and **the peak went DOWN four
+times as the game went on** — beat 06 peaked at 2, the same as beat 01, a third
+of the way in. Four enemies added to the four sagging peak rooms, at positions
+mirrored from spawns already proven good; `tests/qa/enemy-ground.mjs` confirms
+128 walking enemies with **0 buried at spawn and 0 after walking**.
+
+`threat-curve.spec.mjs` now gates it: the peak never shrinks, the finale is
+bigger than the tutorial, and no dungeon is without a real fight. Two break
+modes proven. Everything else in that spec scales HP — none of it could ever
+have said the campaign asks the same question every time.
+
+**Still open: the ceiling.** The target below (early 3, middle 5, late 7) is not
+met — the curve is monotonic but tops out at 4, and raising it is the authoring
+job this section originally described. The sealed rooms and the encounter
+director's token budget (1 attacker in beats 01-04, 2 through 10, 3 in the
+finale) are both already built and waiting for it.
+
 
 *Method:* do not raise every count. Build a **shape** per dungeon.
 

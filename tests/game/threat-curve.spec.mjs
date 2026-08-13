@@ -151,4 +151,45 @@ export function run(t) {
         applyBossCurve(boss, 2);
         t.ok('and so are the early beats the curve deliberately skips', boss.maxHp === 16);
     }
+
+    // ── The SHAPE of a fight, not just its statistics ──────────────────────
+    // Everything above this point scales HP and damage. None of it can tell you
+    // that the campaign asks the same QUESTION every time — and measured, it
+    // very nearly did: peak concurrent enemies per beat ran
+    //
+    //     2 3 3 3 3 2 4 3 4 3 4 4 3 4
+    //
+    // Only three distinct values in fourteen dungeons, and it went DOWN four
+    // times as the game went on. Beat 06 peaked at 2, the same as beat 01.
+    // A curve that rises only through HP is the same fight getting spongier.
+    {
+        const peaks = BEAT_LIST.map((def) => {
+            let peak = 0;
+            for (const room of Object.values(def.rooms || {})) {
+                peak = Math.max(peak, (room.enemies || []).length);
+            }
+            return { id: def.id, peak };
+        });
+
+        const drops = [];
+        for (let i = 1; i < peaks.length; i++) {
+            if (peaks[i].peak < peaks[i - 1].peak) {
+                drops.push(`${peaks[i].id} ${peaks[i - 1].peak}->${peaks[i].peak}`);
+            }
+        }
+        t.ok('the biggest fight never shrinks as the campaign goes on',
+            drops.length === 0,
+            drops.join(', ') || peaks.map((p) => p.peak).join(' '));
+
+        // And the finale must actually be bigger than the tutorial, or
+        // "non-decreasing" is satisfied by a flat line.
+        t.ok('the last dungeon asks a bigger question than the first',
+            peaks[peaks.length - 1].peak > peaks[0].peak,
+            `${peaks[0].peak} -> ${peaks[peaks.length - 1].peak}`);
+
+        // Every beat has to hold a real fight somewhere in it.
+        const thin = peaks.filter((p) => p.peak < 2).map((p) => p.id);
+        t.ok('every dungeon has at least one room with more than one enemy',
+            thin.length === 0, thin.join(', ') || 'none');
+    }
 }
