@@ -212,6 +212,7 @@ export class HUD {
         this._toastShownAt = -1e9; // was shown, so an identical repeat while
         this._toastMs = 0;         // still on screen refreshes instead of re-emitting.
         this._toastEmits = 0;      // count of ACTUAL visual emits (QA hook).
+        this._menuOpen = false;    // see setMenuOpen — a menu suppresses toasts.
 
         // The control legend. NOT permanent any more — see `setHelpVisible`.
         this.helpEl = document.createElement('div');
@@ -344,7 +345,43 @@ export class HUD {
         this.deathEl.style.opacity = '0';
     }
 
+    /**
+     * A menu is covering the screen, so transient chrome must not paint.
+     *
+     * This is a RULE, not a fix for one message. `toast()` has 35 call sites
+     * and every one of them fires on a game event that has nothing to do with
+     * whether a menu happens to be open — entering a region, picking something
+     * up, a door refusing to budge. Any of them can land on top of the title
+     * screen or the pause menu, and the box is 286–323px wide at [~490, 497],
+     * which on a 1280×720 frame is straight through the menu's lower rows.
+     *
+     * The previous attempt at this was to MOVE the toast, from `bottom: 48px`
+     * to `bottom: 186px`, so it stopped colliding with the story panel. That
+     * traded one collision for another: the seat it moved to is the one the
+     * menu uses. Position cannot solve it, because both boxes want the middle
+     * of the screen and only one of them is what the player is reading.
+     *
+     * Suppressed messages are DROPPED, not queued. A toast is a notification
+     * about a moment; replaying it when the player closes a menu ten minutes
+     * later is a ghost, not a message.
+     */
+    setMenuOpen(v) {
+        const open = !!v;
+        if (open === this._menuOpen) return;
+        this._menuOpen = open;
+        if (open) {
+            clearTimeout(this._toastTimer);
+            this.toastEl.style.opacity = '0';
+            // So the message that was on screen can legitimately show again
+            // once the menu closes, rather than being swallowed by the
+            // repeat-suppression above.
+            this._toastMsg = null;
+            this._toastShownAt = -1e9;
+        }
+    }
+
     toast(msg, ms = 2200) {
+        if (this._menuOpen) return;
         // Ticket D — UI never repeats the same message. A message identical to
         // the one currently on screen only refreshes its dwell; it does not
         // re-emit (no flicker, no stacked duplicates). Proximity prompts and

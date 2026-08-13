@@ -1084,6 +1084,8 @@ let titleDrift = 0;
 // that would keep running through a pause and through the death overlay.
 let ambientT = 0;
 
+let firstFrameAnnounced = false;
+
 function frame() {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, clock.getDelta());
@@ -1095,6 +1097,23 @@ function frame() {
         const want = Math.floor(window.innerWidth * renderer.getPixelRatio());
         if (renderer.domElement.width !== want) onResize();
     }
+
+    // A MENU OWNS THE SCREEN AND THE KEYBOARD WHILE IT IS OPEN.
+    //
+    // Both of these are set at the TOP of the frame, before input is polled
+    // and before anything can raise a toast. Down at the bottom with the rest
+    // of the HUD update they would be a frame late, and a frame late is the
+    // whole bug: a message raised by gameplay in the first half of the frame
+    // paints over the menu that was already open when the frame began, and a
+    // verb latched against an open menu fires after it has closed.
+    //
+    // `setUiCapture` drains the pending one-shots on both transitions, which
+    // is what makes the CLOSING keypress safe — the menu closes synchronously
+    // inside its own listener, so the key that closed it has already latched a
+    // gameplay verb by the time this runs. Draining here, above every
+    // `consume*` call below, is what stops that verb from being spent.
+    hud.setMenuOpen(menu.isOpen);
+    input.setUiCapture(menu.isOpen);
 
     // Juice ticks on RAW dt so hitstop can end itself and flashes restore
     juice.update(dt);
@@ -1854,6 +1873,26 @@ function frame() {
 
     composer.render();
 
+    // TELL THE BOOT SPLASH THE TRUTH ABOUT WHEN THE GAME APPEARED.
+    //
+    // `index.html` used to fade `#boot` 900ms after the module import
+    // resolved, under a comment reading "once the first frame has LIKELY
+    // painted". A module resolving is not a frame; the first frame costs a
+    // renderer init, a level bake and a shader compile, and none of that is
+    // 900ms on every machine. Photographed under software GL the splash was
+    // still painting over the open title menu — two copies of the game's name
+    // stacked, one of them saying "loading…" under a screen already offering
+    // `Begin`. Guess low and the splash covers the menu; guess high and the
+    // menu waits behind a splash for nothing.
+    //
+    // This fires once, from below `composer.render()`, so it means exactly one
+    // thing: a frame has been drawn. The listener keeps a timeout of its own,
+    // because a signal the page waits on forever is worse than a bad guess.
+    if (!firstFrameAnnounced) {
+        firstFrameAnnounced = true;
+        window.dispatchEvent(new CustomEvent('ss:first-frame'));
+    }
+
     // S6: luminance sampler — must run in the same task as the render (no
     // preserveDrawingBuffer, so readPixels elsewhere returns black).
     //
@@ -2059,8 +2098,18 @@ window.__sovereignScar = {
     },
 };
 
-// Soft title toast
-hud.toast('SOVEREIGN SCAR — The Wound That Remembers', 2800);
+// THE TITLE SCREEN ALREADY SAYS THIS, IN 44px LETTERS.
+//
+// This line fired a 2800ms HUD toast reading "SOVEREIGN SCAR — The Wound That
+// Remembers" at module load — while the title menu, which carries exactly that
+// title and exactly that subtitle, is open. Photographed at t=1.5s with no
+// input, THREE layers said the same words at once: `#boot` (z 5), the toast
+// (z 25) and `#ss-menu` (z 40). The toast is a 323×37 bordered box at
+// [479,497], which on a 1280×720 title screen is drawn straight through the
+// last menu row — so on the literal first frame of the game, `Credits` was
+// illegible under a duplicate of the game's own name.
+//
+// It predates the title screen. Nothing in the suite or the docs referenced it.
 frame();
 
 console.info(

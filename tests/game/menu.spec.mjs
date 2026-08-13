@@ -3,6 +3,8 @@
 
 import { MenuState } from '../../src/game/ui/menu-state.js';
 import { buildScreens } from '../../src/game/ui/menu.js';
+import { DEV_ONLY } from './hud-player.spec.mjs';
+import { LEVELS } from '../../src/game/levels/registry.js';
 
 function makeState(overrides = {}) {
     const ctx = {
@@ -154,4 +156,127 @@ export function run(t) {
         labels.some((l) => l.includes('8000')));
     t.ok('ineligible entries stay excluded',
         !labels.some((l) => l.includes('7000')));
+
+    // ── THE MENUS ARE A PLAYER-FACING SURFACE TOO ───────────────────────────
+    //
+    // `hud-player.spec.mjs` asserts that the inside of the build never reaches
+    // the player through the HUD. The menus are the OTHER surface the player
+    // reads, and the title screen is the first thing they read at all, so the
+    // same vocabulary check runs over every screen they can open.
+    //
+    // The list is IMPORTED, not retyped. This project has already been bitten
+    // twice by the same list existing in three places and all three disagreeing
+    // — the control sheet in `input.js` says so in its own preamble.
+    devVocabularyScan(t);
+}
+
+/**
+ * Build every reachable screen against a realistic context and read it the way
+ * a player does — labels and notes, nothing else.
+ */
+function devVocabularyScan(t) {
+    const ctx = {
+        settings: () => ({
+            masterVol: 0.8, musicVol: 0.6, sfxVol: 0.7, quality: 'high',
+            reduceShake: false, reduceFlash: false, reduceMotion: false,
+            reduceHorrorAudio: false, monoAudio: true, showTimer: false,
+        }),
+        progress: () => ({
+            runMode: 'medium', runStatus: 'alive', currentBeat: 'beat-04-sky',
+            unlockedBeats: ['overworld', 'beat-01-crypt', 'beat-04-sky'],
+            bossesDefeated: ['crypt_warden'], playTime: 3720,
+            campaignComplete: false, bankedShards: 12,
+            inventory: { flags: { 'altar:beat-01-crypt': true } },
+            upgrades: {},
+        }),
+        hasProgress: () => true,
+        hasItem: () => true,
+        beatName: (id) => (LEVELS.find((l) => l.id === id)?.name || 'The Crypt'),
+        levels: () => LEVELS,
+        scores: () => [],
+        shards: () => 250,
+        upgrades: () => ({}),
+        healthFull: () => false,
+        hasVialSlot: () => true,
+        chargeCost: () => 40,
+        canBuyCharge: () => true,
+        canBuyBuoyancy: () => true,
+    };
+
+    const screens = buildScreens();
+    // Every screen a player can open. `altar` is the shop, reached in world.
+    const names = ['title', 'pause', 'settings', 'beats', 'controls', 'scores',
+        'altar', 'runMode'];
+
+    // ── THE SCAN MUST BE ABLE TO SEE ───────────────────────────────────────
+    //
+    // Every assertion below is of the form "this pattern did not match", which
+    // is exactly what a scan pointed at nothing also reports. So the scan is
+    // first run over a screen built to be caught, containing one of each shape
+    // it claims to catch. Without this the whole section is decoration, and a
+    // typo'd regex would read as a clean bill of health forever.
+    {
+        const hostile = [
+            'Beat: 04 Sky Monument',   // dev label
+            'Mood: crust',             // lighting preset
+            'Witness: 9000',           // raw score
+            'Reconstitutions',         // internal noun
+            'HP (6/6)',                // the number behind the hearts
+            'Depth: undefined',        // a value that was not there
+            'Travel to beat-04-sky',   // an internal id
+            'Combat Sandbox',          // a dev level
+        ];
+        const text = hostile.join(' · ');
+        t.ok('the scan catches developer vocabulary when it is there',
+            DEV_ONLY.filter((re) => re.test(text)).length >= 5,
+            DEV_ONLY.filter((re) => re.test(text)).map(String).join(' '));
+        t.ok('the scan catches an unrendered value',
+            hostile.some((v) => /undefined|null|NaN|\[object Object\]/.test(v)));
+        t.ok('the scan catches an internal level id',
+            hostile.some((v) => /beat-\d\d-[a-z]+/.test(v)));
+        t.ok('the scan catches a dev level',
+            hostile.some((v) => /sandbox|debug|dummy|test/i.test(v)));
+    }
+
+    // The title screen is where the title BELONGS. It is on the banned list for
+    // the HUD because a toast printed it over the game every frame — which is
+    // the bug this pass removed — not because the string is forbidden.
+    const forTitle = DEV_ONLY.filter((re) => !/SOVEREIGN SCAR/.test(String(re)));
+
+    for (const name of names) {
+        const view = screens[name](ctx);
+        const strings = [];
+        for (const it of view.items || []) {
+            if (it.label) strings.push(String(it.label));
+            if (it.note) strings.push(String(it.note));
+        }
+        if (view.title) strings.push(String(view.title));
+        if (view.subtitle) strings.push(String(view.subtitle));
+        const text = strings.join(' · ');
+
+        t.ok(`${name}: has rows to read`, strings.length > 0, `${strings.length} strings`);
+
+        const banned = (name === 'title' ? forTitle : DEV_ONLY)
+            .filter((re) => re.test(text));
+        t.ok(`${name}: no developer vocabulary`, banned.length === 0,
+            banned.map(String).join(' ') || text.slice(0, 90));
+
+        // A label built from a value that was not there reads as a crash the
+        // player can see. These are the four ways that shows up in a template.
+        const broken = strings.filter((sVal) =>
+            /\bundefined\b|\bnull\b|\bNaN\b|\[object Object\]/.test(sVal));
+        t.ok(`${name}: no unrendered values`, broken.length === 0,
+            broken.join(' | ') || 'clean');
+
+        // Internal level ids must never be shown. `beat-04-sky` is a filename;
+        // "Sky Monument" is a place.
+        const ids = strings.filter((sVal) => /beat-\d\d-[a-z]+/.test(sVal));
+        t.ok(`${name}: no internal level ids`, ids.length === 0,
+            ids.join(' | ') || 'clean');
+
+        // Dev levels are not destinations.
+        const devRows = strings.filter((sVal) => /sandbox|debug|dummy|\btest\b/i.test(sVal));
+        t.ok(`${name}: no dev levels offered`, devRows.length === 0,
+            devRows.join(' | ') || 'clean');
+    }
 }

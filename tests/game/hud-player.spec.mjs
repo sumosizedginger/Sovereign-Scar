@@ -84,7 +84,7 @@ const strip = (html) => String(html || '')
  * rather than from a wish list. Each is anchored with its colon or its slash so
  * an ordinary English sentence cannot match by accident.
  */
-const DEV_ONLY = [
+export const DEV_ONLY = [
     /\bBeat:/,          // internal level id — "Beat: 01 Crypt Breach"
     /\bMood:/,          // lighting preset — "Mood: crust"
     /\bMode:/,          // run-mode label in dashboard form

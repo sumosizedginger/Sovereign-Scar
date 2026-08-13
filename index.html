@@ -95,14 +95,26 @@
                 'Sovereign Scar needs WebGL2. Enable hardware acceleration or open the game in a current Chrome, Edge, Firefox, or Safari browser.'
             );
         } else {
+            // Fade the boot overlay when the game says it has painted a frame,
+            // not 900ms after the module import resolves. A module resolving is
+            // not a frame — the renderer init, the level bake and the shader
+            // compile all still have to happen — and the old guess left this
+            // splash painting over the open title menu, so the first thing a
+            // player saw was the game's name twice, one copy saying "loading…"
+            // over a screen already offering "Begin".
+            //
+            // The timeout stays as a floor, because a splash that waits forever
+            // on a signal that never comes is worse than one that fades early.
+            let bootFaded = false;
+            const fadeBoot = () => {
+                if (bootFaded || !boot) return;
+                bootFaded = true;
+                boot.style.opacity = '0';
+                setTimeout(() => boot.remove(), 700);
+            };
+            window.addEventListener('ss:first-frame', fadeBoot, { once: true });
             import('./src/game/index.js').then(() => {
-                // Fade the boot overlay once the first frame has likely painted.
-                setTimeout(() => {
-                    if (boot) {
-                        boot.style.opacity = '0';
-                        setTimeout(() => boot.remove(), 700);
-                    }
-                }, 900);
+                setTimeout(fadeBoot, 4000);
             }).catch((error) => {
                 console.error(error);
                 showFatal(

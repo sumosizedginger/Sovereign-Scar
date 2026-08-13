@@ -24,6 +24,7 @@ import { run as runMusicBed } from './game/music-bed.spec.mjs';
 import { run as runStory } from './game/story.spec.mjs';
 import { run as runJuice } from './game/juice.spec.mjs';
 import { run as runMenu } from './game/menu.spec.mjs';
+import { run as runMenuInputCapture } from './game/menu-input-capture.spec.mjs';
 import { run as runGamepad } from './game/gamepad.spec.mjs';
 import { run as runUpgrades } from './game/upgrades.spec.mjs';
 import { run as runWorldGraph } from './game/world-graph.spec.mjs';
@@ -138,6 +139,7 @@ async function main() {
     runNamed('story', runStory);
     runNamed('juice', runJuice);
     runNamed('menu', runMenu);
+    runNamed('menu-input-capture', runMenuInputCapture);
     runNamed('gamepad', runGamepad);
     runNamed('upgrades', runUpgrades);
     runNamed('world-graph', runWorldGraph);

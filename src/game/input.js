@@ -146,6 +146,7 @@ export class Input {
         this._storyAdvance = false;
         this._muteToggle = false;
         this._anyKey = false;
+        this._uiCapture = false; // a menu owns the keyboard — see setUiCapture
         this._vial = false;
         this._dust = false;
 
@@ -192,13 +193,39 @@ export class Input {
         this._onKeyDown = (e) => {
             this.padActive = false; // keyboard use reverts the pad legend
             this.keys.add(e.code);
+
+            // A MENU OWNS THE KEYBOARD WHILE IT IS OPEN.
+            //
+            // `MenuOverlay` binds its own window keydown listener, so a key
+            // pressed against an open menu reaches BOTH it and this. Measured
+            // in the running game: pause menu open on `Resume`, three lines of
+            // dialogue on screen, one Enter press — the menu closed AND the
+            // conversation advanced, so line two was consumed unread.
+            //
+            // The gate has to live here rather than at the read sites in the
+            // frame loop. The menu closes SYNCHRONOUSLY inside its own
+            // listener, so by the time the next frame reads `menu.isOpen` it
+            // is already false and the latch fires anyway — a guard written a
+            // frame downstream of the event it is guarding tests a world that
+            // has already moved on.
+            //
+            // Pause is the one verb a menu does not own: `Escape` closes the
+            // pause menu through `_pause`, so latching it is how the player
+            // gets out.
+            if (e.code === 'KeyP' || e.code === 'Escape') this._pause = true;
+            if (e.code === 'Tab') e.preventDefault(); // keep focus, menu or not
+            if (e.code === 'Space') e.preventDefault(); // no page scroll, ever
+            if (this._uiCapture) {
+                this._anyKey = true; // "press any key" must still see it
+                return;
+            }
+
             if (e.code === 'Space' || e.code === 'KeyJ') this._attackAt = this._clock();
             if (e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.code === 'KeyK') this._dashAt = this._clock();
             if (e.code === 'KeyE' || e.code === 'KeyF') this._interactPressed = true;
             if (e.code === 'KeyQ') this._weaponCycle = -1;
             if (e.code === 'KeyR') this._weaponCycle = 1;
             if (e.code === 'KeyM') this._moodToggle = true;
-            if (e.code === 'KeyP' || e.code === 'Escape') this._pause = true;
             if (e.code === 'BracketRight' || e.code === 'PageDown') this._levelNext = true;
             if (e.code === 'BracketLeft' || e.code === 'PageUp') this._levelPrev = true;
             if (e.code === 'KeyG') this._grapple = true;
@@ -208,10 +235,7 @@ export class Input {
             if (e.code === 'KeyC') this._dust = true;
             if (e.code === 'KeyT') this._lockToggle = true;
             if (e.code === 'KeyY') this._lockCycle = true;
-            if (e.code === 'Tab') {
-                this._mapToggle = true;
-                e.preventDefault(); // keep focus in the game
-            }
+            if (e.code === 'Tab') this._mapToggle = true;
             // Dev mode (D1)
             if (e.code === 'KeyD' && e.ctrlKey && e.shiftKey) {
                 this._devToggle = true;
@@ -225,8 +249,6 @@ export class Input {
                 e.preventDefault();
             }
             this._anyKey = true;
-            // prevent page scroll on space
-            if (e.code === 'Space') e.preventDefault();
         };
         this._onKeyUp = (e) => this.keys.delete(e.code);
         this._onMouseMove = (e) => {
@@ -349,25 +371,41 @@ export class Input {
         const az = this._armAim ? dz(raz) : 0;
         this.padAim = Math.hypot(ax, az) > 0.3 ? { x: ax, z: az } : null;
 
-        if (pressed(0)) { this._attackAt = this._clock(); this._menuCodes.push('Enter'); }
-        this._padAttack = !!b[0];
-        if (pressed(1)) { this._dashAt = this._clock(); this._menuCodes.push('Backspace'); }
-        if (pressed(2)) this._interactPressed = true;
-        if (pressed(3)) this._grapple = true;
-        if (pressed(4)) this._weaponCycle = -1;
-        if (pressed(5)) this._weaponCycle = 1;
-        // Triggers carry the defensive verbs (Z3/Z4): LT targets, RT guards —
-        // the Ocarina layout. Mute gives up its LT slot and stays on KeyN;
-        // it is a settings toggle, not something you reach for mid-fight.
-        if (pressed(6)) this._lockToggle = true;
-        this._padGuard = !!b[7];
-        if (pressed(10)) this._lockCycle = true; // L3
-        if (pressed(8)) this._mapToggle = true;
+        // THE PAD DELIBERATELY SENDS ONE BUTTON DOWN TWO CHANNELS.
+        //
+        // `A` is both attack and the menu's Enter; `B` is both dash and the
+        // menu's Back; `D-up` is both mirror travel and the menu's ArrowUp.
+        // That is correct while exactly one of the two is listening, and it is
+        // the same double-action the keyboard had while a menu was open — only
+        // more obvious here, because the duplication is written on one line.
+        //
+        // While a menu owns the input, the nav codes still flow and the
+        // gameplay half does not. `Start` stays live for the same reason
+        // `Escape` does: it is how the player gets out.
+        const ui = this._uiCapture;
+        if (pressed(0)) { if (!ui) this._attackAt = this._clock(); this._menuCodes.push('Enter'); }
+        this._padAttack = !ui && !!b[0];
+        if (pressed(1)) { if (!ui) this._dashAt = this._clock(); this._menuCodes.push('Backspace'); }
         if (pressed(9)) this._pause = true;
-        if (pressed(12)) { this._moodToggle = true; this._menuCodes.push('ArrowUp'); }
+        if (pressed(12)) { if (!ui) this._moodToggle = true; this._menuCodes.push('ArrowUp'); }
         if (pressed(13)) this._menuCodes.push('ArrowDown');
         if (pressed(14)) this._menuCodes.push('ArrowLeft');
         if (pressed(15)) this._menuCodes.push('ArrowRight');
+
+        if (!ui) {
+            if (pressed(2)) this._interactPressed = true;
+            if (pressed(3)) this._grapple = true;
+            if (pressed(4)) this._weaponCycle = -1;
+            if (pressed(5)) this._weaponCycle = 1;
+            // Triggers carry the defensive verbs (Z3/Z4): LT targets, RT guards
+            // — the Ocarina layout. Mute gives up its LT slot and stays on
+            // KeyN; it is a settings toggle, not something you reach for
+            // mid-fight.
+            if (pressed(6)) this._lockToggle = true;
+            if (pressed(10)) this._lockCycle = true; // L3
+            if (pressed(8)) this._mapToggle = true;
+        }
+        this._padGuard = !ui && !!b[7];
 
         if (b.some((v, i) => v && !prev[i])) this._anyKey = true;
         if (b.some(Boolean) || this.padMove.x || this.padMove.z) this.padActive = true;
@@ -416,6 +454,57 @@ export class Input {
         const fresh = this._clock() - at <= window;
         this._dashAt = -Infinity;
         return fresh;
+    }
+
+    /**
+     * A menu is open: it owns the keyboard, and gameplay verbs must not latch.
+     *
+     * Set on the OPEN/CLOSE transition rather than polled each frame, because
+     * the menu closes synchronously inside its own keydown listener — a frame
+     * later is already too late to gate the key that did the closing.
+     *
+     * RELEASING DRAINS. Two window listeners receive the same keydown and the
+     * order between them is registration order, which is not a contract. If
+     * this listener happens to run first, the closing press latches a verb
+     * before the menu has had its say; clearing the one-shots as capture drops
+     * makes the outcome the same either way. Held keys (`this.keys`) are left
+     * alone — those are state, not events, and keyup will tidy them.
+     *
+     * `_pause` is exempt on purpose: `Escape` is how the pause menu closes.
+     */
+    setUiCapture(v) {
+        const on = !!v;
+        if (on === this._uiCapture) return;
+        this._uiCapture = on;
+        // BOTH transitions drain, not just the release. On open, a verb pressed
+        // in the frame before the menu appeared would otherwise fire behind it;
+        // on close, the key that did the closing has already latched.
+        this.clearOneShots();
+    }
+
+    /**
+     * Drop every pending one-shot verb. `_pause` and held keys are untouched.
+     *
+     * Enumerated against the latch table in `_onKeyDown` rather than the
+     * handful that happened to cause the bug — a verb missing from this list
+     * fires late and looks like the game acting on its own.
+     */
+    clearOneShots() {
+        this._attackAt = -Infinity;
+        this._dashAt = -Infinity;
+        this._interactPressed = false;
+        this._weaponCycle = 0;
+        this._moodToggle = false;
+        this._levelNext = false;
+        this._levelPrev = false;
+        this._grapple = false;
+        this._storyAdvance = false;
+        this._muteToggle = false;
+        this._vial = false;
+        this._dust = false;
+        this._lockToggle = false;
+        this._lockCycle = false;
+        this._mapToggle = false;
     }
 
     consumeInteract() {
