@@ -171,12 +171,30 @@ written cannot be started.
       meshes, and it cannot touch collision because collision reads the map and
       never the mesh.
 
-   **(b) is the right one**, and it is the reason this is still open rather than
-   done: it means editing the shared level material, which has already been the
+   **(b) is the right one**, and two facts found while checking it make it
+   much cheaper than it looks:
+
+   - `render/materials.js` already installs a **sanctioned bounded
+     `onBeforeCompile` hook** on the level material, and already injects at
+     `#include <begin_vertex>` (that is where `vWorldPosition` is computed). A
+     sway is another line in a shader stage that is already being edited, not a
+     new mechanism.
+   - `room-graph.js` meshes the **platform map with `collisionWorld = null`** —
+     `meshAndCollide(pmap, scene, null, { origin })`. That mesh registers **no
+     solids at all**, so geometry living in `pmap` can be displaced with nothing
+     to desync from. That is the natural home for swayable dressing.
+
+   *Remaining unknown, and it must be resolved first:* how platform geometry is
+   made standable if that mesh registers no solids — presumably through the
+   room's own `getVoxelAt`, in which case displacing a platform voxel WOULD
+   desync what the player stands on, and only non-standable dressing may sway.
+   Answer that before writing any shader.
+
+   The reason this is not done today is the level material has already been the
    site of one expensive bug — CPU mottle multiplied the colour attribute and
-   corrupted the material classifier, and that is recorded in
-   `level-builder.js` at the `mottle` option. That edit wants a session with
-   room to measure, not the tail of one.
+   corrupted the material classifier (`level-builder.js`, the `mottle` option) —
+   and verifying a change to it costs a full suite run plus the reachability
+   probes. It wants a session with room to measure, not the tail of one.
 
 4. ~~**Enemy idle before aggro.**~~ **DONE 2026-08-12.** Stated exactly, because
    the original wording was imprecise: enemy *bodies* already idle-animated
