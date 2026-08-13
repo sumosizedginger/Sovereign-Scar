@@ -18,6 +18,7 @@ import { buildIceCrystal, stampMap } from '../assets/props.js';
 import { fillBox } from '../../voxel/helpers.js';
 import { FrostAndFuel, attachBoss } from '../bosses/index.js';
 import { addAltar } from '../world/altar.js';
+import { FluidPlane } from '../world/fluid-plane.js';
 
 function addIceWall(level, ctx, origin, at, size, id) {
     const ice = new Map();
@@ -36,6 +37,46 @@ function addIceWall(level, ctx, origin, at, size, id) {
     level.destructibles.push(melt);
     level.addSystem({ update() {}, dispose: () => melt.dispose() });
     return melt;
+}
+
+
+/**
+ * SYSTEM REPRISE — meltwater, asking the opposite question to beat 11's sludge.
+ *
+ * `fluid-plane.js` was built, tested, and used in exactly one dungeon: the Mire,
+ * where wading through sludge SLOWS you (`groundDrag: 0.35`, a heavy wind
+ * pushing you off line). The same plane here is meltwater over ice, and it does
+ * the reverse — `groundDrag: 0.96` is almost no grip, so the pool is a patch
+ * you slide across and have to plan a stop before entering.
+ *
+ * Same system, inverted feel: in the Mire the floor holds you, here it lets go.
+ * A mechanic met once is a curiosity; one that returns, changed, is a language.
+ *
+ * Deliberately NOT the "make the level rise" idea from the plan: that changes a
+ * room while the player is standing in it and needs the traversal probes re-run
+ * against a moving surface. This version cannot make anywhere unreachable —
+ * it changes how the floor feels, not where the floor is.
+ */
+function addMeltwater(level, ctx, origin, size) {
+    const fluid = new FluidPlane(ctx.scene, {
+        width: size, depth: size, y: 0.32, amp: 0.09,
+        x: origin.x, z: origin.z,
+        // A drift, not a shove — the Mire's wind is 1.5 and moves you bodily.
+        wind: { x: 0.35, z: -0.2 },
+        color: ABYSS_COLORS.ice || 0x9fd8ff,
+    });
+    level.addSystem({
+        update(dt, game) {
+            fluid.update(dt);
+            const p = game.player.root.position;
+            if (fluid.contains(p.x, p.z) && p.y < 1.5) {
+                game.player.physics.setFrictionProfile({
+                    groundDrag: 0.96, airDrag: 0.99, windVector: fluid.wind,
+                });
+            }
+        },
+        dispose() { fluid.dispose(); },
+    });
 }
 
 export const BEAT10_DEF = {
@@ -149,7 +190,9 @@ export const BEAT10_DEF = {
             },
             enemies: [{ x: 0, z: -4, kind: 'frost', hp: 4, ai: 'charge' }],
             doors: [{ to: 'vaultfloor', side: 'W', at: 0, type: 'open' }],
-            onBake(level, origin) {
+            onBake(level, origin, ctx) {
+                // The crystals have been melting. Cross the middle and you slide.
+                addMeltwater(level, ctx, origin, 9);
                 level.addPickup({ x: origin.x + 5, y: 1.2, z: origin.z - 5 }, {
                     color: 0x7fe0ff,
                     label: 'Crystal cache',
