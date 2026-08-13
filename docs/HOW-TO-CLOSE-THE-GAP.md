@@ -410,10 +410,24 @@ out at 2 for that reason.
 shaped so thinly it reads as an ordinary room.
 
 **Still open, and it is the interesting half:** this section also asks that the
-arena *make one of the boss's existing moves better* — pillars the Arachnid webs
-between, vents the Wyrm surfaces from. That is per-boss design work and none of
-it is done; what is fixed here is that all fourteen arenas are now visibly
-arenas.
+arena *make one of the boss's existing moves better*. That is per-boss design
+work, fourteen times, and none of it is done. What is fixed here is that all
+fourteen arenas are now visibly arenas.
+
+**Warning for whoever picks it up: the two examples in this section were wrong.**
+"Vents the Wyrm surfaces from" — the Magma Wyrm has no burrow or surface move at
+all. It is a six-segment chain that follows a path and lays fire trails
+(`roster.js`, `class MagmaWyrm`: `pathT`, `fireCd`, `trails`). Building vents for
+it would be **adding a move**, which is precisely what the sentence above it
+forbids. Its `vent_ring` arena is already the right shape for what it does — a
+ring is something a snaking chain weaves through.
+
+So the method holds and the examples do not. **Read the boss class first and
+list the moves it actually has**, then shape for one of those. Every time this
+document has offered a specific target this session, measuring first has
+contradicted it — the enemy-AI advice would have deleted abilities, three of
+four ambient claims were false, the encounter target collided with a sealed-room
+rule, and "barely used" described a fully wired channel.
 
 ---
 
