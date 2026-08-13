@@ -2,7 +2,7 @@
 
 import * as THREE from 'three';
 import { sfx } from '../../audio/synth.js';
-import { at as audioAt } from '../../audio/spatial.js';
+import { at as audioAt, silenced } from '../../audio/spatial.js';
 import { scoreStinger } from '../audio/score.js';
 import { juice } from '../fx/juice.js';
 import { getActiveRunMode } from '../kernel/run-mode.js';
@@ -1432,7 +1432,32 @@ export function attachBoss(level, boss, opts = {}) {
             const p = game.player?.root?.position;
             const awake = !anchor || !p
                 || Math.hypot(p.x - anchor.x, p.z - anchor.z) <= WAKE_RADIUS;
-            if (boss.update) boss.update(dt, awake ? game.player : null, game);
+            // A DORMANT BOSS MUST NOT BE HEARD ACROSS THE DUNGEON.
+            //
+            // `awake` was already computed here, and then the boss was updated
+            // anyway with `null` for the player — so a dormant boss kept moving
+            // and kept making noise, and only its TARGETING went blind. The
+            // guard existed and guarded the wrong half.
+            //
+            // Measured in 04 Sky Monument, player standing still in the
+            // ENTRANCE room at 6/6 with nothing on screen: five `sfx.block()`
+            // in 18 seconds, at 3.31s, 4.56s, 9.47s, 13.21s and 15.62s, all
+            // from `KineticCore.tickAI` — the boss bouncing around its arena
+            // two rooms away, playing the metal guard-clang off every wall it
+            // hit. The owner's report was "a sound of being hit, doot doot doot
+            // even while standing still ... nothing giving any sign of what is
+            // causing me harm." There was no sign because there was nothing
+            // there.
+            //
+            // It still TICKS, so its state and pose stay live and it is not
+            // frozen mid-air the moment the player walks in. It is simply not
+            // audible, which is the honest reading of "the player is not here".
+            // Silencing rather than skipping is also the smaller claim: fourteen
+            // bosses run through this line and none of them change behaviour.
+            if (boss.update) {
+                if (awake) boss.update(dt, game.player, game);
+                else silenced(() => boss.update(dt, null, game));
+            }
             // The light follows the body. A boss glow pinned to the spawn point
             // would light the place the boss used to be, which is worse than no
             // light at all — it tells the player to look somewhere wrong.

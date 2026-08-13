@@ -62,6 +62,9 @@ import { getSetting } from '../engine/settings.js';
 let listener = null;    // { x, z, halfWidth }
 /** The source currently being placed, or null. Only ever set inside `at()`. */
 let source = null;      // { x, z }
+// True while a `silenced()` scope is running — see below. Dormant bosses tick
+// inside one, so they keep their state without being heard across the dungeon.
+let muted = false;
 
 /**
  * Hard-pan limit.
@@ -127,6 +130,44 @@ export function at(pos, fn) {
     }
 }
 
+/**
+ * Run `fn` with everything it plays dropped on the floor.
+ *
+ * THE BUG THIS EXISTS FOR. The owner, standing still in the ENTRANCE room of
+ * 04 Sky Monument at 6/6 hearts with nothing on screen: "it's like a sound of
+ * being hit, doot doot doot even while standing still ... nothing hitting me,
+ * nothing exploding, nothing giving any sign of what is causing me harm."
+ *
+ * Measured, 18 seconds, no input: five `sfx.block()` at 3.31s, 4.56s, 9.47s,
+ * 13.21s and 15.62s, all from `KineticCore.tickAI` — the beat-04 boss, bouncing
+ * around its arena in a room the player had never entered, playing the metal
+ * guard-clang off every wall it hit.
+ *
+ * `bosses/base.js` already computed whether a boss is `awake`, and then still
+ * called `boss.update(dt, awake ? game.player : null, game)` — so a dormant
+ * boss kept moving and kept making noise, and only its TARGETING went blind.
+ * The guard existed and guarded the wrong half.
+ *
+ * This is a scope rather than a flag on the boss because the sound is five
+ * `sfx.*` calls deep inside one subclass's AI, and there are fourteen bosses.
+ * Every voice in the game already routes through `spatialize`, so silencing
+ * the scope is one place instead of a call site per sound per boss.
+ */
+export function silenced(fn) {
+    const prev = muted;
+    muted = true;
+    try {
+        return fn();
+    } finally {
+        muted = prev;
+    }
+}
+
+/** Test seam: is sound currently being dropped? Must be false between frames. */
+export function _isMuted() {
+    return muted;
+}
+
 /** `at()` for loose coordinates. */
 export function atXZ(x, z, fn) {
     return at({ x, z }, fn);
@@ -166,6 +207,20 @@ export function placement() {
  * source standing on the listener adds exactly one node, not two.
  */
 export function spatialize(ctx, dest) {
+    // A SILENCED SCOPE DROPS THE VOICE ENTIRELY, and it has to be checked
+    // BEFORE `placement()` — an unplaced sound returns `dest` untouched below,
+    // at full volume, which is precisely how a boss two rooms away was heard.
+    // Distance cannot solve it either: `MIN_DISTANCE_GAIN` is 0.35, so even a
+    // correctly placed source on the far side of the dungeon still arrives at
+    // a third of full volume. "Far away" and "not happening" are different
+    // questions and only the second one is being asked here.
+    if (muted) {
+        if (!ctx) return dest;
+        const g = ctx.createGain();
+        g.gain.value = 0;
+        g.connect(dest);
+        return g;
+    }
     const p = placement();
     if (!p || !ctx) return dest;
 

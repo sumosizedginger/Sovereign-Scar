@@ -26,6 +26,7 @@ import { run as runJuice } from './game/juice.spec.mjs';
 import { run as runMenu } from './game/menu.spec.mjs';
 import { run as runMenuInputCapture } from './game/menu-input-capture.spec.mjs';
 import { run as runHitSoundHonesty } from './game/hit-sound-honesty.spec.mjs';
+import { run as runDormantBossSilence } from './game/dormant-boss-silence.spec.mjs';
 import { run as runGamepad } from './game/gamepad.spec.mjs';
 import { run as runUpgrades } from './game/upgrades.spec.mjs';
 import { run as runWorldGraph } from './game/world-graph.spec.mjs';
@@ -142,6 +143,7 @@ async function main() {
     runNamed('menu', runMenu);
     runNamed('menu-input-capture', runMenuInputCapture);
     runNamed('hit-sound-honesty', runHitSoundHonesty);
+    runNamed('dormant-boss-silence', runDormantBossSilence);
     runNamed('gamepad', runGamepad);
     runNamed('upgrades', runUpgrades);
     runNamed('world-graph', runWorldGraph);
