@@ -136,6 +136,21 @@ export async function run(t) {
                     // armour window. A boss that is armoured or mid-action
                     // would report a band of zero for reasons that are the
                     // fight working correctly.
+                    //
+                    // WHICH MEANS A GREEN RUN HERE SAYS NOTHING ABOUT WHETHER
+                    // THE FIGHT IS WINNABLE. The Obsidian Arachnid passed every
+                    // assertion in this file while being, in play, unkillable
+                    // from anywhere outside its own legs: its plate tracked the
+                    // player faster than the player could circle, so the only
+                    // radius that ever landed a blow was the one this spec
+                    // disables the armour to reach. Three separate "I have to
+                    // stand inside it to hit it" reports came through that gap.
+                    //
+                    // The armour question has its own home now, and it derives
+                    // its radii from the boss's real geometry rather than from
+                    // invented ones: `tests/game/boss-facing.spec.mjs`, the
+                    // block headed THE RADII COME FROM THE BOSS. Do not read
+                    // this file as covering it.
                     const open = () => {
                         tgt.hp = 99999;
                         if (tgt.state) tgt.state.current = 'IDLE';

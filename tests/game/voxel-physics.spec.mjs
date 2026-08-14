@@ -100,17 +100,36 @@ export function run(t) {
         `onStep=${onStep} y=${stepPos.y} maxY=${maxY} floorY=${floorY}`);
     t.ok('still grounded after step-up', stepBody.grounded);
 
-    // Tall wall (maxY style): solid column with no standable top within 1 cell
-    // above feet should still block — simulate with XZ solid only + no voxels.
+    // Tall wall: a solid column with no standable top within a cell of the
+    // feet must block, and must not be climbed.
+    //
+    // THIS CASE USED TO BE UNABLE TO FAIL. Its own comment said "simulate with
+    // XZ solid only + no voxels" — and `_tryStepUp` reads VOXELS, not solids,
+    // so the step-up code was never once shown a wall. It then asserted `x`
+    // alone and never `y`, so a body rocketing seven cells into the sky passed
+    // it cleanly. A test named "no phantom climb" that is structurally
+    // incapable of seeing a phantom climb is worse than no test, because it
+    // spends the reviewer's confidence.
+    //
+    // The wall now exists in BOTH worlds, and both axes are asserted. The full
+    // treatment of this rule — wall heights, shelves, and the step-up that must
+    // survive it — lives in `tests/game/wall-climb.spec.mjs`.
     const wallPos = { x: 0, y: 1.0, z: 0 };
     const wallBody = new VoxelPhysicsBody(
-        wallPos, { x: 0.4, y: 0.95, z: 0.4 }, (x, y) => y >= 0 && y < 1,
+        wallPos, { x: 0.4, y: 0.95, z: 0.4 },
+        (x, y) => (y >= 0 && y < 1) || (x >= 2 && y >= 1 && y < 9),
     );
     wallBody.grounded = true;
     const wallCw = new CollisionWorld();
     wallCw.addSolid({ minX: 2, maxX: 3, minZ: -2, maxZ: 2 });
+    const wallStartY = wallPos.y;
+    let wallMaxY = wallPos.y;
     for (let i = 0; i < 60; i++) {
         wallBody.update(wallCw, 1 / 60, { wishX: 1, wishZ: 0, speed: 8, half: 0.4 });
+        if (wallPos.y > wallMaxY) wallMaxY = wallPos.y;
     }
-    t.ok('tall XZ wall still blocks (no phantom climb)', wallPos.x < 2, `x=${wallPos.x}`);
+    t.ok('tall wall still blocks horizontally', wallPos.x < 2, `x=${wallPos.x}`);
+    t.ok('tall wall is not climbed (no phantom climb)',
+        wallMaxY - wallStartY < 1.05,
+        `rose ${(wallMaxY - wallStartY).toFixed(2)} units — a wall offers no steps`);
 }

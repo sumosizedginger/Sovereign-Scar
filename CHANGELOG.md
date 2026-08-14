@@ -5,6 +5,165 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### The spider you had to stand inside — a third cause for the same sentence
+
+*"Spider boss, I need to be inside of it to hit it before it does its move, I
+should be able to hit it without literally standing in it."*
+
+The third report of that sentence, after two previous fixes (`c700307`,
+`04193e1`) each aimed at a different cause. Its hitbox and its reach were both
+fine. **Its armoured front turned to face you as fast as you could run around
+it.**
+
+Circling only beats a plate inside `player speed / turn rate` — 5.00 units at
+the shipped 1.1 rad/s. `presenceScale(1.70)` puts this boss's legal hitting band
+at **3.19 to 5.35**, so most of it sat outside that circle. Measured with the new
+`tests/qa/armor-flank-reach.mjs`, which drives the shipped `tickAI` and asks the
+real `inFrontArc`:
+
+| standing at | 1.1 rad/s | 0.7 rad/s |
+|---|---|---|
+| body edge, 3.19 | 1.67s | **1.02s** |
+| anchor link max reach, 4.95 | **never** | 2.53s |
+| tectonic wedge max reach, 5.35 | **never** | 3.17s |
+| webbed, at the body edge | **never** | 2.05s |
+
+`bosses/base.js` already stated the rule its own rate had to obey — *"it must be
+SLOWER than the player can orbit, or the flank the fight is built around is
+geometrically unreachable"* — and the call site violated it. What the rule could
+not say is at WHICH radius, and the answer is not a constant: it is
+`speed / (move.range + hitRadius)`, which for a boss scaled 1.70 is a very
+different number than for the 0.49-radius mobs 1.1 was chosen against.
+
+Also: the web patch's `slow: 0.5` halved the player's ORBIT as well as their
+walk, making the plate absolutely unflankable while standing in it — a stun that
+did not admit to being one. Now 0.7.
+
+And the plate now **says which state it is in** before you commit to a swing:
+cold blue while it refuses, its authored hot red with a shallow pulse while it is
+open. Colour rather than brightness, because `clampEmissive` already pins the
+head at the 0.55 ceiling and there is no headroom to flash into.
+
+**Swept, not spot-fixed.** The bulwark elite carries the same plate through the
+same code path and had the same defect for the same reason — its 2.2 rad/s was
+derived against an assumed "melee range (~1.5)" when the tectonic wedge actually
+reaches 2.88. Nobody reported it. `anchor_link` and `tectonic_wedge` at max reach
+both read `never`; at 1.6 they read 2.10s and 4.23s, and up close the fight is
+unchanged to within 0.05s.
+
+**Why no assertion saw it.** `boss-facing.spec.mjs` owns this exact rule and was
+green throughout, because it asked the question at radii **1.5, 2 and 3** against
+a default-sized `makeBoss()` — every one of them inside the spider's own legs.
+It also raced against a `PLAYER_SPEED` of 6.0 when the player has been 5.5 since
+`player.js:132`, in the player's favour, which is the direction that hides this.
+Its radii now come from each armoured boss's real geometry, its speed is read
+from `player.js` and fails loudly if that drifts, and it calls `inFrontArc`
+instead of re-deriving it. Reverting the turn rate turns four assertions red.
+
+### The Heavy Mallet announced a puzzle from across the dungeon
+
+*"Everytime I swing the heavy mallet it says 'too dense need tectonic wedge', I
+only noticed it in level 8, might have happened before that."*
+
+It had been happening since beat 06 — the first beat where the player holds the
+mallet and a crack exists at the same time. `blockers.js` checked which weapon
+was equipped **before** any test of where the blow landed, with the strike
+coordinates sitting right there unused, and `player.js` walks every destructible
+in a prebaked level on every shattering swing. So one mallet swing anywhere in
+the dungeon toasted.
+
+`DestructibleVoxelMesh.shatterAtWorld` already contained the spatial test; the
+filter returned before ever reaching it. Extracted as `nearestVoxelToWorld` and
+asked first, so the message fires under exactly the condition that makes it
+true: the wedge, swung from here, **would** have worked.
+
+### You could climb any wall in the game
+
+*"So the character climbs up the walls, and if you climb too high you fall and
+take damage."*
+
+`_surfaceTopInRange` returned the top of ANY solid cell in range without testing
+what sat above it. Inside a solid column every cell has a top, so a sheer wall
+offered a fresh legal "step" every frame, one cell higher than the last —
+measured at **seven cells in seven frames**, roughly 60 units per second straight
+up, against a wall with no ledges in it at all.
+
+The fall damage was never the bug. It was correctly billing a fall that should
+have been impossible.
+
+This is the **second** report of the symptom. The first was diagnosed as a
+legibility problem, and `traversal-legibility.spec.mjs` states in so many words
+that *"the cause is not that climbing is broken"*. It was. A confident wrong
+conclusion in a comment kept it alive for a second report.
+
+The case in `voxel-physics.spec.mjs` named *"no phantom climb"* could not fail:
+its own comment says *"simulate with XZ solid only + no voxels"*, and
+`_tryStepUp` reads voxels — so the step-up code was never once shown a wall. It
+then asserted X only, never Y. Both fixed; the full rule, including the
+staircases that must still work, is `tests/game/wall-climb.spec.mjs`.
+
+### The dash went nowhere, and drew a swing it could not deliver
+
+*"The dash, even after picking up the dash boots, is only like 1 square and does
+not hit an enemy at all, but there is a swing animation."*
+
+Three defects behind one sentence.
+
+**The speed was discarded.** `tryDash` handed `dashSpeed: 18` to
+`physics.applyImpulse`, and `VoxelPhysicsBody.update` hard-assigns
+`vx = wx * speed` on the next tick whenever there is movement input — which
+there always is during a dash. The impulse never survived a frame. `dashSpeed`
+existed in exactly two places: where it was defined and where it was thrown
+away. What shipped was a flat `14` written inline.
+
+**The dash was steered by live input, and this was the larger half.** The wish
+vector came from `input.moveVector()` for the whole dash, so a player who
+*tapped* dash and released the stick supplied zero movement and the dash covered
+essentially nothing. It is the same defect the grapple was reported for in the
+same playthrough — *"not fall into darkness if I'm not pushing forward."* A
+committed traversal verb now owns its heading for its duration.
+
+Measured with `tests/qa/dash-travel.mjs`, net gain over simply walking the same
+window: **1.13 units before, 1.67 after** — and that is with the stick held. Held
+vs released was the difference between 2.40 units and nothing.
+
+**It drew an attack it did not have.** `arcSmear.spawn` was called with no `arc`,
+falling to `ARC_ANGLE = PI * 0.61` — a 110-degree fan, the same shape a sword
+swing draws, at radius 2, connected to no hitbox. Now a narrow streak that reads
+as movement. `setDashing` was also called without a duration, so the pose played
+against the wrong clock and only ever reached a third of its length.
+
+> **Deliberately dormant:** `DASH_ATTACK` in `weapons.js` is a real lunge with a
+> real hitbox, and it is unreachable — `player.js` resolves the attack before
+> starting the dash, so a same-frame Shift+Space always yields a normal swing.
+> Left that way on purpose: the dash is a movement tool and the rest of the kit
+> is built around it having no damage. Recorded here so the next reader finds a
+> decision rather than a trap.
+
+### The Light Caster's standing line did nothing, and was four times too bright
+
+*"'Light caster leaves a standing line' that does nothing. Lines from the light
+caster are WAY too bright."*
+
+Beat 12 toasts that the Light Caster leaves a standing line. Three quarters of
+the mechanic were present and wired at one end only: `hitsEntity()` was written,
+correct, and called by nothing; `line.hitPoints` was computed and read by
+nothing; the `solid` collision branch was gated on an option no caller ever
+passed. Deleting `hitsEntity` outright would have kept the suite green and the
+game identical.
+
+The line now burns what stands in it, on an interval, through `applyHit` — the
+same path a sword swing takes, so it obeys shields, plates and i-frames rather
+than inventing a second set of combat rules. `opts.solid` is deliberately left
+alone: nothing needs it, and unused code that *looks* wired is what produced
+this defect.
+
+Brightness `2.2` → `0.5`. The bloom threshold is 0.85 and the project's ceiling
+for any emissive part is `BOSS_EMISSIVE_MAX = 0.55` — a scenery effect was four
+times brighter than the brightest thing a boss is allowed to be. `transparent`
+was also only set inside `update()`, so the first frame of every line rendered
+fully opaque: the line popped rather than appeared.
+
 ### Two dungeons never asked you to fight anything
 
 Found by playing: *"you can literally run through grab keys and skip areas, I ran

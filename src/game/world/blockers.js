@@ -351,6 +351,24 @@ export function createBlockerRuntime(ctx, level, b, origin = { x: 0, z: 0 }) {
         // Weapon filter: only Tectonic Wedge damage breaks the crack
         const wrapper = {
             shatterAtWorld(x, y, z, r) {
+                // WHERE BEFORE WHAT.
+                //
+                // The weapon check used to run first, and toast on failure,
+                // without ever asking whether the blow had landed anywhere near
+                // this crack. `player.js` walks EVERY destructible in the level
+                // on every swing that shatters, and rooms are prebaked — so one
+                // mallet swing anywhere in a dungeon containing a crack
+                // announced "Too dense" from across the map. The owner first
+                // noticed it in 08 and it had been happening since 06, which is
+                // simply the first beat where they held the mallet and a crack
+                // existed at the same time.
+                //
+                // `nearestVoxelToWorld` is the same search `shatterAtWorld`
+                // uses to decide where to break, so the message now fires under
+                // exactly the condition that makes it true: the wedge, swung
+                // from here, WOULD have worked. Anywhere else the crack is not
+                // being addressed and has nothing to say.
+                if (!dest.nearestVoxelToWorld(x, y, z)) return 0;
                 const active = ctx.player?.inventory?.activeWeapon;
                 if (active !== 'tectonic_wedge') {
                     level._game?.hud?.toast?.('Too dense — needs the Tectonic Wedge', 1200);

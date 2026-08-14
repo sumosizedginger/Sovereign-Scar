@@ -67,7 +67,11 @@ export function attachLightLinesOnCast(level, ctx, opts = {}) {
     }
 
     level.addSystem({
-        update(dt) { lines.update(dt); },
+        // The enemy list is handed over every frame, because a standing line
+        // that nothing can walk into is scenery. `level.enemies` is the live
+        // array the room owns, so this picks up spawns and splits without
+        // holding a stale copy.
+        update(dt) { lines.update(dt, level.enemies || []); },
         dispose() {
             restore();
             lines.dispose();

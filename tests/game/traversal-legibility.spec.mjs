@@ -8,6 +8,26 @@
 // which. The player learns the difference by walking into things. In Zelda you
 // never have to: stairs are drawn as stairs.
 //
+// THAT FIRST SENTENCE WAS NOT TRUE WHEN THIS FILE WAS WRITTEN, and it is worth
+// knowing why before trusting anything here.
+//
+// `_surfaceTopInRange` returned the top of any solid cell without checking what
+// sat above it, so inside a solid column every cell offered a fresh legal step:
+// a body walking into a flat wall gained SEVEN CELLS IN SEVEN FRAMES. The
+// report this file was written from — "constantly trying to climb up the walls"
+// — was therefore describing a physics bug, and the response was to make the
+// walls easier to read. The marking work below is genuinely worth having, but
+// it was built on top of the defect it was investigating rather than on the
+// settled ground its opening claims.
+//
+// The owner reported the same symptom a second time before anyone measured it.
+// The step-up now enforces its one-cell contract, and the rule has a spec of its
+// own that fails when it does not: `tests/game/wall-climb.spec.mjs`.
+//
+// Keep the lesson attached to the file: an assumption about ANOTHER module,
+// stated as settled ground in a header, is a hypothesis. This one was wrong for
+// months and quietly redirected an entire investigation.
+//
 // markTraversal() recolours the rim of every genuine one-cell rise. These
 // specs pin the two halves of that promise:
 //   1. every climbable rise IS marked  (no unmarked invitation to climb)

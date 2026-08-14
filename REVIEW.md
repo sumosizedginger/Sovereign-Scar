@@ -84,6 +84,42 @@ at the time. Treat any claim of the form "the tests pass" accordingly.
 > secondary: it caught the softlock my fix for the last one would have shipped,
 > and it caught a behaviour combination that fix quietly deleted.
 
+> **The same day, a second session produced six more — and two of them had
+> already been "fixed".** All six were invisible to a suite that stayed green
+> throughout, and the two repeats are the ones a reviewer should care about:
+>
+> - **The Obsidian Arachnid, third occurrence of one sentence.** Twice fixed
+>   before, at two different causes. The real one was that its armoured front
+>   tracked the player faster than the player could circle it, so the only
+>   radius that ever landed a blow was inside its own legs. `boss-facing.spec.mjs`
+>   owns that exact rule, and was green because it asked at radii 1.5, 2 and 3
+>   against a default-sized boss — every one of them inside a body scaled 1.70.
+>   It also raced against a player speed of 6.0 when the player has been 5.5 for
+>   the life of the file, in the direction that hides the bug.
+> - **Wall climbing, second occurrence.** The first report — "the player is
+>   constantly trying to climb up the walls" — was read as a *legibility*
+>   problem, and `traversal-legibility.spec.mjs` was written to mark which rises
+>   are stairs. Its header opens by asserting the physics as settled ground:
+>   "the physics body steps up exactly one voxel". It did not. A body gained
+>   seven cells in seven frames up a flat wall, so the investigation was built
+>   on top of the bug it was investigating. The guard that should have caught
+>   the physics was named "no phantom climb" and was structurally incapable of
+>   seeing one — its own comment reads "simulate with XZ solid only + no
+>   voxels", and the climb code reads voxels.
+> - The other four: a weapon filter that announced itself from anywhere in the
+>   dungeon because it checked the weapon before the location; a dash whose
+>   speed was thrown at an impulse the physics body overwrote on the next tick,
+>   and which was steered by live stick input so a *tapped* dash covered nothing;
+>   a 110° sword arc drawn by a move with no hitbox; and an advertised mechanic
+>   — the Light Caster's standing line — whose hit test was written, correct,
+>   and called by nothing.
+>
+> **The lesson a reviewer should take is about the shape, not the count.** Three
+> of the six were guarded by a spec that named the exact rule and tested it
+> somewhere the rule could not fail. A confident, wrong conclusion written into
+> a comment (§5) kept one of them alive across two reports. When judging this
+> repo, "there is a test for that" is the beginning of the question.
+
 **4.2 Suite size is not coverage, and this repo has the receipt.** When twenty
 shipped fixes were each reverted one at a time, **six could be deleted with
 4426 assertions still green.** That audit is HANDOFF trap 23 and it is the

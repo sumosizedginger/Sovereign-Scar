@@ -120,16 +120,30 @@ export class DestructibleVoxelMesh {
     /**
      * Shatter voxels near a world-space point (weapon impact helper).
      */
-    shatterAtWorld(wx, wy, wz, maxRadius = 3) {
+    /**
+     * The nearest surviving voxel to a world point, or `null` if the point is
+     * nowhere near this body.
+     *
+     * Extracted out of `shatterAtWorld` so that CALLERS CAN ASK "am I actually
+     * standing at this thing" without swinging at it. `blockers.js` wraps a
+     * wedge crack in a weapon filter that has to answer exactly that question,
+     * and having no way to ask it is what made the filter announce itself from
+     * anywhere in the dungeon.
+     *
+     * One search, one answer: a second copy of this arithmetic living in the
+     * caller could drift out of step with the one that does the breaking, and
+     * then "it said I need the wedge" and "the wedge would have worked here"
+     * stop being the same statement.
+     */
+    nearestVoxelToWorld(wx, wy, wz, pad = 2) {
         const s = this.voxelSize;
         const lx = Math.floor((wx - this.origin.x) / s);
         const ly = Math.floor((wy - this.origin.y) / s);
         const lz = Math.floor((wz - this.origin.z) / s);
-        // Find nearest existing voxel in a small neighborhood
         let best = null, bestD = 1e9;
-        for (let dx = -2; dx <= 2; dx++) {
-            for (let dy = -2; dy <= 2; dy++) {
-                for (let dz = -2; dz <= 2; dz++) {
+        for (let dx = -pad; dx <= pad; dx++) {
+            for (let dy = -pad; dy <= pad; dy++) {
+                for (let dz = -pad; dz <= pad; dz++) {
                     const x = lx + dx, y = ly + dy, z = lz + dz;
                     if (!this.hasVoxel(x, y, z)) continue;
                     const d = dx * dx + dy * dy + dz * dz;
@@ -137,6 +151,11 @@ export class DestructibleVoxelMesh {
                 }
             }
         }
+        return best;
+    }
+
+    shatterAtWorld(wx, wy, wz, maxRadius = 3) {
+        const best = this.nearestVoxelToWorld(wx, wy, wz);
         if (!best) return 0;
         return this.shatterConnected(best[0], best[1], best[2], maxRadius);
     }

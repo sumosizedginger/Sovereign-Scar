@@ -972,6 +972,13 @@ export class ObsidianArachnid extends BossBase {
             contactRadius: 1.8, position, mesh: body, phaseThresholds: [0.5],
         });
         this.legs = legs;
+        // The head IS the plate — it sits at +Z, which is the direction
+        // `faceToward` points `state.facingVec`, which is the axis `inFrontArc`
+        // measures. Held so `tickAI` can say out loud which state the armour is
+        // in; see `_paintPlate`.
+        this._plate = head;
+        this._plateHot = new THREE.Color(0xff2040);   // as authored: open, hittable
+        this._plateCold = new THREE.Color(0x86c8ff);  // plate up, blows turn
         this.leapCd = 3;
         this._leapT = 0;
         // Its carapace is armoured; its flanks and its underside are not.
@@ -1014,15 +1021,89 @@ export class ObsidianArachnid extends BossBase {
         return super.stagger(sec);
     }
 
+    /**
+     * Say which state the armour is in, BEFORE the player commits to a swing.
+     *
+     * Until now the only report that a plate had turned a blow was the clang
+     * and the sparks in `combat-sweeper.applyHit` — both of which arrive after
+     * you have already spent the attack. A rule the player can only learn by
+     * paying for it is not a rule, it is a tax, and this one is the whole
+     * fight.
+     *
+     * Colour, not brightness. `BossBase` runs `clampEmissive` over the whole
+     * body in its constructor, so the head is already sitting at the 0.55
+     * ceiling and there is no headroom to flash upward into — trying to signal
+     * by getting brighter here would produce no visible change at all, and
+     * `boss-room-lum.mjs` would have caught it as another bloom blowout if it
+     * had. Cold blue = the carapace refuses. Hot red = its own authored colour,
+     * and a blow lands.
+     *
+     * `armorUp` is derived, never assigned, so this cannot drift out of step
+     * with the thing it is describing: it reads the identical getter that
+     * `applyHit` gates on.
+     */
+    _paintPlate() {
+        const m = this._plate?.material;
+        if (!m?.emissive) return;
+        m.emissive.copy(this.armorUp ? this._plateCold : this._plateHot);
+        // A shallow pulse while open, so "hit me now" reads at a glance across
+        // an arena rather than needing the player to compare two frames.
+        m.emissiveIntensity = this.armorUp
+            ? BOSS_EMISSIVE_MAX
+            : BOSS_EMISSIVE_MAX * (0.72 + 0.28 * Math.sin(this.t * 9));
+    }
+
     tickAI(dt, player) {
         for (let i = 0; i < this.legs.length; i++) {
             this.legs[i].rotation.x = Math.sin(this.t * 6 + i) * 0.35;
         }
         if (this._openT > 0) this._openT -= dt;
+        // BEFORE the early returns. The plate is open during the leap — which
+        // is exactly when `busy` bails out below — and during the dormant
+        // no-player tick, so painting it any further down would leave the tell
+        // frozen on whatever it last showed for the whole of the one window the
+        // fight is built around.
+        this._paintPlate();
         if (!player) return;
-        // Turn no faster than the player can strafe, so circling to the flank
-        // is a race the player wins in about a second and a half.
-        this.faceToward(player, dt, 1.1);
+        // TURN RATE IS DERIVED FROM THIS BOSS'S OWN SIZE, not inherited.
+        //
+        // This was 1.1 with a comment claiming "circling to the flank is a race
+        // the player wins in about a second and a half". Measured — with
+        // `tests/qa/armor-flank-reach.mjs`, which drives this very call — that
+        // sentence was true at exactly one radius: pressed against the body.
+        //
+        //   standing at            1.1 rad/s
+        //   body edge      3.19        1.67s
+        //   anchor_link max 4.95      NEVER
+        //   wedge max      5.35       NEVER
+        //   webbed, at the body edge  NEVER
+        //
+        // The player out-turns the plate only inside `5.5 / rate` — 5.00 units
+        // at 1.1 — and `presenceScale(1.70)` puts this boss's whole legal
+        // hitting band at 3.19–5.35. Most of it is outside that circle. So the
+        // fight taught "stand inside it or nothing lands", which is the owner's
+        // report for the third time, from a third distinct cause.
+        //
+        // `bosses/base.js` already states the rule this violates: the rate must
+        // be SLOWER than the player can orbit. What it cannot know is at which
+        // radius, and the answer is not a constant — it is `speed / reach`, and
+        // reach is `move.range + hitRadius`. For a boss scaled 1.70 that is a
+        // very different number than for the 0.49-radius mobs 1.1 was chosen
+        // against. The bulwark got this right at `enemy.js:302` by doing the
+        // division against its own range; this call copied a figure instead.
+        //
+        // 0.7 puts the break-even at 7.86 — past the longest melee weapon in
+        // the game against this body — so there is no radius left where the
+        // plate simply wins:
+        //
+        //   body edge      3.19        1.02s
+        //   anchor_link max 4.95       2.55s
+        //   wedge max      5.35        3.19s
+        //
+        // Slower the further out you stand, which is the gradient the armour
+        // exists to teach, and finite everywhere, which is what makes it a
+        // puzzle rather than a wall.
+        this.faceToward(player, dt, 0.7);
         if (this.busy) {
             // Airborne through the wind-up, crumpled on the floor through the
             // recovery. Its armoured back is only off the ground while it is
@@ -1115,7 +1196,18 @@ export class ObsidianArachnid extends BossBase {
                 const cz = this.root.position.z + fv.z * WEB_R * 0.7;
                 this.spawnPatch({
                     x: cx, z: cz, r: 2.6, life: 5,
-                    color: 0xa878e0, slow: 0.5, kind: 'web',
+                    // 0.5 → 0.7. A slow patch does not only slow your walk, it
+                    // slows your ORBIT, and this boss's plate is beaten by
+                    // orbiting. At half speed the player's angular rate at the
+                    // body edge fell below even the reduced turn rate, so
+                    // standing in the web made the armour absolutely
+                    // unflankable — measured as `never (>20s)` before this.
+                    //
+                    // The web should punish position, not suspend the fight's
+                    // only verb. At 0.7 the same circle takes about two seconds
+                    // instead of one: slow enough to want out of it, short of
+                    // being a stun that does not say it is a stun.
+                    color: 0xa878e0, slow: 0.7, kind: 'web',
                 });
                 if (this.inCone(p, this.root.position, { x: fv.x, z: fv.z },
                     aim.radius, aim.halfAngle)) {

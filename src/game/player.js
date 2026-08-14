@@ -617,10 +617,30 @@ export class Player {
         const ownsBoot = this.inventory.hasItem('phase_boot') || this.inventory.items.phase_boot;
         const boot = PHASE_BOOT;
         // Without Phase Boot: short hop only (not full gap-cross dash)
-        const power = ownsBoot ? boot.dashSpeed : boot.dashSpeed * 0.45;
+        // THE DASH NOW MOVES AT THE SPEED THE DASH DECLARES.
+        //
+        // This used to hand `dashSpeed` to `physics.applyImpulse`, and
+        // `VoxelPhysicsBody.update` hard-assigns `this.vx = wx * speed` on the
+        // very next tick while there is movement input — which there always is
+        // during a dash. The impulse was overwritten before it moved the player
+        // a single frame. `dashSpeed: 18` existed in exactly two places: where
+        // it was defined, and where it was thrown away.
+        //
+        // What actually shipped was the flat `speed: dashTimer > 0 ? 14` in
+        // `update()`, so the whole dash was 14 x 0.14 = 1.96 units, of which
+        // walking would have covered 0.77 anyway. Net gain over just running:
+        // 1.19 units — about one cell. Hence the report, which is precise: "the
+        // dash, even after picking up the dash boots, is only like 1 square".
+        //
+        // Carried on the player and read by `update()` instead, so the number
+        // in the weapon table is the number the body moves at: 18 x 0.14 = 2.52
+        // units, enough to clear a gap, which is what the item promises.
+        const power = ownsBoot ? boot.dashSpeed : boot.hopSpeed;
         const dur = ownsBoot ? boot.dashDuration : boot.dashDuration * 0.6;
         const fv = this.state.facingVec;
-        this.physics.applyImpulse(fv.x * power, 0, fv.z * power);
+        this._dashSpeed = power;
+        this._dashDuration = dur;
+        this._dashDir = { x: fv.x, z: fv.z };
         this.dashTimer = dur;
         this.dashCd = ownsBoot ? boot.cooldown : boot.cooldown * 1.2;
         // C3: Ghost-step upgrade extends dash i-frames.
@@ -631,11 +651,23 @@ export class Player {
         const iWindow = Math.max(0.3, dur + 0.05) + (this.dashIframeBonus || 0);
         this.health.iFrames = Math.max(this.health.iFrames, iWindow);
         gsfx.dash();
+        // A TRAIL, NOT A SWING.
+        //
+        // This called `spawn` with no `arc`, so it fell to the default
+        // `ARC_ANGLE = PI * 0.61` — a 110-degree fan, the exact shape a sword
+        // swing draws, at radius 2, wired to nothing at all. The dash has no
+        // hitbox by design, so the game was drawing an attack it could not
+        // deliver: "the dash ... does not hit an enemy at all, but there is a
+        // swing animation" is the report, and the animation was the lie.
+        //
+        // A narrow streak along the facing reads as MOVEMENT. It says where the
+        // body went, which is the only thing the dash actually does.
         this.arcSmear.spawn({
             position: this.rig.position,
             facingVec: fv,
             radius: ownsBoot ? 2 : 1.2,
             color: boot.smearColor,
+            arc: 0.26,
         });
         return true;
     }
@@ -724,7 +756,30 @@ export class Player {
             // rather than the speed, so facing stops updating too — the strike
             // resolves along the heading you released on, which is the heading
             // the smear was about to be drawn along.
-            const mv = this.chargeStrike ? { x: 0, z: 0 } : input.moveVector();
+            // A DASH IS A COMMITTED MOVE AND OWNS ITS OWN HEADING.
+            //
+            // This read live stick input for the whole dash, so the dash was
+            // steered by whatever the player happened to be holding — and if
+            // they let go, which is the natural thing to do when you TAP a
+            // dash button, `mv` went to zero and the dash covered no ground at
+            // all. Ground friction then ate the rest. That is the larger half
+            // of "the dash is only like 1 square": the speed fix alone raises
+            // the ceiling, but this is what the player was actually hitting.
+            //
+            // It is the same defect the grapple was reported for in the same
+            // playthrough — "I should be able to grapple and land on the ledge,
+            // not fall into darkness if I'm not pushing forward". A traversal
+            // verb that silently requires you to keep holding forward is a verb
+            // that does nothing on the one input everybody uses.
+            //
+            // Committed to the heading captured at `tryDash`, so the dash goes
+            // where it was aimed, at its own speed, for its own duration.
+            // Facing follows `mv`, so this also keeps the body pointed along
+            // the dash rather than snapping back on release.
+            const mv = this.chargeStrike ? { x: 0, z: 0 }
+                : (this.dashTimer > 0 && this._dashDir)
+                    ? { x: this._dashDir.x, z: this._dashDir.z }
+                    : input.moveVector();
             // A Link to the Past facing model: you face where you walk, and
             // standing still keeps your last facing. Mouse aim used to
             // overwrite this every single frame, so the keyboard never
@@ -747,7 +802,7 @@ export class Player {
                 // purpose: dashing out of a web or a slick is the answer to
                 // being in one, and a slow that also slowed the escape would
                 // just be damage with extra steps.
-                speed: this.dashTimer > 0 ? 14
+                speed: this.dashTimer > 0 ? (this._dashSpeed || PHASE_BOOT.hopSpeed)
                     : this.speed
                         * (this.guard.raised ? GUARD_SPEED_MULT : 1)
                         * (1 - Math.min(0.75, this._hazardSlow || 0))
@@ -842,7 +897,13 @@ export class Player {
                 wishZ: mv2 ? mv2.z : 0,
                 grounded: this.physics.grounded,
             });
-            this.animator.setDashing(this.dashTimer > 0);
+            // WITH ITS REAL LENGTH. `setDashing(active)` alone leaves the
+            // animator on its built-in default, so the dash pose was being
+            // played against the wrong clock and only ever reached a third of
+            // its travel before the dash was over. The pose and the move have
+            // to agree about how long the move is.
+            this.animator.setDashing(this.dashTimer > 0, this.dashTimer > 0
+                ? (this._dashDuration || undefined) : undefined);
             this.animator.setGrapple(!!g.active);
             this.animator.setGuarding(this.guard.raised);
             this.animator.setDead(this.health.dead);

@@ -170,6 +170,21 @@ export const PHASE_BOOT = {
     name: 'Phase Boot',
     dashSpeed: 18,
     dashDuration: 0.14,
+    /**
+     * Speed of the bare dash, before the Phase Boot is found.
+     *
+     * This used to be expressed as `dashSpeed * 0.45` applied to an impulse
+     * that the physics body discarded on the next tick, so what actually
+     * shipped was a flat 14 for BOTH cases — the boot changed the duration and
+     * nothing else. Named here rather than derived, because the two speeds are
+     * a difficulty decision (how much the upgrade is worth) and not a ratio
+     * anybody should have to reverse-engineer.
+     *
+     * 14 is what the game has always moved at during a dash; keeping it means
+     * finding the boot is a clean upgrade rather than the early game quietly
+     * getting slower.
+     */
+    hopSpeed: 14,
     cooldown: 0.7,
     smearColor: 0xffd060,
 };

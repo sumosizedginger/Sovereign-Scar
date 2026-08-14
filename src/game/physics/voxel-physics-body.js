@@ -261,8 +261,29 @@ export class VoxelPhysicsBody {
     }
 
     /**
-     * Highest solid cell top at (wx,wz) whose top lies in [minTop, maxTop].
+     * Highest solid cell top at (wx,wz) whose top lies in [minTop, maxTop] AND
+     * which is actually a surface — that is, with air directly above it.
      * Used for step-up onto platforms that have no XZ CollisionWorld solid.
+     *
+     * THE MISSING WORD WAS "SURFACE".
+     *
+     * This used to return the top of ANY solid cell in the range, with no test
+     * of what sat on top of it. Inside a solid column every cell has a top, so
+     * a sheer wall offered the body a fresh legal "step" on every single frame,
+     * one cell higher than the last. `_tryStepUp` runs once per FRAME rather
+     * than per substep, so the result was a clean 60 units per second straight
+     * up a flat wall — measured at seven cells in seven frames by
+     * `tests/qa/wall-climb.mjs`, against a wall with no ledges in it at all.
+     *
+     * That is the owner's report, twice: "the character climbs up the walls,
+     * and if you climb too high you fall and take damage". The fall damage was
+     * never the bug. It was correctly billing a fall that should have been
+     * impossible, and the first investigation of this symptom went after the
+     * damage and the legibility instead of the climb.
+     *
+     * A cell top with more solid on top of it is not somewhere a body can
+     * stand; it is the inside of a wall. `MAX_STEP_HEIGHT` was always the whole
+     * contract here, and without this test there was nothing holding it.
      */
     _surfaceTopInRange(wx, wz, minTop, maxTop) {
         let best = null;
@@ -272,6 +293,8 @@ export class VoxelPhysicsBody {
             if (!this._solidAt(wx, y, wz)) continue;
             const top = (Math.floor(y / VOXEL_SIZE) + 1) * VOXEL_SIZE;
             if (top < minTop - 1e-4 || top > maxTop + 1e-4) continue;
+            // Air directly above, or this is not a surface.
+            if (this._solidAt(wx, top + VOXEL_SIZE * 0.5, wz)) continue;
             if (best == null || top > best) best = top;
         }
         return best;

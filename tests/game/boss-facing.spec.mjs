@@ -31,13 +31,39 @@
 // opens. Trap 1: every direction here is a world-space position, never the sign
 // of an angle.
 
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import * as THREE from 'three';
 import { BossBase } from '../../src/game/bosses/base.js';
 import { inFrontArc } from '../../src/game/combat/combat-sweeper.js';
 import { CryptWarden, SkeletalMantis, ObsidianArachnid } from '../../src/game/bosses/roster.js';
+import { measureBody } from '../../src/game/bosses/boss-models.js';
+import { WEAPONS } from '../../src/game/combat/weapons.js';
 
-/** Walk speed the player actually has, so the race is against a real number. */
-const PLAYER_SPEED = 6.0;
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const SRC = (rel) => fs.readFileSync(path.join(HERE, '../../src', rel), 'utf8');
+
+/**
+ * Walk speed the player actually has, so the race is against a real number.
+ *
+ * It said 6.0. The player has been 5.5 since `player.js:132`. An 9% error in the
+ * player's own side of a race is not a rounding difference — it is the wrong
+ * race — and it inflated every number in this file in the player's favour.
+ *
+ * So it is READ, not cited. `assertPlayerSpeed` below fails loudly if the game
+ * changes underneath, rather than letting this constant quietly go stale again.
+ */
+const PLAYER_SPEED = 5.5;
+
+/**
+ * The longest reach any melee weapon in the game has, so "how far out can the
+ * player stand and still land a blow" is answered by the weapon table rather
+ * than by a number somebody remembered.
+ */
+const LONGEST_MELEE = Math.max(...Object.values(WEAPONS)
+    .filter((w) => typeof w.range === 'number' && !w.ray && w.range < 6)
+    .map((w) => w.range));
 
 function makePlayer(x, z) {
     return {
@@ -79,29 +105,80 @@ const ARMOR_ARC = Math.PI / 3;   // +-60 degrees
  * The spec below pins both halves: fast at knife range, hopeless from the back
  * of the room.
  */
-function timeToFlank(turnRate, radius, cap = 12, dt = 1 / 60) {
-    const boss = makeBoss();
+function timeToFlank(make, radius, armorArc = ARMOR_ARC, speed = PLAYER_SPEED,
+    cap = 12, dt = 1 / 60) {
+    const { defender, turn } = make();
     const player = makePlayer(radius, 0);
-    boss.faceToward(player, dt, turnRate);   // first sight snaps; that is by design
+    turn(player, dt);                        // first sight snaps; that is by design
 
-    const omega = PLAYER_SPEED / radius;     // player's angular speed, rad/s
+    // ORBIT THE BOSS, NOT THE ORIGIN — AND ASK `inFrontArc`, DO NOT RE-DERIVE IT.
+    //
+    // This loop used to walk the player around a circle centred on (0,0) and
+    // then compute its own dot product against the boss's facing. Both halves
+    // were wrong in the same direction and covered for each other:
+    //
+    //   - a real boss CHASES. The Arachnid closes distance inside the same
+    //     `tickAI` that turns it, so within a second "radius" no longer
+    //     described the gap between the two bodies at all.
+    //   - the hand-rolled angle left the defender's own position out of the
+    //     subtraction, which is precisely the term that starts to matter the
+    //     moment the boss moves. `combat-sweeper.inFrontArc` — the function
+    //     `applyHit` actually gates damage on — does subtract it.
+    //
+    // Measured against the identical fixture, the re-derivation said 3.17s
+    // where the shipped rule said 1.62s. Two copies of one formula are not
+    // evidence even when they agree, and these did not.
+    const omega = speed / radius;            // player's angular speed, rad/s
     let theta = 0;
     for (let i = 0; i < Math.round(cap / dt); i++) {
         theta += omega * dt;
-        player.root.position.x = Math.cos(theta) * radius;
-        player.root.position.z = Math.sin(theta) * radius;
-        boss.faceToward(player, dt, turnRate);
-
-        // Angle between where the boss looks and where the player stands, both
-        // as world-space vectors (trap 1 — never the sign of an angle).
-        const fv = boss.state.facingVec;
-        const px = player.root.position.x, pz = player.root.position.z;
-        const len = Math.hypot(px, pz) || 1;
-        const dot = (px / len) * fv.x + (pz / len) * fv.z;
-        if (Math.acos(Math.max(-1, Math.min(1, dot))) > ARMOR_ARC) return i * dt;
+        const c = defender.root?.position ?? { x: 0, z: 0 };
+        player.root.position.x = c.x + Math.cos(theta) * radius;
+        player.root.position.z = c.z + Math.sin(theta) * radius;
+        turn(player, dt);
+        if (!inFrontArc(defender, player, armorArc)) return i * dt;
     }
     return Infinity;
 }
+
+/**
+ * A bare `BossBase` turning at a rate we choose — for the gradient and the
+ * counterfactual, where the point is to vary the rate rather than to test a
+ * shipped one.
+ */
+const synthetic = (rate) => () => {
+    const boss = makeBoss();
+    return { defender: boss, turn: (p, dt) => boss.faceToward(p, dt, rate) };
+};
+
+/**
+ * A REAL boss, driven through its REAL `tickAI`, so the rate under test is
+ * whatever `roster.js` passes to `faceToward` — not a number copied into this
+ * file. The old version of this spec took the rate as a literal `1.1`, which
+ * meant it went on reporting the same answer no matter what the game did: the
+ * Arachnid's turn rate could be changed to anything at all and every assertion
+ * here stayed green. A test that cannot see the code it names is not a test.
+ *
+ * `actionCd` is pinned high because `tickAI` returns early while `busy`, and a
+ * boss mid-leap is not a boss being circled.
+ */
+const shipped = (Cls) => () => {
+    const boss = new Cls(new THREE.Scene(), { x: 0, z: 0 });
+    boss._awake = true;
+    return {
+        defender: boss,
+        turn: (p, dt) => { boss.actionCd = 99; boss.t = (boss.t || 0) + dt; boss.tickAI(dt, p, null); },
+    };
+};
+
+/**
+ * How far out the player can stand and still land a blow on `boss`.
+ * Verbatim the test `src/combat/hitbox.js:64` applies: `move.range + hitRadius`.
+ */
+const maxReach = (boss) => LONGEST_MELEE + (boss.hitRadius || 0);
+
+/** The radius of the circle containing the body from above. */
+const bodyEdge = (boss) => measureBody(boss.root || boss.mesh).radius;
 
 export function run(t) {
     // ── faceToward keeps the mesh and the combat facing in agreement ───────
@@ -152,19 +229,71 @@ export function run(t) {
     // The Arachnid's ±60-degree plate (armorArc = PI/3) is the reference: to
     // beat it the player must get more than 60 degrees off the nose.
     {
-        // At the range this fight is actually fought — inside the scythe's
-        // reach — circling has to WORK, and quickly enough to be worth doing
-        // between attacks. The Mantis's cooldown is 1.4s at phase 1.
-        for (const radius of [1.5, 2, 3]) {
-            const s = timeToFlank(1.1, radius);
-            t.ok(`at ${radius} units the flank opens inside one attack cooldown`,
-                s <= 1.4, `${s === Infinity ? 'never' : s.toFixed(2) + 's'} to clear a 60deg plate`);
+        // THE RADII COME FROM THE BOSS, NOT FROM THIS FILE.
+        //
+        // This block used to ask the question at 1.5, 2 and 3 units against a
+        // default-sized `makeBoss()`, and it was green while the shipped fight
+        // was unwinnable. The Obsidian Arachnid carries `presenceScale(1.70)`:
+        // its body edge is 3.19 and its hitbox reaches 5.35 with the tectonic
+        // wedge. EVERY radius this spec tested was inside the spider's own legs
+        // — a place the player cannot stand and fight from. The one place
+        // measured was the one place that was already fine, which is this
+        // project's most expensive recurring bug, and it cost three separate
+        // "I have to stand inside it to hit it" reports.
+        //
+        // The rule, stated so it cannot go stale: IF THE PLAYER CAN LEGALLY LAND
+        // A BLOW FROM A RADIUS, THEY MUST BE ABLE TO REACH THE FLANK FROM THAT
+        // RADIUS. Anything else is not armour, it is a wall with a hit sound.
+        for (const [name, Cls] of [['Obsidian Arachnid', ObsidianArachnid]]) {
+            const probe = new Cls(new THREE.Scene(), { x: 0, z: 0 });
+            if (probe.armorArc == null) continue;      // not armoured; nothing to flank
+            const edge = bodyEdge(probe);
+            const far = maxReach(probe);
+            const make = shipped(Cls);
+
+            t.ok(`${name}: its reach band is real`, far > edge,
+                `edge ${edge.toFixed(2)}, max reach ${far.toFixed(2)}`);
+
+            // Both ends of the band the fight is really fought in, and a
+            // DIFFERENT bar at each — because the gradient is the lesson, and
+            // one invented number covering both ends would flatten it.
+            //
+            //   body edge   pressed against it: this is the reward for closing,
+            //               so it has to land inside a single exchange.
+            //   max reach   the very tip of the longest weapon in the game.
+            //               One full leap cycle (`leapCd = 3`) is the honest
+            //               bar: hanging back should cost you a whole rotation
+            //               of the fight, and it does — it must not cost you
+            //               the fight itself, which is what `never` meant.
+            for (const [label, r, bar] of [
+                ['body edge', edge, 1.5],
+                ['max reach', far, 3.5],
+            ]) {
+                const s = timeToFlank(make, r, probe.armorArc);
+                t.ok(`${name}: the flank opens at ${label} (${r.toFixed(2)})`,
+                    s !== Infinity,
+                    `${s === Infinity ? 'NEVER' : s.toFixed(2) + 's'} — a radius you can hit `
+                    + 'from must be a radius you can flank from');
+                t.ok(`${name}: …within ${bar}s at ${label}`,
+                    s <= bar,
+                    `${s === Infinity ? 'NEVER' : s.toFixed(2) + 's'} to clear a `
+                    + `+-${(probe.armorArc * 180 / Math.PI).toFixed(0)}deg plate`);
+            }
+
+            // AND WHILE SLOWED. A patch that slows your walk slows your ORBIT,
+            // and this boss lays one. At the old slow of 0.5 the plate became
+            // absolutely unflankable — measured as never — which is a stun that
+            // does not admit to being a stun.
+            const sSlow = timeToFlank(make, edge, probe.armorArc, PLAYER_SPEED * 0.7);
+            t.ok(`${name}: the flank still opens while slowed by its own web`,
+                sSlow !== Infinity && sSlow <= 3,
+                `${sSlow === Infinity ? 'NEVER' : sSlow.toFixed(2) + 's'} at the body edge`);
         }
 
         // And it must degrade the right way, not fall off a cliff: further out
         // is slower, which is what makes closing the distance a decision.
-        const near = timeToFlank(1.1, 2);
-        const mid = timeToFlank(1.1, 4);
+        const near = timeToFlank(synthetic(1.1), 2);
+        const mid = timeToFlank(synthetic(1.1), 4);
         t.ok('and standing further out is strictly slower', mid > near,
             `${mid.toFixed(2)}s at 4 units vs ${near.toFixed(2)}s at 2`);
 
@@ -173,8 +302,25 @@ export function run(t) {
         // boss's nose at every range. No walk, at any radius, ever flanks it.
         for (const radius of [1.5, 2, 3, 4.5]) {
             t.ok(`an instant turn at ${radius} units can never be flanked`,
-                timeToFlank(1e6, radius) === Infinity,
+                timeToFlank(synthetic(1e6), radius) === Infinity,
                 'an armoured boss that snaps to face its attacker has no back');
+        }
+    }
+
+    // ── The player's own speed is READ, not remembered ─────────────────────
+    // `PLAYER_SPEED` in this file said 6.0 while the player has been 5.5 since
+    // `player.js:132`. Every number in the race was computed with the player 9%
+    // faster than they actually are — in the player's favour, which is the
+    // direction that HIDES exactly the bug above. A constant describing another
+    // file is a hypothesis until something checks it.
+    {
+        const src = SRC('game/player.js');
+        const m = src.match(/this\.speed\s*=\s*([\d.]+)\s*;/);
+        t.ok('player.js still states a walk speed', !!m, 'expected `this.speed = <n>;`');
+        if (m) {
+            t.ok('and this spec races against that exact number',
+                Math.abs(parseFloat(m[1]) - PLAYER_SPEED) < 1e-9,
+                `player.js says ${m[1]}, this file assumes ${PLAYER_SPEED} — re-derive the race`);
         }
     }
 

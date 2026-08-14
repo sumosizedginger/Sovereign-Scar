@@ -299,15 +299,31 @@ export class Enemy {
         // every angle, and a bulwark was literally unkillable by melee. The
         // flank the kind is built around was geometrically unreachable.
         //
-        // 2.2 rad/s is derived, not picked. The plate spans ±75° (PI/2.4), so
-        // the player must win 1.31 rad of relative bearing. Circling at speed
-        // 5.5 from melee range (~1.5) is 3.7 rad/s of orbit, so the net gain is
-        // ~1.5 rad/s — just under a second of committed strafing to open the
-        // back. Fast enough to feel earned, slow enough that standing still and
-        // swinging never works. Infinity leaves every other kind bit-for-bit
-        // identical to before.
+        // 1.6 rad/s is derived, not picked — but the derivation has to use the
+        // player's REAL reach, which is what the previous one got wrong.
+        //
+        // It was 2.2, derived against "melee range (~1.5)". The player does not
+        // fight at 1.5. `src/combat/hitbox.js:64` lands a blow out to
+        // `move.range + hitRadius`, and against a bulwark that is 2.48 holding
+        // the anchor link and 2.88 holding the tectonic wedge. Circling only
+        // beats a plate inside `speed / turnRate`, which at 2.2 is 2.50 — so
+        // both of the player's longer weapons reached PAST the radius where
+        // flanking still works. Measured with `tests/qa/armor-flank-reach.mjs`:
+        //
+        //   standing at            2.2 rad/s    1.6 rad/s
+        //   body edge   0.87          0.32s        0.28s
+        //   anchor max  2.48         NEVER         2.10s
+        //   wedge max   2.88         NEVER         4.20s
+        //
+        // Nobody reported this; it was found sweeping the Arachnid's identical
+        // defect across every armoured defender rather than fixing the one that
+        // was named. Up close the fight is unchanged to within a rounding
+        // error — what changes is that hanging back at the end of a long weapon
+        // is now merely a bad idea instead of a stalemate.
+        //
+        // Infinity leaves every other kind bit-for-bit identical to before.
         this.turnRate = opts.turnRate != null ? opts.turnRate
-            : (this.frontArmor ? 2.2 : Infinity);
+            : (this.frontArmor ? 1.6 : Infinity);
         this.hover = opts.hover != null ? opts.hover : this.kind === 'mote';
         // Cruise height is deliberately ABOVE every melee vertical gate
         // (heavy_mallet gate ≈ 2.0 against a player at 1.95 → anything under
