@@ -48,8 +48,20 @@ standing beside. A peg must now be **across the chasm** to be a destination
 (`segmentCrossesRect`, an exact slab clip), which is symmetric and needs no
 tuned constant; ties break on distance rather than array order.
 
-**Still open:** the return pull now aims correctly and is then cancelled by the
-collision sweep one frame in, so the crossing back is not yet possible.
+**And the reason the crossing back still failed after that: the sweep ran
+backwards.** `GrappleController.update` steps the pull in four substeps, and the
+eased progress starts near zero — so on the first frame the first substep asked
+to move to a point **two thirds of the pull distance behind the player**. With
+anything solid back there the move is refused, the blocked-check fires, and the
+whole pull cancels before it moves. The windworks far ledge is one metre of
+floor with a full-height wall behind it, so the return trip swept into that wall
+and cancelled having moved 0.10. Clamped: **arrives at z −65.7, moved 4.80.**
+
+That was never gap-specific — the grapple failed **anywhere the player had their
+back to a wall**, and only one direction was ever broken because firing the other
+way the same backwards substep lands on open floor and resolves cleanly. `cx`/`cz`,
+the sweep's starting point, already carried the same `Math.max(0, …)`; the loop
+was the half that missed it.
 
 ### A boss two rooms away was audible at full volume
 

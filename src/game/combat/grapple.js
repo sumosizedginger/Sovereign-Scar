@@ -141,7 +141,30 @@ export class GrappleController {
             let cx = this.from.x + (this.to.x - this.from.x) * Math.max(0, e - 1 / steps);
             let cz = this.from.z + (this.to.z - this.from.z) * Math.max(0, e - 1 / steps);
             for (let i = 0; i < steps; i++) {
-                const t1 = Math.min(1, e - (steps - 1 - i) / steps);
+                // CLAMPED AT ZERO, or the early substeps sweep BACKWARDS.
+                //
+                // `e` starts near zero, so on the first frame of a pull this
+                // was `e - 0.75` for i=0 — about −0.66 — and the swept target
+                // came out two thirds of the pull distance BEHIND the player,
+                // in the opposite direction to the grapple. If anything solid
+                // is back there, `resolveMove` refuses, the check below sees a
+                // difference of more than 0.05 and cancels the whole pull.
+                //
+                // So the grapple failed whenever the player had their back to a
+                // wall, anywhere in the game. Measured in 04 Sky Monument's
+                // windworks: the far ledge is one metre of standable ground at
+                // z −70.5 with a full-height wall behind it at z −71, so the
+                // return trip computed a sweep to z −73.65, straight into that
+                // wall, and cancelled at z −70.6 having moved 0.10. The owner's
+                // report was that you simply cannot get back across.
+                //
+                // It also explains why only ONE direction was broken: firing
+                // south-to-north the same backwards substep lands on open
+                // floor, resolves cleanly, and nothing ever noticed.
+                //
+                // `cx`/`cz` above already carry a `Math.max(0, …)` for exactly
+                // this reason. The loop was the half that missed it.
+                const t1 = Math.min(1, Math.max(0, e - (steps - 1 - i) / steps));
                 const nx = this.from.x + (this.to.x - this.from.x) * t1;
                 const nz = this.from.z + (this.to.z - this.from.z) * t1;
                 const r = collisionWorld.resolveMove(cx, cz, nx, nz, half);
