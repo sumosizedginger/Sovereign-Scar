@@ -160,9 +160,35 @@ this defect.
 
 Brightness `2.2` → `0.5`. The bloom threshold is 0.85 and the project's ceiling
 for any emissive part is `BOSS_EMISSIVE_MAX = 0.55` — a scenery effect was four
-times brighter than the brightest thing a boss is allowed to be. `transparent`
-was also only set inside `update()`, so the first frame of every line rendered
-fully opaque: the line popped rather than appeared.
+times brighter than the brightest thing a boss is allowed to be.
+
+**That brightness fix then removed the line entirely, and the follow-up is the
+more interesting half.** Reported immediately: *"now no line is being left by
+the light caster."* Two bugs had been hiding each other.
+
+`transparent` was only ever assigned inside `update()`, on a material
+constructed opaque — and three.js will not move a material onto its transparent
+path without `needsUpdate`. So `opacity` was silently ignored: the line held
+full strength for its whole life and then popped out of existence. Setting
+`transparent: true` at construction made the material honest and, in doing so,
+switched on a fade that **had never once run in the shipped game** — a straight
+ramp from `life / maxLife` starting on frame one. Stacked on a 4.4× brightness
+cut, the line was too faint to read for most of its 1.8 seconds. A flash, not a
+standing line.
+
+So the fade now **holds full strength for 70% of the line's life and goes out
+over the last 30%**, and the line is drawn at `0.35` units instead of `0.15`.
+That thickness is the real lesson: at 0.15, seen from a camera seventeen units
+up, the line was a hairline that was only ever visible AS BLOOM. A shape that
+has to breach the bloom threshold in order to exist is not a shape — which is
+why "far too bright" and "not there at all" looked like the same axis and were
+not.
+
+Found by photographing it (`tests/qa/light-line-look.mjs`, frames in
+`docs/media/light-line/`). The first version of that probe pinned `life = 999`,
+which forces the fade factor to 1.0 — it photographed the best frame of the
+line's existence and would have reported the bug as fixed. The report was about
+the other 90% of its lifetime.
 
 ### Two dungeons never asked you to fight anything
 

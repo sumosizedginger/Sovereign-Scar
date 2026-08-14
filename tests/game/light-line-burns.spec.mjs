@@ -122,11 +122,52 @@ export function run(t) {
             L.mat.transparent === true,
             'set only inside update(), the first frame rendered fully opaque');
 
-        // …and it fades rather than holding full strength to the end.
-        const at0 = L.mat.emissiveIntensity;
-        for (let i = 0; i < 60; i++) sys.update(1 / 60, []);
-        t.ok('it dims as it dies', L.mat.emissiveIntensity < at0,
-            `${at0} -> ${L.mat.emissiveIntensity}`);
+        // IT STANDS, THEN IT GOES OUT.
+        //
+        // The fade used to be `life / maxLife`, a straight ramp from the first
+        // frame, so the line was too faint to read for most of its existence —
+        // a flash rather than the standing line beat 12 advertises. The owner's
+        // second report was "now no line is being left by the light caster".
+        //
+        // That bug was ALSO hidden by a second one. `transparent` was assigned
+        // inside `update()` on a material constructed opaque, and three.js will
+        // not move a material onto its transparent path without `needsUpdate`
+        // — so `opacity` was silently ignored and the line held full strength
+        // for its whole life and then vanished. Fixing the material turned on a
+        // fade that had never once run, and stacking that on a 4.4x brightness
+        // cut is what deleted the line.
+        //
+        // So both halves are pinned: full strength through the middle of its
+        // life, and genuinely out by the end.
+        const mid = new LightLineSystem(new THREE.Scene(), null);
+        const M = mid.fire(origin, dir, { range: 8, life: 2 });
+        const at0 = M.mat.emissiveIntensity;
+        for (let i = 0; i < 60; i++) mid.update(1 / 60, []);   // 1.0s of 2.0s
+        t.ok('it is still at full strength half way through its life',
+            M.mat.opacity > 0.99 && M.mat.emissiveIntensity >= at0 - 1e-6,
+            `opacity ${M.mat.opacity.toFixed(2)} at t=1.0s of 2.0s — a standing `
+            + 'line must stand, not start dying on frame one');
+
+        for (let i = 0; i < 54; i++) mid.update(1 / 60, []);   // 1.9s of 2.0s
+        t.ok('…and it has gone out by the end', M.mat.opacity < 0.35,
+            `opacity ${M.mat.opacity.toFixed(2)} at t=1.9s of 2.0s`);
+    }
+
+    // ── 6b. IT IS THICK ENOUGH TO BE A SHAPE ───────────────────────────────
+    // At 0.15 units, seen from a camera seventeen units up, the line was a
+    // hairline — visible only as BLOOM, which is why it could be seen at all
+    // only while it was blowing the arena out. A shape that has to breach the
+    // bloom threshold in order to exist is not a shape, and that is the trap
+    // that made "too bright" and "not there" look like the same axis.
+    {
+        const sys = new LightLineSystem(new THREE.Scene(), null);
+        const L = sys.fire(origin, dir, { range: 8, life: 2 });
+        const p = L.mesh.geometry.parameters;
+        t.ok('the line is drawn thick enough to read without bloom',
+            p.width >= 0.3 && p.height >= 0.3,
+            `${p.width} x ${p.height} — 0.15 was a hairline`);
+        t.ok('…and is still a line, not a slab',
+            p.depth > p.width * 5, `${p.width} x ${p.depth}`);
     }
 
     // ── 7. THE WIRE IS ACTUALLY CONNECTED ──────────────────────────────────

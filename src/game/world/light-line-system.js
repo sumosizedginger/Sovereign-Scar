@@ -10,6 +10,26 @@ import { applyHit } from '../combat/combat-sweeper.js';
  */
 const MAX_EMISSIVE = 0.5;
 
+/**
+ * How thick the line is drawn, in world units.
+ *
+ * 0.15 is a hairline seen from a camera seventeen units up — at that size the
+ * line was never really visible AS GEOMETRY, it was visible as BLOOM, which is
+ * why it could only be seen at all when it was blowing the arena out. A shape
+ * that needs to be over the bloom threshold to exist is not a shape.
+ */
+const THICKNESS = 0.35;
+
+/**
+ * Fraction of its life the line holds full strength before it starts to go out.
+ *
+ * It used to fade linearly from the very first frame, so it was dimmer than it
+ * looked for almost its whole existence — a flash, not a line. "No line is
+ * being left by the light caster" is what that reads as, and the toast in beat
+ * 12 promises a STANDING line. It stands, then it goes out.
+ */
+const HOLD = 0.7;
+
 /** Seconds between damage ticks for a target standing in the line. */
 const BURN_INTERVAL = 0.4;
 
@@ -35,7 +55,7 @@ export class LightLineSystem {
 
         const dir = new THREE.Vector3(facing.x, 0, facing.z).normalize();
         const len = range;
-        const geo = new THREE.BoxGeometry(0.15, 0.15, len);
+        const geo = new THREE.BoxGeometry(THICKNESS, THICKNESS, len);
         // 2.2 -> 0.5, AND TRANSPARENT FROM THE FIRST FRAME.
         //
         // `UnrealBloomPass` runs at threshold 0.85 and the project's ceiling for
@@ -122,7 +142,22 @@ export class LightLineSystem {
         for (let i = this.lines.length - 1; i >= 0; i--) {
             const L = this.lines[i];
             L.life -= dt;
-            const a = Math.max(0, L.life / L.maxLife);
+            // HOLD, THEN GO OUT — not a fade that starts on frame one.
+            //
+            // This was `a = life / maxLife`, a straight ramp down from the
+            // moment the line appeared, so it spent most of its 1.8s too faint
+            // to read and the player saw a flash rather than a standing line.
+            //
+            // It was also invisible as a bug until `transparent` moved to the
+            // constructor. Assigned inside this loop on a material built
+            // opaque, three.js never recompiled the material onto its
+            // transparent path, so `opacity` was quietly ignored and the line
+            // held full strength for its whole life and then popped out of
+            // existence. Making the material honest turned on a fade that had
+            // never actually run, on top of a brightness cut — and the two
+            // together are what removed the line.
+            const t = Math.max(0, L.life / L.maxLife);
+            const a = t >= 1 - HOLD ? 1 : t / (1 - HOLD);
             L.mat.emissiveIntensity = MAX_EMISSIVE * a;
             L.mat.opacity = a;
 
