@@ -1,3 +1,4 @@
+// @ts-check
 // Beat 11 Rot Mire — animated sludge plane + wind bias helper.
 
 import * as THREE from 'three';

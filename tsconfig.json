@@ -1,0 +1,107 @@
+{
+    // TYPE CHECKING, WITHOUT TYPESCRIPT.
+    //
+    // Nothing here is compiled. `noEmit` is on, there is no build step, and not
+    // one `.ts` file exists in the product. What this buys is `checkJs`:
+    // TypeScript reads the plain JavaScript and the JSDoc that is already in it
+    // and reports the errors a type checker can see. `npm run typecheck` runs
+    // it; `npm run check` runs it beside the linter.
+    //
+    // ── THE BOUNDARY, AND WHY IT IS WHERE IT IS ────────────────────────────
+    //
+    // `include` below is FOUR trees, not the whole game. That is deliberate and
+    // it is the honest version of this feature.
+    //
+    // Checking all of `src/game/` reports ~250 errors. Almost none of them are
+    // defects — they are JSDoc `@param {{...}}` blocks that describe an options
+    // object less completely than the code uses it, which is a documentation
+    // debt worth paying but not one worth paying in a single 250-site commit
+    // nobody can review. Turning them all green by pasting `any` everywhere
+    // would produce a checker that passes and proves nothing, which is worse
+    // than no checker.
+    //
+    // So the checked set is the four trees where this project's real bugs have
+    // actually lived, per its own incident record in `REVIEW.md` and
+    // `HANDOFF.md`:
+    //
+    //   kernel/    the save schema, progress, health, inventory, run mode.
+    //              A wrong shape here corrupts a save.
+    //   world/     the room graph, key economy, blockers, doors, puzzles.
+    //              Every softlock this game has ever had lived in this tree.
+    //   combat/    the single damage entry point and the armour predicate.
+    //   physics/   the body that decides where the player may stand.
+    //
+    // Everything outside them is UNCHECKED. Presentation code (`fx/`, `ui/`,
+    // `render/`, `assets/`), the boss roster, `index.js`, `player.js`,
+    // `enemy.js` and the fourteen level definitions get no type analysis at
+    // all. `REVIEW.md` says so in the same words, because a reader who assumes
+    // "the repo has a type checker" means "the repo is type-checked" would be
+    // wrong by about 80%.
+    //
+    // The frozen My-Engine trees (`src/engine/`, `src/voxel/`, `src/combat/`,
+    // `src/characters/`, `src/audio/`) are outside the boundary on purpose:
+    // repository policy is that they are not edited from here, and a checker
+    // that reports errors nobody is allowed to fix is a checker people learn to
+    // ignore. They are still PULLED IN as dependencies of the checked trees, so
+    // a checked file calling into the kit is still checked against the kit's
+    // real signatures — `skipLibCheck` and the absence of `checkJs` errors
+    // outside `include` is what keeps their own internals quiet.
+    //
+    // ── EXPANDING IT ───────────────────────────────────────────────────────
+    //
+    // Add a tree to `include`, run `npm run typecheck`, fix what it says. The
+    // fix is nearly always widening a JSDoc `@param` to match what the function
+    // is really passed. Do NOT add `// @ts-ignore` to close the gap: an
+    // ignored error is a lie with a comment on it, and the whole point of this
+    // file is that the repository is harder to lie to.
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "lib": ["ES2022", "DOM", "DOM.Iterable"],
+
+        "allowJs": true,
+        "noEmit": true,
+
+        // FALSE, and the boundary is per-file instead: every file in the four
+        // trees below carries `// @ts-check` on line 1.
+        //
+        // `checkJs: true` is not a boundary. TypeScript pulls in everything the
+        // included files import — the frozen kit, `assets/`, `characters/`,
+        // `fx/` — and checks all of it, so `include` narrows what is NAMED and
+        // nothing about what is REPORTED. The per-file pragma is the only way
+        // to say "these files are checked and their dependencies are not".
+        //
+        // The obvious hole is that the pragma is one line anybody can delete,
+        // so `tests/game/typecheck-boundary.spec.mjs` reads this file, walks
+        // those trees, and fails if any file has lost it — which also makes
+        // "add a file to a checked tree" a thing the suite notices.
+        "checkJs": false,
+
+        // Off on purpose. `strict` turns on `strictNullChecks`, which in a
+        // codebase written without it reports every `foo?.bar` chain the author
+        // already guarded by hand. The errors that survive with it off are the
+        // ones that are wrong in any dialect: a property that does not exist, a
+        // call with the wrong arity, a value of the wrong kind. Those are what
+        // this gate is for. Tightening it is a later, separate decision.
+        "strict": false,
+
+        // Vendored three.js under `lib/` is a minified build with its own
+        // hand-written .d.ts; checking that is someone else's job.
+        "skipLibCheck": true,
+
+        // No ambient @types packages. The only ambient declaration this project
+        // needs is its own, below.
+        "types": [],
+
+        "resolveJsonModule": true,
+        "forceConsistentCasingInFileNames": true
+    },
+    "include": [
+        "types/**/*.d.ts",
+        "src/game/kernel/**/*.js",
+        "src/game/world/**/*.js",
+        "src/game/combat/**/*.js",
+        "src/game/physics/**/*.js"
+    ]
+}

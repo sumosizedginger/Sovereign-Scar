@@ -1,3 +1,4 @@
+// @ts-check
 // Named surface friction / wind profiles for VoxelPhysicsBody.
 
 export const FRICTION = {

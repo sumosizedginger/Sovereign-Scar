@@ -24,6 +24,14 @@ function memoryStorage() {
 }
 
 export async function run(t) {
+    // `globalThis.window` is installed and removed by this spec. The removal
+    // used to be the last statement of the function, which is a cleanup that
+    // only runs when every assertion above it survived — and this is the spec
+    // MOST likely to throw, because half of it is about a module degrading in
+    // hostile environments. A leaked fake `window` is worse than none: it
+    // defeats the `typeof window === 'undefined'` guards production code uses
+    // to detect a headless run. So: `finally`.
+    try {
     // No window.localStorage at all (window exists, no storage key) — must not throw.
     {
         globalThis.window = {};
@@ -155,7 +163,9 @@ export async function run(t) {
             JSON.stringify(seen));
     }
 
-    delete globalThis.window;
+    } finally {
+        delete globalThis.window;
+    }
 }
 
 // Directly runnable: `node tests/settings.spec.mjs`

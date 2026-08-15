@@ -14,7 +14,6 @@
 // decode it on a 2D canvas, and compare the pixels covering the character against
 // an annulus of floor just outside them. Reports mean CIE-L* difference and mean
 // RGB distance. No modelling of the shader — it reads the shipped frame.
-import fs from 'node:fs';
 import { startServer, findChromeVerbose, sleep, disableGamepads } from '../harness.mjs';
 
 const chrome = findChromeVerbose();

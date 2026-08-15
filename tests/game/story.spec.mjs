@@ -32,6 +32,14 @@ export function run(t) {
         };
     }
 
+    // The teardown below used to be the last STATEMENT of this function rather
+    // than a `finally`, which puts it after fifteen assertions any one of which
+    // could throw. A cleanup that only runs when nothing goes wrong is a
+    // cleanup that is missing exactly when it is needed — the failing run is
+    // the one that then poisons every spec after it, and the report blames the
+    // wrong file. `run-all.mjs` now also catches this at the runner, but the
+    // spec that opens the door should close it.
+    try {
     const panel = new StoryPanel();
     t.ok('starts empty', panel.current == null && panel.queue_.length === 0);
     panel.queue([
@@ -65,5 +73,7 @@ export function run(t) {
     t.ok('stable story IDs do not repeat', !panel.queue_.some((line) => line.text === 'duplicate'));
     panel.dispose();
     t.ok('dispose ok', true);
-    removeDomShim();
+    } finally {
+        removeDomShim();
+    }
 }

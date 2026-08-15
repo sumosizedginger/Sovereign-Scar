@@ -1,3 +1,4 @@
+// @ts-check
 // Bake-time weathering — scorch, moss, frost, staining, dust.
 //
 // Every dungeon already declares an `atmosphere` in its kit ('drips', 'vapor',

@@ -2,20 +2,11 @@
 
 import * as THREE from 'three';
 import {
-    BossBase, bossHit, laneMesh, discMesh, haloMesh, moveToward, bounceArena,
-    circleStrafe, BOSS_EMISSIVE_MAX,
+    BossBase, bossHit, laneMesh, discMesh, haloMesh, moveToward, BOSS_EMISSIVE_MAX,
 } from './base.js';
 import { sfx } from '../../audio/synth.js';
 import { ABYSS_COLORS, CRUST_COLORS } from '../assets/palettes.js';
-import { DestructibleVoxelMesh } from '../world/destructible-voxel-mesh.js';
-import { fillBox } from '../../voxel/helpers.js';
 import { voxBlade, voxBlob, voxBox, voxRing, voxSphere, voxSpike } from './boss-models.js';
-
-function mat(color, emissive = 0x000000, ei = 0.6, extras = {}) {
-    return new THREE.MeshStandardMaterial({
-        color, emissive, emissiveIntensity: ei, roughness: 0.55, metalness: 0.25, ...extras,
-    });
-}
 
 // The Warden's phase-2 ring, in world units. Exported because the spec has to
 // assert the geometry rather than restate it, and because the two numbers only

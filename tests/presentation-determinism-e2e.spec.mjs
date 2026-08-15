@@ -8,7 +8,7 @@
 // proves the funnel by composing every (quality, mood) pair in both orders
 // and asserting byte-identical visual snapshots.
 
-import { startServer, findChromeVerbose, disableGamepads, sleep } from './harness.mjs';
+import { startServer, findChromeVerbose, disableGamepads } from './harness.mjs';
 
 const QUALITIES = ['low', 'med', 'high', 'ultra'];
 const MOODS = ['crust', 'abyss'];

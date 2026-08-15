@@ -1,3 +1,4 @@
+// @ts-check
 // Beat 12 Vector Staff — procedural light-voxel line with lifetime decay.
 
 import * as THREE from 'three';

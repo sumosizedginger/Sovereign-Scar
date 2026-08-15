@@ -1,3 +1,4 @@
+// @ts-check
 // The emissive motif each dungeon has always declared, finally built.
 //
 // `dungeon-kits.js` has carried an `emissive` field for all fourteen dungeons
@@ -171,7 +172,7 @@ export function fixtureCount(half) {
  * @param {{x:number,z:number}} origin  room origin in world space
  * @param {THREE.Scene} scene
  * @param {object} pool     LocalLightPool (may be null in tests)
- * @returns {{group:THREE.Group, sources:Array}|null}
+ * @returns {{group:THREE.Group, sources:Array, material?:any, flickers?:any}|null}
  */
 export function buildRoomLights(kit, room, roomId, origin, scene, pool) {
     const motif = kit && MOTIFS[kit.emissive];

@@ -1,3 +1,4 @@
+// @ts-check
 // Bake-time room trim — parapets, pilasters and corner posts.
 //
 // The world was not under-detailed because of a technical constraint. Measured

@@ -1,3 +1,4 @@
+// @ts-check
 // Phase E3 — the people.
 //
 // THE HOLE THIS FILLS

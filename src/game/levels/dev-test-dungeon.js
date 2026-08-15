@@ -3,7 +3,6 @@
 
 import { createDungeon } from '../world/room-graph.js';
 import { addKeyPickup } from '../world/keys.js';
-import { CRUST_COLORS } from '../assets/palettes.js';
 
 export const TEST_DUNGEON_DEF = {
     id: 'w-test-dungeon',

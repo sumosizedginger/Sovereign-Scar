@@ -10,7 +10,7 @@ import { HeartDropManager } from '../../src/game/world/heart-drops.js';
 import { scaleEnemyHp } from '../../src/game/world/threat-curve.js';
 import { buildVoxelGeo, AO_LEVELS, vkey } from '../../src/voxel/core.js';
 import { classifyFamily, FAMILY } from '../../src/game/render/materials.js';
-import { CRUST_COLORS, ABYSS_COLORS } from '../../src/game/assets/palettes.js';
+import { CRUST_COLORS } from '../../src/game/assets/palettes.js';
 import { DestructibleVoxelMesh } from '../../src/game/world/destructible-voxel-mesh.js';
 import { buildPickupMesh } from '../../src/game/assets/pickup-shapes.js';
 import { BEAT07_DEF } from '../../src/game/levels/beat-07-sluice.js';

@@ -1,3 +1,4 @@
+// @ts-check
 import { getRunMode, normalizeRunMode } from './run-mode.js';
 
 export function createLivesState(mode) {

@@ -66,6 +66,7 @@ import { patchOverworld } from './world/keys.js';
 import { DeathEcho } from './world/death-echo.js';
 import { updateRoomLightFlicker } from './world/room-lights.js';
 import { AnchorThread } from './narrative/anchor-thread.js';
+import { reconstitutionLine } from './narrative/reconstitution-copy.js';
 import { getRunMode, setActiveRunMode } from './kernel/run-mode.js';
 import {
     chargeLabel,
@@ -1002,17 +1003,6 @@ function finalScorePayload(progress, completed) {
         eligible: witnessScore?.state?.eligible !== false,
         runId: progress.runId,
     };
-}
-
-function reconstitutionLine(progress, outcome) {
-    if (outcome === 'run_end') return 'I remember you. The world does not.';
-    if (outcome === 'expedition_break') {
-        return 'I can rebuild you, but not here. This place has eaten the route.';
-    }
-    const charges = progress.lives?.charges;
-    if (charges == null || charges >= 4) return 'Again. I still remember enough of you.';
-    if (charges >= 2) return 'The Link is losing detail. Stop making me rebuild your hands.';
-    return 'One clean memory remains.';
 }
 
 // Restore progress

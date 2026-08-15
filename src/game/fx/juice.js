@@ -16,6 +16,17 @@ class Juice {
         this.damageFlash = 0;
         /** Fired with the killed defender; index.js hooks soul motes here. */
         this.onKill = null;
+        /**
+         * Fired with `(defender, dir, move)` on every landed or turned blow;
+         * index.js hooks impact sparks here.
+         *
+         * Declared even though it is only ever assigned from outside, because
+         * it was NOT declared for a long time and the result was a contract
+         * that existed in two files and was written down in neither: assigned
+         * once in `index.js`, called twice in `combat-sweeper.js`, invisible to
+         * anyone reading this class. `checkJs` is what found it.
+         */
+        this.onImpact = null;
         this._t = 0;
         this._hitstopT = 0;
         this._flashes = [];        // { material, origHex, origIntensity, until }

@@ -78,6 +78,7 @@ function report(label, drawnList, move) {
     const pct = (n, d) => (d ? ((n / d) * 100).toFixed(0) : '  0').padStart(3);
     console.log(
         `  ${label.padEnd(22)} drawn ${String(drawCells).padStart(5)}  hit ${String(hitCells).padStart(5)}`
+        + `  AGREE ${pct(both, drawCells)}%`
         + `  OVER ${pct(over, drawCells)}%  UNDER ${pct(under, hitCells)}%`
         + `  nearest drawn ${(nearestDrawn === Infinity ? 0 : nearestDrawn).toFixed(2)}`
         + `  furthest over-draw ${maxOverReach.toFixed(2)}`

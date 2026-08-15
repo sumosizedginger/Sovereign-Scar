@@ -9,6 +9,12 @@
     "test": "node tests/run-all.mjs",
     "test:unit": "node tests/run-all.mjs --unit-only",
     "test:e2e": "node tests/run-all.mjs",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json",
+    "check": "npm run lint && npm run typecheck && npm run test:unit",
+    "pages:build": "node scripts/build-pages.mjs",
+    "pages:validate": "node scripts/validate-pages.mjs",
+    "pages": "npm run pages:build && npm run pages:validate",
     "icon": "node scripts/make-icon.mjs",
     "desktop": "electron .",
     "desktop:build": "electron-builder --win --publish never",
@@ -68,10 +74,14 @@
   "author": "sumosizedginger",
   "license": "MIT",
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "electron": "^43.3.0",
     "electron-builder": "^26.15.3",
+    "eslint": "^10.8.1",
+    "globals": "^17.11.0",
     "puppeteer-core": "^25.3.0",
-    "three": "0.185.1"
+    "three": "0.185.1",
+    "typescript": "^5.9.3"
   },
   "engines": {
     "node": ">=18"

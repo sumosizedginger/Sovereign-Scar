@@ -1,3 +1,4 @@
+// @ts-check
 // W7: item-gating blocker primitives. Each blocker has two halves:
 //   applyBlockerToMap(map, b)          — build-time map edits (LOCAL coords)
 //   createBlockerRuntime(ctx, level,   — per-frame behavior, world coords

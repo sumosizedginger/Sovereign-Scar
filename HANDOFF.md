@@ -81,8 +81,15 @@ file.** It says what is and is not under review, how to check the claims here
 yourself, and what this project's known weaknesses are.
 
 Everything below is green in the working tree. `npm test` — unit + full browser
-E2E — **4992/4992** in about 8.5 minutes. `npm run test:unit` alone:
-**4115/4115** in about 90 seconds, no browser.
+E2E — runs in about nine minutes; `npm run test:unit` alone is about ninety
+seconds and needs no browser. There are several thousand assertions and the
+figure moves every session, so **the exact count is deliberately not written
+down here**: run the thing, and treat a number in any document as a hypothesis.
+(Numbers attached to past events further down this file are history and stay as
+they were.)
+
+`npm run check` is the pre-push gate: `lint`, then `typecheck`, then the unit
+suite, in that order — cheapest first.
 
 That full run also left `git status` showing **only deliberate edits**, which it
 had not done for the life of the project: the boss E2E used to screenshot over a

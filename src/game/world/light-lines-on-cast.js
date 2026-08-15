@@ -1,3 +1,4 @@
+// @ts-check
 // src/game/world/light-lines-on-cast.js — "casting also fires a light line",
 // as one implementation instead of one per dungeon.
 //

@@ -1,3 +1,4 @@
+// @ts-check
 // Phase F1 — the kit channels that had nothing behind them.
 //
 // `dungeon-kits.js` declares seven design channels per dungeon. `applyKit`
@@ -292,6 +293,7 @@ function streamFor(seed) {
  * Returns how many were placed, so a probe can measure the dressing density
  * rather than trusting it.
  */
+/** @param {(x: number, z: number) => boolean} [isBlocked] */
 export function stampKitProps(map, kit, room, roomId, isBlocked = () => false) {
     if (!kit || !room) return 0;
     const half = room.half || 0;

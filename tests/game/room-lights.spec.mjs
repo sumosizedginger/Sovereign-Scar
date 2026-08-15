@@ -93,7 +93,7 @@ export function run(t) {
     {
         const pool = makePool();
         const scene = new THREE.Scene();
-        const built = buildRoomLights(
+        buildRoomLights(
             KITS['beat-10-cryo'], ROOM, 'twincage', { x: 0, z: 0 }, scene, pool
         );
         const afterBake = pool._sources.length;

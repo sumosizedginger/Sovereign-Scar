@@ -1,3 +1,4 @@
+// @ts-check
 // Phase E1 — the authored puzzle beats.
 //
 // WHAT THIS PLACES, AND THE ONE BIG DESIGN DECISION IN IT
@@ -136,6 +137,42 @@ export function flavourFor(beatNo) {
  */
 const DOOR_CLEAR = 2;
 
+/**
+ * One authored puzzle piece, as this file emits it and `blockers.js` consumes it.
+ *
+ * WHY THIS IS WRITTEN DOWN AT ALL. Every field below is optional and only some
+ * combinations are legal — `at` for a point piece, `rect` for an area piece,
+ * `signal`/`clear` for anything that drives a gate. That is a contract between
+ * two modules that until now existed only as the intersection of what one file
+ * happened to write and what the other happened to read. This repo's most
+ * expensive recurring bug is a producer wired to a consumer that reads
+ * something else, and a shape nobody wrote down is how that happens.
+ *
+ * @typedef {object} PuzzlePiece
+ * @property {string} type one of vault | timed_gate | beam_source | beam_target
+ *   | block_socket | pressure_plate | pushable | switch
+ * @property {string} id unique within the room
+ * @property {{x:number,z:number}} [at] point pieces
+ * @property {{x0:number,x1:number,z0:number,z1:number}} [rect] area pieces
+ * @property {{x:number,z:number}} [dir] beam heading
+ * @property {number} [range] beam length
+ * @property {string} [signal] the bus name this piece drives or answers
+ * @property {{x0:number,x1:number,z0:number,z1:number}} [clear] ground a gate
+ *   refuses to close on
+ * @property {string} [open] the signal that opens a vault
+ * @property {string} [flush] vault side already backed by the room wall
+ * @property {boolean} [mirror] a pushable that reflects a beam
+ * @property {number} [spin] mirror orientation, 0 = "/" 1 = "\"
+ * @property {number} [roomHalf] the room's half-extent, for out-of-room reset
+ * @property {string} [accepts] what may hold a plate: any | player | block
+ * @property {number} [hold] seconds a switch stays held
+ */
+
+/**
+ * @param {(x: number, z: number) => boolean} [isBlocked]
+ * @param {(x: number, z: number) => boolean} [isDoorway]
+ * @returns {PuzzlePiece[]}
+ */
 function layoutPuzzle(def, roomId, room, beatNo, isBlocked = () => false,
     isDoorway = () => false) {
     if (!def?.theme || !room || room.boss) return [];
@@ -206,6 +243,7 @@ function layoutPuzzle(def, roomId, room, beatNo, isBlocked = () => false,
 
     const id = `pz-${beatNo}-${slot}`;
     const signal = sig(beatNo, slot);
+    /** @type {PuzzlePiece[]} */
     const out = [
         // `flush` is the side that is already backed by the room's own perimeter
         // wall, and it is the side whose vault wall is therefore pointless.
@@ -415,6 +453,12 @@ function clearRun(from, to, free) {
  *   possible to solve is worse than a room with no puzzle in it, and this file
  *   already takes that trade once for the corner search.
  */
+/**
+ * @param {PuzzlePiece[]} out
+ * @param {{ half: number,
+ *           isBlocked: (x: number, z: number) => boolean,
+ *           isSoft: (x: number, z: number) => boolean }} room
+ */
 function settle(out, { half, isBlocked, isSoft }) {
     const taken = new Set();
     const vault = out.find((b) => b.type === 'vault');
@@ -509,6 +553,12 @@ function settle(out, { half, isBlocked, isSoft }) {
  * against what the room actually contains. Returns `[]` when the room is too
  * small, is the boss room, is not one of the named theme rooms, or when the
  * beat cannot be laid out honestly — so this is safe to call for every room.
+ */
+/**
+ * @param {(x: number, z: number) => boolean} [isBlocked]
+ * @param {(x: number, z: number) => boolean} [isSoft]
+ * @param {(x: number, z: number) => boolean} [isDoorway]
+ * @returns {PuzzlePiece[]}
  */
 export function puzzleFor(
     def, roomId, room, beatNo, isBlocked = () => false, isSoft = () => false,

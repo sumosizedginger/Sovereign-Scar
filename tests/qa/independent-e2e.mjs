@@ -1,3 +1,16 @@
+// ═══ UNMAINTAINED ONE-OFF INVESTIGATION HARNESS — DO NOT CITE ═══════════════
+//
+// Written to answer one question on one afternoon and never maintained since.
+// It is kept as a record of an investigation, not as an instrument. A number
+// this file prints today is not evidence of anything: the code it probes has
+// moved, and the audit in `tests/qa/README.md` lists the specific ways this
+// class of probe was found to be lying — including one that manufactured the
+// damage it then reported as proof that combat worked.
+//
+// If you need this question answered NOW, write a probe that answers it now.
+// The maintained instruments are the ones cited from `HANDOFF.md`.
+// ════════════════════════════════════════════════════════════════════════════
+
 // Independent QA harness for Sovereign Scar — does not modify game source.
 // Exercises boot, all 15 levels, combat, dash, mood, pause, HUD, save, movement.
 
@@ -250,15 +263,9 @@ export async function run(t) {
             p.state.setFacing(0, -1);
             // Force attack via combat path
             p.attackCd = 0;
-            const fakeInput = {
-                moveX: 0, moveZ: 0,
-                consumeAttack: () => true,
-                consumeDash: () => false,
-                consumeWeaponNext: () => false,
-                consumeWeaponPrev: () => false,
-                consumeInteract: () => false,
-                aimNDC: null,
-            };
+            // A `fakeInput` stub used to be built here and handed to nothing —
+            // the block below calls `tryAttack` directly. Removed: an input
+            // stub that is never fed to the code under test is a prop.
             // Call update with attack — may need direct combatSweep
             try {
                 p.tryAttack?.(enemies, s.game.level?.destructibles || [], s.camera, s.renderer);

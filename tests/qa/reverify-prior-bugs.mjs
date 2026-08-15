@@ -1,3 +1,16 @@
+// ═══ UNMAINTAINED ONE-OFF INVESTIGATION HARNESS — DO NOT CITE ═══════════════
+//
+// Written to answer one question on one afternoon and never maintained since.
+// It is kept as a record of an investigation, not as an instrument. A number
+// this file prints today is not evidence of anything: the code it probes has
+// moved, and the audit in `tests/qa/README.md` lists the specific ways this
+// class of probe was found to be lying — including one that manufactured the
+// damage it then reported as proof that combat worked.
+//
+// If you need this question answered NOW, write a probe that answers it now.
+// The maintained instruments are the ones cited from `HANDOFF.md`.
+// ════════════════════════════════════════════════════════════════════════════
+
 // Re-verify prior FAIL findings against CURRENT code. No project source edits.
 // node tests/qa/reverify-prior-bugs.mjs
 
@@ -222,13 +235,11 @@ export async function run(t) {
         // ── 3) Level unlock gating on ] ──
         const gate = await page.evaluate(async () => {
             const s = window.__sovereignScar;
-            // Reset progress unlocks to defaults via local storage path if available
-            const { loadSovereignProgress, saveSovereignProgress } = await import('/src/game/kernel/progress.js').catch(() => ({}));
-
-            // Direct progress reset through settings
-            try {
-                const raw = localStorage.getItem('my-engine-progress') || localStorage.getItem('progress');
-            } catch (_) {}
+            // Two dead fragments used to sit here: an import of
+            // `loadSovereignProgress`/`saveSovereignProgress` that was never
+            // called, and a `localStorage.getItem` whose result was thrown
+            // away. Both read as "the probe resets progress before measuring".
+            // It does not; the real reset is the `setProgress` call below.
 
             // Use public save if exposed
             if (typeof s.save === 'function') {

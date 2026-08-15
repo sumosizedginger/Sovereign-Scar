@@ -1,3 +1,4 @@
+// @ts-check
 // Nested sovereignProgress under engine getProgress/setProgress (D4).
 
 import { getProgress, setProgress } from '../../engine/settings.js';

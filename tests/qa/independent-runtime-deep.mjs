@@ -1,3 +1,16 @@
+// ═══ UNMAINTAINED ONE-OFF INVESTIGATION HARNESS — DO NOT CITE ═══════════════
+//
+// Written to answer one question on one afternoon and never maintained since.
+// It is kept as a record of an investigation, not as an instrument. A number
+// this file prints today is not evidence of anything: the code it probes has
+// moved, and the audit in `tests/qa/README.md` lists the specific ways this
+// class of probe was found to be lying — including one that manufactured the
+// damage it then reported as proof that combat worked.
+//
+// If you need this question answered NOW, write a probe that answers it now.
+// The maintained instruments are the ones cited from `HANDOFF.md`.
+// ════════════════════════════════════════════════════════════════════════════
+
 // Deep runtime probes: boss collision live, onShatter, luminance, dust, grade.
 // node tests/qa/independent-runtime-deep.mjs
 
@@ -51,9 +64,9 @@ try {
     // ── Shadow radius at runtime ──────────────────────────────────────────
     const lights = await page.evaluate(() => {
         const s = window.__sovereignScar;
-        let radius = null;
-        let mapSize = null;
-        s.scene?.traverse?.(() => {});
+        // Two nulls and a `traverse(() => {})` used to sit here — a walk of the
+        // whole scene graph with an empty callback, and two variables nothing
+        // ever wrote. The real scan is the traverse below.
         const mood = s.mood;
         const sun = mood?._lights?.keySun || mood?.lights?.keySun;
         // Also search scene for DirectionalLight
@@ -354,7 +367,6 @@ try {
 
     // ── Mote dive live in sandbox if possible ─────────────────────────────
     const moteLive = await page.evaluate(async () => {
-        const s = window.__sovereignScar;
         // import Enemy and run in-page
         try {
             const base = window.location.origin;
@@ -439,7 +451,7 @@ try {
     // ── AO on live geometry after level load ──────────────────────────────
     const aoLive = await page.evaluate(() => {
         const s = window.__sovereignScar;
-        let meshes = 0, withAo = 0, minAo = 1, maxAo = 0, colorMatches = true;
+        let meshes = 0, withAo = 0, minAo = 1, maxAo = 0;
         s.scene?.traverse?.((o) => {
             if (!o.isMesh || !o.geometry) return;
             meshes++;

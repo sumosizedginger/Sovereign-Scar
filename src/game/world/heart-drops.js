@@ -1,10 +1,10 @@
+// @ts-check
 // Heart recovery. Before this existed HealthPool.heal() was never called by
 // anything: the only way to get hearts back was to die, so every fight
 // permanently drained you until a death reset the run. Slain enemies now
 // drop hearts, and rooms can be seeded with them.
 
 import * as THREE from 'three';
-import { sfx } from '../../audio/synth.js';
 import { gsfx } from '../audio/sfx-bank.js';
 import { getActiveRunMode } from '../kernel/run-mode.js';
 

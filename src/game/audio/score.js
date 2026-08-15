@@ -331,7 +331,6 @@ function layerGain(layer) {
 function scheduleStep(absStep, when) {
     const bar = Math.floor(absStep / STEPS_PER_BAR);
     const s = absStep % STEPS_PER_BAR;
-    const beat = s / 4;
     const spb = 60 / track.bpm;             // seconds per beat
     const root = noteToMidi(track.key);
     const prog = track.progression;

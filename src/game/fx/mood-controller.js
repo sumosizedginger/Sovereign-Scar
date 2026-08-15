@@ -9,9 +9,7 @@ import * as THREE from 'three';
 import { scene, renderer, bloomPass, filmPass, vignettePass } from '../../engine/renderer.js';
 import { applyMoodEnvironment } from '../render/mood-environment.js';
 import { stopAllDrones, playNoise, initAudio } from '../../audio/synth.js';
-import {
-    startScore, stopScore, updateScore, setIntensity, currentScore,
-} from '../audio/score.js';
+import { startScore, updateScore, setIntensity } from '../audio/score.js';
 import { MOOD_PRESETS } from '../assets/palettes.js';
 import { getSetting } from '../../engine/settings.js';
 import { getQuality, TIERS } from '../../engine/quality.js';

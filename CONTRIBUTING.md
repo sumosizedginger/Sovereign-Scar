@@ -16,12 +16,21 @@ that keep it that way:
   top-down adventure, or a shmup equally. If a change only makes sense for
   one genre, it belongs in a consumer's own code, not here.
 
-## Running tests
+## Running the checks
 
 ```
 npm i
+npm run check      # lint + typecheck + unit specs — run this before every push
 npm test           # full suite: unit specs + browser E2E (needs Chrome)
+```
+
+Individually:
+
+```
+npm run lint       # ESLint, seconds
+npm run typecheck  # tsc --checkJs over the checked trees, seconds
 npm run test:unit  # unit specs only, ~90s, no Chrome required
+npm run pages      # stage and validate the browser artifact
 ```
 
 Counts move every session, so treat any number written in a document as a
@@ -30,11 +39,29 @@ hypothesis and run the thing. `npm test` prints the only figure that counts.
 Set `CHROME_PATH` if `tests/harness.mjs`'s `findChrome()` doesn't locate your
 browser automatically.
 
-**CI only runs `npm run test:unit`.** GitHub's hosted runners have no GPU, and
+**CI does not run the browser half.** GitHub's hosted runners have no GPU, and
 headless Chrome's WebGL smoke test proved unreliable there across several
 attempts (see the `fix:` commit history around the CI workflow if you're
-curious). Run `npm test` locally — it's the real check for anything that
-touches rendering, and it's required before tagging a release.
+curious). It runs lint, typecheck, the unit specs, and a build-and-validate of
+the Pages artifact. Run `npm test` locally — it's the real check for anything
+that touches rendering, and it's **required before tagging a release**, because
+a tag builds and attaches desktop binaries.
+
+### Static analysis, and what it is for
+
+`npm run lint` is correctness only. It has no opinion about formatting, quotes,
+semicolons, import order or line length, and it never will — `.editorconfig` and
+"match the neighbours" cover that. If a rule ever produces mostly noise here,
+scope or disable it *with the reason written in `eslint.config.js`*, the way the
+existing disables are. Do not silence a finding to reach green.
+
+`npm run typecheck` covers `src/game/kernel/`, `world/`, `combat/` and
+`physics/` — the files carry `// @ts-check` on line 1 and
+`tests/game/typecheck-boundary.spec.mjs` fails if one loses it. To bring another
+tree in: add it to `include` in `tsconfig.json`, add the pragma, and fix what
+`tsc` reports — which is nearly always a JSDoc `@param` that describes an
+options object less completely than the code uses it. **Do not add `@ts-ignore`
+to close the gap.** An ignored error is a lie with a comment on it.
 
 ## Writing specs for gameplay rules
 

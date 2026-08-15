@@ -38,13 +38,12 @@ const BODY = 0.4;      // player half-extent (player.js: extents.x)
 const RISE = 0.95;     // player half-height; rig.y = surfaceTop + RISE
 const HEAD = 1.9;      // full body height
 
-// Not exported from room-graph. Four lines, and if they ever disagree the
-// entry points this probe computes stop matching the ones the game computes,
-// which is exactly the thing every number below depends on.
-const SIDE_NORMAL = {
-    N: { x: 0, z: -1 }, S: { x: 0, z: 1 },
-    W: { x: -1, z: 0 }, E: { x: 1, z: 0 },
-};
+// A copy of room-graph's `SIDE_NORMAL` used to live here, under a comment
+// warning that the two must never disagree. Both were left behind when this
+// probe stopped deriving arrival points and started asking `level.arrivalPoint`
+// for them (see the note further down) — so the constant was dead and the
+// warning described a calculation the probe no longer does. Found by the
+// linter. A comment about code that isn't there is worse than no comment.
 
 function keyStoreStub() {
     const open = new Set();

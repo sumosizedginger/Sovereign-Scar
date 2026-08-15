@@ -1,3 +1,16 @@
+// ═══ UNMAINTAINED ONE-OFF INVESTIGATION HARNESS — DO NOT CITE ═══════════════
+//
+// Written to answer one question on one afternoon and never maintained since.
+// It is kept as a record of an investigation, not as an instrument. A number
+// this file prints today is not evidence of anything: the code it probes has
+// moved, and the audit in `tests/qa/README.md` lists the specific ways this
+// class of probe was found to be lying — including one that manufactured the
+// damage it then reported as proof that combat worked.
+//
+// If you need this question answered NOW, write a probe that answers it now.
+// The maintained instruments are the ones cited from `HANDOFF.md`.
+// ════════════════════════════════════════════════════════════════════════════
+
 // Independent QA — playtest 2026-07-23 + graphics overhaul.
 // Does NOT modify game source. Evidence from real module imports + browser.
 // node tests/qa/independent-playtest-graphics-qa.mjs
@@ -7,7 +20,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import * as THREE from 'three';
 import {
-    createSink, startServer, findChromeVerbose, sleep, disableGamepads,
+    startServer, findChromeVerbose, sleep, disableGamepads,
 } from '../harness.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -31,7 +44,7 @@ function assert(tag, cond, msg = '') {
 // ── Unit-level probes (real modules) ───────────────────────────────────────
 
 async function probePlaytestAndGraphics() {
-    const { Enemy, attachSplit } = await import('../../src/game/enemy.js');
+    const { Enemy } = await import('../../src/game/enemy.js');
     const { hitboxCheck } = await import('../../src/combat/hitbox.js');
     const { WEAPONS } = await import('../../src/game/combat/weapons.js');
     const { HealthPool } = await import('../../src/game/kernel/health.js');
@@ -373,25 +386,10 @@ async function probeBrowser() {
             JSON.stringify({ calls: boot.calls, tri: boot.triangles }));
         assert('e2e-hp', boot.hp > 0, `hp=${boot.hp}`);
 
-        // Load beat-07 and sample luminance of a centre crop
-        async function loadLevel(id) {
-            return page.evaluate(async (levelId) => {
-                const s = window.__sovereignScar;
-                if (typeof s.loadLevel === 'function') {
-                    await s.loadLevel(levelId);
-                } else if (typeof s.goToLevel === 'function') {
-                    await s.goToLevel(levelId);
-                } else if (s.dev?.loadLevel) {
-                    await s.dev.loadLevel(levelId);
-                } else {
-                    // Fall back to URL hash / keyboard if exposed
-                    const meta = s.LEVELS?.find((l) => l.id === levelId);
-                    if (!meta) return { ok: false, err: 'no level' };
-                    if (s.setLevel) await s.setLevel(levelId);
-                }
-                return { ok: true, id: s.currentLevelId || s.level?.id || levelId };
-            }, id);
-        }
+        // A `loadLevel` helper used to sit here, guessing at four different
+        // possible level-loading APIs. Nothing ever called it. Removed rather
+        // than left in place: a dead helper full of guesses about the debug
+        // hook is how a probe ends up exercising an API the game does not have.
 
         // Discover API
         const api = await page.evaluate(() => {

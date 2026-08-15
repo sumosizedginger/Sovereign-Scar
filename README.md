@@ -9,37 +9,88 @@ Built on **[My-Engine](https://github.com/sumosizedginger/My-Engine) 0.2.0** (pi
 
 ![Sigil](https://img.shields.io/badge/sigil-%E2%88%9A%CF%80%20%E2%8A%97%20%E2%88%9E%20%E2%8A%97%20%CF%84%C2%B2-d4a84b)
 
-## Quick start
+## ▶ Play it
+
+**[Play in your browser →](https://sumosizedginger.github.io/Sovereign-Scar/)**
+Needs WebGL2 — any current Chrome, Edge, Firefox or Safari. Nothing to install,
+nothing to download, and it saves to your browser's local storage.
+
+**[Download for Windows →](https://github.com/sumosizedginger/Sovereign-Scar/releases)**
+An installer and a portable `.exe`. Both are **unsigned**: Windows SmartScreen
+will warn on first run until they are code-signed, which is a certificate
+purchase and not something the code can fix.
+
+> **Both are the same game.** The browser build and the desktop build run the
+> identical files out of `src/` and `lib/` — no bundler, no transpiler, no
+> web-specific or Electron-specific fork of the gameplay. GitHub Pages serves
+> those files over HTTPS; Electron serves them over a loopback port inside a
+> window. They are two containers, not two products, and
+> `tests/game/dual-runtime.spec.mjs` fails the build if they start to drift.
+
+Click once to unlock audio, then explore with **WASD**. **B** (or right mouse)
+guards — hold to block, tap to parry — and **T** locks on. **Enter** advances
+story lines, **Tab** opens the map. A new game begins on the Scarred Crust; the
+Crypt Breach lies north. Full controls: [docs/CONTROLS.md](docs/CONTROLS.md).
+
+## Run it from source
 
 ```bash
+npm i
 npm run serve          # http://127.0.0.1:8799/
-npm test               # unit + browser E2E (4992 assertions, ~8.5 min)
-npm run test:unit      # unit only (4115 assertions, ~90s, no browser)
 ```
 
-### Desktop (Windows)
+No build step. `npm run serve` is a 60-line static file server; the browser
+loads the ES modules directly off disk.
+
+### Desktop, locally
 
 ```bash
 npm run desktop        # run the native app
-npm run desktop:build  # build installer + portable .exe into dist-desktop/
+npm run desktop:build  # installer + portable .exe into dist-desktop/
 ```
 
-The desktop shell is `electron/main.cjs` and it changes nothing about the game:
-same files, no build step, no bundler. It starts the project's own
-`scripts/serve.mjs` on a loopback port and points a window at it, because
-`loadFile` over `file://` makes Chromium apply CORS to every ES-module import
-and the game will not load. The port is OS-assigned, so the app never collides
-with a dev server you already have open.
+The desktop shell is `electron/main.cjs` and it changes nothing about the game.
+It starts the project's own `scripts/serve.mjs` on a loopback port and points a
+window at it, because `loadFile` over `file://` makes Chromium apply CORS to
+every ES-module import and the game will not load. The port is OS-assigned, so
+the app never collides with a dev server you already have open.
 
-`npm run desktop:build` produces two x64 artifacts in `dist-desktop/`:
-`SovereignScar-<version>-x64-setup.exe` (installer) and
-`…-portable.exe` (no install). Both are unsigned — Windows SmartScreen will
-warn on first run until they are code-signed.
+### Build the browser artifact
 
-Open the URL, click once to unlock audio, then explore with WASD. **B** (or
-right mouse) guards — hold to block, tap to parry — and **T** locks on. Press **Enter** to advance story lines,
-**Tab** for the map. A new game begins on the Scarred Crust — the Crypt Breach
-lies north.
+```bash
+npm run pages          # stage dist-pages/ and validate it
+```
+
+`scripts/build-pages.mjs` walks the real import graph out of `index.html` and
+copies only what the game needs — no tests, no audits, no changelogs. The file
+list is derived rather than authored, so a new module cannot be forgotten.
+`scripts/validate-pages.mjs` then checks the staged directory: the graph closes,
+nothing reaches outside `/Sovereign-Scar/`, no development material got
+published, and `.nojekyll` is present (without it GitHub Pages silently drops
+`src/game/levels/_common.js`, which every level imports).
+
+## Checks
+
+```bash
+npm run lint           # ESLint — correctness rules only, no style opinions
+npm run typecheck      # TypeScript checkJs over kernel/world/combat/physics
+npm run test:unit      # the pure-Node suite (4,000+ assertions, ~90s)
+npm test               # everything, incl. browser E2E (5,000+, needs Chrome, ~9 min)
+npm run check          # lint + typecheck + unit, in that order
+```
+
+`npm test` prints the only assertion count that is true right now. Counts move
+every session, so no number written in a document here is load-bearing — run the
+thing.
+
+**What a green GitHub Actions run proves:** the pure-Node suite passes, no
+undefined identifiers or unreachable branches, the checked trees type-check, and
+the browser artifact builds and validates.
+**What it does not prove:** that the game renders anything. The browser/WebGL
+half of the suite does not run in CI — hosted runners have no GPU and software
+rendering proved unreliable across several attempts — so it is a required local
+check before release, not a gate. That half is historically the half that caught
+the real bugs. See [REVIEW.md](REVIEW.md) §4.5.
 
 ## What's in this build
 
@@ -134,12 +185,29 @@ src/game/           product code
   levels/           overworld + sandbox + 14 dungeon defs + dungeon kits
   dev/              dev mode (gate, panel, overlays, geometry)
   ui/               HUD, story, menus, map screen, ending, coach hints
+  narrative/        anchor thread, cutscenes, item chains, reconstitution copy
 src/audio/          frozen kit synth primitives (the game drives no drones)
 tests/              unit + browser E2E (world, bosses, campaign, visual sanity, audio render)
-tests/qa/           measurement probes (time-to-kill, difficulty curve, luminance, audio envelope)
+tests/qa/           print-only measurement probes — see tests/qa/README.md first
+scripts/            static server, icon builder, Pages stage + validate
+electron/           desktop shell (opens a window at the loopback server)
+types/              ambient .d.ts for the one global the game writes
+.github/workflows/  tests · pages deploy · tagged desktop release
 docs/media/         gate screenshots + certification captures
 ```
+
+Configuration worth knowing about: `eslint.config.js` (correctness rules and a
+written reason for every disable), `tsconfig.json` (the checked-tree boundary
+and why it is there).
 
 ## License
 
 MIT (inherits kit license). Game content © project authors.
+
+**That sentence and the `LICENSE` file do not currently agree**, and the
+disagreement is unresolved rather than settled: MIT grants rights to "the
+Software" with no carve-out, and naming the author of the content reserves
+nothing that MIT does not already leave with them. `package.json` says `MIT`
+flatly. [docs/LICENSING.md](docs/LICENSING.md) sets out exactly what the files
+communicate today and what each possible intention would require. Nothing about
+the licence was changed while writing it — that is the owner's decision.

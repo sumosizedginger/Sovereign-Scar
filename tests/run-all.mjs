@@ -1,7 +1,10 @@
 // tests/run-all.mjs
 // Runs engine unit specs + Sovereign Scar game specs.
 
-import { createSink, summarize, writeStepSummary, printErrorAnnotations } from './harness.mjs';
+import {
+    createSink, summarize, writeStepSummary, printErrorAnnotations,
+    snapshotEnvironment, environmentDrift,
+} from './harness.mjs';
 import { run as runCollision } from './collision.spec.mjs';
 import { run as runHitbox } from './hitbox.spec.mjs';
 import { run as runSettings } from './settings.spec.mjs';
@@ -109,24 +112,78 @@ import { run as runCredits } from './game/credits.spec.mjs';
 import { run as runPlaytest0723 } from './game/playtest-2026-07-23.spec.mjs';
 import { run as runCasterDark } from './game/caster-dark.spec.mjs';
 import { run as runCutsceneWiring } from './game/cutscene-wiring.spec.mjs';
+import { run as runTypecheckBoundary } from './game/typecheck-boundary.spec.mjs';
+import { run as runDualRuntime } from './game/dual-runtime.spec.mjs';
+import { run as runReconstitutionCopy } from './game/reconstitution-copy.spec.mjs';
 
 const unitOnly = process.argv.includes('--unit-only');
 
 async function main() {
     const sinks = [];
 
+    /**
+     * Run one spec with a guaranteed teardown check around it.
+     *
+     * THREE THINGS THIS DOES THAT A BARE `fn(sink)` DID NOT.
+     *
+     * 1. A spec that THROWS is recorded as a failure and the run continues.
+     *    Before, one exception killed `main()` and every spec after it simply
+     *    never ran — with an exit code of 2 and no per-assertion evidence. That
+     *    matters most during counterfactual testing, which is how this project
+     *    proves a fix is real: breaking a fix on purpose sometimes crashes a
+     *    spec instead of failing it, and a crash that greps as zero failures
+     *    reads exactly like a pass.
+     *
+     * 2. A spec that DIRTIES THE PROCESS fails, and fails in its own name.
+     *    Specs share one Node process; `harness.mjs` explains the historical
+     *    bug at length. The point of putting the check here rather than in each
+     *    spec is that it applies to specs nobody thought to check, including
+     *    ones not written yet.
+     *
+     * 3. Both happen in a `finally`, so a spec that throws WHILE holding a
+     *    global still gets its leak reported. The old failure mode was two bugs
+     *    at once and only the first was visible.
+     */
     function runNamed(name, fn) {
         const sink = createSink(name);
-        fn(sink);
+        const before = snapshotEnvironment();
+        try {
+            fn(sink);
+        } catch (e) {
+            sink.ok(name + ': the spec threw', false, String((e && e.stack) || e));
+        } finally {
+            for (const d of environmentDrift(before)) {
+                sink.ok(name + ': left the process dirty', false, d);
+            }
+        }
+        sinks.push(sink);
+    }
+
+    /** Same contract for the async specs. */
+    async function runNamedAsync(name, fn) {
+        const sink = createSink(name);
+        const before = snapshotEnvironment();
+        try {
+            await fn(sink);
+        } catch (e) {
+            sink.ok(name + ': the spec threw', false, String((e && e.stack) || e));
+        } finally {
+            for (const d of environmentDrift(before)) {
+                sink.ok(name + ': left the process dirty', false, d);
+            }
+        }
         sinks.push(sink);
     }
 
     runNamed('collision', runCollision);
     runNamed('hitbox', runHitbox);
 
-    const settings = createSink('settings');
-    await runSettings(settings);
-    sinks.push(settings);
+    // `settings.spec.mjs` installs `globalThis.window` to test the module's
+    // headless degradation and removes it at the end. Run through the same
+    // guard as everything else: if a future edit puts a `return` or a throw
+    // before that cleanup, the leak is reported here rather than surfacing as
+    // an inexplicable failure in whatever spec runs next.
+    await runNamedAsync('settings', runSettings);
 
     // Game unit specs
     runNamed('health', runHealth);
@@ -236,97 +293,45 @@ async function main() {
     runNamed('playtest-2026-07-23', runPlaytest0723);
     runNamed('caster-dark', runCasterDark);
     runNamed('cutscene-wiring', runCutsceneWiring);
+    runNamed('typecheck-boundary', runTypecheckBoundary);
+    runNamed('dual-runtime', runDualRuntime);
+    runNamed('reconstitution-copy', runReconstitutionCopy);
 
     if (!unitOnly) {
-        const { run: runSmoke } = await import('./smoke.spec.mjs');
-        const smoke = createSink('smoke');
-        await runSmoke(smoke);
-        sinks.push(smoke);
-
-        const { run: runGameSmoke } = await import('./game-smoke.spec.mjs');
-        const gameSmoke = createSink('game-smoke');
-        await runGameSmoke(gameSmoke);
-        sinks.push(gameSmoke);
-
-        const { run: runBossE2E } = await import('./boss-e2e.spec.mjs');
-        const bossE2E = createSink('boss-e2e');
-        await runBossE2E(bossE2E);
-        sinks.push(bossE2E);
-
-        const { run: runBossCombat } = await import('./boss-combat-e2e.spec.mjs');
-        const bossCombat = createSink('boss-combat-e2e');
-        await runBossCombat(bossCombat);
-        sinks.push(bossCombat);
-
-        const { run: runVisualSanity } = await import('./visual-sanity.spec.mjs');
-        const visualSanity = createSink('visual-sanity');
-        await runVisualSanity(visualSanity);
-        sinks.push(visualSanity);
-
-        const { run: runShadowFrustum } = await import('./shadow-frustum-e2e.spec.mjs');
-        const shadowFrustum = createSink('shadow-frustum-e2e');
-        await runShadowFrustum(shadowFrustum);
-        sinks.push(shadowFrustum);
-
-        const { run: runCampaignE2E } = await import('./campaign-e2e.spec.mjs');
-        const campaignE2E = createSink('campaign-e2e');
-        await runCampaignE2E(campaignE2E);
-        sinks.push(campaignE2E);
-
-        const { run: runDoorRefusal } = await import('./door-refusal-e2e.spec.mjs');
-        const doorRefusal = createSink('door-refusal-e2e');
-        await runDoorRefusal(doorRefusal);
-        sinks.push(doorRefusal);
-
-        const { run: runBossReach } = await import('./boss-reach-e2e.spec.mjs');
-        const bossReach = createSink('boss-reach-e2e');
-        await runBossReach(bossReach);
-        sinks.push(bossReach);
-
-        const { run: runSealStalemate } = await import('./seal-stalemate-e2e.spec.mjs');
-        const sealStalemate = createSink('seal-stalemate-e2e');
-        await runSealStalemate(sealStalemate);
-        sinks.push(sealStalemate);
-
-        const { run: runWorldE2E } = await import('./world-e2e.spec.mjs');
-        const worldE2E = createSink('world-e2e');
-        await runWorldE2E(worldE2E);
-        sinks.push(worldE2E);
-
-        const { run: runLockedDoorsE2E } = await import('./locked-doors-e2e.spec.mjs');
-        const lockedDoorsE2E = createSink('locked-doors-e2e');
-        await runLockedDoorsE2E(lockedDoorsE2E);
-        sinks.push(lockedDoorsE2E);
-
-        const { run: runKeyProgressionE2E } = await import('./key-progression-e2e.spec.mjs');
-        const keyProgressionE2E = createSink('key-progression-e2e');
-        await runKeyProgressionE2E(keyProgressionE2E);
-        sinks.push(keyProgressionE2E);
-
-        const { run: runBossQuality } = await import('./boss-quality-e2e.spec.mjs');
-        const bossQuality = createSink('boss-quality-e2e');
-        await runBossQuality(bossQuality);
-        sinks.push(bossQuality);
-
-        const { run: runCombatFeelE2E } = await import('./combat-feel-e2e.spec.mjs');
-        const combatFeelE2E = createSink('combat-feel-e2e');
-        await runCombatFeelE2E(combatFeelE2E);
-        sinks.push(combatFeelE2E);
-
-        const { run: runNarrativeSystemsE2E } = await import('./narrative-systems-e2e.spec.mjs');
-        const narrativeSystemsE2E = createSink('narrative-systems-e2e');
-        await runNarrativeSystemsE2E(narrativeSystemsE2E);
-        sinks.push(narrativeSystemsE2E);
-
-        const { run: runAudioRender } = await import('./audio-render-e2e.spec.mjs');
-        const audioRender = createSink('audio-render-e2e');
-        await runAudioRender(audioRender);
-        sinks.push(audioRender);
-
-        const { run: runPresentationDeterminism } = await import('./presentation-determinism-e2e.spec.mjs');
-        const presentationDeterminism = createSink('presentation-determinism-e2e');
-        await runPresentationDeterminism(presentationDeterminism);
-        sinks.push(presentationDeterminism);
+        // The browser half, in order. Each one is loaded lazily so a machine
+        // with no Chrome still gets the whole unit run, and each goes through
+        // the same crash/leak guard as the pure-node specs above.
+        //
+        // `pages-smoke-e2e` is deliberately near the end: it builds
+        // `dist-pages/` and serves it under a `/Sovereign-Scar/` prefix on its
+        // own port, which is a different world from every spec before it, so a
+        // failure there reads as "the deployment shape is wrong" rather than
+        // "the game is broken".
+        const browserSpecs = [
+            ['smoke', './smoke.spec.mjs'],
+            ['game-smoke', './game-smoke.spec.mjs'],
+            ['boss-e2e', './boss-e2e.spec.mjs'],
+            ['boss-combat-e2e', './boss-combat-e2e.spec.mjs'],
+            ['visual-sanity', './visual-sanity.spec.mjs'],
+            ['shadow-frustum-e2e', './shadow-frustum-e2e.spec.mjs'],
+            ['campaign-e2e', './campaign-e2e.spec.mjs'],
+            ['door-refusal-e2e', './door-refusal-e2e.spec.mjs'],
+            ['boss-reach-e2e', './boss-reach-e2e.spec.mjs'],
+            ['seal-stalemate-e2e', './seal-stalemate-e2e.spec.mjs'],
+            ['world-e2e', './world-e2e.spec.mjs'],
+            ['locked-doors-e2e', './locked-doors-e2e.spec.mjs'],
+            ['key-progression-e2e', './key-progression-e2e.spec.mjs'],
+            ['boss-quality-e2e', './boss-quality-e2e.spec.mjs'],
+            ['combat-feel-e2e', './combat-feel-e2e.spec.mjs'],
+            ['narrative-systems-e2e', './narrative-systems-e2e.spec.mjs'],
+            ['audio-render-e2e', './audio-render-e2e.spec.mjs'],
+            ['pages-smoke-e2e', './pages-smoke-e2e.spec.mjs'],
+            ['presentation-determinism-e2e', './presentation-determinism-e2e.spec.mjs'],
+        ];
+        for (const [name, mod] of browserSpecs) {
+            const { run } = await import(mod);
+            await runNamedAsync(name, run);
+        }
     }
 
     writeStepSummary(sinks);

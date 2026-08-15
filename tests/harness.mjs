@@ -123,6 +123,94 @@ export function printErrorAnnotations(sinks) {
     }
 }
 
+/**
+ * ── PROCESS HYGIENE ────────────────────────────────────────────────────────
+ *
+ * Every spec in this suite runs in ONE Node process, in one order, with no
+ * isolation. `REVIEW.md` §4.4 says so plainly and gives the receipt: three
+ * specs installed a fake global `document` and never removed it, which defeated
+ * `typeof document === 'undefined'` guards in PRODUCTION code for every spec
+ * that ran afterwards. Each of those three passed on its own. The suite crashed
+ * in order, in a fourth spec, with an error about a canvas.
+ *
+ * That class of bug is invisible from inside the spec that causes it, and its
+ * symptom always appears somewhere else — which makes it the most expensive
+ * kind of test failure there is to diagnose.
+ *
+ * `snapshotEnvironment()` and `environmentDrift()` are the two halves of a
+ * cheap, general answer: take a fingerprint of the shared surface before a
+ * spec, compare after, and turn any difference into a FAILING assertion
+ * attributed to the spec that caused it. Not the spec that tripped over it
+ * later. The one that did it.
+ *
+ * WHAT IS WATCHED, AND WHY IT IS THIS LIST
+ *
+ *   * the set of global names — catches `globalThis.document = …`, the actual
+ *     historical bug, and anything else installed on the global object;
+ *   * the identity of the functions a test is most tempted to stub —
+ *     `Math.random` above all, because a spec that forces a deterministic roll
+ *     and forgets to put it back makes every later spec deterministic too, and
+ *     they will all still pass;
+ *   * `process.env` keys, because an env var set for one spec changes what
+ *     production code does in the next;
+ *   * the shape of `Object.prototype` and `Array.prototype`, because a stray
+ *     property on either is invisible until something iterates.
+ *
+ * WHAT IS NOT WATCHED, DELIBERATELY
+ *
+ * Module-level singleton state — the coach's spoken set, the score engine's
+ * current track, saved progress. Those live inside modules, not on any shared
+ * object, and no general fingerprint can see them. They are a real remaining
+ * gap and `REVIEW.md` says so rather than implying this guard covers them.
+ */
+const WATCHED_FUNCTIONS = [
+    ['Math.random', () => Math.random],
+    ['Date.now', () => Date.now],
+    ['JSON.parse', () => JSON.parse],
+    ['JSON.stringify', () => JSON.stringify],
+    ['console.log', () => console.log],
+    ['console.warn', () => console.warn],
+    ['console.error', () => console.error],
+];
+
+/** Fingerprint the shared surface a spec could dirty. */
+export function snapshotEnvironment() {
+    return {
+        globals: new Set(Object.getOwnPropertyNames(globalThis)),
+        env: new Set(Object.keys(process.env)),
+        fns: WATCHED_FUNCTIONS.map(([name, get]) => [name, get()]),
+        objectProto: Object.getOwnPropertyNames(Object.prototype).length,
+        arrayProto: Object.getOwnPropertyNames(Array.prototype).length,
+    };
+}
+
+/** What changed since `before`. Empty array means the spec cleaned up. */
+export function environmentDrift(before) {
+    const now = snapshotEnvironment();
+    const out = [];
+
+    for (const k of now.globals) {
+        if (!before.globals.has(k)) out.push(`added global \`${k}\``);
+    }
+    for (const k of before.globals) {
+        if (!now.globals.has(k)) out.push(`removed global \`${k}\``);
+    }
+    for (const k of now.env) {
+        if (!before.env.has(k)) out.push(`set process.env.${k}`);
+    }
+    for (const k of before.env) {
+        if (!now.env.has(k)) out.push(`deleted process.env.${k}`);
+    }
+    for (let i = 0; i < WATCHED_FUNCTIONS.length; i++) {
+        const [name] = WATCHED_FUNCTIONS[i];
+        if (before.fns[i][1] !== now.fns[i][1]) out.push(`left \`${name}\` replaced`);
+    }
+    if (before.objectProto !== now.objectProto) out.push('mutated Object.prototype');
+    if (before.arrayProto !== now.arrayProto) out.push('mutated Array.prototype');
+
+    return out;
+}
+
 /** A tiny assertion sink shared across specs. */
 export function createSink(label) {
     const results = [];

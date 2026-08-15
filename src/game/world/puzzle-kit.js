@@ -1,3 +1,4 @@
+// @ts-check
 // Phase E1 — the puzzle primitives, as pure logic.
 //
 // WHY THIS FILE EXISTS SEPARATELY FROM `blockers.js`
@@ -107,6 +108,10 @@ export function within(p, at, r) {
  * `accepts` narrows it. A plate that only a block can hold is a plate that has
  * told the player what it wants.
  */
+/**
+ * @param {{ at: {x:number,z:number}, r?: number, accepts?: string }} plate
+ * @param {{ player?: {x:number,z:number}, blocks?: any[], enemies?: any[] }} [world]
+ */
 export function plateHeld(plate, { player, blocks = [], enemies = [] } = {}) {
     const at = plate.at;
     const r = plate.r != null ? plate.r : 1.1;
@@ -151,6 +156,13 @@ export function socketFilled(socket, blocks = []) {
  * bounces, and a set of already-used mirrors. Two mirrors facing each other are
  * an infinite loop, and a player can build that arrangement by accident in
  * about four seconds.
+ */
+/**
+ * @param {{ at: {x:number,z:number}, dir: {x:number,z:number} }} source
+ * @param {{ mirrors?: any[], targets?: any[],
+ *           isSolid?: (x: number, z: number) => boolean,
+ *           maxDist?: number, maxBounces?: number,
+ *           step?: number, radius?: number }} [world]
  */
 export function traceBeam(source, {
     mirrors = [], targets = [], isSolid = () => false,

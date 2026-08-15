@@ -1,3 +1,4 @@
+// @ts-check
 // Health, i-frames, death.
 
 /**

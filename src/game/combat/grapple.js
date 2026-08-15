@@ -1,3 +1,4 @@
+// @ts-check
 // Magnetic Grapple — short swept pull with cancel if path blocked.
 
 import { gsfx } from '../audio/sfx-bank.js';

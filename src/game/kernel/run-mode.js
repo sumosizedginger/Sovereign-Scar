@@ -1,3 +1,4 @@
+// @ts-check
 // Campaign-owned run modes. These values are gameplay rules, not preferences.
 
 export const RUN_MODES = Object.freeze({

@@ -28,7 +28,7 @@
 // cover.
 
 import * as THREE from 'three';
-import { createDungeon, doorCells, DOOR_WIDTH } from '../../src/game/world/room-graph.js';
+import { createDungeon, doorCells } from '../../src/game/world/room-graph.js';
 import { CollisionWorld } from '../../src/engine/collision.js';
 import { Player } from '../../src/game/player.js';
 import { BEAT_LIST } from './_beat-defs.mjs';

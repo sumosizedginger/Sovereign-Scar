@@ -6,11 +6,10 @@
 // drift out of sync with the arm — the failure mode you get from animating a
 // weapon separately and matching it to the body by hand.
 
-import * as THREE from 'three';
 import { buildWeaponModel, HAND_OFFSET, HAND_TILT } from '../assets/weapon-models.js';
 
 export class HeldWeapon {
-    /** @param {THREE.Object3D} rigRoot the actor's root group */
+    /** @param {import('three').Object3D} rigRoot the actor's root group */
     constructor(rigRoot) {
         this.rigRoot = rigRoot;
         this.current = null;

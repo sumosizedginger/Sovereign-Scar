@@ -1,0 +1,83 @@
+name: pages
+
+# Publishes the browser runtime to
+#   https://sumosizedginger.github.io/Sovereign-Scar/
+#
+# THE SAME GAME, NOT A COPY OF IT. The artifact is built from `src/` and
+# `lib/` by `scripts/build-pages.mjs`, which follows the real import graph out
+# of the real `index.html`. Nothing is transpiled, rewritten or duplicated into
+# a `docs/` folder — a second checked-in copy of the game is a second
+# Sovereign Scar, and it starts drifting from the first the same week.
+#
+# IT DOES NOT DEPLOY WHAT IT HAS NOT CHECKED. Lint, the type boundary, the unit
+# suite and the artifact validator all run before the upload. A push that
+# breaks any of them leaves the currently published game up.
+#
+# The browser/WebGL half of the suite still does not run here. That includes
+# `pages-smoke-e2e.spec.mjs`, which is the only thing that proves the artifact
+# BOOTS rather than merely being well-formed — so it is a required local check
+# before a release, not a gate. Said plainly in README.md and REVIEW.md.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time. `cancel-in-progress: false` because cancelling a
+# half-finished Pages deployment is how a site ends up serving a partial
+# artifact.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit suite
+        run: npm run test:unit
+
+      - name: Stage the artifact
+        run: npm run pages:build
+
+      - name: Validate the artifact
+        run: npm run pages:validate
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-pages
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

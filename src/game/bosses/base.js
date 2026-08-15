@@ -1570,7 +1570,6 @@ export function circleStrafe(pos, player, dt, opts = {}) {
     const cur = Math.hypot(dx, dz) || 0.001;
     const want = Math.max(minRadius, cur - close * dt);
     const a = Math.atan2(dz, dx) + spin * dt;
-    const tx = px + Math.cos(a) * want, tz = pz + Math.sin(a) * want;
     // Step toward the strafe point WITHOUT overshooting it. moveToward has no
     // clamp, so once the spiral reaches its minimum radius a full step sails
     // past the target and lands further out than it started — the boss ends up

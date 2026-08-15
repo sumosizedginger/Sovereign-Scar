@@ -1,3 +1,4 @@
+// @ts-check
 // Z3 — the defensive verb.
 //
 // Every hostile action in this game already winds up, paints a ring on the

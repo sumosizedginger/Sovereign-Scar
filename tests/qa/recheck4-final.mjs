@@ -1,3 +1,16 @@
+// ═══ UNMAINTAINED ONE-OFF INVESTIGATION HARNESS — DO NOT CITE ═══════════════
+//
+// Written to answer one question on one afternoon and never maintained since.
+// It is kept as a record of an investigation, not as an instrument. A number
+// this file prints today is not evidence of anything: the code it probes has
+// moved, and the audit in `tests/qa/README.md` lists the specific ways this
+// class of probe was found to be lying — including one that manufactured the
+// damage it then reported as proof that combat worked.
+//
+// If you need this question answered NOW, write a probe that answers it now.
+// The maintained instruments are the ones cited from `HANDOFF.md`.
+// ════════════════════════════════════════════════════════════════════════════
+
 // Final recheck #4: units already separate; this is live browser evidence.
 // Spawn/ground all levels, beat-09 soak, combat, boss single-step.
 

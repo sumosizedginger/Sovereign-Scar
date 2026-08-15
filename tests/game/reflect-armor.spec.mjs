@@ -33,7 +33,7 @@
 import * as THREE from 'three';
 import { Enemy } from '../../src/game/enemy.js';
 import { applyHit, inFrontArc } from '../../src/game/combat/combat-sweeper.js';
-import { coach, resetCoach, setCoachSink } from '../../src/game/ui/coach.js';
+import { resetCoach, setCoachSink } from '../../src/game/ui/coach.js';
 import { BEAT_LIST } from './_beat-defs.mjs';
 
 function spawn(opts) {

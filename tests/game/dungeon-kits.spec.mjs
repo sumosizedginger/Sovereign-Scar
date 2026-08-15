@@ -65,7 +65,7 @@ export function run(t) {
     t.ok('applyKit adds no voxels', base.size === before.size, `after=${base.size} before=${before.size}`);
     let solidsChanged = false, capBrighter = 0, inlayBrighter = 0, dimmed = 0;
     for (const [k, after] of base) {
-        const [x, y] = k.split(',').map(Number);
+        const [, y] = k.split(',').map(Number);
         const bef = before.get(k);
         if (y >= 1 && y < 4 && after !== bef) solidsChanged = true; // mid-wall untouched
         if (after !== bef) {

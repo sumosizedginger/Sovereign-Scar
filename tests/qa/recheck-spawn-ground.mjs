@@ -1,3 +1,16 @@
+// ═══ UNMAINTAINED ONE-OFF INVESTIGATION HARNESS — DO NOT CITE ═══════════════
+//
+// Written to answer one question on one afternoon and never maintained since.
+// It is kept as a record of an investigation, not as an instrument. A number
+// this file prints today is not evidence of anything: the code it probes has
+// moved, and the audit in `tests/qa/README.md` lists the specific ways this
+// class of probe was found to be lying — including one that manufactured the
+// damage it then reported as proof that combat worked.
+//
+// If you need this question answered NOW, write a probe that answers it now.
+// The maintained instruments are the ones cited from `HANDOFF.md`.
+// ════════════════════════════════════════════════════════════════════════════
+
 // Independent recheck: spawn solid + grounded after settle on every level.
 // Does not modify game source.
 
@@ -144,7 +157,9 @@ export async function run(t) {
             results.push(r);
 
             const playableY = r.pos.y > 0.4 && r.pos.y < 12;
-            const notTerminalFall = r.vy > -20 || r.grounded;
+            // A `notTerminalFall` value was computed here and never asserted.
+            // The "grounded after settle" check below is the stronger claim and
+            // subsumes it.
             t.ok(`${id}: loaded`, r.id === id, JSON.stringify(r));
             t.ok(`${id}: solid under spawn`, r.solidAtSpawnY01, JSON.stringify(r.spawn));
             t.ok(`${id}: player Y playable`, playableY, `y=${r.pos.y} grounded=${r.grounded} vy=${r.vy}`);

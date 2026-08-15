@@ -21,7 +21,6 @@ import * as THREE from 'three';
 import { createDungeon, ROOM_STRIDE, walkableCells } from '../../src/game/world/room-graph.js';
 import { CollisionWorld } from '../../src/engine/collision.js';
 import { BEAT_LIST } from '../game/_beat-defs.mjs';
-import { puzzleFor } from '../../src/game/world/puzzles.js';
 
 
 
@@ -42,7 +41,6 @@ let nUnstandable = 0, nUnreachable = 0, nSpawnTrapped = 0, nVaultSealed = 0;
 let nTightMouth = 0;
 
 for (const def of BEAT_LIST) {
-    const beatNo = Number(String(def.id).match(/beat-(\d+)/)?.[1] || 0);
     let level;
     try {
         level = createDungeon(

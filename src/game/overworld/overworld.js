@@ -2,7 +2,7 @@
 // room-graph machinery (a screen is a room with partial borders modeled as
 // wide edge doors). One registry entry; internal screen management.
 
-import { createDungeon, doorCells } from '../world/room-graph.js';
+import { createDungeon } from '../world/room-graph.js';
 import { getOverworldState, patchOverworld, markScreenVisited } from '../world/keys.js';
 import { loadSovereignProgress } from '../kernel/progress.js';
 import { CRUST_COLORS, ABYSS_COLORS } from '../assets/palettes.js';

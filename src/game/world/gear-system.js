@@ -1,3 +1,4 @@
+// @ts-check
 // Rotating gear solids — dynamic cylinder-ish collision via AABB approximations.
 
 import * as THREE from 'three';

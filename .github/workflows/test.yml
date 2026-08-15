@@ -8,7 +8,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -26,18 +26,43 @@ jobs:
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
 
+      # Cheapest gate first: it is seconds, and an undefined identifier or an
+      # unreachable branch should not wait behind ninety seconds of specs.
+      - name: Lint
+        run: npm run lint
+
+      # Type checking, scoped. Only `src/game/kernel|world|combat|physics`
+      # carry `// @ts-check`; see the long note in tsconfig.json for why the
+      # boundary is where it is. `typecheck-boundary.spec.mjs` in the unit run
+      # below is what stops the boundary shrinking quietly.
+      - name: Type check
+        run: npm run typecheck
+
       # CI runs the full pure-node unit suite via --unit-only (engine
       # collision/hitbox/settings — incl. the vectorized-vs-classic-cone
       # equivalence proof — plus every src/game unit spec: health, inventory,
       # weapons, bosses, world-graph, motifs, and the rest; ~90s and fully
       # deterministic). The browser E2E half (smoke, boss-e2e, boss-combat-e2e,
-      # visual-sanity, campaign/world-e2e) is left to local runs: GitHub's hosted
-      # runners have no GPU, and headless Chrome + SwiftShader software
-      # rendering proved unreliable here across several attempts (a GPU-less
-      # runner refusing WebGL under --use-gl=angle, then hanging on repeated
-      # navigation/context creation under SwiftShader even after working
-      # around that). Rather than keep chasing runner-image flakiness, the
-      # browser suite stays a required local pre-release check (see
+      # visual-sanity, campaign/world-e2e, pages-smoke) is left to local runs:
+      # GitHub's hosted runners have no GPU, and headless Chrome + SwiftShader
+      # software rendering proved unreliable here across several attempts (a
+      # GPU-less runner refusing WebGL under --use-gl=angle, then hanging on
+      # repeated navigation/context creation under SwiftShader even after
+      # working around that). Rather than keep chasing runner-image flakiness,
+      # the browser suite stays a required local pre-release check (see
       # CONTRIBUTING.md) instead of a CI gate.
+      #
+      # WHAT A GREEN RUN OF THIS JOB PROVES, AND WHAT IT DOES NOT, is written
+      # out in full in README.md and REVIEW.md §4.5. The short version: it
+      # proves the pure-logic half of the game is consistent and the deployable
+      # artifact is well-formed. It does not prove the game renders, and it has
+      # never been the half that caught the important bugs here.
       - name: Run unit suite
         run: npm run test:unit
+
+      # Build the exact artifact the Pages job publishes and check its shape:
+      # graph closure, no path that escapes /Sovereign-Scar/, no development
+      # material, `.nojekyll` present. Deterministic, no browser, no GPU — so
+      # unlike the browser suite this one is safe to gate on.
+      - name: Build and validate the Pages artifact
+        run: npm run pages

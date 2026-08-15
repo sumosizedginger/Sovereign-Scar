@@ -1,3 +1,4 @@
+// @ts-check
 // Weapon move templates. depthTolerance = range * sin(arcDeg/2) in engine units.
 
 /**

@@ -1,0 +1,91 @@
+name: release
+
+# Builds the Windows desktop artifacts and attaches them to a GitHub Release.
+#
+# TAG-DRIVEN, NOT PUSH-DRIVEN, ON PURPOSE. `electron-builder` pulls a ~350 MB
+# Electron binary and produces two ~100 MB executables. Doing that on every
+# commit to main would spend most of the runner minutes this repository has, to
+# produce installers nobody downloads. A release is an event; ordinary work is
+# not.
+#
+#   git tag v0.3.1
+#   git push origin v0.3.1
+#
+# The tag is the trigger. The Release it creates is a DRAFT — see the note on
+# `draft:` below; there is a decision the owner has to make before that can
+# honestly change.
+#
+# The unsigned-binary problem is not solvable here. Both executables will raise
+# Windows SmartScreen on first run until they are signed with a real code
+# signing certificate, which is a purchase and an identity check, not a
+# workflow step. Nothing in this file can substitute for it and nothing in it
+# pretends to.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Electron IS needed here, so no skip.
+      - run: npm ci
+
+      # A tag does not get to skip the gates. If the checks that run on every
+      # ordinary push cannot pass, the thing being tagged is not a release.
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit suite
+        run: npm run test:unit
+
+      - name: Build installer and portable
+        run: npm run desktop:build
+
+      - name: Check the artifacts exist
+        shell: bash
+        run: |
+          ls -la dist-desktop/
+          test -n "$(ls dist-desktop/*setup.exe 2>/dev/null)" \
+            || { echo 'no installer produced'; exit 1; }
+          test -n "$(ls dist-desktop/*portable.exe 2>/dev/null)" \
+            || { echo 'no portable build produced'; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sovereign-scar-windows
+          path: |
+            dist-desktop/*setup.exe
+            dist-desktop/*portable.exe
+
+      # DRAFT, DELIBERATELY.
+      #
+      # Publishing straight from a tag needs a versioning policy that does not
+      # exist in this repository yet: `package.json` says 0.3.0, nothing keeps
+      # it in step with the tag, and there is no rule saying what "0.4.0" means
+      # here. Until the owner decides that, a draft is the honest output — the
+      # binaries are built and attached, and a human presses publish.
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          draft: true
+          generate_release_notes: true
+          files: |
+            dist-desktop/*setup.exe
+            dist-desktop/*portable.exe

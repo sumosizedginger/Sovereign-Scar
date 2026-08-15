@@ -5,6 +5,149 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### One game, two containers — GitHub Pages and Electron from one source tree
+
+The game is now playable at
+`https://sumosizedginger.github.io/Sovereign-Scar/` and downloadable from
+Releases, **from the same files**. No bundler, no transpiler, no web-specific or
+desktop-specific fork of the gameplay, and no second checked-in copy of the game
+in a `docs/` folder.
+
+- `scripts/build-pages.mjs` stages `dist-pages/` by walking the real static
+  import graph out of the real `index.html`. The file list is **derived, not
+  authored**, so a new module cannot be forgotten. Under 200 files, a couple of
+  megabytes — `npm run pages:build` prints the real figures, which is the point
+  of not writing them here.
+- `scripts/validate-pages.mjs` judges the staged directory: the graph closes,
+  nothing reaches outside `/Sovereign-Scar/`, no development material got
+  published, `.nojekyll` is present.
+- `tests/pages-smoke-e2e.spec.mjs` serves that directory under a
+  `/Sovereign-Scar/` prefix, **404s and records anything requested outside it**,
+  and drives a real browser through boot → dungeon load → save → reload. That
+  counter is the point: a root-relative path works perfectly on the dev server
+  and 404s on Pages, and the obvious way to write this test wrong is to point it
+  at the ordinary root server and call the result a Pages check.
+- `tests/game/dual-runtime.spec.mjs` uses the *same derivation* to check the
+  Electron `build.files` globs cover every runtime file, so the two containers
+  cannot drift apart.
+- `.github/workflows/pages.yml` deploys on green. `release.yml` builds the
+  Windows installer and portable on a version tag and attaches them to a
+  **draft** Release — draft because there is no versioning policy yet, and that
+  is an owner decision.
+
+**`.nojekyll` is load-bearing.** GitHub Pages runs Jekyll unless it is there,
+and Jekyll silently drops every path beginning with `_`. Exactly one file in the
+runtime graph starts with one — `src/game/levels/_common.js` — and
+`room-graph.js` reaches it through `encounter-director.js`, so it is on the path
+to loading any level at all.
+
+**A defect in my own tooling, found by the smoke test.** The builder's import
+scanner required whitespace after `import`, which every hand-written line in
+this repo has — and the vendored three.js build does not: it opens
+`import{Matrix3 as e,…}from"./three.core.min.js"`. So `three.core.min.js` was
+never staged, and the static validator *passed the broken artifact*, because it
+carried a copy of the same regex with the same blind spot. The browser found it
+on the first boot. Both scanners fixed, and the validator gained a second pass
+that starts from the staged file list rather than from the entry — a different
+starting point for the same question, so a scanner that stops early cannot hide
+the gap twice.
+
+### Static analysis, and the four things it found
+
+`npm run lint` (ESLint) and `npm run typecheck` (TypeScript `checkJs`). Both
+correctness-only. **No formatting rules, no style rules, no bulk reformat** —
+`REVIEW.md` §4.3 used to say this repository had no static analysis at all, and
+now says exactly what it does and does not cover.
+
+The type boundary is deliberately four trees — `kernel/`, `world/`, `combat/`,
+`physics/` — via `// @ts-check` per file, with
+`tests/game/typecheck-boundary.spec.mjs` guarding it so it cannot shrink one
+deleted comment at a time. Whole-repo checking reports ~250 errors, almost all
+JSDoc that under-describes an options object; closing those with `any` would
+produce a checker that passes and proves nothing.
+
+Real findings, each fixed individually:
+
+- **An assertion that could not fail.** `registry.spec.mjs` claimed "omitting
+  the field yields the STRICT floor" and tested it as
+  `({}).space === undefined && (undefined || 'enclosed') === 'enclosed'` — two
+  constants, true in every JavaScript that has ever existed. It now reads the
+  real gate in `visual-sanity.spec.mjs` and holds it to both halves of the
+  claim.
+- **A duplicate object key.** A boss fixture declared `defeated: false` and then
+  a `get defeated()`; the getter silently won and the literal was dead.
+- **A condition that cannot be false.** `destructible-voxel-mesh.js` registered
+  collision under `if (col.maxY - col.minY >= 0 || true)`, wrapped around the
+  only statement in the loop, with two comments arguing both sides of a decision
+  nothing was making.
+- **A contract declared in neither file that used it.** `juice.onImpact` is
+  assigned in `index.js` and called twice in `combat-sweeper.js` and was
+  declared nowhere. Now declared on `Juice`, where a reader can see it.
+
+Plus dead weight: an unused `snapY` walk in the physics body computing a landing
+height nothing read (a stale second answer to a question `_groundTop` already
+owns), dead `tx`/`tz` in the boss strafe, and about fifteen unused imports.
+
+### The test runner catches specs that lie about being finished
+
+Every spec runs in one Node process with no isolation. `runNamed` /
+`runNamedAsync` now fingerprint the shared surface before each spec and compare
+after — global names, `process.env`, a replaced `Math.random` / `Date.now` /
+`console.*` / `JSON.*`, a mutated `Object.prototype` or `Array.prototype`.
+
+- A spec that dirties any of it **fails in its own name**, not in whichever spec
+  trips over it later. That is the whole value: the historical `document` leak
+  passed in all three specs that caused it and crashed a fourth.
+- A spec that **throws** is recorded as a failure and the run continues, rather
+  than killing `main()` and losing every result after it. This also closes a
+  hole in this project's counterfactual method — a break that crashed a spec
+  used to grep as zero failures and read exactly like a pass.
+- Both proven by deliberately breaking a spec's teardown, and separately by
+  making a spec throw, and confirming red in each case.
+
+`story.spec.mjs` and `settings.spec.mjs` had their teardown moved into a
+`finally`; it was the last statement of the function, which is a cleanup that
+only runs when nothing went wrong.
+
+### QA probes audited; nine marked unmaintained
+
+`tests/qa/README.md` is the audit. The worst finding: `independent-e2e.mjs`
+falls back to `target.hp -= 2; manualHit = true` when the real attack path
+produces nothing, and the assertion beneath it passes on `manualHit` — a probe
+that subtracts the damage itself and then reports that combat works.
+
+Also found: four probes writing reports to a hardcoded `D:\tmp\…` (they crash on
+any other machine, which nobody had noticed); one importing a *different*
+three.js from the one the game uses; a `scene.traverse(() => {})` walking the
+whole graph doing nothing; and — the one that matters, because it was in a
+maintained probe — `entry-safety.mjs` keeping a duplicated copy of
+`SIDE_NORMAL` under a comment warning it must never drift, long after the probe
+had stopped using it.
+
+### Documentation that stops going stale
+
+README no longer publishes assertion counts; they were already false. The play
+links are now the first thing on the page. `docs/ARCHITECTURE.md` gained the
+static-analysis boundary, the process-hygiene rules, the dual-runtime rules, and
+a candidate-by-candidate decomposition audit of `index.js` and `enemy.js`.
+
+**`enemy.js`: nothing extracted.** Thirty-eight methods over one mutable bag of
+state; the AI families each touch a dozen fields of `this`, so moving them out
+would mutate another object's privates from outside — the same coupling, further
+away, wearing a boundary. **`index.js`: one function extracted.**
+`reconstitutionLine` → `narrative/reconstitution-copy.js`, because it is a pure
+function of saved progress and was **untested for its whole life** (reaching it
+meant booting the renderer and dying with the right number of charges left). Ten
+assertions now, including the branch where a pre-lives-system save must read as
+*plenty* rather than *none*. Every rejected extraction is written down as
+rejected, with the reason.
+
+`docs/LICENSING.md` — new. `LICENSE` and `package.json` say MIT with no
+carve-out; the README adds "Game content © project authors", which reserves
+nothing, because MIT already leaves copyright with the author. The document sets
+out what each possible intention would require. **The licence was not changed**:
+that alters what people may do with the work, and it is the owner's decision.
+
 ### The spider you had to stand inside — a third cause for the same sentence
 
 *"Spider boss, I need to be inside of it to hit it before it does its move, I

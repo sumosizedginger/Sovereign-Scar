@@ -1,3 +1,4 @@
+// @ts-check
 // Phase E2 — vertical interest.
 //
 // WHY THIS KEEPS GETTING UNDONE
@@ -50,6 +51,12 @@ function shapeFor(roomId) {
  * geometry, doorways, spawns, the puzzle vault. Anything it refuses is skipped
  * cell by cell rather than cancelling the whole shape, so a terrace flows around
  * a pillar instead of vanishing because of one.
+ *
+ * @param {Map<string, number>} pmap
+ * @param {{half?: number}} room
+ * @param {string} roomId
+ * @param {number} color
+ * @param {(x: number, z: number) => boolean} [isBlocked]
  */
 export function terraceRoom(pmap, room, roomId, color, isBlocked = () => false) {
     const half = room.half || 0;

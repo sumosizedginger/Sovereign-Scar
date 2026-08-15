@@ -23,7 +23,7 @@
 
 import * as THREE from 'three';
 import {
-    SignalBus, plateHeld, socketFilled, traceBeam, isRecoverable, within,
+    SignalBus, plateHeld, socketFilled, traceBeam, isRecoverable,
 } from '../../src/game/world/puzzle-kit.js';
 import {
     puzzleFor, puzzlesForDungeon, SLOTS, MIN_HALF, flavourFor,

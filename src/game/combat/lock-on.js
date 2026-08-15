@@ -1,3 +1,4 @@
+// @ts-check
 // Z4 — Z-targeting.
 //
 // Facing in this game is derived from the movement vector (player.js, the

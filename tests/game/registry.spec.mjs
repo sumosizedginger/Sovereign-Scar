@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { LEVELS, getLevel, nextLevelId, prevLevelId, levelIndex } from '../../src/game/levels/registry.js';
 
 /**
@@ -26,9 +27,38 @@ function checkSpace(t, LEVELS) {
     }
     const openCount = LEVELS.filter((m) => m.space === 'open').length;
     t.ok('exactly two levels are open ground', openCount === 2, `${openCount}`);
-    t.ok('omitting the field yields the STRICT floor',
-        ({}).space === undefined && (undefined || 'enclosed') === 'enclosed',
-        'forgetting it must make a level harder to pass, never easier');
+
+    // ── THE DEFAULT FAILS SAFE ─────────────────────────────────────────────
+    //
+    // This assertion used to read:
+    //
+    //     ({}).space === undefined && (undefined || 'enclosed') === 'enclosed'
+    //
+    // Both halves are constants. `undefined || 'enclosed'` is 'enclosed' in
+    // every JavaScript that has ever existed, so the assertion could not fail —
+    // not if the fallback were changed to `'open'`, not if the two floors were
+    // swapped, not if the whole `space` mechanism were deleted. It was a
+    // decorative copy of the rule sitting next to the rule, which is the
+    // failure shape `REVIEW.md` §5 names first, and the new linter is what
+    // found it (`no-constant-binary-expression`).
+    //
+    // The rule does not live here. It lives in `visual-sanity.spec.mjs`, which
+    // is the gate that reads `space` and picks a contrast floor from it. So
+    // read THAT file and hold it to both halves of the claim: the fallback has
+    // to be the enclosed one, and enclosed has to be the harder number.
+    const gate = fs.readFileSync(
+        new URL('../visual-sanity.spec.mjs', import.meta.url), 'utf8');
+
+    t.ok('the certification gate defaults a missing `space` to enclosed',
+        /space:\s*meta\.space\s*\|\|\s*'enclosed'/.test(gate),
+        'forgetting the field must make a level harder to pass, never easier');
+
+    const floors = gate.match(/CONTRAST_FLOORS\s*=\s*\{\s*dungeon:\s*(\d+),\s*open:\s*(\d+)\s*\}/);
+    t.ok('…and the gate still declares two contrast floors', !!floors,
+        'if this stops matching the assertion below is scanning nothing');
+    t.ok('…and the enclosed floor is the STRICTER of the two',
+        !!floors && Number(floors[1]) > Number(floors[2]),
+        floors ? `dungeon ${floors[1]} vs open ${floors[2]}` : 'no floors found');
 }
 
 export function run(t) {

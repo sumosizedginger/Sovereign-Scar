@@ -1,3 +1,4 @@
+// @ts-check
 // Phase D2 — elites.
 //
 // THE GAP THIS FILLS

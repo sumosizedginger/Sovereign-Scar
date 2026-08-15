@@ -1,3 +1,4 @@
+// @ts-check
 // Y-axis gravity + fall damage. XZ still owned by CollisionWorld.
 // Default gravity is −Y only; setGravityVector is available for Beat 14.
 //
@@ -37,6 +38,10 @@ export class VoxelPhysicsBody {
         this.enabled = true;
     }
 
+    /**
+     * @param {{ groundDrag?: number, airDrag?: number,
+     *           windVector?: { x: number, y: number, z: number } }} [profile]
+     */
     setFrictionProfile({ groundDrag, airDrag, windVector } = {}) {
         if (groundDrag != null) this.profile.groundDrag = groundDrag;
         if (airDrag != null) this.profile.airDrag = airDrag;
@@ -156,18 +161,12 @@ export class VoxelPhysicsBody {
             const solidUnder = this._solidAt(gx, feetY - 0.02, gz) || this._solidAt(gx, feetY, gz);
 
             if (this.vy <= 0 && solidUnder) {
-                // Snap feet to top of voxel cell
-                const cell = Math.floor(feetY / VOXEL_SIZE);
-                const top = (cell + 1) * VOXEL_SIZE;
-                // Walk up: find highest solid top under feet within 1 cell
-                let snapY = top;
-                for (let dy = 0; dy <= 2; dy++) {
-                    const ty = feetY - dy * VOXEL_SIZE;
-                    if (this._solidAt(gx, ty, gz)) {
-                        snapY = (Math.floor(ty / VOXEL_SIZE) + 1) * VOXEL_SIZE;
-                        break;
-                    }
-                }
+                // The landing height comes from `_groundTop` below, which is the
+                // one function in this file allowed to answer "what is the
+                // surface under me". A second, older cell-walk used to compute
+                // its own `snapY` here and then throw it away unread — two
+                // answers to one question, one of them dead. Deleted: a stale
+                // duplicate of a rule is how the two versions drift apart.
                 if (this._solidAt(gx, feetY - 0.01, gz) || this._solidAt(gx, this.position.y - this.extents.y - 0.05, gz)) {
                     const groundTop = this._groundTop(gx, this.position.y, gz);
                     if (groundTop != null) {

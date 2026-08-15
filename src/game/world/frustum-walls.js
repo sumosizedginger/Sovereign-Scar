@@ -1,10 +1,11 @@
+// @ts-check
 // Beat 09 — walls solid only when inside camera frustum (binary on/off).
 
 import * as THREE from 'three';
 
 export class FrustumWallSystem {
     /**
-     * @param {Array<{ mesh: THREE.Object3D, solid: object, id: string }>} walls
+     * @param {Array<{ mesh: THREE.Object3D, solid: any, id: string, solidActive?: boolean }>} walls
      * @param {object} collisionWorld
      * @param {THREE.Camera} camera
      */

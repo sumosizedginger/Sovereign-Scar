@@ -1,3 +1,4 @@
+// @ts-check
 // Phase W (W1): multi-room dungeons on a fixed world grid.
 //
 // Core spatial decision (Builder Guide Part 5): room (i, j) has world origin
@@ -9,7 +10,7 @@
 // internally — the loadLevel outer contract (G9) is untouched.
 
 import * as THREE from 'three';
-import { meshAndCollide, buildRoomFloor, VS } from './level-builder.js';
+import { meshAndCollide, buildRoomFloor } from './level-builder.js';
 import { KITS as DUNGEON_KITS, applyKit, markTraversal } from '../levels/dungeon-kits.js';
 import { buildRoomLights, disposeRoomLights } from './room-lights.js';
 import { coach } from '../ui/coach.js';

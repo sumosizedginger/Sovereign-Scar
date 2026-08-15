@@ -1,4 +1,4 @@
-import { createLevelShell, CRUST_COLORS } from './_common.js';
+import { createLevelShell } from './_common.js';
 import { buildScatteredPredecessor, buildDeadConsole } from '../assets/props.js';
 import { stampMap } from '../assets/props.js';
 

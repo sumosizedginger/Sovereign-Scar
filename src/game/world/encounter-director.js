@@ -1,3 +1,4 @@
+// @ts-check
 // Phase D1 — the encounter director.
 //
 // THE PROBLEM IT EXISTS FOR

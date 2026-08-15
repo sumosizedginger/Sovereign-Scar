@@ -17,7 +17,7 @@
 // was no reason to move and no way to lose.
 
 import * as THREE from 'three';
-import { BossBase, bossHit, discMesh, BOSS_EMISSIVE_MAX } from './base.js';
+import { BossBase, bossHit, BOSS_EMISSIVE_MAX } from './base.js';
 import { DestructibleVoxelMesh } from '../world/destructible-voxel-mesh.js';
 import { fillBox } from '../../voxel/helpers.js';
 import { CRUST_COLORS } from '../assets/palettes.js';

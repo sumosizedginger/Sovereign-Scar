@@ -1,3 +1,4 @@
+// @ts-check
 // Pushable voxel block — mutates CollisionWorld solid each frame.
 
 import * as THREE from 'three';
@@ -20,6 +21,20 @@ export class PushableBlock {
         this.id = opts.id || `push:${Math.random().toString(36).slice(2, 8)}`;
         this.mass = opts.mass || 1;
         this.scene = scene;
+
+        // Set from OUTSIDE, by `blockers.js`, once the block is placed in a
+        // room. They are declared here rather than materialising later,
+        // because five fields that only exist after another module has touched
+        // the object are five fields nobody reading this class can see — and
+        // `spawn` in particular is what the out-of-room reset reads, so a block
+        // built by any other caller would have thrown on the first reset.
+        /** @type {{x:number,y:number,z:number}|null} where a reset returns it */
+        this.spawn = null;
+        this.canReset = false;
+        this.spin = 0;
+        this.mirror = false;
+        /** @type {((x:number, z:number) => boolean)|null} platform-map probe */
+        this.blocked = null;
 
         const m = new Map();
         fillBox(m, -1, 1, 0, 2, -1, 1, opts.color || CRUST_COLORS.clay);

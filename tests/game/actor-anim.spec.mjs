@@ -9,7 +9,6 @@
 import * as THREE from 'three';
 import { createActorRig } from '../../src/game/characters/actor-rig.js';
 import { createActorAnimator } from '../../src/game/characters/actor-animator.js';
-import { ARCHETYPES } from '../../src/game/characters/archetypes.js';
 import { HERO_PALETTE, ENEMY_PALETTES } from '../../src/game/assets/palettes.js';
 import { HAND_OFFSET, HAND_TILT, weaponTipY } from '../../src/game/assets/weapon-models.js';
 

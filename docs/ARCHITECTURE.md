@@ -216,3 +216,148 @@ getProgress().sovereignProgress = {
 Custom passes **must** sit before `outputPass`:
 
 `Render → Bloom → Vignette → RGB → Film → SMAA → Flicker → Wrap → Output`
+
+---
+
+## Static analysis
+
+Two gates, both cheap, both correctness-only.
+
+| command | what it is |
+|---|---|
+| `npm run lint` | ESLint (`eslint.config.js`). Undefined identifiers, unreachable code, duplicate object keys, duplicate switch cases, constant conditions, self-comparison, dead private fields, unused variables and imports. **No formatting, no style rules.** Every rule turned off is turned off with a written reason in the config. |
+| `npm run typecheck` | TypeScript `checkJs` (`tsconfig.json`). Emits nothing; there is no `.ts` in the product and no build step. |
+
+**The type boundary is four trees, not the whole game.** Only files under
+`src/game/kernel/`, `src/game/world/`, `src/game/combat/` and
+`src/game/physics/` carry `// @ts-check` and are analysed — the save schema, the
+key economy and room graph, the damage entry point, and the body that decides
+where the player may stand. That is where this project's bugs have actually
+lived. Everything else — `index.js`, `player.js`, `enemy.js`, the boss roster,
+all of `fx/`, `ui/`, `render/`, `assets/` and `levels/` — gets **no type
+analysis at all**, and the frozen kit trees are excluded by policy.
+
+`tests/game/typecheck-boundary.spec.mjs` reads `tsconfig.json`, walks those four
+trees, and fails if any file has lost its pragma or if `checkJs` gets flipped on
+(which would silently make `include` meaningless, since TypeScript checks
+everything the included files import). Expanding the boundary is: add a tree to
+`include`, add the pragma, fix what `tsc` says. Adding `@ts-ignore` instead is
+explicitly not the move.
+
+## Test process hygiene
+
+Every spec runs in **one Node process**, in order, with no isolation. That has
+cost this project real time — three specs once installed a fake global
+`document` and never removed it, defeating `typeof document === 'undefined'`
+guards in production code for every spec that ran afterwards. All three passed
+alone; the suite crashed in a fourth.
+
+`runNamed` / `runNamedAsync` in `tests/run-all.mjs` now wrap every spec:
+
+- a spec that **throws** is recorded as a failing assertion and the run
+  continues, instead of killing `main()` and losing every spec after it;
+- a spec that **dirties the shared surface** fails, in its own name — global
+  names added or removed, `process.env` keys, a replaced `Math.random` /
+  `Date.now` / `console.*` / `JSON.*`, a mutated `Object.prototype` or
+  `Array.prototype`;
+- both run in a `finally`, so a spec that throws while holding a global reports
+  both problems rather than only the first.
+
+**What it does not see:** module-level singleton state — the coach's spoken set,
+the score engine's current track, saved progress. Those live inside modules, not
+on any shared object, and no general fingerprint can reach them. That gap is
+real and `REVIEW.md` §4.4 says so.
+
+## Two containers, one game
+
+```
+                    canonical source
+                    index.html + src/ + lib/
+                             │
+             ┌───────────────┴───────────────┐
+       GitHub Pages                      Electron
+   dist-pages/ over HTTPS          loopback HTTP in a window
+   /Sovereign-Scar/                 OS-assigned port
+```
+
+There is no web-specific and no desktop-specific gameplay code, and no second
+copy of the game in a `docs/` folder. The rules that keep it that way:
+
+- **Every runtime path is relative.** The import map is `./lib/three/…`, the
+  entry is `./src/game/index.js`, and nothing in `src/` writes a leading-slash
+  URL, a `localhost`, a port, or a `file://`. A leading slash resolves against
+  the *origin* root, which on Pages is somebody else's URL space.
+- **No module knows where it is hosted.** The string `/Sovereign-Scar/` appears
+  in the deployment scripts and workflows and nowhere in `src/`.
+- **The Pages file list is derived, not authored.** `scripts/build-pages.mjs`
+  walks the real import graph from the real entry and exports that derivation;
+  `tests/game/dual-runtime.spec.mjs` uses the same function to check the
+  Electron `build.files` globs cover every file in it. One derivation, two
+  consumers — so a new module cannot be shipped to one container and forgotten
+  in the other.
+- **`.nojekyll` is load-bearing.** GitHub Pages runs Jekyll unless it is
+  present, and Jekyll silently drops every path beginning with `_`. Exactly one
+  file in the runtime graph starts with one — `src/game/levels/_common.js` —
+  and `room-graph.js` reaches it through `encounter-director.js`, so it is on
+  the path to loading any level at all.
+- **Electron serves rather than `loadFile`s.** `file://` makes Chromium apply
+  CORS to every ES-module import; the window would open black. The loopback
+  server is `scripts/serve.mjs` — the same one the tests use.
+
+`scripts/validate-pages.mjs` checks the staged artifact's shape.
+`tests/pages-smoke-e2e.spec.mjs` serves it under a `/Sovereign-Scar/` prefix,
+404s and *records* anything requested outside that prefix, and drives a real
+browser through boot → dungeon load → save → reload.
+
+---
+
+## The two large files, deliberately left large
+
+`src/game/index.js` (~2,100 lines) and `src/game/enemy.js` (~1,900 lines) were
+audited for decomposition. Almost nothing came out, and this section is the
+record of why — so the next reader does not have to re-derive it, and so
+"someone should split these up" stops being a free opinion.
+
+The test applied to every candidate: **does the extraction move state, or only
+move code?** Moving code that still reaches into another object's mutable fields
+does not create a boundary; it creates the appearance of one, which is worse,
+because the next person trusts it.
+
+### `enemy.js` — one class, 38 methods, one bag of state
+
+| candidate seam | verdict |
+|---|---|
+| **AI behaviour families** (`_aiLunge`, `_aiDrift`, `_aiWeave`, `_aiCenser`, `_aiChase`, `_aiCharge`, `_aiRanged`, ~300 lines) | **Rejected.** Each reads and writes a dozen fields of `this` — `_windupT`, `attackCd`, `_denied`, `_pressure`, `state.current`, `rig.position`, `facing`. As free functions taking `(enemy, dt, player, …)` they would mutate another object's privates from outside. Same coupling, further away, and now it *looks* modular. |
+| **Projectiles** (`_spawnProjectile`, `_updateProjectiles`, `_reflect`, `_clearProjectiles`) | **Rejected, but it is the closest call.** It does own a self-contained list with its own lifetime. It also resolves damage against the player and consults guard state to decide a reflect, so the boundary would carry combat rules across it — and a new wire between a producer and a consumer is this repository's single most expensive recurring defect (`REVIEW.md` §5). Not worth paying that to make one file shorter. |
+| **Webs** (`_spawnWeb`, `_tickWebs`, `_clearWebs`) | **Rejected**, same shape as projectiles and a third the size. |
+| **Ground and placement** (`_groundAt`, `_standingY`, `_move`, `seatOnGround`, `_followGround`, `_clampToRoom`) | **Rejected.** These are the enemy's answer to "where may my body be", and the whole file's correctness depends on them agreeing with each other. Splitting them is how two answers to one question appear — the exact bug removed from `voxel-physics-body.js` this pass. |
+| **Nine archetypes → nine subclasses** | **Rejected outright.** The archetypes differ by a data table and a switch in `defaultAi`, not by structure. Nine classes to express nine strings is abstraction for its own sake, and it would make "what does a censer do differently" require reading nine files. |
+| **The constant block** (~135 lines of tuning) | **Rejected.** Moving it to `enemy-tuning.js` is a re-export shuffle that separates the numbers from the code that reads them, and several are exported and imported by specs. |
+
+**Nothing was extracted from `enemy.js`.** It is large because it is one entity
+with many behaviours, all of which read and write the same mutable state, and
+that is a shape where visible orchestration is genuinely safer than distributed
+orchestration.
+
+### `index.js` — boot, lifecycle, wiring, frame loop
+
+| candidate seam | verdict |
+|---|---|
+| **The frame loop** | **Rejected, on principle.** Update order *is* gameplay behaviour here, and the file documents why: `hud.setMenuOpen` and `input.setUiCapture` are at the top of the frame, above every `consume*`, because a frame late is the whole bug — a menu that closes inside its own listener has already let the closing keypress latch a gameplay verb. Splitting the loop into phases hides that ordering behind call sites. |
+| **Boot / singleton construction** (~220 lines) | **Rejected.** The construction *order* is load-bearing — the post-stack passes must be assembled before `outputPass`, and the sequence is documented above. A `boot()` returning a bag of thirty names replaces one readable sequence with a destructure and a function boundary that hides the ordering constraint. |
+| **Level lifecycle** (`unloadLevel`, `loadLevel`, `requestLevel`, `activateCampaignServices`, ~220 lines) | **Rejected.** Closes over roughly twenty-five module-scope singletons. Extraction means passing all of them, or passing a context object everything reaches into — which is the same coupling with an extra layer. |
+| **Menu and ending wiring** (~350 lines) | **Rejected.** It is one large declarative `MenuOverlay` configuration whose callbacks close over `game`, `player`, `hud`, `menu`, `loadLevel` and progress. The recent `Enter`-eats-a-dialogue-line bug lived precisely in the interaction between this wiring and the frame loop, and was fixed by *ordering*; moving the wiring further from the loop makes that harder to see, not easier. |
+| **`finalScorePayload(progress, completed)`** | **Rejected.** Reads as pure, is not — it closes over `witnessScore`, `game` and `SCORE_VERSION`. |
+| **`reconstitutionLine(progress, outcome)`** | **PERFORMED.** → `src/game/narrative/reconstitution-copy.js`. |
+
+**The one extraction, and why it was the only one.** `reconstitutionLine` is a
+pure function of saved progress — no renderer, no scene, no singleton, no
+mutation. It is also narrative content, and it belongs with the narrative code.
+It had **no test at all** while it lived in the boot file, because reaching it
+meant booting the renderer, starting a run and dying with the right number of
+charges left; as a free function it costs ten assertions to pin completely
+(`tests/game/reconstitution-copy.spec.mjs`), including the branch where a
+pre-lives-system save must read as *plenty* rather than *none*.
+
+That is the shape a justified extraction has here. If a candidate does not look
+like that one, the honest answer is to leave it where it is and write down why.

@@ -1,3 +1,4 @@
+// @ts-check
 // C3: Scar Shard upgrade economy — pure logic, node-testable.
 // Purchases persist under sovereignProgress.upgrades = { edge: 1, ... }.
 //

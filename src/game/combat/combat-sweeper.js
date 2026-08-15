@@ -1,3 +1,4 @@
+// @ts-check
 // Multi-target wrapper around engine hitboxCheck.
 
 import { hitboxCheck } from '../../combat/hitbox.js';

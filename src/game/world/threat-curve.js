@@ -1,3 +1,4 @@
+// @ts-check
 // Campaign HP scaling — the one lever that keeps a fight worth having.
 //
 // THE PROBLEM THIS EXISTS TO FIX

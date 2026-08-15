@@ -1,3 +1,4 @@
+// @ts-check
 // Shared level construction: floors, walls, solids, occupancy queries.
 
 import * as THREE from 'three';
@@ -125,7 +126,7 @@ export function meshAndCollide(map, scene, collisionWorld, opts = {}) {
 
 export function abyssTint(map) {
     // Overpaint some floor cells with basalt/gold for Abyss mood rooms
-    for (const [k, c] of map) {
+    for (const [k] of map) {
         const [x, y, z] = k.split(',').map(Number);
         if (y === 0 && ((x + z) % 7 === 0)) map.set(k, ABYSS_COLORS.goldVein);
         else if (y === 0 && ((x * 3 + z) % 5 === 0)) map.set(k, ABYSS_COLORS.basalt);

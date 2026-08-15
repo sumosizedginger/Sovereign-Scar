@@ -2,7 +2,7 @@
 // Skipped automatically when Chrome/Edge is not installed.
 
 import {
-    createSink, startServer, findChromeVerbose, sleep, disableGamepads,
+    startServer, findChromeVerbose, sleep, disableGamepads,
 } from './harness.mjs';
 
 export async function run(t) {

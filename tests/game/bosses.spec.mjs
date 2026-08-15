@@ -175,11 +175,16 @@ export function run(t) {
         const level2 = { enemies: enemies2, addSystem(s) { systems2.push(s); return s; }, boss: null };
         const multi = {
             bossId: 'multi', bossName: 'Multi', managedBySystem: false,
-            state: { current: 'IDLE' }, defeated: false,
+            state: { current: 'IDLE' },
             cores: [
                 { managedBySystem: false, state: { current: 'IDLE' }, hp: 2 },
                 { managedBySystem: false, state: { current: 'IDLE' }, hp: 2 },
             ],
+            // A multi-core boss is defeated when its cores are, so `defeated` is
+            // COMPUTED here. There used to be a plain `defeated: false` a few
+            // lines up as well; the getter silently won and the literal was
+            // dead, so the fixture read as if it had a settled flag when it did
+            // not. Found by `no-dupe-keys`.
             get defeated() { return this.cores.every((c) => c.state.current === 'DEAD'); },
             update() {}, dispose() {},
         };

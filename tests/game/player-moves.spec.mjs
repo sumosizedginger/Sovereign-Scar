@@ -391,9 +391,9 @@ export function run(t) {
     }
 
     // ── The dash-attack ────────────────────────────────────────────────────
+    // This block drives `tryDash` / `tryDashAttack` directly rather than
+    // through the input layer, so it builds no `Input`.
     {
-        const clock = makeClock();
-        const input = inputWith(new Input(fakeDom, { clock: clock.now }));
         const player = makePlayer('anchor_link');
         player.inventory.items.phase_boot = true;
 

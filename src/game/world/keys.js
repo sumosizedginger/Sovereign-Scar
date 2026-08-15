@@ -1,3 +1,4 @@
+// @ts-check
 // W3: per-dungeon lock-and-key state, persisted under
 // sovereignProgress.dungeons[dungeonId] (read-modify-write — G13: the
 // top-level save only shallow-merges).

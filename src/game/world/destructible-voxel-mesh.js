@@ -1,3 +1,4 @@
+// @ts-check
 // Destructible island mesh: owns Map + mesh + solid ids.
 // Map is truth; geometry is a view. Prefer small islands (D1 / SS-032).
 
@@ -178,24 +179,25 @@ export class DestructibleVoxelMesh {
             }
         }
         const s = this.voxelSize;
-        for (const [ck, col] of columns) {
+        for (const [ck] of columns) {
             const [x, z] = ck.split(',').map(Number);
-            // Only block XZ if column is tall enough to be a wall (height > 1)
-            // or always for simplicity — short floor columns still block feet XZ
-            // which is correct for raised platforms as walls at edges.
+            // EVERY occupied column blocks XZ, however short it is.
+            //
+            // This used to read `if (col.maxY - col.minY >= 0 || true)`, which
+            // is a condition that cannot be false, wrapped around the only
+            // statement in the loop. It looked like a height decision and was
+            // not one, and the two comments above it argued both sides of a
+            // choice nothing was making. Short floor columns still block feet,
+            // which is correct: a raised platform is a wall at its edges.
             const id = `${this.solidIdPrefix}:${x},${z}`;
-            // Floor platforms: treat as solid only when tall OR we want edge collision.
-            // For raised boulders we want full column solid.
-            if (col.maxY - col.minY >= 0 || true) {
-                this.collisionWorld.addSolid({
-                    id,
-                    minX: this.origin.x + x * s,
-                    maxX: this.origin.x + (x + 1) * s,
-                    minZ: this.origin.z + z * s,
-                    maxZ: this.origin.z + (z + 1) * s,
-                });
-                this.solidIds.add(id);
-            }
+            this.collisionWorld.addSolid({
+                id,
+                minX: this.origin.x + x * s,
+                maxX: this.origin.x + (x + 1) * s,
+                minZ: this.origin.z + z * s,
+                maxZ: this.origin.z + (z + 1) * s,
+            });
+            this.solidIds.add(id);
         }
     }
 

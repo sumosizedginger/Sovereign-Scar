@@ -1,3 +1,4 @@
+// @ts-check
 // C3: Reconstitution Altar — a glowing kintsugi shrine that opens the
 // upgrade shop when the player interacts nearby.
 //
@@ -9,6 +10,11 @@
 
 import * as THREE from 'three';
 
+/**
+ * @param {any} level
+ * @param {any} ctx
+ * @param {{ x?: number, z?: number, y?: number }} [at]
+ */
 export function addAltar(level, ctx, { x, z, y = 0.5 } = {}) {
     const scene = ctx.scene;
     const group = new THREE.Group();

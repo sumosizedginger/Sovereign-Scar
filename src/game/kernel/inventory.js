@@ -1,3 +1,4 @@
+// @ts-check
 // Key items, weapons, memory keys, flags.
 
 import { coach } from '../ui/coach.js';

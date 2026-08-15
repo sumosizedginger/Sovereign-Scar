@@ -13,9 +13,7 @@ import { EncounterDirector } from '../world/encounter-director.js';
  * @returns level handle with dispose, enemies, destructibles, pickups, update, getVoxelAt, spawn
  */
 export function createLevelShell(ctx, opts = {}) {
-    const {
-        scene, collisionWorld, particles, player,
-    } = ctx;
+    const { scene, collisionWorld } = ctx;
 
     const disposers = [];
     const enemies = [];
