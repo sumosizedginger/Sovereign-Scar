@@ -146,9 +146,20 @@ export class CryptWarden extends BossBase {
         // axis foreshortens into a mitten. Swung out to nearly a right angle it
         // lies ACROSS the frame instead, clears the body entirely, and the
         // reach it advertises is the reach that hits you.
-        const blade = voxBlade(2.4, 0.34, 0.10, 0xc0c8d8, 0x80a0ff, 0.5);
-        blade.position.set(1.30, 0.52, 0.30);
-        blade.rotation.set(0, -1.16, 0.22);
+        // LENGTH AND OFFSET ARE A REACH NUMBER; ONLY THE ANGLE IS FREE.
+        // Swinging the blade out to lie across the frame is what makes it read
+        // — but at 2.4 long and 1.30 out it put real geometry at 3.72 on the
+        // Warden's flank while damage stops at 3.39, so there was nowhere to
+        // stand on that side that was outside the boss and still in range.
+        // `boss-reach-e2e` failed it at band -0.32, and that is the "you have
+        // to stand inside it to hit it" report the Arachnid produced three
+        // times. Raising `hitRadius` would have cleared it by making the
+        // tutorial boss 58% easier to hit, which is not a rendering decision.
+        // Back to the original 1.9 at 0.98 — the ANGLE was always the part
+        // doing the work — and the flank band comes back positive.
+        const blade = voxBlade(1.9, 0.34, 0.10, 0xc0c8d8, 0x80a0ff, 0.5);
+        blade.position.set(0.84, 0.48, 0.26);
+        blade.rotation.set(0, -0.96, 0.22);
 
         body.add(plinth, torso, seam, yoke, pauldronL, pauldronR,
             helm, mask, hornL, hornR, fin, bracer, blade);
