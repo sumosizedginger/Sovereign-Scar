@@ -598,7 +598,7 @@ rule, and "barely used" described a fully wired channel.
 
 ---
 
-## 12. Nobody has played it end to end (a weekend, and it is yours)
+## 12. Nobody has played it end to end — DONE, owner report 2026-08-16 (notes not yet filed; see below for what they should capture)
 
 *Method:* fresh save, dev mode off, no teleporting, start to finish, with a
 notepad. Write down **the minute** anything is confusing, boring or annoying —

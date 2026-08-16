@@ -121,7 +121,11 @@ calls per dungeon, against a renderer that will take several hundred thousand.
 Headless Chrome here runs software GL at **~1.5 fps**, so nothing automated can
 certify frame rate or feel. Outstanding since Phase R:
 
-- a by-hand fresh-save, dev-off playthrough — **still open**
+- a by-hand fresh-save, dev-off playthrough — **DONE, owner report 2026-08-16.**
+  The notes from that run are not yet filed anywhere in the repo; if it produced
+  findings, capture them (the minute and the feeling, per
+  `HOW-TO-CLOSE-THE-GAP.md` §12) before they evaporate — this project's history
+  says one played session outproduces a thousand assertions.
 - an overlays-on ≥60 FPS pass on a real GPU — **DONE, see below**
 
 ### The frame-rate half is answered, and the answer is "there is no problem"

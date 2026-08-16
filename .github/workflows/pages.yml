@@ -66,7 +66,15 @@ jobs:
       - name: Validate the artifact
         run: npm run pages:validate
 
+      # `enablement: true` because the first real deploy failed exactly here:
+      # Pages had never been switched on in the repository settings, so
+      # configure-pages got a 404 from "Get Pages site" and the game's README
+      # pointed at a URL that did not exist. This lets the workflow create the
+      # Pages site itself (the `pages: write` permission above covers it)
+      # instead of depending on a Settings click nobody can see is missing.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:

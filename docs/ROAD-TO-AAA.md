@@ -293,11 +293,13 @@ Every image the project has of itself is a 30-pixel character in a room. Key
 art — a rendered hero at full size — is a completely different object and the
 one thing Blender is genuinely the right tool for.
 
-### 12. The game has never been played start to finish by a human
+### 12. ~~The game has never been played start to finish by a human~~ — DONE, owner report 2026-08-16
 
-`docs/OPEN_QUESTIONS.md` §4, open since Phase R, and the single largest unknown
-in the project. 4,911 automated assertions cannot tell you whether the second
-hour is boring. **Nothing on this list should be trusted over one playthrough.**
+`docs/OPEN_QUESTIONS.md` §4, open since Phase R and the single largest unknown
+in the project, is closed: the owner has played it through. What the repo does
+not yet hold is the run's *notes* — the minutes that were confusing, boring or
+annoying. If any exist, they outrank every remaining item on this list, because
+that has been true of every play report so far.
 
 ---
 
