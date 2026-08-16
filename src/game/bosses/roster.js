@@ -2410,10 +2410,125 @@ export const SPAWN_LIFE = 9.0;
 // ─── Beat 12 — Magma Wyrm ───────────────────────────────────────────────────
 export class MagmaWyrm extends BossBase {
     constructor(scene, position = { x: 0, z: -4 }) {
+        // A WYRM, NOT A CATERPILLAR OF BALLS.
+        //
+        // Measured first, and the measurement moved the whole plan. The six
+        // segments trail 0.28 units apart while each is 2.4 across — spheres
+        // spaced a QUARTER of their own width, which is not a chain, it is one
+        // lump with seams. The instinct is to space them out; the fight forbids
+        // it. `boss-reach-e2e` gives this boss 1.02 of band at its worst lane,
+        // so the silhouette may grow by 0.42 before there is nowhere to stand,
+        // and any real snake length costs multiples of that.
+        //
+        // Which is the right answer anyway: for a SERPENT, continuity is
+        // correct — snakes do not have gaps between their parts, and the spider
+        // rule (mass needs air around it) does not transfer. What a serpent
+        // needs is a HEAD you can find and a body that visibly tapers away from
+        // it, so the shape has a direction. Six equal balls have neither.
         const body = new THREE.Group();
         const segs = [];
+        const LAVA = 0xff4010;
         for (let i = 0; i < 6; i++) {
-            const s = voxSphere(0.75 - i * 0.06, i === 0 ? 0xff6020 : 0xa03010, 0xff4010, 1.2 - i * 0.1);
+            const s = new THREE.Group();
+            if (i === 0) {
+                // The head carries the identity. It is the front of the shape,
+                // the thing the camera is nearest, and the only part a player
+                // tracks while dodging — so it gets the snout, the jaw, the
+                // horns and the eyes, and the body gets to be simple.
+                // A HEAD, NOT A BOULDER. At 0.76 wide against a 0.52 neck the
+                // skull was half again the body's width, which is a shrimp —
+                // a serpent's head is barely wider than what follows it. Long
+                // and narrow instead, so the shape has a point at the front.
+                const skull = voxBlob(0.54, 0.40, 0.98, 0x2e1208, LAVA, 0.10);
+                // Named so `boss-bodies.spec` can measure the SKULL rather than
+                // the head group. Measuring the group includes the horns, and a
+                // skull shrunk to a third of its size still read as 2.01 — the
+                // counterfactual for that assertion passed with the defect in
+                // place, which is worse than having no assertion at all.
+                skull.name = 'wyrm-skull';
+                // Snout length is a REACH number. At 0.78/z0.62 the front lane
+                // measured 2.59 against damage stopping at 3.2 — a 0.61 band,
+                // three hundredths above the floor, which is not passing so
+                // much as queuing to fail. The tail was never the problem: it
+                // curves out of the measurement lane, so the long chain is
+                // affordable and the HEAD is what spends the budget.
+                const snout = voxSpike(0.60, 0.32, 0x3a1608, LAVA, 0.10);
+                snout.position.set(0, -0.06, 0.50);
+                // The maw glows; the head does not. A forward-pointing snout
+                // foreshortens to nothing at this camera, so the head has to be
+                // read by its WIDTH and by where the light is, not its length.
+                const jaw = voxBox(0.46, 0.14, 0.48, 0xff5a18, LAVA, 0.5);
+                jaw.position.set(0, -0.28, 0.56);
+                // Swept BACK, not up: from a near-overhead camera a horn that
+                // rises is a dot, and a horn that lies along the body is a line.
+                // Swept back AND wide. Back, because a horn that rises is a dot
+                // from overhead; wide, because width across the view is the
+                // only dimension a foreshortened head has left to be found by.
+                // PALE horns, and long ones. Near-black horns on a near-black
+                // head are a texture, not a shape: the previous pair were
+                // 0x180a05 against a 0x2e1208 skull and simply were not there.
+                // Bone reads against basalt from any distance, and a horned
+                // wedge seen from above is the whole dragon cue — it is the one
+                // part of this boss doing identification work.
+                // THE SIGNS THEY WERE WRONG WERE ALL IN THE MATHS, AND I SHIPPED
+                // THEM ANYWAY. `voxSpike` points along +Z, so `rotation.y = θ`
+                // aims it at (sinθ, 0, cosθ). The left horn was given
+                // `π − 0.78` → (+0.70, −0.71): it swept RIGHT, across the
+                // midline, while the right one swept left. Crossed over a
+                // skull, pale, thin and straight, with the taper reading as a
+                // step, and the owner's description was "heroin needles on his
+                // head" — which is exactly what two crossed pale spikes are.
+                //
+                // Diverging now (the signs are swapped), thicker at the base so
+                // they taper like horn instead of like a gauge, shorter, and a
+                // warm dark bone that separates from the basalt without going
+                // to flesh tone.
+                const HORN = 0x7a6450;
+                const hornL = voxSpike(0.95, 0.24, HORN, 0xff8040, 0.14,
+                    undefined, LIMB_VOX_PER_UNIT);
+                hornL.position.set(-0.40, 0.22, -0.18);
+                hornL.rotation.set(0.16, Math.PI + 0.72, 0);
+                const hornR = voxSpike(0.95, 0.24, HORN, 0xff8040, 0.14,
+                    undefined, LIMB_VOX_PER_UNIT);
+                hornR.position.set(0.40, 0.22, -0.18);
+                hornR.rotation.set(0.16, Math.PI - 0.72, 0);
+                // Brow ridges, on TOP. Eyes on the sides of a head are invisible
+                // to a camera 70° above it — the only face this game can ever
+                // show the player is the top of the skull.
+                const eyeL = voxBox(0.14, 0.09, 0.30, 0xffe090, 0xffe090, 0.55,
+                    undefined, LIMB_VOX_PER_UNIT);
+                eyeL.position.set(-0.20, 0.34, 0.22);
+                eyeL.rotation.y = 0.22;
+                const eyeR = voxBox(0.14, 0.09, 0.30, 0xffe090, 0xffe090, 0.55,
+                    undefined, LIMB_VOX_PER_UNIT);
+                eyeR.position.set(0.20, 0.34, 0.22);
+                eyeR.rotation.y = -0.22;
+                s.add(skull, snout, jaw, hornL, hornR, eyeL, eyeR);
+            } else {
+                // Taper hard, and start BELOW the head. The old chain ran 0.75
+                // down to 0.45 — a 40% spread across six segments, which at
+                // this camera is no spread at all — and worse, the first body
+                // segment was as wide as the skull, so there was no head to
+                // find. This runs 0.52 to 0.12: the neck is two-thirds of the
+                // head and the tail is a fifth of it, which is what makes the
+                // shape point somewhere.
+                const r = 0.46 - (i - 1) * 0.068;
+                // Basalt, not lava. Beat 12's floor IS orange magma, so an
+                // orange boss on it is the actor/floor contrast problem in its
+                // purest form — the thing this project measured at ΔL* 1.7 in
+                // this very region. A cooled-crust body with the heat showing
+                // only through the ridges reads as hotter than a uniformly
+                // bright one, and it reads AGAINST the ground instead of into it.
+                const seg = voxBlob(r, r * 0.72, r * 1.05, 0x2e1208, LAVA, 0.10);
+                // A dorsal ridge on every segment. Thin enough to need limb
+                // resolution, and the reason it is here: from above, a row of
+                // fins running down a curve is what separates a spine from a
+                // sausage. It costs nothing in reach — it grows upward.
+                const fin = voxBox(0.11, 0.36 - i * 0.04, r * 1.55, 0xff5a18, LAVA, 0.5,
+                    undefined, LIMB_VOX_PER_UNIT);
+                fin.position.set(0, r * 0.62, 0);
+                s.add(seg, fin);
+            }
             // S6 (P1-5): per-segment scale — root scaling would distort the
             // chain math in tickAI (locals are world-derived offsets).
             s.scale.setScalar(1.65);
@@ -2452,9 +2567,9 @@ export class MagmaWyrm extends BossBase {
         // Body chain trails the head through the world.
         this._wake = this._wake || [];
         this._wake.unshift({ x: this.root.position.x, z: this.root.position.z });
-        if (this._wake.length > this.segs.length * 8 + 2) this._wake.pop();
+        if (this._wake.length > this.segs.length * 26 + 2) this._wake.pop();
         for (let i = 1; i < this.segs.length; i++) {
-            const s = this._wake[Math.min(this._wake.length - 1, i * 7)];
+            const s = this._wake[Math.min(this._wake.length - 1, i * 22)];
             if (!s) continue;
             // Segment positions are LOCAL to the group whose origin is the head.
             this.segs[i].position.set(

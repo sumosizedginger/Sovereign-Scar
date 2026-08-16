@@ -71,7 +71,19 @@ const PARTIAL_BODY = {
     // at the `hitRadius` assignment in its tickAI), so measuring the whole
     // serpent and demanding the hitbox cover it would be asking for a different
     // fight, not for a correct hitbox.
-    'magma wyrm': 0.6,
+    //
+    // 0.6 → 0.3 when the chain was spaced out to read as a serpent rather than
+    // a lump (segments trailed 0.28 apart while being 2.4 across). NOTE WHAT
+    // THAT NUMBER IS AND IS NOT: it is a statement about how much of a
+    // DECORATIVE tail the whole-body statistic now sweeps up, and loosening it
+    // on its own would be exactly the "raise the threshold until it passes"
+    // move this repo warns about. It is only defensible because the tail is
+    // provably inert — `BossBase`'s contact test measures from `this.root.
+    // position`, the head, so no trailing segment can touch the player, and
+    // `hitRadius` resolves there too, so none of them can be struck either.
+    // The assertion that carries the real weight is the head-specific one
+    // below; this one is left as a loose sanity bound, not as the gate.
+    'magma wyrm': 0.3,
 };
 
 const fakePlayer = () => ({
@@ -225,6 +237,47 @@ export function run(t) {
         t.ok(`${name}: the hitbox describes the body`,
             ratio >= floor && (floor === 0 || ratio <= 1.6),
             `hitRadius=${hitRadius.toFixed(2)} body=${r.toFixed(2)} ratio=${ratio.toFixed(2)}`);
+
+        // THE WYRM'S REAL GATE. Its whole-body ratio is meaningless — most of
+        // the silhouette is an inert tail — so the question that matters is
+        // whether the hitbox describes the part the fight actually resolves
+        // against: segment 0, the head. Without this, the loosened floor above
+        // would let the head shrink to nothing with the tail holding the
+        // number up, and a player would be swinging at a head that is not
+        // where the damage is.
+        if (name === 'magma wyrm' && b.segs?.length > 1) {
+            const segR = (s) => {
+                const bb = new THREE.Box3().setFromObject(s);
+                return Math.max(bb.max.x - bb.min.x, bb.max.z - bb.min.z) / 2;
+            };
+            // The SKULL by name, not the head group — the group carries the
+            // horns, and measuring it made this assertion untestable: shrinking
+            // the skull to a third of its size left the number at 2.01 and the
+            // counterfactual passed. An assertion whose break mode cannot be
+            // demonstrated is decoration.
+            const skull = b.segs[0].getObjectByName('wyrm-skull');
+            const headR = skull ? segR(skull) : 0;
+            const neckR = segR(b.segs[1]);
+            t.ok(`${name}: its skull is findable for measurement`, !!skull,
+                skull ? 'named wyrm-skull' : 'no wyrm-skull in segs[0]');
+
+            // Not a ratio against the head's own size — the head GROUP carries
+            // the horns, so that number is mostly horn and means very little.
+            // These two are the invariants that keep the fight honest:
+            //
+            //   * there is a head at least as big as the thing you swing at, so
+            //     the hitbox is never floating in air beside a shrunken skull;
+            //   * the head is the biggest segment, so the shape points at the
+            //     part the damage resolves against. When the body was six near
+            //     equal spheres this was false by a hair, and "which end do I
+            //     hit" was a genuine question.
+            t.ok(`${name}: …its head is at least as big as its hitbox`,
+                headR >= hitRadius * 0.8,
+                `head=${headR.toFixed(2)} hitRadius=${hitRadius.toFixed(2)}`);
+            t.ok(`${name}: …and the head is the widest segment, so the shape aims`,
+                headR > neckR * 1.05,
+                `head=${headR.toFixed(2)} next=${neckR.toFixed(2)}`);
+        }
 
         // A glow light was derived, so the boss lights its arena instead of
         // clipping its own pixels.

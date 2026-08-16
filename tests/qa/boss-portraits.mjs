@@ -154,17 +154,27 @@ try {
             const root = boss.root || boss.mesh;
             if (!root) { out.push({ num, slug, error: 'no root' }); continue; }
 
-            // Run it before shooting it. Five bosses assemble at the origin and
-            // only fly apart on the first tick — the Hydroid Cloud builds all
-            // twelve orbs in the same place — so a portrait taken cold is a
-            // picture of a boss nobody fights.
+            // Run it before shooting it, and run it against a player that
+            // MOVES. Five bosses assemble at the origin and only fly apart on
+            // the first tick — the Hydroid Cloud builds all twelve orbs in the
+            // same place — so a portrait taken cold is a picture of a boss
+            // nobody fights. The Magma Wyrm is the sharper case: it is a chain
+            // that trails through a wake buffer, so against a STATIONARY player
+            // it never swims, the six segments collapse onto each other, and it
+            // photographs as one lumpy ball. That is not the boss either; it is
+            // an artefact of the harness standing still, and judging the model
+            // from it would send the redesign after a problem it does not have.
             const player = {
                 root: { position: { x: 0, y: 1.95, z: 4 } },
                 health: { hp: 6, maxHp: 6, dead: false, damage: () => ({ accepted: true }) },
                 state: { facingVec: { x: 0, z: -1 } },
             };
             boss._awake = true;
-            for (let i = 0; i < 60; i++) {
+            for (let i = 0; i < 150; i++) {
+                // Orbit the player so movement-driven bosses actually move.
+                const a = (i / 150) * Math.PI * 1.6;
+                player.root.position.x = Math.sin(a) * 4.5;
+                player.root.position.z = Math.cos(a) * 4.5;
                 try { boss.tickAI?.(1 / 60, player, null); } catch (_) { /* needs fuller ctx */ }
                 boss.t = (boss.t || 0) + 1 / 60;
             }
