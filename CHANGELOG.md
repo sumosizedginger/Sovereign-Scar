@@ -5,6 +5,13 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-08-16
+
+Everything below this heading and above `[0.3.0]` shipped between the two tags.
+The heading was cut when the first release workflow run was set in motion —
+v0.3.0 predates `release.yml`, so this is the first tag that builds installers.
+The owner's start-to-finish playthrough (OPEN_QUESTIONS §4) closed the same day.
+
 ### One game, two containers — GitHub Pages and Electron from one source tree
 
 The game is now playable at

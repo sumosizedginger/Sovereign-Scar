@@ -7,7 +7,7 @@ anything; the traps at the bottom have each already cost this project real time.
 
 **Sovereign Scar** — a 14-beat Zelda-like 3D WebGL voxel labyrinth on My-Engine
 0.2.0 (pinned SHA in `ENGINE_PIN.md`). Zero-build, offline-first, three.js r185,
-no bundler. Version `0.3.0`.
+no bundler. Version `0.4.0`.
 
 ```bash
 npm run serve          # http://127.0.0.1:8799/
