@@ -7,6 +7,41 @@ measurement disagreed, the measurement wins.
 
 You asked for brutal. Here it is, and then here is what to do about it.
 
+> ## ⚠ CORRECTION 2026-08-16 — EVERY "56°" IN THIS FILE IS WRONG
+>
+> **The camera is at 70.7°, not 56°, and has been for some time.** This document
+> says "the rig sits at height 18, back 12" in §3 and reasons from it three more
+> times (§4 item 3, §5 Tier 1 item 3). Measured from the source today:
+>
+> ```
+> src/game/index.js:  camera.fov = 40
+>                     const CAM_HEIGHT = 17.5
+>                     new CameraRig({ height: CAM_HEIGHT, back: CAM_HEIGHT * 0.35 })
+>                  →  back 6.13,  pitch atan2(17.5, 6.13) = 70.7°,  dist 18.54
+> ```
+>
+> **Where the wrong number comes from, because it will catch the next reader
+> too:** `camera-rig.js` still declares `height = 18` and `back = 12` as its
+> class DEFAULTS — the old rig — and `index.js` overrides both at the call site.
+> Read the rig file alone and you get 56°. That is exactly how this error
+> survived into a document, and out of the document into a probe:
+> `tests/qa/boss-portraits.mjs` was written this week with a hardcoded 56° taken
+> from the prose below, and spent a whole session photographing fourteen bosses
+> at an angle the game does not use. It now reads fov, height and back ratio out
+> of `index.js` rather than restating them.
+>
+> **What the correction changes, and what it does not.** The *conclusion* of §3
+> survives — a fresnel rim still fails here, and it fails HARDER at 70.7° than
+> at 56°, because the camera is even closer to looking straight down the
+> normals it needs to graze. What does NOT survive is §5's "drop the pitch from
+> 56° toward ~40°": that was written about a rig that no longer exists, the
+> owner has since said the framing is correct as-is, and `ROAD-TO-AAA.md` lists
+> the camera under *what is not stopping it*.
+>
+> **The rule this file keeps proving on itself:** a number written into prose
+> stops being measured the moment it is written down. Derive it from source, or
+> expect to be reasoning about a build that has moved on.
+
 The four pictures this report argues from are in `docs/media/aaa/`, kept out of
 the certification set on purpose because they show the game **with the HUD on**,
 which the certification captures deliberately hide:
@@ -171,6 +206,11 @@ different good idea:
 > normals of the head and shoulders, which is most of what it can see. The rim
 > appears on the character's *sides*, which the camera barely sees.
 >
+> *(**Corrected 2026-08-16:** height 17.5 / back 6.13, a **70.7°** pitch — see
+> the note at the top of this file. The argument holds and gets stronger: the
+> steeper the camera, the more of the actor is presented normal-on and the less
+> rim there is to see.)*
+>
 > The silhouette system and the camera angle are each defensible. Together they
 > cancel.
 
@@ -228,6 +268,11 @@ being able to locate yourself is not a polish issue — it is a design failure
 that silently taxes every fight in the game.
 
 ### 3. The camera is showing you the least interesting angle of everything
+
+*(**Corrected 2026-08-16: 70.7°, not 56°** — top of file. This section's
+complaint is therefore understated rather than wrong, and its prescription is
+withdrawn: the owner has since called the framing correct, and dropping the
+pitch is no longer on any plan.)*
 
 56° pitch means you are looking at the tops of hats and the tops of boxes. A
 Link to the Past cheats this: its camera is top-down but its *art* is drawn at
@@ -318,7 +363,10 @@ and 4 combined**, which is the whole point of ranking them this way.
 3. **Fix the character silhouette.** Three moves, do all three:
    - Add a genuine dark outline on actors only (inverted-hull is ~30 lines and
      costs one extra draw call per actor — you have 46 and room for a thousand).
-   - Drop the camera pitch from 56° toward ~40°.
+   - ~~Drop the camera pitch from 56° toward ~40°.~~ **Withdrawn 2026-08-16.**
+     The pitch was never 56° (it is 70.7° — top of this file), and the owner
+     has since confirmed the framing is right; `ROAD-TO-AAA.md` files the
+     camera under *what is NOT stopping it*. Do not act on this line.
    - Add a **certification gate for character contrast**, exactly like the
      luminance gate you already have: every region must clear a minimum ΔL*
      between actors and their floor. You already know how to build these gates

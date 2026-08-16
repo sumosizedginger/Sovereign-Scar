@@ -313,8 +313,13 @@ Worth saying plainly, because it is where effort would be wasted:
   documented trap list. This is better instrumented than most shipped games.
 - **Systems coverage.** Guard, parry, lock-on, 9 enemy kinds, 14 bosses, item
   chains, puzzles, scoring, three run modes, saves, Electron packaging — built.
-- **The camera.** 56° is a deliberate, defensible choice and the owner likes it.
-  Leave it.
+- **The camera.** A deliberate, defensible choice and the owner likes it. Leave
+  it. **(Corrected 2026-08-16: the pitch is 70.7°, not the 56° this line used to
+  quote.** `index.js` runs `CAM_HEIGHT = 17.5` with `back = 0.35 × height`;
+  `camera-rig.js` still carries the OLD 18/12 as class defaults, which is where
+  every wrong quotation of this number has come from. `AAA.md`'s correction note
+  has the full account, including a probe that spent a session photographing
+  bosses at the phantom angle.)
 - **Audio.** A generated adaptive score with proven dynamics. It needs more
   variety, not repair.
 

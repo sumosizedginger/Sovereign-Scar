@@ -40,8 +40,10 @@ and looks more like a massive shield on his back."* Correct, and unfixable by
 resizing.
 
 **What was kept:** the separation light, because it is a lighting repair rather
-than an accessory — the old fresnel was geometrically defeated by the 56° camera
-and did nothing in the rooms that needed it most.
+than an accessory — the old fresnel was geometrically defeated by the camera and
+did nothing in the rooms that needed it most. *(That camera is **70.7°**, not
+the 56° this line used to say; corrected 2026-08-16, and the defeat is worse at
+the true angle, not better. See the note at the top of `AAA.md`.)*
 
 **What it bought:** one real bug. See §1b.
 

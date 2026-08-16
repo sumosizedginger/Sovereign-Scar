@@ -6,6 +6,23 @@ import { camera } from '../engine/renderer.js';
 import { juice } from './fx/juice.js';
 
 export class CameraRig {
+    /**
+     * THESE DEFAULTS ARE NOT THE GAME'S CAMERA, AND READING THEM AS SUCH HAS
+     * COST REAL TIME. The only construction site is `index.js`, which passes
+     * `height: 17.5, back: 17.5 * 0.35` — a **70.7°** pitch. The 18/12 below is
+     * the ORIGINAL rig, a 56° pitch, kept only as a fallback for a call that
+     * does not exist.
+     *
+     * Anyone reading this file alone concludes the game runs at 56°, and that
+     * conclusion has propagated: into `AAA.md`, which reasons from it four
+     * times and prescribed a pitch change on the strength of it, and out of
+     * that prose into `tests/qa/boss-portraits.mjs`, which photographed
+     * fourteen bosses at an angle the game does not use before anyone checked.
+     * That probe now derives the camera from `index.js` instead.
+     *
+     * If you change the real camera, change it at the call site — and if you
+     * ever find these defaults in use, that is a bug, not a configuration.
+     */
     constructor(opts = {}) {
         this.height = opts.height != null ? opts.height : 18;
         this.back = opts.back != null ? opts.back : 12;
