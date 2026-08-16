@@ -1034,44 +1034,55 @@ export class ObsidianArachnid extends BossBase {
         // slower orbit and the ±60° plate stops opening in time. An earlier
         // attempt at this reached 4.13 and failed that gate at 1.65s — the
         // "spider you had to stand inside" defect returning from a change that
-        // was only ever meant to be cosmetic. The edge below is held at the
-        // original 3.19, so the fight is bit-for-bit the one that was played.
+        // was only ever meant to be cosmetic. The edge below measures **3.25**
+        // against the original **3.19** — inside 2%, and the web-slowed flank
+        // 2.15s against 2.05s — so the fight is the one that was played. Do not
+        // let that drift further while rearranging parts: it is checked by
+        // `boss-facing.spec`, and the number is quoted here so a later edit has
+        // something to compare against instead of a feeling.
         const body = new THREE.Group();
         const SHELL = 0x2a1c3a;
         const GLOW = ABYSS_COLORS.violetHot;
 
-        const abdomen = voxBlob(0.74, 0.56, 1.00, SHELL, GLOW, 0.34);
-        abdomen.position.set(0, 0.06, -0.46);
+        // ANATOMY, WHICH IS WHAT WAS ACTUALLY WRONG. Thin legs were necessary
+        // and nowhere near sufficient: the first thin build spread its eight
+        // attach points along the whole body, so the thing read as a lump with
+        // sticks coming out of its sides. A spider carries ALL EIGHT legs on
+        // the small front section and drags a legless abdomen behind them —
+        // that arrangement, seen from above, is the entire recognition cue, and
+        // no amount of leg-thinning substitutes for it.
+        const abdomen = voxBlob(0.62, 0.50, 0.80, SHELL, GLOW, 0.34);
+        abdomen.position.set(0, 0.04, -0.85);
 
         // The top of the abdomen is the largest surface this camera ever sees
         // of this boss, and it used to be flat violet — the best real estate on
         // the model spent on nothing. A glyph here reads from directly above at
         // any distance, which is the one angle the head cannot serve.
-        const markSpine = voxBox(0.10, 0.09, 0.62, GLOW, GLOW, 0.55,
+        const markSpine = voxBox(0.09, 0.09, 0.48, GLOW, GLOW, 0.55,
             undefined, LIMB_VOX_PER_UNIT);
-        markSpine.position.set(0, 0.54, -0.46);
-        const markBar = voxBox(0.42, 0.09, 0.11, GLOW, GLOW, 0.55,
+        markSpine.position.set(0, 0.48, -0.85);
+        const markBar = voxBox(0.34, 0.09, 0.10, GLOW, GLOW, 0.55,
             undefined, LIMB_VOX_PER_UNIT);
-        markBar.position.set(0, 0.54, -0.22);
+        markBar.position.set(0, 0.48, -0.66);
 
         // Spiders are two masses, not one; the waist is what stops the body
         // reading as a single lump.
-        const thorax = voxBlob(0.50, 0.40, 0.54, SHELL, GLOW, 0.30);
-        thorax.position.set(0, 0.02, 0.44);
+        const thorax = voxBlob(0.44, 0.36, 0.52, SHELL, GLOW, 0.30);
+        thorax.position.set(0, 0.02, 0.30);
 
-        const head = voxSphere(0.34, 0x462a52, 0xff2040, 0.5);
-        head.position.set(0, 0.06, 0.88);
+        const head = voxSphere(0.30, 0x462a52, 0xff2040, 0.5);
+        head.position.set(0, 0.04, 0.86);
 
         // Chelicerae, so the front of the outline comes to a point. Which way
         // this boss faces is the whole fight — the plate is on its front arc —
         // and colour cannot carry that, because colour is not shape.
-        const fangL = voxSpike(0.44, 0.09, 0x120c1a, GLOW, 0.28,
+        const fangL = voxSpike(0.40, 0.08, 0x120c1a, GLOW, 0.28,
             undefined, LIMB_VOX_PER_UNIT);
-        fangL.position.set(-0.17, -0.13, 1.08);
+        fangL.position.set(-0.15, -0.12, 1.04);
         fangL.rotation.set(-0.44, 0.18, 0);
-        const fangR = voxSpike(0.44, 0.09, 0x120c1a, GLOW, 0.28,
+        const fangR = voxSpike(0.40, 0.08, 0x120c1a, GLOW, 0.28,
             undefined, LIMB_VOX_PER_UNIT);
-        fangR.position.set(0.17, -0.13, 1.08);
+        fangR.position.set(0.15, -0.12, 1.04);
         fangR.rotation.set(-0.44, -0.18, 0);
 
         body.add(abdomen, markSpine, markBar, thorax, head, fangL, fangR);
@@ -1080,7 +1091,10 @@ export class ObsidianArachnid extends BossBase {
         // one's `rotation.x` individually — `voxRadial` would be fewer draw
         // calls and would freeze the walk.
         const legs = [];
-        const LEG_YAW = [1.22, 0.62, -0.06, -0.74];
+        // Fanned front-to-back across ~120°, and all eight rooted in the same
+        // 0.5-unit cluster on the thorax rather than strung along the body.
+        const LEG_YAW = [0.96, 0.26, -0.44, -1.13];
+        const LEG_Z = [0.52, 0.36, 0.20, 0.04];
         for (let i = 0; i < 8; i++) {
             const side = i < 4 ? -1 : 1;
             const idx = i % 4;
@@ -1092,18 +1106,18 @@ export class ObsidianArachnid extends BossBase {
             // where the fight was tuned for more). A silhouette pass that
             // quietly makes a boss easier is the same class of error as one
             // that makes it harder.
-            const femur = voxBox(0.94, 0.15, 0.15, SHELL, GLOW, 0.26,
+            const femur = voxBox(1.05, 0.15, 0.15, SHELL, GLOW, 0.26,
                 undefined, LIMB_VOX_PER_UNIT);
-            femur.position.set(0.44, 0.30, 0);
-            femur.rotation.z = 0.66;
+            femur.position.set(0.50, 0.30, 0);
+            femur.rotation.z = 0.55;
 
-            const tibia = voxBox(1.02, 0.13, 0.13, SHELL, GLOW, 0.26,
+            const tibia = voxBox(1.15, 0.13, 0.13, SHELL, GLOW, 0.26,
                 undefined, LIMB_VOX_PER_UNIT);
-            tibia.position.set(1.10, 0.02, 0);
-            tibia.rotation.z = -1.04;
+            tibia.position.set(1.20, 0.00, 0);
+            tibia.rotation.z = -0.85;
 
             leg.add(femur, tibia);
-            leg.position.set(side * 0.44, -0.08, 0.74 - idx * 0.50);
+            leg.position.set(side * 0.30, -0.06, LEG_Z[idx]);
             // Mirrored by rotation, not by `scale.x = -1`: a negative scale
             // inverts winding and every face on that side would light wrong.
             leg.rotation.y = side < 0 ? Math.PI - LEG_YAW[idx] : LEG_YAW[idx];

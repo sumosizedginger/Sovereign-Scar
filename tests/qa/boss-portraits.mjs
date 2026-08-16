@@ -28,6 +28,27 @@
 // the same reason `voxRing` lies flat: the answer has to be measured where the
 // player is standing, not where the geometry is easiest to look at.
 //
+// THE CAMERA IS READ FROM `index.js`, NEVER TYPED HERE
+//
+// The first version of this probe hardcoded a 56° pitch, taken from a sentence
+// in `AAA.md` describing a rig at height 18 / back 12. That rig is gone: the
+// game runs `CAM_HEIGHT = 17.5` with `back = 0.35 * height`, which is **70.7°**
+// — far closer to overhead. So every boss judgement made through this probe's
+// first outing was made at an angle the game does not use, and the parts that
+// looked load-bearing from 56° (a fin seen edge-on, a leg seen side-on) are not
+// the parts a player sees. An instrument's constants are hypotheses; this one
+// was a hypothesis copied out of prose about a build that had moved on.
+//
+// AND IT IS SHOT AT GAMEPLAY SIZE TOO, WHICH IS THE HARDER TEST
+//
+// A boss rendered to fill 700px is not the boss anyone fights. At the real
+// camera distance the frame spans ~24 world units, so a 6-unit boss is about a
+// quarter of the width — and detail that carries a portrait can disappear
+// entirely at that scale, or worse, dissolve into shimmer. This project has
+// made that mistake before in the other direction: an outline that improved
+// every number and looked worse, on a character too small to afford it. The
+// `-ingame` frame is the one to trust when the two disagree.
+//
 // PRINT-ONLY, AND NOT A GATE. "Can you name this shape" is a judgement by a
 // person, which is exactly the kind of thing `REVIEW.md` §4.6 says must not be
 // promoted into a threshold — a gate here would only teach whoever hit it to
@@ -36,6 +57,21 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { startServer, findChromeVerbose, disableGamepads, sleep } from '../harness.mjs';
+
+// Derived from the game's own source, so a rig change cannot leave this probe
+// quietly photographing a camera angle nobody uses. It already did once.
+const INDEX = fs.readFileSync('src/game/index.js', 'utf8');
+const num = (re, what) => {
+    const m = INDEX.match(re);
+    if (!m) throw new Error(`cannot read ${what} from src/game/index.js`);
+    return parseFloat(m[1]);
+};
+const CAM_FOV = num(/camera\.fov\s*=\s*([\d.]+)/, 'camera.fov');
+const CAM_HEIGHT = num(/const CAM_HEIGHT\s*=\s*([\d.]+)/, 'CAM_HEIGHT');
+const CAM_BACK_RATIO = num(/back:\s*CAM_HEIGHT\s*\*\s*([\d.]+)/, 'camera back ratio');
+const CAM_BACK = CAM_HEIGHT * CAM_BACK_RATIO;
+const CAM_DIST = Math.hypot(CAM_HEIGHT, CAM_BACK);
+const CAM_PITCH = Math.atan2(CAM_HEIGHT, CAM_BACK);
 
 const arg = (k) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const SET = arg('set') || 'current';
@@ -67,7 +103,7 @@ try {
     await page.waitForFunction(() => !!window.__sovereignScar, { timeout: 60000 });
     await sleep(400);
 
-    const shots = await page.evaluate(async (only) => {
+    const shots = await page.evaluate(async (only, cam) => {
         const THREE = await import('three');
         const R = await import('/src/game/bosses/roster.js');
         const { SandSpur } = await import('/src/game/bosses/sand-spur.js');
@@ -109,10 +145,7 @@ try {
         renderer.setSize(700, 700, false);
         renderer.setPixelRatio(1);
 
-        // The game's own pitch. camera-rig sits at height 18 / back 12, which
-        // is atan(18/12) = 56.3° — the number every readability finding in this
-        // project turns on, so it is derived here rather than typed as "56".
-        const PITCH = Math.atan2(18, 12);
+        const PITCH = cam.pitch;
 
         const out = [];
         for (const [num, slug, make] of ROSTER) {
@@ -146,15 +179,18 @@ try {
 
             const fov = 35;
             const dist = (extent / (2 * Math.tan((fov * Math.PI) / 360))) * 1.75;
-            const cam = new THREE.PerspectiveCamera(fov, 1, 0.1, 400);
+            const shotCam = new THREE.PerspectiveCamera(fov, 1, 0.1, 400);
             // In FRONT of the boss: bodies are built head-forward along +Z
             // (`faceToward` says so), so a camera on -Z photographs its back.
-            cam.position.set(
-                c.x,
-                c.y + Math.sin(PITCH) * dist,
-                c.z + Math.cos(PITCH) * dist,
-            );
-            cam.lookAt(c);
+            const place = (camera, d) => {
+                camera.position.set(
+                    c.x,
+                    c.y + Math.sin(PITCH) * d,
+                    c.z + Math.cos(PITCH) * d,
+                );
+                camera.lookAt(c);
+            };
+            place(shotCam, dist);
 
             const key = new THREE.DirectionalLight(0xffffff, 2.6);
             key.position.set(4, 9, 6);
@@ -163,8 +199,19 @@ try {
             const amb = new THREE.HemisphereLight(0xcfd6e4, 0x2a2a32, 1.15);
             shotScene.add(key, rim, amb);
             shotScene.background = new THREE.Color(0x2a2d34);
-            renderer.render(shotScene, cam);
+            renderer.render(shotScene, shotCam);
             const lit = canvas.toDataURL('image/png');
+
+            // AT GAMEPLAY SIZE. The real camera: its fov, its distance, and a
+            // 16:9 frame — so the boss subtends exactly the fraction of the
+            // screen it does in a fight. Detail that survives the portrait and
+            // dies here is detail the player never receives.
+            renderer.setSize(1280, 720, false);
+            const gameCam = new THREE.PerspectiveCamera(cam.fov, 1280 / 720, 0.1, 400);
+            place(gameCam, cam.dist);
+            renderer.render(shotScene, gameCam);
+            const ingame = canvas.toDataURL('image/png');
+            renderer.setSize(700, 700, false);
 
             // THE TEST. Every material flat black, background white. Swapped
             // rather than recoloured, and the originals are put back after, so
@@ -177,18 +224,21 @@ try {
                 o.material = flat;
             });
             shotScene.background = new THREE.Color(0xffffff);
-            renderer.render(shotScene, cam);
+            renderer.render(shotScene, shotCam);
             const shadow = canvas.toDataURL('image/png');
             for (const [o, m] of saved) o.material = m;
 
             out.push({
-                num, slug, lit, shadow,
+                num, slug, lit, shadow, ingame,
                 w: +size.x.toFixed(2), h: +size.y.toFixed(2), d: +size.z.toFixed(2),
+                // What fraction of the frame's width the boss actually covers.
+                frac: +(size.x / (2 * cam.dist * Math.tan((cam.fov * Math.PI) / 360)
+                    * (1280 / 720))).toFixed(3),
             });
         }
         renderer.dispose();
         return out;
-    }, ONLY);
+    }, ONLY, { pitch: CAM_PITCH, fov: CAM_FOV, dist: CAM_DIST });
 
     fs.mkdirSync(OUT, { recursive: true });
     const write = (file, dataUrl) =>
@@ -196,13 +246,18 @@ try {
             Buffer.from(dataUrl.split(',')[1], 'base64'));
 
     console.log('\n=== BOSS PORTRAITS ===');
-    console.log('  lit + shadow, shot at the game\'s own 56° pitch, from the front\n');
+    console.log(`  camera read from index.js: fov ${CAM_FOV}°, height ${CAM_HEIGHT},`
+        + ` back ${CAM_BACK.toFixed(2)} → pitch ${(CAM_PITCH * 180 / Math.PI).toFixed(1)}°,`
+        + ` dist ${CAM_DIST.toFixed(2)}`);
+    console.log('  lit + shadow framed on the boss; -ingame at true gameplay size\n');
     for (const s of shots) {
         if (s.error) { console.log(`  ${s.num} ${s.slug.padEnd(20)} ERROR ${s.error}`); continue; }
         write(`${s.num}-${s.slug}.png`, s.lit);
         write(`${s.num}-${s.slug}-shadow.png`, s.shadow);
+        write(`${s.num}-${s.slug}-ingame.png`, s.ingame);
         console.log(`  ${s.num} ${s.slug.padEnd(20)} ${String(s.w).padStart(6)} w ·`
-            + ` ${String(s.h).padStart(6)} h · ${String(s.d).padStart(6)} d`);
+            + ` ${String(s.h).padStart(6)} h · ${String(s.d).padStart(6)} d`
+            + ` · covers ${(s.frac * 100).toFixed(0)}% of frame width`);
     }
     console.log(`\n  → ${OUT}/  (${shots.filter((s) => !s.error).length * 2} images)`);
     console.log(`  page errors: ${errors.length}`);
