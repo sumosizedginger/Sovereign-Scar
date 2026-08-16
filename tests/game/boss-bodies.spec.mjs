@@ -29,7 +29,9 @@ import {
 import { SandSpur } from '../../src/game/bosses/sand-spur.js';
 import { KineticCore } from '../../src/game/bosses/kinetic-core.js';
 import { BOSS_EMISSIVE_MAX, clampEmissive } from '../../src/game/bosses/base.js';
-import { VOX_PER_UNIT, voxBox, voxSphere, voxBlade } from '../../src/game/bosses/boss-models.js';
+import {
+    VOX_PER_UNIT, LIMB_VOX_PER_UNIT, voxBox, voxSphere, voxBlade,
+} from '../../src/game/bosses/boss-models.js';
 
 const P = { x: 0, y: 1.4, z: 0 };
 const particles = { spawn() {}, burst() {}, update() {} };
@@ -273,5 +275,63 @@ export function run(t) {
         t.ok('no boss re-assigns hitRadius from a bare literal',
             bad.length === 0,
             bad.length ? `literals: ${bad.join(', ')} — scale from this.baseHitRadius` : 'all derived');
+    }
+
+    // ── A thin part is actually thin ────────────────────────────────────────
+    //
+    // The builders round to whole voxels and clamp at one, so at the body
+    // resolution the thinnest box expressible is 3 cells — 0.5 world units —
+    // and EVERY width from 0.12 to 0.34 comes out identical. That is a silent
+    // quantisation: the number in the source is not the number in the world.
+    //
+    // It cost a full boss redesign to find. The Arachnid's legs are authored at
+    // 0.15 and were really 0.5; times its 1.70 presence that is 0.85 units of
+    // leg, eight of them, on a spider whose span its own flank rule caps near
+    // 3.5 — so they closed into a dome and the boss read as a blob. Three
+    // separate passes at "make the legs thinner" changed nothing at all,
+    // because nothing could.
+    //
+    // Both halves are asserted deliberately. The floor is real and is allowed
+    // to exist — bodies want it, it is what keeps the bosses as blocky as the
+    // architecture — so this pins that it is still there AND that the escape
+    // hatch works, and then it asks the shipped spider rather than a fixture.
+    {
+        const boxWidth = (w, res) => {
+            const m = voxBox(w, 1, w, 0x808080, 0, 0, undefined, res);
+            m.geometry.computeBoundingBox();
+            const b = m.geometry.boundingBox;
+            return b.max.x - b.min.x;
+        };
+
+        t.ok('the body resolution has a 0.5-unit floor, and it is not a bug',
+            Math.abs(boxWidth(0.15) - 0.5) < 1e-6 && Math.abs(boxWidth(0.34) - 0.5) < 1e-6,
+            `0.15 -> ${boxWidth(0.15).toFixed(3)}, 0.34 -> ${boxWidth(0.34).toFixed(3)}`);
+
+        t.ok('…and LIMB_VOX_PER_UNIT is a real way through it',
+            boxWidth(0.15, LIMB_VOX_PER_UNIT) < 0.2,
+            `0.15 at limb res -> ${boxWidth(0.15, LIMB_VOX_PER_UNIT).toFixed(3)}`);
+
+        t.ok('…without resizing the bodies that never asked for it',
+            Math.abs(boxWidth(1.6) - 1.8333) < 1e-3,
+            `a 1.6 body box is ${boxWidth(1.6).toFixed(4)}`);
+
+        // Wired to the building, not to the wire: ask the boss the campaign
+        // ships. Reverting its legs to the default resolution fails here, which
+        // is the whole point — the three no-op attempts were green throughout.
+        const spider = new ObsidianArachnid(new THREE.Scene(), { x: 0, z: 0 });
+        const legParts = [];
+        for (const leg of spider.legs) {
+            leg.traverse((o) => {
+                if (!o.isMesh || !o.geometry) return;
+                o.geometry.computeBoundingBox();
+                const b = o.geometry.boundingBox;
+                legParts.push(Math.min(b.max.x - b.min.x, b.max.z - b.min.z));
+            });
+        }
+        const thickest = legParts.length ? Math.max(...legParts) : Infinity;
+        t.ok('the Arachnid\'s legs are built thin enough to have air between them',
+            legParts.length > 0 && thickest < 0.3,
+            `${legParts.length} leg parts, thickest ${thickest.toFixed(3)} `
+            + '(0.5 means it fell back to the body resolution)');
     }
 }

@@ -6,7 +6,9 @@ import {
 } from './base.js';
 import { sfx } from '../../audio/synth.js';
 import { ABYSS_COLORS, CRUST_COLORS } from '../assets/palettes.js';
-import { voxBlade, voxBlob, voxBox, voxRing, voxSphere, voxSpike } from './boss-models.js';
+import {
+    voxBlade, voxBlob, voxBox, voxRing, voxSphere, voxSpike, LIMB_VOX_PER_UNIT,
+} from './boss-models.js';
 
 // The Warden's phase-2 ring, in world units. Exported because the spec has to
 // assert the geometry rather than restate it, and because the two numbers only
@@ -37,19 +39,119 @@ export const SWEEP_HALF = Math.PI / 3;
 // ─── Beat 01 — Crypt Warden ─────────────────────────────────────────────────
 export class CryptWarden extends BossBase {
     constructor(scene, position = { x: 0, z: -4 }) {
+        // A grave-marker that stood up.
+        //
+        // ARRANGED FOR THE PLAN VIEW, because that is the only view this game
+        // has. At a 56° pitch the camera reads a footprint, not a portrait:
+        // mass that extends OUTWARD becomes the silhouette and mass that hangs
+        // DOWNWARD disappears under whatever is above it. The old body was a
+        // 1.6-wide box with a helm on top and a sword out to one side, which
+        // from overhead is a rectangle — and a rectangle cannot say which way
+        // it is about to sweep. The parts below are chosen so that the three
+        // things a player needs (this is a boss / it is facing there / it
+        // swings from that side) all survive being seen from directly above.
+        //
+        // The Skeletal Mantis is the proof this is the right rule: it is the
+        // one boss in the roster that reads instantly, and the only structural
+        // difference is that its scythes splay outward instead of hanging.
         const body = new THREE.Group();
-        const torso = voxBox(1.6, 2.4, 1.0, CRUST_COLORS.slate, 0x402010, 0.5);
-        torso.position.y = 0.2;
-        const helm = voxBox(1.2, 0.8, 1.1, CRUST_COLORS.iron, CRUST_COLORS.goldLeaf, 1.2);
-        helm.position.y = 1.6;
-        // The first boss in the game, and its weapon used to be a 0.2-wide
-        // slab standing 2.2 units straight up: one pixel of blade from the
-        // only camera angle the player has. Held out to the side and forward,
-        // so the reach it represents is the thing you can see.
-        const blade = voxBlade(2.0, 0.30, 0.09, 0xc0c8d8, 0x80a0ff, 0.55);
-        blade.position.set(1.0, 0.35, 0.2);
-        blade.rotation.y = -0.28;
-        body.add(torso, helm, blade);
+
+        // The slab it rose out of. Invisible from directly overhead (the yoke
+        // is wider) and doing its work in the 3/4 of the frame where the boss
+        // is not centred, plus in the contact shadow it casts.
+        const plinth = voxBox(1.5, 0.55, 1.15, CRUST_COLORS.slateDark, 0x402010, 0.25);
+        plinth.position.y = -1.05;
+
+        // Narrower than the old torso ON PURPOSE — the shoulders only read as
+        // broad if there is something narrower underneath them to be broad
+        // against.
+        const torso = voxBox(1.15, 1.9, 0.85, CRUST_COLORS.slate, 0x402010, 0.35);
+        torso.position.y = 0.15;
+
+        // Beat 01's tomb is seamed with gold leaf (VISUAL_PLAN's answer to that
+        // room sitting on the luminance floor), so the thing guarding the tomb
+        // is made of the same repair it is. Style that is already canon costs
+        // nothing to justify.
+        const seam = voxBox(0.14, 1.05, 0.12, CRUST_COLORS.goldLeaf, CRUST_COLORS.goldLeaf, 0.45);
+        seam.position.set(0, 0.05, 0.46);
+
+        // THE SHOULDER YOKE — deliberately THIN, which is the correction the
+        // first version of this body needed. Width alone does not make a
+        // silhouette: the first attempt was a 2.4-wide slab with pauldrons
+        // sitting flush on it, and as a black shape the whole assembly fused
+        // into one lump you could not name. A readable outline needs AIR — the
+        // Mantis reads because its scythes have background between them and its
+        // body. So the yoke is a narrow bar that merely bridges the shoulders,
+        // and the pauldrons ride above it with a notch underneath.
+        const yoke = voxBox(1.75, 0.30, 0.72, CRUST_COLORS.iron, 0x402010, 0.3);
+        yoke.position.y = 1.05;
+
+        // Raised and tilted hard, so each one breaks the outline as a separate
+        // angular mass instead of thickening the torso.
+        const pauldronL = voxBox(0.78, 0.46, 1.15, CRUST_COLORS.slate, 0x402010, 0.3);
+        pauldronL.position.set(-1.30, 1.34, 0);
+        pauldronL.rotation.z = 0.52;
+        const pauldronR = voxBox(0.78, 0.46, 1.15, CRUST_COLORS.slate, 0x402010, 0.3);
+        pauldronR.position.set(1.30, 1.34, 0);
+        pauldronR.rotation.z = -0.52;
+
+        // Raised clear of the shoulders. The gap between yoke-top and helm-base
+        // is the neck, and a neck is most of what makes a shape read as a
+        // figure rather than as a pile — at this pitch the notch is worth more
+        // than any amount of detail on the helm itself.
+        const helm = voxBox(0.78, 0.66, 0.86, CRUST_COLORS.iron, CRUST_COLORS.goldLeaf, 0.25);
+        helm.position.y = 2.02;
+
+        // Horns, spreading in X. A crest that runs front-to-back is invisible
+        // from the front — it foreshortens to a nub, which is exactly what the
+        // first version's did. Anything that must survive being seen from a
+        // fixed angle has to have width ACROSS that angle, so the crown spreads
+        // sideways and the fin behind it carries the facing instead.
+        const hornL = voxSpike(1.05, 0.17, CRUST_COLORS.goldLeaf, CRUST_COLORS.goldLeaf, 0.5);
+        hornL.position.set(-0.46, 2.24, 0);
+        hornL.rotation.set(0, Math.PI / 2, 0.92);
+        const hornR = voxSpike(1.05, 0.17, CRUST_COLORS.goldLeaf, CRUST_COLORS.goldLeaf, 0.5);
+        hornR.position.set(0.46, 2.24, 0);
+        hornR.rotation.set(0, -Math.PI / 2, -0.92);
+
+        // The mask. The only gold on the front of the thing, and the reason
+        // this fight has a face at all: "Something inside is still using my
+        // name" is the first line of the game, and until now the sentence had
+        // nothing to point at.
+        const mask = voxBox(0.50, 0.40, 0.16, CRUST_COLORS.goldLeaf, CRUST_COLORS.goldLeaf, 0.55);
+        mask.position.set(0, 2.00, 0.47);
+
+        // The fin carries the FACING, which is a job the horns cannot do
+        // because they are symmetric. It runs along +Z — forward, per
+        // `faceToward`'s "a mesh built head-forward along +Z" — and it is the
+        // highest thing on the body, so from overhead it draws on top of
+        // everything and points at wherever 120° of frontal cone is about to
+        // land. Tall and thin rather than long and thin, so the 56° camera sees
+        // a blade of gold rather than the end of a stick.
+        const fin = voxBox(0.13, 0.34, 1.00, CRUST_COLORS.goldLeaf, CRUST_COLORS.goldLeaf, 0.5);
+        fin.position.set(0, 2.44, 0.20);
+
+        // A left arm, so the body is asymmetric on purpose rather than by
+        // omission. A blade on one side and nothing at all on the other reads
+        // as an unfinished model, not as a stance. Angled outward to keep a
+        // sliver of background between it and the torso.
+        const bracer = voxBox(0.42, 1.15, 0.50, CRUST_COLORS.iron, 0x402010, 0.3);
+        bracer.position.set(-1.24, 0.30, 0.05);
+        bracer.rotation.z = 0.20;
+
+        // THE BLADE IS THE BOSS'S NAME — "the Warden holds your weapon" is the
+        // line the room opens with — so it has to be the most legible thing in
+        // the outline, and in the first version it was the least: `voxBlade` is
+        // long in Z, +Z points at the player, and a sword aimed down the camera
+        // axis foreshortens into a mitten. Swung out to nearly a right angle it
+        // lies ACROSS the frame instead, clears the body entirely, and the
+        // reach it advertises is the reach that hits you.
+        const blade = voxBlade(2.4, 0.34, 0.10, 0xc0c8d8, 0x80a0ff, 0.5);
+        blade.position.set(1.30, 0.52, 0.30);
+        blade.rotation.set(0, -1.16, 0.22);
+
+        body.add(plinth, torso, seam, yoke, pauldronL, pauldronR,
+            helm, mask, hornL, hornR, fin, bracer, blade);
         super(scene, {
             // C6: fought with the 0.5-dmg Bare Strike (his defeat grants the
             // Anchor Link), so 8 hp = 16 hits — in line with the Act I curve.
@@ -915,20 +1017,96 @@ export const FLARE_R = 6.0;
 // ─── Beat 06 — Obsidian Arachnid ────────────────────────────────────────────
 export class ObsidianArachnid extends BossBase {
     constructor(scene, position = { x: 0, z: -2 }) {
+        // OBSIDIAN, AND ACTUALLY A SPIDER.
+        //
+        // The eight legs were always here and nobody had ever seen one. They
+        // were authored `voxBox(0.15, 0.15, 1.8)` — and were really 0.5 thick,
+        // because below ~0.34 the builders round every width up to their own
+        // floor (see `LIMB_VOX_PER_UNIT`). At this boss's 1.70 presence that is
+        // 0.85 units of leg, eight of them, on a body whose total span its own
+        // flank rule caps near 3.5: they could not be given air between them at
+        // any arrangement, so they closed into a dome and the boss read as a
+        // purple blob with a slot in it. Built at limb resolution they are
+        // 0.167 — a third of the old floor — and the gaps are the shape.
+        //
+        // SPAN IS A FIGHT NUMBER. `boss-facing.spec` measures the flank against
+        // the body EDGE, and the player orbits at v/r, so a wider spider is a
+        // slower orbit and the ±60° plate stops opening in time. An earlier
+        // attempt at this reached 4.13 and failed that gate at 1.65s — the
+        // "spider you had to stand inside" defect returning from a change that
+        // was only ever meant to be cosmetic. The edge below is held at the
+        // original 3.19, so the fight is bit-for-bit the one that was played.
         const body = new THREE.Group();
-        const abdomen = voxSphere(1.1, 0x3a2850, 0x6020a0, 1.1);
-        abdomen.scale.set(1.3, 0.9, 1.5);
-        const head = voxSphere(0.55, 0x462a52, 0xff2040, 1.4);
-        head.position.set(0, 0.2, 1.2);
-        body.add(abdomen, head);
+        const SHELL = 0x2a1c3a;
+        const GLOW = ABYSS_COLORS.violetHot;
+
+        const abdomen = voxBlob(0.74, 0.56, 1.00, SHELL, GLOW, 0.34);
+        abdomen.position.set(0, 0.06, -0.46);
+
+        // The top of the abdomen is the largest surface this camera ever sees
+        // of this boss, and it used to be flat violet — the best real estate on
+        // the model spent on nothing. A glyph here reads from directly above at
+        // any distance, which is the one angle the head cannot serve.
+        const markSpine = voxBox(0.10, 0.09, 0.62, GLOW, GLOW, 0.55,
+            undefined, LIMB_VOX_PER_UNIT);
+        markSpine.position.set(0, 0.54, -0.46);
+        const markBar = voxBox(0.42, 0.09, 0.11, GLOW, GLOW, 0.55,
+            undefined, LIMB_VOX_PER_UNIT);
+        markBar.position.set(0, 0.54, -0.22);
+
+        // Spiders are two masses, not one; the waist is what stops the body
+        // reading as a single lump.
+        const thorax = voxBlob(0.50, 0.40, 0.54, SHELL, GLOW, 0.30);
+        thorax.position.set(0, 0.02, 0.44);
+
+        const head = voxSphere(0.34, 0x462a52, 0xff2040, 0.5);
+        head.position.set(0, 0.06, 0.88);
+
+        // Chelicerae, so the front of the outline comes to a point. Which way
+        // this boss faces is the whole fight — the plate is on its front arc —
+        // and colour cannot carry that, because colour is not shape.
+        const fangL = voxSpike(0.44, 0.09, 0x120c1a, GLOW, 0.28,
+            undefined, LIMB_VOX_PER_UNIT);
+        fangL.position.set(-0.17, -0.13, 1.08);
+        fangL.rotation.set(-0.44, 0.18, 0);
+        const fangR = voxSpike(0.44, 0.09, 0x120c1a, GLOW, 0.28,
+            undefined, LIMB_VOX_PER_UNIT);
+        fangR.position.set(0.17, -0.13, 1.08);
+        fangR.rotation.set(-0.44, -0.18, 0);
+
+        body.add(abdomen, markSpine, markBar, thorax, head, fangL, fangR);
+
+        // `legs[i]` stays one object per leg because `tickAI` animates each
+        // one's `rotation.x` individually — `voxRadial` would be fewer draw
+        // calls and would freeze the walk.
         const legs = [];
+        const LEG_YAW = [1.22, 0.62, -0.06, -0.74];
         for (let i = 0; i < 8; i++) {
-            const leg = voxBox(0.15, 0.15, 1.8, 0x3a2f44, 0x401060, 0.7);
             const side = i < 4 ? -1 : 1;
             const idx = i % 4;
-            leg.position.set(side * 0.9, -0.3, -0.6 + idx * 0.5);
-            leg.rotation.z = side * 0.6;
-            leg.rotation.y = side * (0.2 + idx * 0.15);
+            const leg = new THREE.Group();
+
+            // Lengths tuned against the MEASURED edge, not chosen: the first
+            // thin-legged build came out at 2.95 against the original 3.19,
+            // which is a smaller spider and a measurably easier flank (0.88s
+            // where the fight was tuned for more). A silhouette pass that
+            // quietly makes a boss easier is the same class of error as one
+            // that makes it harder.
+            const femur = voxBox(0.94, 0.15, 0.15, SHELL, GLOW, 0.26,
+                undefined, LIMB_VOX_PER_UNIT);
+            femur.position.set(0.44, 0.30, 0);
+            femur.rotation.z = 0.66;
+
+            const tibia = voxBox(1.02, 0.13, 0.13, SHELL, GLOW, 0.26,
+                undefined, LIMB_VOX_PER_UNIT);
+            tibia.position.set(1.10, 0.02, 0);
+            tibia.rotation.z = -1.04;
+
+            leg.add(femur, tibia);
+            leg.position.set(side * 0.44, -0.08, 0.74 - idx * 0.50);
+            // Mirrored by rotation, not by `scale.x = -1`: a negative scale
+            // inverts winding and every face on that side would light wrong.
+            leg.rotation.y = side < 0 ? Math.PI - LEG_YAW[idx] : LEG_YAW[idx];
             body.add(leg);
             legs.push(leg);
         }

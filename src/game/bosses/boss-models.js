@@ -40,6 +40,37 @@ import { fillBox, fillEllipsoid } from '../../voxel/helpers.js';
  */
 export const VOX_PER_UNIT = 6;
 
+/**
+ * Resolution for THIN parts — limbs, blades, antennae, anything whose job is to
+ * be a line rather than a mass.
+ *
+ * ## The floor these builders have, which is not obvious and has already cost a
+ * ## boss redesign
+ *
+ * `cells()` rounds to whole voxels and clamps at 1, and `voxBox` takes a HALF
+ * extent, so the thinnest box `VOX_PER_UNIT = 6` can express is 3 cells —
+ * **0.5 world units** — and the next size up is 0.833. Measured, every one of
+ * `0.12 · 0.14 · 0.15 · 0.19 · 0.22 · 0.26 · 0.34` comes out at exactly 0.500.
+ *
+ * That is a silent quantisation: the number in the source is not the number in
+ * the world, and nothing complains. The Obsidian Arachnid's legs are authored
+ * `voxBox(0.15, 0.15, 1.8)` and have always been **0.5 thick, 3.3x what they
+ * say** — times its 1.70 presence scale, 0.85 units of leg on a spider whose
+ * span its own flank rule caps near 3.5. Eight limbs that thick cannot have air
+ * between them, and air between the legs is the whole of what makes a spider
+ * legible. Three separate attempts to "thin the legs" were literal no-ops
+ * before anyone measured the builder rather than trusting its arguments.
+ *
+ * 18 is chosen, not guessed: it is 3x the body resolution, so a limb can be
+ * one-third of the old floor (0.167) and still land on a whole number of cells,
+ * and it keeps the cell GRID commensurate — a limb built at 18 shares corners
+ * with a body built at 6, so the two do not visibly disagree where they meet.
+ * Bodies stay at `VOX_PER_UNIT`, deliberately: the blockiness of the masses is
+ * what matches the architecture, and this is not a licence to smooth the game
+ * out one boss at a time.
+ */
+export const LIMB_VOX_PER_UNIT = 18;
+
 /** Shared material for a voxel boss part. Vertex-coloured, like the world. */
 function bossMaterial(emissive, ei, extras) {
     return new THREE.MeshStandardMaterial({
@@ -56,7 +87,7 @@ function bossMaterial(emissive, ei, extras) {
  * Turn a voxel map into a mesh scaled so one cell is 1/VOX_PER_UNIT units, and
  * centred on its own bounding box so the mesh's origin behaves like a primitive's.
  */
-function meshFromMap(map, emissive, ei, extras) {
+function meshFromMap(map, emissive, ei, extras, res = VOX_PER_UNIT) {
     const geo = buildVoxelGeo(map);
     geo.computeBoundingBox();
     const b = geo.boundingBox;
@@ -73,7 +104,7 @@ function meshFromMap(map, emissive, ei, extras) {
         -(b.max.y + b.min.y) / 2,
         -(b.max.z + b.min.z) / 2
     );
-    geo.scale(1 / VOX_PER_UNIT, 1 / VOX_PER_UNIT, 1 / VOX_PER_UNIT);
+    geo.scale(1 / res, 1 / res, 1 / res);
     geo.computeBoundingBox();
     const mesh = new THREE.Mesh(geo, bossMaterial(emissive, ei, extras));
     mesh.castShadow = true;
@@ -81,22 +112,28 @@ function meshFromMap(map, emissive, ei, extras) {
     return mesh;
 }
 
-const cells = (u) => Math.max(1, Math.round(u * VOX_PER_UNIT));
+const cells = (u, res = VOX_PER_UNIT) => Math.max(1, Math.round(u * res));
 
 /** Voxel stand-in for SphereGeometry(radius). */
-export function voxSphere(radius, color, emissive, ei, extras) {
+export function voxSphere(radius, color, emissive, ei, extras, res = VOX_PER_UNIT) {
     const m = new Map();
-    const r = cells(radius);
+    const r = cells(radius, res);
     fillEllipsoid(m, 0, 0, 0, r, r, r, color);
-    return meshFromMap(m, emissive, ei, extras);
+    return meshFromMap(m, emissive, ei, extras, res);
 }
 
-/** Voxel stand-in for BoxGeometry(w, h, d). */
-export function voxBox(w, h, d, color, emissive, ei, extras) {
+/**
+ * Voxel stand-in for BoxGeometry(w, h, d).
+ *
+ * Pass `LIMB_VOX_PER_UNIT` as `res` for anything meant to read as a LINE rather
+ * than a mass — below ~0.34 units the default resolution silently rounds every
+ * width up to 0.5. See the note on `LIMB_VOX_PER_UNIT`.
+ */
+export function voxBox(w, h, d, color, emissive, ei, extras, res = VOX_PER_UNIT) {
     const m = new Map();
-    const hx = cells(w / 2), hy = cells(h / 2), hz = cells(d / 2);
+    const hx = cells(w / 2, res), hy = cells(h / 2, res), hz = cells(d / 2, res);
     fillBox(m, -hx, hx, -hy, hy, -hz, hz, color);
-    return meshFromMap(m, emissive, ei, extras);
+    return meshFromMap(m, emissive, ei, extras, res);
 }
 
 /**
@@ -141,9 +178,9 @@ export function voxRing(radius, tube, color, emissive, ei, extras) {
  * its base is a circle from above and says nothing. Pointing forward, it says
  * which way the thing is facing, from the only angle the player ever has.
  */
-export function voxSpike(length, baseRadius, color, emissive, ei, extras) {
+export function voxSpike(length, baseRadius, color, emissive, ei, extras, res = VOX_PER_UNIT) {
     const m = new Map();
-    const L = cells(length), R = cells(baseRadius);
+    const L = cells(length, res), R = cells(baseRadius, res);
     for (let z = 0; z <= L; z++) {
         const t = 1 - z / L;
         const r = Math.max(0, R * t);
@@ -154,7 +191,7 @@ export function voxSpike(length, baseRadius, color, emissive, ei, extras) {
             }
         }
     }
-    return meshFromMap(m, emissive, ei, extras);
+    return meshFromMap(m, emissive, ei, extras, res);
 }
 
 /**
