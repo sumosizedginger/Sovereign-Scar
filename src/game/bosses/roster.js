@@ -2142,18 +2142,171 @@ export const IMAGE_LIFE = 1.5;
 // ─── Beat 10 — Frost & Fuel (twin) ──────────────────────────────────────────
 export class FrostAndFuel extends BossBase {
     constructor(scene, position = { x: 0, z: -3 }) {
+        // ONE CREATURE CLEAVED DOWN ITS LENGTH, NOT TWO BALLS.
+        //
+        // It was two spheres — one cyan, one orange — floating 2.8 apart with
+        // nothing between them, which says "two enemies" when the subtitle says
+        // *Two Heads, Two Hungers* and the whole fight is about what happens
+        // where the two elements MEET. So: a single low body, rimed and cracked
+        // down one side, charred and burning down the other, joined by a seam
+        // that steams.
+        //
+        // BOTH HALVES ARE DARK, and the two glows carry the read. That is trap
+        // 1 (a lit mass renders as its emissive colour and nothing else) and
+        // trap 5 at once: the frost half used to be 0x80c0e0 under a 0x40e0ff
+        // glow, and this room's kit accent is `0xa0e8ff` — the ice half of an
+        // ice boss, painted the colour of its own ice room. Deep slate and
+        // char, with the elements living in the maws where the emissive
+        // contrast mechanic already puts them.
+        //
+        // NOT BUILT OUT OF THE ROOM. `beat-10-cryo` dresses itself with
+        // `ice_fins`, `pipes`, `condensers` and `frost_crust`, so this is a
+        // beast and not machinery — an industrial burner would have vanished
+        // into the plumbing (see trap 8, which cost the Witness a whole design).
         const body = new THREE.Group();
-        const frost = voxSphere(0.9, 0x80c0e0, 0x40e0ff, 1.3);
-        const fuel = voxSphere(0.9, 0xe06020, 0xff6020, 1.3);
-        frost.position.x = -1.4;
-        fuel.position.x = 1.4;
-        body.add(frost, fuel);
+        // Sway lives on an inner frame because the ROOT now carries facing.
+        // Adding a wobble to the same rotation the facing lerp is chasing means
+        // the facing never settles.
+        const frame = new THREE.Group();
+        body.add(frame);
+
+        const ICE_MASS = 0x40708c, ICE_RIME = 0x9fcbdd;
+        const CHAR_MASS = 0x241d1a, CHAR_HOT = 0x6b3018;
+
+        // ── The shared body, split down the middle ─────────────────────────
+        // SMALL AND LOW, on purpose. A trunk built big enough to be impressive
+        // simply swallowed the necks and heads: the shadow test came back as
+        // one solid oval with no air in it at all, which is the exact failure
+        // the Golem had. The heads are the subject here; the trunk is what they
+        // grow out of, and it has to stay under them to let them read.
+        for (const [side, mass, trim] of [[1, ICE_MASS, ICE_RIME], [-1, CHAR_MASS, CHAR_HOT]]) {
+            const half = voxBlob(0.70, 0.52, 0.92, mass, 0x000000, 0);
+            half.position.set(side * 0.44, -0.28, -0.10);
+            frame.add(half);
+            // Crust on the ice side, cooling crack on the char side. Behind the
+            // shoulder and clear of the trunk's own footprint, so it breaks the
+            // silhouette instead of hiding under it (trap 4).
+            // A run of small spines, not a plate. The plate version read as a
+            // plank lying on the boss — a flat slab at this pitch is a roof,
+            // and a roof is the one shape trap 4 says not to build.
+            for (let i = 0; i < 3; i++) {
+                const spine = voxSpike(0.34 - i * 0.06, 0.09, trim, 0x000000, 0,
+                    undefined, LIMB_VOX_PER_UNIT);
+                spine.position.set(side * (0.30 + i * 0.30), 0.14, -0.52 - i * 0.16);
+                spine.rotation.set(-0.55, 0, side * -0.30);
+                frame.add(spine);
+            }
+        }
+
+        // ── The seam ───────────────────────────────────────────────────────
+        // Where the two hazards meet is the answer to `twinned`, so the body
+        // says it: a pale steaming plate standing in the gap. It brightens in
+        // `tickAI` while the twinned volley is winding up.
+        const seam = voxBox(0.13, 1.00, 1.25, 0x8fa6ad, 0xdff2ff, 0.06,
+            undefined, LIMB_VOX_PER_UNIT);
+        seam.position.set(0, -0.18, -0.10);
+        frame.add(seam);
+
+        // ── Two heads on two necks ─────────────────────────────────────────
+        // Angled outward AND up. A head that sits level presents its skull to a
+        // 70.7° camera, not its face — the Witness cost four rebuilds learning
+        // that, and the maw is the part that has to be visible here because the
+        // maw is the light that says which twin is armed.
+        //
+        // FROST SITS ON LOCAL +X, AND THAT IS NOT ARBITRARY. `_twinned` fires
+        // fuel to `+perp` and frost to `-perp` of the boss→player line, and a
+        // root facing the player maps local +X onto `-perp`. So the head on
+        // your left is the head that burns the ground on your left. It was the
+        // other way round before, which nothing could notice while the body
+        // free-spun. `frost-and-fuel-sides` in boss-bodies.spec.mjs asserts it
+        // in world space, because the sign of a rotation angle has lied here
+        // before.
+        const heads = {};
+        const glows = {};
+        for (const [key, side, mass, glowC] of [
+            ['frost', 1, ICE_MASS, 0x40e0ff],
+            ['fuel', -1, CHAR_MASS, 0xff6020],
+        ]) {
+            // THE NECK IS THREE SEPARATE SEGMENTS WITH GAPS, and the gaps are
+            // the point. The Mantis is the roster's reference silhouette and it
+            // reads for exactly one reason: splayed limbs with background
+            // between them. A neck modelled as one solid box tucked against the
+            // body is not a neck at this camera, it is more body.
+            //
+            // The arc runs outward and FORWARD, so from overhead each head
+            // stands clear of the trunk with floor visible between them.
+            for (let n = 0; n < 3; n++) {
+                const u = (n + 1) / 4;
+                const seg = voxBox(0.40 - n * 0.04, 0.34, 0.40 - n * 0.04,
+                    mass, 0x000000, 0, undefined, LIMB_VOX_PER_UNIT);
+                seg.position.set(side * (0.54 + u * 0.80), -0.12 + u * 0.72,
+                    -0.10 + u * 0.60);
+                seg.rotation.z = side * -0.5;
+                frame.add(seg);
+            }
+
+            const head = new THREE.Group();
+            const skull = voxBlob(0.60, 0.54, 0.70, mass, 0x000000, 0);
+            head.add(skull);
+            const jaw = voxBox(0.66, 0.22, 0.54, mass, 0x000000, 0,
+                undefined, LIMB_VOX_PER_UNIT);
+            jaw.position.set(0, -0.44, 0.16);
+            head.add(jaw);
+
+            // THE MAW IS THE EMISSIVE PART, and it is what `this.frost` /
+            // `this.fuel` point at — `tickAI` drives their `emissiveIntensity`
+            // between the cap and 0.36 of it, and that 2.5:1 contrast is the
+            // whole read of the fight. Keeping those two names on the GLOW
+            // meshes leaves that mechanic untouched by this rebuild.
+            const maw = voxBox(0.52, 0.30, 0.34, glowC, glowC, 0.55,
+                undefined, LIMB_VOX_PER_UNIT);
+            maw.position.set(0, -0.26, 0.66);
+            head.add(maw);
+            glows[key] = maw;
+
+            // Horns: frost grows them, char has burnt them back to stubs.
+            for (const s of [-1, 1]) {
+                const horn = key === 'frost'
+                    ? voxSpike(0.85, 0.13, ICE_RIME, 0x000000, 0,
+                        undefined, LIMB_VOX_PER_UNIT)
+                    : voxSpike(0.38, 0.15, CHAR_HOT, 0x000000, 0,
+                        undefined, LIMB_VOX_PER_UNIT);
+                horn.position.set(s * 0.34, 0.44, -0.22);
+                horn.rotation.set(-0.5, 0, s * 0.42);
+                head.add(horn);
+            }
+
+            head.position.set(side * 1.46, 0.72, 0.60);
+            head.rotation.set(-0.42, side * -0.30, side * 0.12);
+            frame.add(head);
+            heads[key] = head;
+        }
+
+        // ── Four short legs, planted outside the body ──────────────────────
+        // A quadruped's legs live UNDER it, which at this pitch means they do
+        // not exist. Splayed out past the body's own footprint so they read as
+        // a stance rather than as nothing.
+        for (const sx of [-1, 1]) {
+            for (const sz of [-1, 1]) {
+                const leg = voxBox(0.24, 0.62, 0.28, sx > 0 ? ICE_MASS : CHAR_MASS,
+                    0x000000, 0, undefined, LIMB_VOX_PER_UNIT);
+                leg.position.set(sx * 0.86, -0.92, sz * 0.62);
+                leg.rotation.z = sx * -0.30;
+                frame.add(leg);
+            }
+        }
+
         super(scene, {
             id: 'frost_and_fuel', name: 'Frost & Fuel', hp: 16,
             hitRadius: 2.2, contactRadius: 2.4, position, mesh: body, phaseThresholds: [0.5],
         });
-        this.frost = frost;
-        this.fuel = fuel;
+        this.frame = frame;
+        this.seam = seam;
+        this.frostHead = heads.frost;
+        this.fuelHead = heads.fuel;
+        this.frost = glows.frost;
+        this.fuel = glows.fuel;
+        this._headY = { frost: heads.frost.position.y, fuel: heads.fuel.position.y };
         this.mode = 'frost'; // alternates
         this.modeTimer = 0;
         this.castCd = 2.0;
@@ -2173,9 +2326,37 @@ export class FrostAndFuel extends BossBase {
             BOSS_EMISSIVE_MAX * (this.mode === 'frost' ? 1 : 0.36);
         this.fuel.material.emissiveIntensity =
             BOSS_EMISSIVE_MAX * (this.mode === 'fuel' ? 1 : 0.36);
-        this.frost.position.y = Math.sin(this.t * 2) * 0.3;
-        this.fuel.position.y = Math.sin(this.t * 2 + 1) * 0.3;
-        this.root.rotation.y += dt * 0.4;
+        // The heads breathe, not the glows — `this.frost` / `this.fuel` are now
+        // the maws INSIDE the heads, and bobbing those would slide each mouth
+        // around its own skull.
+        this.frostHead.position.y = this._headY.frost + Math.sin(this.t * 2) * 0.3;
+        this.fuelHead.position.y = this._headY.fuel + Math.sin(this.t * 2 + 1) * 0.3;
+
+        // IT FACES YOU. It used to free-spin at 0.4 rad/s, and `strafe` only
+        // moves — it never sets rotation — so nothing ever aimed this body.
+        // For a fight whose entire read is WHICH HEAD IS LIT that is a real
+        // defect: at half the angles in the spin one head is directly behind
+        // the other. Facing also fixes the sides in place, so "the burning one
+        // is on my right" becomes something a player can learn.
+        //
+        // Through `faceToward`, NOT by writing `rotation.y`. The first version
+        // here hand-rolled the same lerp and turned the mesh only, which leaves
+        // `state.facingVec` pinned to its constructor default of due south
+        // forever — the precise bug the Crypt Warden's own comment warns about,
+        // and the one that once made the bulwark unkillable by melee. It costs
+        // nothing to use the helper and it keeps this boss honest if it is ever
+        // given an armoured arc.
+        if (player) this.faceToward(player, dt, 3.0);
+        // The sway that the free spin used to provide, on the inner frame so it
+        // cannot fight the facing lerp above.
+        this.frame.rotation.z = Math.sin(this.t * 1.1) * 0.05;
+        // The seam runs hot while the twinned volley is coming, because the
+        // seam is that move's answer. Same condition that fires it, so the tell
+        // cannot drift from the move.
+        if (this.seam?.material) {
+            const twinning = this.action?.name === 'twinned';
+            this.seam.material.emissiveIntensity = twinning ? 0.5 : 0.1;
+        }
         if (player && this.actionCd <= 0 && !this.busy) {
             // TWINNED (phase 2): both heads fire at once into opposite halves,
             // and you cross through the seam between them.

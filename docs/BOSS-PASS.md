@@ -1,10 +1,10 @@
 # The boss pass — what is left, and exactly how to do it
 
-Seven of fourteen are rebuilt and owner-approved: Crypt Warden, Obsidian
-Arachnid, Magma Wyrm, Leviathan Core, Phantasm, Sludge Golem, GUMOI Witness.
-The Skeletal Mantis needs nothing and never did. **Six remain.**
+Eight of fourteen are rebuilt: Crypt Warden, Obsidian Arachnid, Magma Wyrm,
+Leviathan Core, Phantasm, Sludge Golem, GUMOI Witness, Frost & Fuel. The
+Skeletal Mantis needs nothing and never did. **Five remain.**
 
-This document is the method that survived those six, the traps each one cost,
+This document is the method that survived those eight, the traps each one cost,
 and a per-boss plan with the numbers already measured. It exists because the
 first three bosses took four to six passes each and the last three took two —
 almost all of the difference was knowing the things written down here.
@@ -73,8 +73,8 @@ is above it.**
 the Golem was `ABYSS_COLORS.sludge` in the sludge room; the Witness was
 `0xff40c8` in a room whose accent is `0xff40c8`. Check the kit in
 `levels/dungeon-kits.js` before picking a palette, and go dark against it with
-the accent in the seams. Now gated for beat 13 by `runWitness` in
-`boss-bodies.spec.mjs`; the other thirteen are still on trust.
+the accent in the seams. Now gated for beats 13 and 10 by `runWitness` and
+`runFrostAndFuel` in `boss-bodies.spec.mjs`; the other twelve are still on trust.
 
 **6. Span is a fight number, not an art number.** `boss-reach-e2e` measures
 whether there is anywhere to stand that is outside the body and still in range.
@@ -115,6 +115,12 @@ materials, found white fourteen times, and passed a boss painted the room's
 exact magenta on purpose. `THREE.Color(hex)` already converts sRGB to linear —
 converting again moved the accent 0.27 away from itself and let the same
 counterfactual through a second time. *Break every new gate before trusting it.*
+
+**12. A part that must be SEEN has to sit past the surface it is mounted on.**
+Enlarging Frost & Fuel's skulls left the glow mesh inside the skull, and the one
+light that tells you which head is armed silently disappeared. Nothing errors,
+nothing dims — the mesh is simply interior. *When a body part grows, re-check
+every child that was flush against it.*
 
 ---
 
@@ -205,28 +211,64 @@ room's accent** (the gate the old body should have failed), and the open drives
 `tickAI` for real and asserts the heads travel >20%, the core lights, and it
 shuts again.
 
-### 10 — Frost & Fuel
+### 10 — Frost & Fuel · **DONE** (2026-08-17)
 
-*Now:* two separate balls, one orange one cyan, 5.57 wide. Band **1.62**, edge
-3.59, damage stops 5.21 — lots of headroom.
+*Was:* two separate balls, one orange one cyan, floating 2.8 apart with nothing
+between them, 5.57 wide. The subtitle is *Two Heads, Two Hungers* and the whole
+fight is about where the two elements MEET, and the body said "two enemies".
 
-*Does:* two heads that cast opposing hazards, and `twinned` (phase 2) fires both
-at once into opposite halves. The two hazards **interact** — fire melts ice, ice
-quenches fire — and its source says that interaction is the whole reason it has
-two heads.
+*Does:* alternating `cast-frost` / `cast-fuel`, and `twinned` (phase 2) fires
+both at once to either side of you with a safe seam pointing at you. The hazards
+**interact** — fire melts ice, ice quenches fire.
 
-*Build:* **one creature cleaved down its length.** A single body, ice-rimed and
-cracked on one side, molten and scorched on the other, joined by a seam that
-steams where they meet. Two heads on one neck-line rather than two floating
-orbs. The seam glows hottest during `twinned`.
+*Built:* **one creature cleaved down its length.** A small low trunk, ice-rimed
+on one side and charred on the other, split by a steaming seam plate; two necks
+arcing outward and forward in three segments each; two heads with glowing maws.
+Spined along each half's back. 7.63 wide, 32% of frame, hitbox ratio 0.89.
 
-*Constraints:* the `CONTRAST` comment pins a 2.5:1 emissive ratio between the
-halves inside the bloom cap — preserve it, it is what keeps the two hazards
-readable apart. Keep the two heads' world positions where they are if anything
-aims from them.
+**Band 1.75 at 45°, up from 1.62** — visible edge 3.46 against 3.59 before, so
+the fight got MORE room to stand in while the boss got wider. That is the trunk
+shrinking: the span moved out into the heads, and `edgeAlong` traverses a lane
+rather than a bounding box. Trap 6 says widening a boss closes flank windows,
+and it usually does; this is what it looks like when the anatomy pays for the
+size instead of the player.
 
-*Risk:* low-medium — check nothing aims from the individual head meshes before
-merging them onto one body. **Effort: one sitting.**
+**Both halves are dark and the two maws carry the read.** The frost half used to
+be `0x80c0e0` under a `0x40e0ff` glow — and `beat-10-cryo`'s kit accent is
+`0xa0e8ff`. The ice half of an ice boss, painted the colour of its own ice room.
+`this.frost` / `this.fuel` now point at the two MAWS rather than two spheres, so
+the 2.5:1 armed/idle emissive contrast that is the fight's entire read carries
+over untouched.
+
+**It faces you now.** `strafe` only moves — it never sets rotation — so the only
+rotation this boss had was a free `rotation.y += dt * 0.4` spin. For a fight
+whose read is *which head is lit*, that put one head directly behind the other
+at half the angles in the cycle. It now lerps to face the player, with the sway
+moved onto an inner frame so it cannot fight the facing.
+
+**And the sides mean something.** `_twinned` fires fuel to `+perp` of the
+boss→player line and frost to `-perp`; a root facing the player maps local `+X`
+onto `-perp`, so frost sits on local `+X` and **the head on your left is the head
+that burns the ground on your left.** It was the other way round before, which
+nothing could notice while the body free-spun.
+
+*What it cost:*
+
+1. **The halves were mirrored against the heads** for two passes — ice trunk
+   with the fuel head on it. Invisible in code, obvious in one photograph.
+2. **A bigger trunk made it worse, twice.** The heads sank into the mass and the
+   shadow test came back as one solid oval. The fix was to make the trunk
+   *smaller* and give the necks three segments with gaps, because the Mantis
+   reads for exactly one reason: background between the limbs.
+3. **The skull ate the maw.** Enlarging the head left the glow mesh inside it,
+   and the fight's signal light silently vanished. *A part that must be seen has
+   to sit past the surface it is mounted on.*
+
+*Guarded by:* `runFrostAndFuel` in `boss-bodies.spec.mjs` — the armed/idle
+contrast, the twinned volley landing one patch of each element, **each head on
+the side its own element lands** (driven through the real move and read as a
+world-space cross product, never as the sign of a rotation angle), and the
+room-colour gate with the two maws exempted. Swapping the heads' sides fails it.
 
 ### 07 — Hydroid Cloud
 
@@ -299,7 +341,7 @@ valuable one and should not be allowed to crowd out the rest:
 | item | state |
 |---|---|
 | Distribution live (Pages + a release) | **pushed, still dark** — `v0.4.0` is on the remote and `enablement: true` is in `pages.yml`, but `sumosizedginger.github.io/Sovereign-Scar/` still 404s (checked 2026-08-16). Next check is the Actions log for `pages.yml`; if it is still refusing, the fallback is one click in Settings → Pages → Source: GitHub Actions |
-| Boss silhouettes | **7 of 14 done**; 6 planned here; 1 needs nothing |
+| Boss silhouettes | **8 of 14 done**; 5 planned here; 1 needs nothing |
 | Occlusion | not started — agreed to land BEFORE the combo work |
 | Combo system | not started, riskiest item in v1 |
 | 80% room variation (wall/ceiling height) | not started |
@@ -308,11 +350,10 @@ valuable one and should not be allowed to crowd out the rest:
 | Doc truth pass + licence line | camera correction done; licence line outstanding |
 | Tester round folded back in | waiting on distribution |
 
-**Six sittings of boss work is a lot of runway.** If the choice is between
-finishing the roster and getting the game in front of testers, testers win —
-six of the seven rebuilt bosses have never been seen by anyone in an actual
-fight, and this project's entire history says the fight is where the real
-defects are.
+**The campaign has been played start to finish, and everything that
+playthrough turned up is fixed.** More testers are being lined up by the owner;
+that is in hand and is not a reason to hold up the roster. Do not keep
+re-proposing it.
 
-*Suggested interleave:* ~~the Witness~~ (done) → push and tester round →
-occlusion → the remaining six bosses in the gaps.
+*Suggested interleave:* ~~the Witness~~ ~~Frost & Fuel~~ (both done) →
+occlusion → the remaining five bosses in the gaps.

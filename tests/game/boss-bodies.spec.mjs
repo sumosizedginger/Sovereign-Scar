@@ -422,6 +422,7 @@ export function run(t) {
     }
 
     runWitness(t);
+    runFrostAndFuel(t);
 }
 
 /**
@@ -529,4 +530,112 @@ export function runWitness(t) {
     for (let i = 0; i < 90; i++) boss.tickAI(1 / 60, player, null);
     t.ok('…and it shuts again afterwards', spread() < shut * 1.1,
         `reclosed to ${spread().toFixed(2)} against a shut ${shut.toFixed(2)}`);
+}
+
+/**
+ * Frost & Fuel — the twin rebuilt as one cleaved creature.
+ *
+ * The assertion that matters is the SIDES one. `_twinned` fires fuel to one
+ * side of the boss→player line and frost to the other, and the rebuild put a
+ * head on each side to match — a claim about world-space geometry made through
+ * two rotations (the root's facing lerp, then each head's local offset), which
+ * is precisely the shape of claim that has been wrong here before. It is
+ * checked by driving the real move and reading the real patches, not by
+ * re-deriving the maths the boss already did.
+ */
+export function runFrostAndFuel(t) {
+    const boss = new FrostAndFuel(new THREE.Scene(), { x: 0, y: 1.4, z: 0 });
+    const player = {
+        root: { position: { x: 0, y: 1.95, z: 6 } },
+        health: { hp: 6, maxHp: 6, dead: false, damage: () => ({ accepted: true }) },
+        state: { facingVec: { x: 0, z: -1 } },
+    };
+
+    // The maws are what `tickAI` drives, and the 2.5:1 contrast between them is
+    // the entire read of the fight. This rebuild moved `this.frost`/`this.fuel`
+    // from two spheres onto two mouths inside two heads; if that rewiring ever
+    // slips, the boss still animates and simply stops saying which half is
+    // armed.
+    boss.mode = 'frost';
+    boss.tickAI(1 / 60, player, null);
+    const armed = boss.frost.material.emissiveIntensity;
+    const idle = boss.fuel.material.emissiveIntensity;
+    t.ok('Frost & Fuel: the armed head outshines the idle one',
+        armed > idle * 2 && armed <= BOSS_EMISSIVE_MAX + 1e-6,
+        `armed ${armed.toFixed(3)} vs idle ${idle.toFixed(3)}`);
+
+    // ── The head on your left burns the ground on your left ────────────────
+    // Let the facing lerp settle first: the sides only mean anything once the
+    // body is actually pointed at the player, and this boss did not aim at all
+    // before the rebuild (it free-spun, and `strafe` never touches rotation).
+    for (let i = 0; i < 120; i++) boss.tickAI(1 / 60, player, null);
+
+    const patches = [];
+    boss.spawnPatch = (o) => patches.push(o);
+    boss.clearPatches = () => {};
+    // `startAction` resolves its target from `_actionPlayer` when none is passed
+    // and bails out entirely if it has neither, which is why driving this
+    // straight left `action` null. The stored action is `{ def, aim, … }`, so
+    // the real strike is `action.def.strike` against the aim the boss itself
+    // already computed — not a re-derived one, which would let this test agree
+    // with a boss that aims somewhere else.
+    boss._actionPlayer = player;
+    boss._twinned(player);
+    boss.action.def.strike(player, boss.action.aim);
+
+    const bp = boss.root.position;
+    const dx = player.root.position.x - bp.x, dz = player.root.position.z - bp.z;
+    // Which side of the boss→player line a point falls on. In world space, and
+    // as a cross product — never as the sign of a rotation angle, which is how
+    // a backwards swing once shipped green.
+    const sideOf = (x, z) => Math.sign(dx * (z - bp.z) - dz * (x - bp.x));
+    const headSide = (h) => {
+        const w = h.getWorldPosition(new THREE.Vector3());
+        return sideOf(w.x, w.z);
+    };
+    const patchSide = (kind) => {
+        const p = patches.find((q) => q.kind === kind);
+        return p ? sideOf(p.x, p.z) : 0;
+    };
+
+    t.ok('Frost & Fuel: the twinned volley lands one patch of each element',
+        patches.length === 2 && patchSide('frost') !== 0
+        && patchSide('frost') === -patchSide('fuel'),
+        `${patches.length} patches: ${patches.map((q) => q.kind).join(',')}`);
+
+    t.ok('…and each head is on the side its own element lands',
+        headSide(boss.frostHead) === patchSide('frost')
+        && headSide(boss.fuelHead) === patchSide('fuel'),
+        `frost head ${headSide(boss.frostHead)} vs frost patch ${patchSide('frost')}, `
+        + `fuel head ${headSide(boss.fuelHead)} vs fuel patch ${patchSide('fuel')}`);
+
+    // ── Not the colour of its own room ─────────────────────────────────────
+    // The frost half used to be 0x80c0e0 under a 0x40e0ff glow in a room whose
+    // kit accent is 0xa0e8ff. Same gate as the Witness's, same 0.22 in linear
+    // RGB, read off the vertex attribute because these meshes carry no
+    // material colour. The two MAWS are exempt: they are the fight's signal
+    // lights, they are meant to be hot cyan and hot orange, and an emissive
+    // point source at 0.55 is not what "lost against the wall" means.
+    const accent = new THREE.Color(KITS['beat-10-cryo'].accent);
+    const glows = new Set([boss.frost, boss.fuel]);
+    const clashes = [];
+    const seen = new Set();
+    boss.root.traverse((o) => {
+        if (glows.has(o)) return;
+        const attr = o.isMesh && o.geometry?.getAttribute?.('color');
+        if (!attr) return;
+        for (let i = 0; i < attr.count; i++) {
+            const r = attr.getX(i), g = attr.getY(i), b = attr.getZ(i);
+            const key = `${(r * 64) | 0},${(g * 64) | 0},${(b * 64) | 0}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const d = Math.hypot(r - accent.r, g - accent.g, b - accent.b);
+            if (d < 0.22) {
+                clashes.push(`rgb(${r.toFixed(2)},${g.toFixed(2)},${b.toFixed(2)}) `
+                    + `d=${d.toFixed(2)}`);
+            }
+        }
+    });
+    t.ok('…and its ice half is not painted the colour of its ice room',
+        clashes.length === 0, clashes.slice(0, 4).join(', ') || 'none');
 }
