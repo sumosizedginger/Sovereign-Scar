@@ -1,11 +1,11 @@
 # The boss pass — what is left, and exactly how to do it
 
-Eleven of fourteen are rebuilt: Crypt Warden, Tri-Compiler, Obsidian Arachnid,
-Magma Wyrm, Leviathan Core, Phantasm, Sludge Golem, GUMOI Witness, Frost & Fuel,
-Hydroid Cloud, The Proxy. The Skeletal Mantis needs nothing and never did.
-**Two remain: the Sand Spur and the Kinetic Core.**
+Twelve of fourteen are rebuilt: Crypt Warden, Tri-Compiler, Sand Spur, Obsidian
+Arachnid, Magma Wyrm, Leviathan Core, Phantasm, Sludge Golem, GUMOI Witness,
+Frost & Fuel, Hydroid Cloud, The Proxy. The Skeletal Mantis needs nothing and
+never did. **One remains: the Kinetic Core.**
 
-This document is the method that survived those eleven, the traps each one cost,
+This document is the method that survived those twelve, the traps each one cost,
 and a per-boss plan with the numbers already measured. It exists because the
 first three bosses took four to six passes each and the last three took two —
 almost all of the difference was knowing the things written down here.
@@ -85,14 +85,15 @@ call:
 | | nearest | share |
 |---|---|---|
 | ten bosses | 0.25 – 0.97 | **0.0%** |
-| Sand Spur | 0.014 | 88.8% |
 | Skeletal Mantis | 0.001 | 59.3% |
 | Magma Wyrm | 0.013 | 39.7% |
 
 There is no middle ground, because the defect is always the same mechanical
 act: the kit's accent constant gets typed into the boss. **Five of fourteen did
-it** — the Witness and the Proxy are fixed; the other three are pinned at their
-measured value as ceilings that still fail if they get worse.
+it** — the Witness, the Proxy and the Sand Spur are fixed (the Spur went from
+88.8% at 0.014 to 0.0% at 0.345, and its entry was REMOVED rather than
+loosened); the other two are pinned at their measured value as ceilings that
+still fail if they get worse.
 
 - **Mantis — accepted.** It is the reference silhouette and the one body nobody
   has asked to change. It reads on SHAPE, which is exactly the property that
@@ -103,8 +104,9 @@ measured value as ceilings that still fail if they get worse.
   floor" as a FIXED example of this trap. **It is not fixed**: two fifths of the
   body is still within 0.013 of the pyre accent. The model is owner-approved, so
   it is pinned rather than changed unasked. Raise with the owner.
-- **Sand Spur — outstanding**, and the worst on the roster. Beat 03 is still to
-  be rebuilt; 88.8% is the number that rebuild has to beat.
+- **Sand Spur — fixed.** It was the worst on the roster at 88.8%; the rebuild
+  put it at 0.0%, so the exemption is gone. An exemption that is no longer
+  earned gets removed, which is the only direction a ratchet may move.
 
 **6. Span is a fight number, not an art number.** `boss-reach-e2e` measures
 whether there is anywhere to stand that is outside the body and still in range.
@@ -123,6 +125,20 @@ player every frame over 150 ticks.
 assembly was never ticked at all. The optional chain made the second one silent.
 Corrected, the boss went from "2.93 wide, 12% of frame" to **10.33 wide, 43%** —
 from the smallest thing on the roster to the largest.
+
+**And a third instrument had the same blind spot, in the game's own debug
+hook.** `__ssDebug.measure()` did `out.boss = box(b.root)`, which
+`visual-sanity`'s "boss silhouette dominates" gate reads — so for the same two
+bosses that gate has been asking whether a THIRD of a boss out-spans the trash
+mobs. Corrected, the Tri-Compiler reports 10.79 where it used to report one
+core. The Sand Spur also needed its MOUND included, because while it is burrowed
+every segment is hidden and the mound is the only thing on screen.
+
+**So the same defect appeared in three separate instruments, written at three
+different times, and every one of them was `root`-only.** `TriCompiler.root` is
+`cores[0].root`; `SandSpur.root` is `segments[0]`. Anything that measures a boss
+must collect `root` **plus** `cores` / `segments` / `segs`, and the Spur's
+`mound`.
 
 *If a boss looks inexplicably wrong, suspect the instrument before the model.
 Across this pass that has been the answer more often than not, and every time it
@@ -460,12 +476,64 @@ its beam's destination as a **dot product against the real bearing, never the
 sign of an angle**, the re-aim on a core's death, and only the aperture lit.
 Restoring the free spin fails the first two; lighting the whorl fails the third.
 
-### 03 · 04 — Sand Spur, Kinetic Core
+### 03 — Sand Spur · **DONE** (2026-08-17)
 
-*Now:* 3.62 and 2.88 wide — the two smallest on the roster. **Re-measure both
-before designing**: the probe fixes above changed what the Tri-Compiler's numbers
-meant entirely, and `SandSpur` and `KineticCore` are the other two bosses that
-live outside `roster.js`.
+⚠ **And the probe was lying about this one too — worse than about the
+Tri-Compiler.** `SandSpur.root` is `segments[0]`, so the shot framed one segment
+of six; and the boss constructs `submerged = true` with every segment hidden, so
+the portrait came back as **an entirely blank frame**. This boss had never been
+photographed at all. It is shot with `--open` now, which surfaces it, and the
+probe keeps the player orbiting for bosses that trail — parking the player stops
+the head, floods the 38-entry trail with one repeated point and collapses the
+whole animal into a single cube, which is exactly what the first corrected shot
+produced.
+
+*Was:* six identical `voxBox(0.9, 0.7, 0.9)` cubes scaled 3.1 — the least
+designed body on the roster — and **88.8% of it within 0.014 of the sink's own
+accent**, the worst colour score of the fourteen.
+
+*Does:* HUNT (a mound crosses the floor at you) → ERUPT → **BEACHED** (arched
+out of the sand, motionless, weak seam lit, double damage — its own source calls
+this "the whole fight") → DIVE, a little faster each time.
+
+*Built:* **a sandworm.** Dark umber carapace, a head that is four splayed
+mandibles around a dark maw — a star, which has an unmistakable centre from
+directly above and is the only silhouette shaped like that on the roster — and
+tapering body rings with back plates. 4.84 wide, 20% of frame. **Colour now 0.0%
+within 0.12, nearest 0.345**, so its entry came out of the exemption list
+entirely rather than being loosened.
+
+**THE CHAIN NEVER SPREAD, AND THAT WAS THE REAL DEFECT.** Segments sampled
+`trail[i * 5]` — five FRAMES of history each. At ~3.4 units/s that is 0.28 world
+units between bodies two units across, so the whole serpent occupied 1.4 units
+and sat inside itself. **This is the Magma Wyrm's bug exactly**, which was found
+and fixed on the Wyrm by widening its stride, and never swept across to the
+second body in the game built the same way.
+
+Frames were the wrong unit regardless: this boss's speed runs 3.9 → 5.7 across
+its phases, so a fixed frame stride silently stretches the animal apart as the
+fight escalates. It samples by **arc length** now (`SEG_GAP = 2.5`, a little
+over one body), which is speed-independent. *The Wyrm is still counting frames.*
+
+**The weak seam was inside the head.** Authored at `y = 0.42`, within the maw
+blob — the "hit here" sign for the window the entire fight is built around was
+interior geometry. Trap 12, the same way Frost & Fuel's skulls swallowed their
+own maws.
+
+*Band 1.74 at 225°, up from 0.74. Hitbox ratio 1.30.*
+
+*Guarded by:* `runSandSpur` in `boss-bodies.spec.mjs` — `trailAt` sampling by
+distance (tested against a straight line whose answer is known exactly, rather
+than by driving a boss), the shipped chain not sitting inside itself, and the
+seam proud of the head. Restoring the five-frame stride fails the first;
+returning the seam to `y = 0.42` fails the last.
+
+### 04 — Kinetic Core
+
+*Now:* 2.88 wide — the smallest left. **Re-measure before designing.** Three
+separate instruments turned out to be measuring a fraction of a multi-part boss
+this session, and `KineticCore` is the last of the three that live outside
+`roster.js`.
 
 *Does:* the Tri-Compiler is a three-core assembly with a beam cycle and a
 `converge` slam; the Spur burrows and surfaces (`sand-wake`, `breach`); the Core
@@ -494,7 +562,7 @@ valuable one and should not be allowed to crowd out the rest:
 | item | state |
 |---|---|
 | Distribution live (Pages + a release) | **pushed, still dark** — `v0.4.0` is on the remote and `enablement: true` is in `pages.yml`, but `sumosizedginger.github.io/Sovereign-Scar/` still 404s (checked 2026-08-16). Next check is the Actions log for `pages.yml`; if it is still refusing, the fallback is one click in Settings → Pages → Source: GitHub Actions |
-| Boss silhouettes | **11 of 14 done**; 2 planned here; 1 needs nothing |
+| Boss silhouettes | **12 of 14 done**; 1 planned here; 1 needs nothing |
 | Occlusion | not started — agreed to land BEFORE the combo work |
 | Combo system | not started, riskiest item in v1 |
 | 80% room variation (wall/ceiling height) | not started |
@@ -509,4 +577,4 @@ that is in hand and is not a reason to hold up the roster. Do not keep
 re-proposing it.
 
 *Suggested interleave:* ~~the Witness~~ ~~Frost & Fuel~~ ~~Hydroid Cloud~~
-~~the Proxy~~ ~~Tri-Compiler~~ (done) → occlusion → the Spur and the Core.
+~~the Proxy~~ ~~Tri-Compiler~~ ~~Sand Spur~~ (done) → occlusion → the Core.

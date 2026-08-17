@@ -29,7 +29,7 @@ import {
 import { HERO_PALETTE } from '../../src/game/assets/palettes.js';
 import { KITS } from '../../src/game/levels/dungeon-kits.js';
 import { LEVELS } from '../../src/game/levels/registry.js';
-import { SandSpur } from '../../src/game/bosses/sand-spur.js';
+import { SandSpur, SEG_GAP, trailAt } from '../../src/game/bosses/sand-spur.js';
 import { KineticCore } from '../../src/game/bosses/kinetic-core.js';
 import { BOSS_EMISSIVE_MAX, clampEmissive } from '../../src/game/bosses/base.js';
 import {
@@ -127,7 +127,22 @@ function roomClashShare(boss) {
     // magenta 0.27 from itself and let the counterfactual through.
     const accent = new THREE.Color(kit.accent);
     let near = 0, total = 0, min = Infinity;
-    boss.root.traverse((o) => {
+    // EVERY PART, not `root`. Two bosses keep their pieces as siblings in the
+    // scene — `TriCompiler.root` is `cores[0].root` and `SandSpur.root` is
+    // `segments[0]` — so a traverse from root measures one core of three or one
+    // segment of six. That is the same blind spot `boss-portraits.mjs` had, and
+    // a colour gate that only reads the head is exactly the kind of gate that
+    // reports safety it has not checked.
+    const parts = [boss.root];
+    for (const c of boss.cores || []) if (c.root) parts.push(c.root);
+    for (const s of boss.segments || []) parts.push(s);
+    for (const s of boss.segs || []) parts.push(s);
+    const seenObj = new Set();
+    for (const part of parts) part.traverse((o) => {
+        // A part may be reachable twice (root plus its own entry); counting it
+        // twice would skew the share rather than just wasting work.
+        if (seenObj.has(o)) return;
+        seenObj.add(o);
         const attr = o.isMesh && o.geometry?.getAttribute?.('color');
         if (!attr) return;
         for (let i = 0; i < attr.count; i++) {
@@ -165,10 +180,10 @@ const ROOM_CLASH = {
     // approved as it stands, so this is pinned at its current value rather than
     // changed unasked. Revisit with the owner.
     magma_wyrm: 0.42,        // measured 39.7% at 0.013 from #ff5520
-    // OUTSTANDING. Worst on the roster: a tan body in a tan sink. Beat 03 is
-    // one of the three bosses still to be rebuilt, so this is the number that
-    // rebuild has to beat.
-    sand_spur: 0.90,         // measured 88.8% at 0.014 from #c8a060
+    // (The Sand Spur was here at 0.90 — 88.8% at 0.014, the worst on the
+    // roster. Its rebuild put it at 0.0% and 0.345 away, so the entry is gone
+    // rather than loosened: an exemption that is no longer earned is removed,
+    // which is the only direction a ratchet is allowed to move.)
 };
 
 /** p85 horizontal radius of the visible body, measured from the root's own XZ. */
@@ -513,6 +528,7 @@ export function run(t) {
     runHydroid(t);
     runProxy(t);
     runTriCompiler(t);
+    runSandSpur(t);
 }
 
 /**
@@ -853,4 +869,69 @@ export function runTriCompiler(t) {
     t.ok('…and only its aperture is lit, not the whole stone',
         lit.length === 1 && lit[0] === boss.cores[0].glow,
         `${lit.length} lit part(s) of ${boss.cores[0].mesh.children.length}`);
+}
+
+/**
+ * The Sand Spur — the chain that has to read as a chain.
+ *
+ * Its six segments took their positions from `trail[i * 5]`, five FRAMES of
+ * history each. At ~3.4 units/s that is 0.28 world units between bodies two
+ * units across: the whole serpent occupied 1.4 units and photographed as one
+ * brown lump. The Magma Wyrm had the identical bug and was fixed by widening
+ * its stride; the fix was never swept across to the second body built the same
+ * way.
+ *
+ * Frames were the wrong unit anyway — this boss's speed runs 3.9 → 5.7 across
+ * its phases, so a fixed frame stride stretches the animal apart as the fight
+ * escalates. It samples by ARC LENGTH now, and that is what these check.
+ */
+export function runSandSpur(t) {
+    // The sampler on its own, against a trail whose geometry is known exactly:
+    // a straight line one unit per step. Then "2.5 units back" has a right
+    // answer that does not depend on driving a boss.
+    const line = [];
+    for (let i = 0; i < 40; i++) line.push({ x: -i, z: 0 });
+    const at = trailAt(line, 2.5);
+    t.ok('trailAt samples a trail by distance, not by index',
+        at && Math.abs(-at.x - 3) < 1e-6, `2.5 units back → x=${at && at.x}`);
+    t.ok('…and clamps to the far end rather than returning nothing',
+        trailAt(line, 1e6) === line[line.length - 1], 'clamped');
+
+    // And the shipped boss, driven. Surfaced so the segments are visible, with
+    // the player circling so the head actually travels — a stationary Spur
+    // floods its own trail with one repeated point, which is what made every
+    // portrait of it a single cube.
+    const boss = new SandSpur(new THREE.Scene(), null, particles, [{ x: 0, z: 0 }]);
+    const player = {
+        root: { position: { x: 0, y: 1.95, z: 6 } },
+        health: { hp: 6, maxHp: 6, dead: false, damage: () => ({ accepted: true }) },
+        state: { facingVec: { x: 0, z: -1 } },
+    };
+    for (let i = 0; i < 240; i++) {
+        const a = (i / 120) * Math.PI;
+        player.root.position.x = Math.sin(a) * 7;
+        player.root.position.z = Math.cos(a) * 7;
+        boss.submerged = false;
+        try { boss.tickAI(1 / 60, player, {}); } catch (_) { /* headless gaps */ }
+        boss.t = (boss.t || 0) + 1 / 60;
+    }
+    let tightest = Infinity;
+    for (let i = 1; i < boss.segments.length; i++) {
+        const a2 = boss.segments[i - 1].position, b2 = boss.segments[i].position;
+        tightest = Math.min(tightest, Math.hypot(a2.x - b2.x, a2.z - b2.z));
+    }
+    // A little under SEG_GAP, because the head turns and a curved path shortens
+    // the straight-line distance between two points measured along it.
+    t.ok('the Sand Spur\'s segments do not sit inside each other',
+        tightest > SEG_GAP * 0.6,
+        `tightest centre gap ${tightest.toFixed(2)} against a target of ${SEG_GAP}`);
+
+    // The weak seam is the "hit here" sign for the beached window the whole
+    // fight is built around, and it was authored at y=0.42 — inside the maw
+    // blob, i.e. interior geometry nobody could see (trap 12).
+    const maw = boss.segments[0].children.find((o) => o !== boss.weak && o.isMesh
+        && o.position.y > 0.2);
+    t.ok('…and its weak seam sits proud of the head rather than inside it',
+        boss.weak.position.y > (maw ? maw.position.y : 0),
+        `seam y ${boss.weak.position.y} vs nearest mass y ${maw && maw.position.y}`);
 }

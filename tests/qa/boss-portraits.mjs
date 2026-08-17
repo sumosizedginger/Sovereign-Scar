@@ -240,23 +240,74 @@ try {
             // `busy` actually reads is the real condition rather than a mime of
             // it.
             for (let i = 0; i < 150; i++) {
-                player.root.position.x = root.position.x;
-                player.root.position.z = root.position.z + 4.5;
-                if (forceOpen && !boss.action) boss.action = { name: 'probe-open' };
+                // A CHAIN NEEDS THE PLAYER TO KEEP MOVING.
+                //
+                // The Sand Spur's segments take their x/z from `this.trail`,
+                // which only fills while the head travels. Parking the player
+                // stops the head, the 38-entry trail floods with one repeated
+                // point, and all six segments collapse onto each other — the
+                // boss photographed as a single tan cube. Same failure the
+                // Magma Wyrm had against a stationary harness. Bosses that
+                // trail keep orbiting instead; they have no facing to converge,
+                // so nothing is lost by it.
+                if (boss.submerged !== undefined) {
+                    const a = (i / 150) * Math.PI * 2;
+                    player.root.position.x = root.position.x + Math.sin(a) * 5.5;
+                    player.root.position.z = root.position.z + Math.cos(a) * 5.5;
+                } else {
+                    player.root.position.x = root.position.x;
+                    player.root.position.z = root.position.z + 4.5;
+                }
+                if (forceOpen) {
+                    // `stage: 'recover'` because `staggered` is a getter over
+                    // it, and that is the flag a boss's OPEN pose hangs off.
+                    // NOT for a boss that trails: pinning RECOVER [drive:][path]filename beaches
+                    // the Spur, and a beached Spur is motionless, which is the
+                    // one thing that stops its chain spreading. Surfaced and
+                    // swimming is the pose that shows the body.
+                    if (!boss.action && boss.submerged === undefined) {
+                        boss.action = { name: 'probe-open', stage: 'recover' };
+                    }
+                    // The Sand Spur is INVISIBLE at rest: it constructs with
+                    // `submerged = true` and hides every segment, so its
+                    // portrait came out as an empty frame — the boss had never
+                    // been photographed at all. Its own source calls the
+                    // beached window "the whole fight", so that is the pose to
+                    // shoot: surfaced, and staggered.
+                    if (boss.submerged) boss.submerged = false;
+                }
                 drive(boss, player);
                 boss.t = (boss.t || 0) + 1 / 60;
             }
 
-            // PHOTOGRAPH EVERY CORE, NOT `root`.
+            // PHOTOGRAPH EVERY PART, NOT `root`.
             //
-            // `TriCompiler` is a trio, and `this.root = this.cores[0].root` —
-            // so every portrait of it ever taken has been a picture of one
-            // third of the boss, framed tight on a single sphere. That is where
-            // "2.93 wide, 12% of frame, they do not read as bosses mainly
-            // because they are small" came from: a measurement of a third.
-            const subjects = (boss.cores?.length
-                ? boss.cores.map((c) => c.root).filter(Boolean)
-                : [root]);
+            // Some bosses are assemblies whose pieces are siblings in the scene
+            // rather than children of `root`, and for those `root` is only ONE
+            // PIECE:
+            //
+            //   TriCompiler  `this.root = this.cores[0].root`   — 1 of 3
+            //   SandSpur     `this.root = this.segments[0]`     — 1 of 6
+            //
+            // Every portrait ever taken of those two framed a fraction of the
+            // boss, which is where "2.93 wide, 12% of frame" and "3.62 wide,
+            // 15%" came from. The Magma Wyrm is NOT affected — it passes its
+            // group as `mesh`, so its chain are children of `root` and were
+            // always in shot. Checked rather than assumed.
+            //
+            // Anything already inside another subject is dropped, so a boss
+            // that does parent its parts is unaffected by this.
+            const parts = [];
+            const push = (o) => { if (o && !parts.includes(o)) parts.push(o); };
+            push(root);
+            for (const c of boss.cores || []) push(c.root || c.mesh);
+            for (const s of boss.segments || []) push(s);
+            for (const s of boss.segs || []) push(s);
+            const under = (anc, o) => {
+                for (let p = o.parent; p; p = p.parent) if (p === anc) return true;
+                return false;
+            };
+            const subjects = parts.filter((p) => !parts.some((q) => q !== p && under(q, p)));
             const shotScene = new THREE.Scene();
             for (const s of subjects) shotScene.add(s);
 
@@ -305,13 +356,22 @@ try {
             // THE TEST. Every material flat black, background white. Swapped
             // rather than recoloured, and the originals are put back after, so
             // a boss shot later in the same run is not left painted black.
+            // OVER EVERY SUBJECT, not just `root`. For a boss whose parts are
+            // siblings in the scene rather than children of root — the
+            // Tri-Compiler's three cores, the Sand Spur's six segments — this
+            // painted the head black and left the rest of the body in full
+            // colour. The shadow test is described at the top of this file as
+            // THE POINT of the probe, and for those two bosses it has been
+            // silently testing one piece of them.
             const saved = [];
             const flat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-            root.traverse((o) => {
-                if (!o.isMesh) return;
-                saved.push([o, o.material]);
-                o.material = flat;
-            });
+            for (const s of subjects) {
+                s.traverse((o) => {
+                    if (!o.isMesh) return;
+                    saved.push([o, o.material]);
+                    o.material = flat;
+                });
+            }
             shotScene.background = new THREE.Color(0xffffff);
             renderer.render(shotScene, shotCam);
             const shadow = canvas.toDataURL('image/png');

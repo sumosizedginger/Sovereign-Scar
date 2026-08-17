@@ -2075,7 +2075,31 @@ window.__sovereignScar = {
             if (e.rig) out.mobs.push(box(e.rig));
         }
         const b = game.level?.boss;
-        if (b?.root) out.boss = box(b.root);
+        // THE WHOLE BOSS, not `root`. Two bosses keep their parts as siblings
+        // in the scene rather than as children of root — `TriCompiler.root` is
+        // `cores[0].root` and `SandSpur.root` is `segments[0]` — so boxing root
+        // measured one core of three, or one segment of six. `visual-sanity`'s
+        // "boss silhouette dominates" gate reads this, so for those two it has
+        // been asking whether a THIRD of a boss out-spans the trash mobs.
+        if (b?.root) {
+            const parts = [b.root];
+            for (const c of b.cores || []) if (c.root) parts.push(c.root);
+            for (const s of b.segments || []) parts.push(s);
+            for (const s of b.segs || []) parts.push(s);
+            // The Sand Spur's mound. While it is burrowed every segment is
+            // `visible = false` and the mound is the ONLY thing on screen — its
+            // own source calls it "the whole read while the Spur is
+            // underground" — so measuring the hidden body and reporting that
+            // the boss is smaller than the trash mobs is measuring the wrong
+            // object, not finding a real defect.
+            if (b.mound) parts.push(b.mound);
+            const bb = new THREE.Box3();
+            for (const p2 of parts) if (p2.visible !== false) bb.expandByObject(p2);
+            out.boss = isFinite(bb.min.y)
+                ? { h: bb.max.y - bb.min.y, w: bb.max.x - bb.min.x,
+                    d: bb.max.z - bb.min.z, minY: bb.min.y }
+                : box(b.root);
+        }
         return out;
     },
     /** Full frame-luminance distribution: { mean, p10, p50, p90, spread }. */

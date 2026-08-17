@@ -23,7 +23,7 @@ import { fillBox } from '../../voxel/helpers.js';
 import { CRUST_COLORS } from '../assets/palettes.js';
 import { sfx } from '../../audio/synth.js';
 import { markShadowRoles } from '../render/shadow-roles.js';
-import { voxBlob, voxBox, voxSphere } from './boss-models.js';
+import { voxBlob, voxBox, voxSphere, voxSpike, LIMB_VOX_PER_UNIT } from './boss-models.js';
 
 // The mound's own reach, and how often it can bite. 1.5 is the mound mesh's
 // visible footprint — one number for the picture and the rule, so the thing you
@@ -37,9 +37,111 @@ export const WAKE_CD = 1.0;
 // re-aims, which this project has now been bitten by twice. Drawing the entire
 // swept area is an honest overstatement: everything inside it is at risk, and
 // leaving it is the answer.
+// WORLD UNITS between one segment centre and the next — not frames.
+//
+// The original sampled `trail[i * 5]`, five frames of history per segment. Two
+// things are wrong with counting frames. It is meaningless against the thing
+// that actually matters, the segment's own SIZE: at ~3.4 units/s five frames is
+// 0.28 units, so six segments each 2.2 across were strung over 1.4 units and
+// sat inside one another — the serpent photographed as a single lump. And it is
+// SPEED-DEPENDENT: this boss's speed goes 3.9 → 5.7 across its phases, so a
+// fixed frame stride silently stretches the animal apart as the fight escalates.
+//
+// Sampling by arc length fixes both. 2.5 is a little over one body, so the
+// segments read as separate plates with floor visible between them — which is
+// the only reason the Skeletal Mantis reads, and it holds at every speed.
+//
+// (The Magma Wyrm has the same frame-stride construction, widened to 22 when it
+// had this exact bug. It is the only other body in the game built this way, and
+// it is still counting frames.)
+export const SEG_GAP = 2.5;
+
+/** The point `dist` world units back along a trail of {x,z} samples. */
+export function trailAt(trail, dist) {
+    if (!trail.length) return null;
+    let acc = 0;
+    for (let k = 1; k < trail.length; k++) {
+        acc += Math.hypot(trail[k].x - trail[k - 1].x, trail[k].z - trail[k - 1].z);
+        if (acc >= dist) return trail[k];
+    }
+    return trail[trail.length - 1];
+}
+
 export const BREACH_R = 4.5;
 export const BREACH_TIME = 1.6;
 export const BREACH_HALF = Math.PI / 5;
+
+// THE SPUR'S OWN COLOURS, AND THEY ARE NOT THE SINK'S.
+//
+// The head was `0xc4a060` against a `beat-03-sink` kit accent of `0xc8a060` —
+// near enough the same tan that 88.8% of this body sat within 0.014 of its own
+// room, the worst score on the roster by a distance (see the roster-wide gate
+// in `boss-bodies.spec.mjs`). A sand-coloured serpent in a sand basin is a
+// thematically tidy way of being invisible.
+//
+// Dark umber carapace instead, with the pale scoured plates kept well off the
+// accent. It still reads as a desert animal; it just stops being the floor.
+const CARAPACE = 0x4a3826;
+const CARAPACE_DARK = 0x2e2317;
+const PLATE = 0x8a7f6d;
+
+/**
+ * The head: a sandworm's mouth, which is the one shape that reads from directly
+ * above.
+ *
+ * All six segments used to be `voxBox(0.9, 0.7, 0.9)` scaled 3.1 — six
+ * identical cubes, the least designed body in the roster. A chain of boxes says
+ * nothing about which end is the head or which way it is going, and at this
+ * camera the answer to both has to come from the footprint.
+ *
+ * Mandibles splayed radially around a dark maw give a star, and a star has an
+ * unmistakable centre. It is also the only silhouette on the roster shaped like
+ * this, which matters more than any amount of detail.
+ */
+function buildSpurHead() {
+    const g = new THREE.Group();
+    const skull = voxBlob(1.22, 0.70, 1.34, CARAPACE, 0x000000, 0, { roughness: 0.9 });
+    g.add(skull);
+    // The maw: a dark well at the centre, so the mandibles have something to be
+    // arranged around rather than just being spikes on a lump.
+    const maw = voxBlob(0.58, 0.40, 0.58, CARAPACE_DARK, 0x000000, 0, { roughness: 1 });
+    maw.position.y = 0.48;
+    g.add(maw);
+    // Four mandibles, splayed OUT and forward. Limb resolution: at the body
+    // grid a 0.16 spike comes back half a unit thick and the star fills in.
+    for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+        const jaw = voxSpike(1.34, 0.22, PLATE, 0x000000, 0,
+            { roughness: 0.9 }, LIMB_VOX_PER_UNIT);
+        jaw.position.set(Math.cos(a) * 0.88, 0.34, Math.sin(a) * 0.88);
+        // `voxSpike` points along +Z, so aim each one outward from the maw and
+        // tilt it up out of the sand.
+        jaw.rotation.y = Math.atan2(Math.cos(a), Math.sin(a));
+        jaw.rotation.x = -0.38;
+        g.add(jaw);
+    }
+    return g;
+}
+
+/** A body ring: tapering, with a back ridge so the chain has a direction. */
+function buildSpurSegment(i, n) {
+    const g = new THREE.Group();
+    const u = i / Math.max(1, n - 1);
+    const r = 1.18 - u * 0.52;
+    const ring = voxBlob(r, 0.58 - u * 0.18, r, CARAPACE, 0x000000, 0, { roughness: 0.9 });
+    g.add(ring);
+    // Three plates along the back. They break the silhouette of the ring they
+    // sit on rather than hiding inside it (trap 4), and they are what makes a
+    // row of blobs read as one segmented animal.
+    for (const sx of [-1, 0, 1]) {
+        const plate = voxBox(0.30, 0.26, 0.62 - u * 0.2, PLATE, 0x000000, 0,
+            { roughness: 0.9 }, LIMB_VOX_PER_UNIT);
+        plate.position.set(sx * r * 0.62, 0.34 - u * 0.08, 0);
+        plate.rotation.z = sx * -0.35;
+        g.add(plate);
+    }
+    return g;
+}
 
 export class SandSpur extends BossBase {
     constructor(scene, collisionWorld, particles, path = [], opts = {}) {
@@ -67,18 +169,9 @@ export class SandSpur extends BossBase {
         this.trail = [];
         const n = opts.segments || 6;
         for (let i = 0; i < n; i++) {
-            const mesh = voxBox(
-                0.9, 0.7, 0.9,
-                i === 0 ? 0xc4a060 : 0x9a8b78,
-                i === 0 ? 0x402010 : 0x000000,
-                0.4,
-                { roughness: 0.9 }
-            );
-            // S6 (P1-5): emerged silhouette must clear the mob bar (~2.1+)
-            mesh.scale.setScalar(3.1);
+            const mesh = i === 0 ? buildSpurHead() : buildSpurSegment(i, n);
             mesh.position.set(pts[0].x, 0.6, pts[0].z);
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
+            mesh.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
             scene.add(mesh);
             this.segments.push(mesh);
         }
@@ -88,8 +181,12 @@ export class SandSpur extends BossBase {
         this.home = { x: this.lair.x, z: this.lair.z };
 
         // The weak seam only lights while beached — it is the "hit here" sign.
-        const weak = voxSphere(0.22, 0xffd060, 0xffd060, 0.4);
-        weak.position.set(0, 0.42, 0);
+        // ON TOP OF THE HEAD, not inside it. At 0.42 it sat within the maw
+        // blob and was simply interior geometry — the "hit here" sign the
+        // beached window depends on could not be seen at all (trap 12, the same
+        // way Frost & Fuel's skulls swallowed their own maws).
+        const weak = voxSphere(0.30, 0xffd060, 0xffd060, 0.4);
+        weak.position.set(0, 0.86, -0.20);
         this.segments[0].add(weak);
         this.weak = weak;
         // Segments past the head are added straight to the scene rather than
@@ -298,14 +395,27 @@ export class SandSpur extends BossBase {
         this._spin(dt, player);
 
         // Trail history — segments follow where the head has been.
+        //
+        // THE STRIDE WAS FIVE FRAMES, AND THAT IS WHY THIS BOSS WAS A LUMP.
+        // At 60fps and a speed of ~3.4, five frames is 0.28 world units — so
+        // six segments each about two units across were strung out over 1.4
+        // units total and sat almost entirely inside one another. Photographed,
+        // the "serpent" was a single brown mass with a gold badge on it.
+        //
+        // This is the Magma Wyrm's bug, exactly: its chain "trailed 0.28 apart
+        // while being 2.4 across" and was fixed by widening the stride to 22
+        // with a matching history cap. That fix was never swept across to here
+        // — the second body in the game built the same way.
         this.trail.unshift({ x: this.root.position.x, z: this.root.position.z });
-        if (this.trail.length > this.segments.length * 6 + 2) this.trail.pop();
+        // Long enough to hold the whole animal at its slowest, capped so a
+        // stationary Spur cannot grow an unbounded history.
+        if (this.trail.length > 400) this.trail.pop();
 
         const beached = this.staggered;
         for (let i = 0; i < this.segments.length; i++) {
             const s = this.segments[i];
             if (i > 0) {
-                const sample = this.trail[Math.min(this.trail.length - 1, i * 5)];
+                const sample = trailAt(this.trail, i * SEG_GAP);
                 if (sample) { s.position.x = sample.x; s.position.z = sample.z; }
             }
             if (this.submerged) {
@@ -367,9 +477,10 @@ export class SandSpur extends BossBase {
 
     dispose() {
         for (const s of this.segments) {
+            // Groups now, not single meshes — dispose has to traverse or every
+            // part of this boss except one leaks on every level unload.
             if (s.parent) s.parent.remove(s);
-            s.geometry.dispose();
-            s.material.dispose();
+            s.traverse((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
         }
         if (this.mound?.parent) this.mound.parent.remove(this.mound);
         this.mound?.geometry.dispose();
