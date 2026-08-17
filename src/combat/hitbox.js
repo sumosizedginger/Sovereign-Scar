@@ -1,6 +1,8 @@
 // src/combat/hitbox.js
 // Purpose: World-unit hitbox checks (NOT pixels).
-// Dependencies: none
+// Dependencies: combat/line-of-sight
+
+import { sightBetweenBodies } from './line-of-sight.js';
 
 /**
  * Returns true if attacker can hit defender with the given move.
@@ -12,8 +14,14 @@
  * forward === signed dx and |lateral| === |dz| — i.e. this is exactly the old
  * X-signed test, bit-for-bit. A free-roam game that aims facing on both axes
  * gets a cone that turns with it, for free.
+ *
+ * `solidAt` is optional world occupancy (`level.getVoxelAt`). Supplied, a blow
+ * must also have a clear line to what it hits; omitted, the geometry test is
+ * exactly what it always was. It is LAST and it is checked LAST on purpose —
+ * it is the only gate here that costs more than a few multiplies, so the cheap
+ * reach and lane gates get to reject first.
  */
-export function hitboxCheck(attacker, defender, move) {
+export function hitboxCheck(attacker, defender, move, solidAt) {
     if (!attacker || !defender || !move) return false;
     if (defender.state && defender.state.current === 'DEAD') return false;
 
@@ -43,10 +51,15 @@ export function hitboxCheck(attacker, defender, move) {
     // circle the smear draws. A player-side move whose shape is "everything
     // around me" has to actually be a disc, or the answer to "why did that
     // miss" is "you were at 4 o'clock".
+    // Deferred so it runs only on blows that have already passed every cheap
+    // gate — and so a `radial` move and a lane move ask the identical question.
+    const sighted = () => sightBetweenBodies(
+        solidAt, attacker.root.position, defender.root.position);
+
     if (move.radial) {
         const dyR = defender.root.position.y - attacker.root.position.y;
         if (Math.abs(dyR) > move.vertical + r) return false;
-        return Math.hypot(ox, oz) <= move.range + r;
+        return Math.hypot(ox, oz) <= move.range + r && sighted();
     }
 
     // Lateral (depth) gate. For ±X facing this is the classic dz check.
@@ -67,5 +80,5 @@ export function hitboxCheck(attacker, defender, move) {
     const dy = defender.root.position.y - attacker.root.position.y;
     if (Math.abs(dy) > move.vertical + r) return false;
 
-    return true;
+    return sighted();
 }

@@ -6,6 +6,7 @@ import { createActorAnimator } from './characters/actor-animator.js';
 import { bodyFor, childBody } from './characters/bodies.js';
 import { attachEnemyProp } from './assets/enemy-props.js';
 import { makeFacing } from '../combat/facing.js';
+import { sightHit } from '../combat/line-of-sight.js';
 import { ENEMY_PALETTES } from './assets/palettes.js';
 import { sfx } from '../audio/synth.js';
 import { gsfx } from './audio/sfx-bank.js';
@@ -1433,8 +1434,30 @@ export class Enemy {
     _updateProjectiles(dt, player) {
         this.projectiles = this.projectiles.filter((p) => {
             p.life -= dt;
+            const px = p.mesh.position.x, pz = p.mesh.position.z;
             p.mesh.position.x += p.vx * dt;
             p.mesh.position.z += p.vz * dt;
+
+            // A BOLT STOPS AT A WALL. It never did: nothing in combat held a
+            // reference to the world, so shots crossed the room shell and kept
+            // going, and no pillar or terrace in the game gave cover from one.
+            // Swept from the previous position rather than tested at the new
+            // one — at 9 units/s a 1-unit wall is crossed in 0.11s, so a
+            // point test misses it outright on a slow frame.
+            if (this.getVoxelAt) {
+                const hit = sightHit(this.getVoxelAt,
+                    { x: px, y: p.mesh.position.y, z: pz },
+                    { x: p.mesh.position.x, y: p.mesh.position.y, z: p.mesh.position.z },
+                    { margin: 0 });
+                if (hit) {
+                    p.mesh.position.set(hit.x, hit.y, hit.z);
+                    p.life = 0;
+                    if (p.mesh.parent) p.mesh.parent.remove(p.mesh);
+                    p.mesh.geometry.dispose();
+                    p.mesh.material.dispose();
+                    return false;
+                }
+            }
 
             if (p.reflected) {
                 // The bolt belongs to the player now. It no longer threatens

@@ -11,9 +11,10 @@ import { at as audioAt } from '../../audio/spatial.js';
  * @param {object} attacker { root: { position }, state: { facingVec } }
  * @param {object[]} defenders each { root: { position }, hitRadius?, state? }
  * @param {object} move { range, depthTolerance, vertical, omni? }
+ * @param {Function} [solidAt] world occupancy, so a blow needs a clear line
  * @returns {object[]} defenders that were hit
  */
-export function combatSweep(attacker, defenders, move) {
+export function combatSweep(attacker, defenders, move, solidAt) {
     if (!attacker || !defenders || !move) return [];
     const hits = [];
     for (const d of defenders) {
@@ -21,7 +22,7 @@ export function combatSweep(attacker, defenders, move) {
         // Dematerialize (Phantasm): skip entirely
         if (d.canHit === false) continue;
         // Shielded: still "hit" for feedback but applyHit will block damage
-        if (hitboxCheck(attacker, d, move)) hits.push(d);
+        if (hitboxCheck(attacker, d, move, solidAt)) hits.push(d);
     }
     return hits;
 }

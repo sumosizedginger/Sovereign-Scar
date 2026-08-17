@@ -313,7 +313,7 @@ export class Player {
             color: weapon.smearColor || 0x7fe0ff,
         });
 
-        const hits = combatSweep(this, enemies, weapon);
+        const hits = combatSweep(this, enemies, weapon, this.physics.getVoxelAt);
         for (const h of hits) applyHit(h, weapon, this);
 
         if (weapon.shatter && destructibles) {
@@ -502,7 +502,7 @@ export class Player {
         }
         juice.addTrauma(0.22);
 
-        const hits = combatSweep(this, enemies, charge);
+        const hits = combatSweep(this, enemies, charge, this.physics.getVoxelAt);
         for (const h of hits) {
             applyHit(h, charge, this);
             // The shockwave's job is the opening, not the kill.
@@ -599,7 +599,7 @@ export class Player {
             vertical: 1.4,
         };
         const landed = [];
-        for (const e of combatSweep(this, enemies, move)) {
+        for (const e of combatSweep(this, enemies, move, this.physics.getVoxelAt)) {
             if (this._dashAttackHit.has(e)) continue;
             this._dashAttackHit.add(e);
             applyHit(e, move, this);

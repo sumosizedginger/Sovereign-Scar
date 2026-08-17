@@ -151,12 +151,29 @@ export async function run(t) {
                     // invented ones: `tests/game/boss-facing.spec.mjs`, the
                     // block headed THE RADII COME FROM THE BOSS. Do not read
                     // this file as covering it.
+                    // AND PUT IT BACK WHERE IT STARTED, which is the same idea
+                    // as the rest of this block and was missing.
+                    //
+                    // The search below lands ~112 blows on a boss whose AI is
+                    // switched off, and every one of them applies knockback. It
+                    // therefore walks the boss across the arena and pins it
+                    // against its own clamp, so late directions are measured
+                    // against a boss standing somewhere the fight would never
+                    // put it — with its back to a wall.
+                    //
+                    // That was invisible while nothing in combat could see a
+                    // wall. It is not any more: from a cornered boss the only
+                    // remaining stances on the wall side are INSIDE the wall,
+                    // the sight line correctly refuses them, and the probe reads
+                    // the room instead of the body it is here to measure.
+                    const homeX = bp.x, homeZ = bp.z;
                     const open = () => {
                         tgt.hp = 99999;
                         if (tgt.state) tgt.state.current = 'IDLE';
                         boss.phase = 9; boss.action = null; boss._openT = 999;
                         tgt.shielded = false; tgt.canHit = true;
                         if (tgt !== boss) { boss.shielded = false; boss.canHit = true; }
+                        bp.x = homeX; bp.z = homeZ;
                     };
                     const lands = (dir, d) => {
                         open();
@@ -168,28 +185,73 @@ export async function run(t) {
                         return tgt.hp < before;
                     };
 
+                    // ONLY WHERE A PLAYER CAN ACTUALLY STAND.
+                    //
+                    // The search teleports the player to a point and asks
+                    // whether a swing from there connects. Some of those points
+                    // are inside walls, and it used to matter to nobody: no
+                    // attack in the game could see a wall, so a blow thrown from
+                    // inside one landed exactly like any other. Now that combat
+                    // has line of sight, a stance inside solid matter correctly
+                    // hits nothing — and folding that into the band would report
+                    // a BODY defect ("nowhere to stand outside it") for a ROOM
+                    // fact ("this side of the arena is a wall").
+                    //
+                    // So a direction whose stances are walled is EXCLUDED and
+                    // named, rather than scored. What is measured is the same
+                    // question this file always asked, over the ground a player
+                    // can occupy.
+                    // AT THE HEIGHT THE SIGHT LINE IS DRAWN AT, which is not the
+                    // 1.95 this probe teleports the player to. Not every room's
+                    // floor tops out at y=1: Beat 04's is two cells thick and
+                    // its surface is y=2, so a stance test at 1.95 there reports
+                    // solid on every square of the arena — the FLOOR, read as a
+                    // wall. Measured off the boss, which is standing on the same
+                    // ground the player would be.
+                    const solidAt = lvl.getVoxelAt || (() => false);
+                    const standY = Math.max(1.95, bp.y);
+                    const standable = (dir, d) =>
+                        !solidAt(bp.x + dir.x * d, standY, bp.z + dir.z * d);
+
                     let worst = Infinity, worstAt = null, edgeAtWorst = 0, hitAtWorst = 0;
+                    const walled = [];
                     for (let k = 0; k < 8; k++) {
                         const a = k * Math.PI / 4;
+                        const deg = Math.round(a * 180 / Math.PI);
                         const dir = { x: Math.sin(a), z: Math.cos(a) };
                         const edge = edgeAlong(tgt.root, dir);
-                        // Binary search the outer edge of the hittable interval.
-                        let lo = 0.15, hi = 9.0;
+                        // Binary search the outer edge of the hittable interval,
+                        // capped at the last stance that is not inside a wall.
+                        let reach = 9.0;
+                        for (let d = 0.5; d <= 9.0; d += 0.25) {
+                            if (!standable(dir, d)) { reach = d - 0.25; break; }
+                        }
+                        if (reach <= edge) { walled.push(`${deg}°`); continue; }
+                        let lo = 0.15, hi = reach;
                         if (!lands(dir, lo)) { lo = 0; hi = 0; }
                         for (let it = 0; it < 14 && hi > lo; it++) {
                             const mid = (lo + hi) / 2;
                             if (lands(dir, mid)) lo = mid; else hi = mid;
                         }
+                        // The search was capped at the last standable metre, so
+                        // a result sitting ON that cap was decided by the ROOM
+                        // and not by the weapon — the player ran out of floor
+                        // before running out of reach. Scoring it would report
+                        // "this boss is hard to reach" for "this wall is close",
+                        // which is the confusion this whole exclusion exists to
+                        // avoid. Excluded and named, like a walled direction.
+                        if (lo >= reach - 0.3) { walled.push(`${deg}°`); continue; }
                         const band = lo - edge;
                         if (band < worst) {
-                            worst = band; worstAt = Math.round(a * 180 / Math.PI);
+                            worst = band; worstAt = deg;
                             edgeAtWorst = edge; hitAtWorst = lo;
                         }
                     }
                     out.push({
                         beat, boss: boss.constructor.name,
-                        band: +worst.toFixed(2), at: worstAt,
+                        band: worst === Infinity ? null : +worst.toFixed(2), at: worstAt,
                         edge: +edgeAtWorst.toFixed(2), maxHit: +hitAtWorst.toFixed(2),
+                        walled, measured: 8 - walled.length,
                     });
                 } catch (e) {
                     out.push({ beat, err: String(e).slice(0, 160) });
@@ -205,6 +267,28 @@ export async function run(t) {
                 t.ok(`${r.beat} exempt from the floor-level reach probe`, true, EXEMPT[r.beat]);
                 continue;
             }
+            // A boss measured from one or two directions is not measured. The
+            // exclusion above is the honest way to keep the room out of a body
+            // gate, and it is also the obvious way to turn this file green by
+            // accident — so the count is asserted, loudly, next to the band.
+            // The number is 2 because 2 is what the campaign supports, and the
+            // measured spread is worth writing down rather than rounding off:
+            // eight bosses score all eight directions, four score seven or
+            // five, the Proxy scores three and the Magma Wyrm two. Those last
+            // two spawn with arena wall or room dressing inside a weapon's
+            // reach on most sides — a placement fact, and a real one, but not
+            // a statement about the body this gate grades.
+            //
+            // What this assertion is actually for: the exclusion above is the
+            // obvious way to turn this file green by accident, and an excluded
+            // direction is silent. Demanding that some directions survive, and
+            // printing the count next to the band every run, is what keeps
+            // "measured nothing" from reading like "measured fine".
+            t.ok(`${r.beat} has open ground to measure from`,
+                r.measured >= 2,
+                `${r.measured} of 8 directions scored; room-limited at ` +
+                `${r.walled.length ? r.walled.join(', ') : 'none'}`);
+            if (r.band == null) continue;
             measured.push(r.band);
             t.ok(`${r.beat} can be hit from outside its own body`,
                 r.band >= MIN_BAND,

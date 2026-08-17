@@ -1,6 +1,7 @@
 // Multi-phase boss framework — telegraphs, contact damage, phases, HP API.
 
 import * as THREE from 'three';
+import { sightBetweenBodies } from '../../combat/line-of-sight.js';
 import { sfx } from '../../audio/synth.js';
 import { at as audioAt, silenced } from '../../audio/spatial.js';
 import { scoreStinger } from '../audio/score.js';
@@ -253,6 +254,11 @@ export class BossBase {
         // wall put the body inside masonry, and nothing stopped a walk out the
         // open doorway. Enemies already had resolveMove; bosses did not.
         this.collisionWorld = opts.collisionWorld || null;
+        // World occupancy for LINE OF SIGHT — a different question from the
+        // collision world above, which is a flat list of XZ boxes with no
+        // height. Wired by `attachBoss` from the level; null in every headless
+        // spec, where the sight tests then fail open. See combat/line-of-sight.
+        this.solidAt = opts.solidAt || null;
         // Half-extent of the legal arena around `home`. Default sits inside a
         // typical room half (8–12) so a doorway gap never becomes an exit.
         this.arenaRadius = opts.arenaRadius != null ? opts.arenaRadius : 7.5;
@@ -1032,6 +1038,25 @@ export class BossBase {
         this._telegraphMax = life;
     }
 
+    /**
+     * Is there a clear line from an attack's ORIGIN to the player?
+     *
+     * The origin, not the boss. A floor slam telegraphed six units away is
+     * occluded by what stands between the player and the marked ground, and a
+     * breath cone is occluded by what stands in front of the mouth — asking
+     * from the body would answer a different question for every move that
+     * lands away from it.
+     *
+     * Height: the shape tests are all flat XZ, so a blast has no y of its own.
+     * The line is drawn at the PLAYER's height in that case, which is where a
+     * wall would have to be to matter.
+     */
+    _sighted(player, x, z, y) {
+        if (!this.solidAt || !player) return true;
+        const p = player.root.position;
+        return sightBetweenBodies(this.solidAt, { x, y: y != null ? y : p.y, z }, p);
+    }
+
     /** Cone hit test in the XZ plane — matches the 'cone' telegraph. */
     inCone(player, origin, dir, radius, halfAngle = Math.PI / 4) {
         if (!player) return false;
@@ -1041,7 +1066,8 @@ export class BossBase {
         if (d > radius) return false;
         const len = Math.hypot(dir.x, dir.z) || 1;
         const dot = (dx * dir.x + dz * dir.z) / (d || 1) / len;
-        return dot >= Math.cos(halfAngle);
+        if (dot < Math.cos(halfAngle)) return false;
+        return this._sighted(player, origin.x, origin.z, origin.y);
     }
 
     /**
@@ -1053,7 +1079,8 @@ export class BossBase {
     inRing(player, x, z, inner, outer) {
         if (!player) return false;
         const d = Math.hypot(player.root.position.x - x, player.root.position.z - z);
-        return d >= inner && d <= outer;
+        if (d < inner || d > outer) return false;
+        return this._sighted(player, x, z);
     }
 
     /**
@@ -1194,10 +1221,12 @@ export class BossBase {
     /** Radial hit test in the XZ plane — matches the 'circle' telegraph. */
     inBlast(player, x, z, radius) {
         if (!player) return false;
-        return Math.hypot(
+        const d = Math.hypot(
             player.root.position.x - x,
             player.root.position.z - z
-        ) < radius;
+        );
+        if (d >= radius) return false;
+        return this._sighted(player, x, z);
     }
 
     /**
@@ -1363,6 +1392,7 @@ export function attachBoss(level, boss, opts = {}) {
         if (!boss.collisionWorld) {
             boss.collisionWorld = level.collisionWorld || opts.collisionWorld || null;
         }
+        if (!boss.solidAt) boss.solidAt = level.getVoxelAt || null;
         if (opts.arenaRadius != null) boss.arenaRadius = opts.arenaRadius;
         else if (level.halfSize != null) {
             // Level room size always wins over the constructor default so a
@@ -1388,6 +1418,7 @@ export function attachBoss(level, boss, opts = {}) {
             if (!c.collisionWorld) {
                 c.collisionWorld = level.collisionWorld || opts.collisionWorld || null;
             }
+            if (!c.solidAt) c.solidAt = level.getVoxelAt || null;
             if (c.arenaRadius == null && level.halfSize != null) {
                 c.arenaRadius = Math.max(3, level.halfSize - 1.25);
             }
