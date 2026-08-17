@@ -9,6 +9,14 @@ import { ABYSS_COLORS, CRUST_COLORS } from '../assets/palettes.js';
 import {
     voxBlade, voxBlob, voxBox, voxRing, voxSphere, voxSpike, LIMB_VOX_PER_UNIT,
 } from './boss-models.js';
+// The Phantasm is built from the HERO'S OWN RIG, not from an imitation of it.
+// `HERO_RIG` is imported rather than its numbers copied for the usual reason:
+// a duplicated proportion drifts the first time anyone touches the player, and
+// this boss's entire premise is that it is the same shape you are.
+// (`player.js` does not import the boss roster, so there is no cycle.)
+import { createActorRig } from '../characters/actor-rig.js';
+import { HERO_RIG } from '../player.js';
+import { HERO_PALETTE } from '../assets/palettes.js';
 
 // The Warden's phase-2 ring, in world units. Exported because the spec has to
 // assert the geometry rather than restate it, and because the two numbers only
@@ -1899,58 +1907,87 @@ export class SkeletalMantis extends BossBase {
 // ─── Beat 09 — Phantasm (full class) ────────────────────────────────────────
 export class PhantasmBoss extends BossBase {
     constructor(scene, position = { x: 0, z: -4 }) {
-        // YOU, HOLLOWED OUT.
+        // YOU, HOLLOWED OUT — AND IT IS LITERALLY YOUR RIG.
         //
         // This boss mirrors your movement, inverts your facing, and its own
-        // line is "I wear your facing. I wear your fear." All of which was
-        // delivered by a floating violet ball. The identity was already written
-        // and the model said none of it.
+        // line is "I wear your facing. I wear your fear." That was delivered by
+        // a floating violet ball, and then by a hand-built humanoid that the
+        // owner correctly called "not the player model" — because it was an
+        // imitation of the hero's proportions rather than the hero's.
         //
-        // So it is a PERSON: the hero's proportions — head, shoulders, two
-        // arms, two legs — with nothing in them. Featureless, near-black, and
-        // lit only by a single seam where a face should be. The horror is not
-        // a monster; it is recognising your own outline coming at you, which
-        // is a thing the player already knows how to read because they have
-        // been looking at that shape for fourteen dungeons.
-        const VOID = 0x33244d;
-        // The hero reads at this camera because of COLOUR STRUCTURE — a pale
-        // head over a red torso — not because a humanoid silhouette survives
-        // being seen from 70 degrees up. It does not; the Warden proved that.
-        // So the thing that wears your facing wears your PALETTE, drained of
-        // its blood: the same pale crown, the same block of colour at the
-        // chest, both pulled toward the violet it is made of.
-        const PALE = 0x9c8fb8;
-        const DRAINED = 0x53284e;
-        const SEAM = ABYSS_COLORS.violetHot;
-        const ghost = { transparent: true, opacity: 0.9 };
+        // So it is built by `createActorRig(HERO_RIG)`: the same call
+        // `player.js` makes, the same profile scales, the same geometry. Only
+        // the palette differs. If the hero is ever re-proportioned, this
+        // follows, because there is nothing here to drift out of step.
+        //
+        // GHOST, NOT CORPSE. Everything above the waist is the hero drained —
+        // his skin washed to grave-lilac, his hair and belt dimmed into it, his
+        // cyan eye-glow pushed to the Abyss violet. Below the waist he has no
+        // legs at all: the rig's are hidden and the body tails off into a wisp
+        // that narrows and fades. A figure with legs is a person; a figure that
+        // ends in vapour is a haunting, and this thing hovers already.
+        const GHOST_PALETTE = {
+            ...HERO_PALETTE,
+            skin: 0xa99dc4, skinDark: 0x7b6f9c, skinD2: 0x564b78,
+            hair: 0x4a3d68, hairDark: 0x2b2340, hairLight: 0x6a5a8a,
+            beard: 0x4a3d68, beardDark: 0x2b2340,
+            belt: 0x4a3d68, beltDark: 0x2b2340,
+            freck: 0xb0a4c8, brow: 0x4a3d68,
+            eyeWhite: 0xe8e2f4, pupil: 0x1a1226,
+            eyeGlow: ABYSS_COLORS.violetHot,
+            // `shirt` is NOT in HERO_PALETTE — `builders.js` falls back to a
+            // hard-coded 0xb03030 when a palette omits it, which is where the
+            // hero's red comes from. Spreading HERO_PALETTE therefore inherited
+            // the red and the first ghost turned up in the player's actual
+            // shirt. Named here so the drain reaches the one garment the hero
+            // is most recognised by.
+            shirt: 0x4f4270, shirtDark: 0x342b4c,
+        };
+        const rig = createActorRig({ ...HERO_RIG, palette: GHOST_PALETTE });
         const mesh = new THREE.Group();
+        mesh.add(rig.root);
+        // A boss has to be the subject of its own room, and the hero at his own
+        // scale reads as furniture next to one. Measured, not guessed: the
+        // presence gate wants a body radius over 0.8 and the raw rig lands
+        // under it even after this boss's 1.60 presence multiplier.
+        rig.root.scale.setScalar(1.9);
+        rig.root.position.y = 0.55;
 
-        const head = voxBlob(0.31, 0.35, 0.28, PALE, SEAM, 0.14, ghost);
-        head.position.y = 1.06;
-        // The seam. Vertical, on the front of a blank head — a crack in
-        // something wearing a face rather than a face.
-        const seam = voxBox(0.11, 0.46, 0.10, SEAM, SEAM, 0.5,
-            { ...ghost }, LIMB_VOX_PER_UNIT);
-        seam.position.set(0, 1.08, 0.27);
+        // No legs. The rig still builds them — hiding is cheaper and safer than
+        // teaching the shared rig an optionally-legless mode that only one
+        // thing in the game would ever ask for.
+        if (rig.legL) rig.legL.visible = false;
+        if (rig.legR) rig.legR.visible = false;
 
-        const torso = voxBlob(0.46, 0.56, 0.25, DRAINED, SEAM, 0.12, ghost);
-        torso.position.y = 0.34;
-        const pelvis = voxBox(0.36, 0.22, 0.22, VOID, SEAM, 0.10, ghost);
-        pelvis.position.y = -0.06;
+        // EVERY RIG MATERIAL MUST BE TRANSPARENT, and this is not cosmetic.
+        // `tickAI` fades this boss to 0.12 opacity while it is incorporeal —
+        // the tell for "your sword will pass through me". A `MeshStandardMaterial`
+        // ignores `opacity` entirely unless `transparent` is set, so the rig
+        // arrived fully solid and the phase-out would have gone silent: the
+        // boss would still have been unhittable, with nothing on screen saying
+        // so. Cloned first, because these materials come from the shared part
+        // builders and the player is wearing them.
+        rig.root.traverse((o) => {
+            if (!o.isMesh || !o.material) return;
+            o.material = o.material.clone();
+            o.material.transparent = true;
+            o.material.depthWrite = false;
+        });
 
-        const armL = voxBox(0.14, 0.94, 0.16, VOID, SEAM, 0.10, ghost);
-        armL.position.set(-0.66, 0.28, 0);
-        armL.rotation.z = 0.10;
-        const armR = voxBox(0.14, 0.94, 0.16, VOID, SEAM, 0.10, ghost);
-        armR.position.set(0.66, 0.28, 0);
-        armR.rotation.z = -0.10;
-
-        const legL = voxBox(0.17, 0.86, 0.19, VOID, SEAM, 0.10, ghost);
-        legL.position.set(-0.17, -0.62, 0);
-        const legR = voxBox(0.17, 0.86, 0.19, VOID, SEAM, 0.10, ghost);
-        legR.position.set(0.17, -0.62, 0);
-
-        mesh.add(head, seam, torso, pelvis, armL, armR, legL, legR);
+        // The wisp is anchored to the body that is actually there, measured
+        // after the legs are hidden rather than guessed from the rig's numbers.
+        const rb = new THREE.Box3().setFromObject(rig.root);
+        const hemY = isFinite(rb.min.y) ? rb.min.y : -0.4;
+        const wisp = [];
+        for (let i = 0; i < 5; i++) {
+            const t = i / 4;
+            const w = voxBlob(0.60 - t * 0.42, 0.34 - t * 0.18, 0.50 - t * 0.34,
+                0x6f6291, ABYSS_COLORS.violetHot, 0.14 + t * 0.16,
+                { transparent: true, opacity: 0.55 - t * 0.38, depthWrite: false });
+            w.position.set(0, hemY + 0.16 - i * 0.44, 0.02 + i * 0.06);
+            mesh.add(w);
+            wisp.push(w);
+        }
 
         super(scene, {
             id: 'phantasm', name: 'Phantasm', hp: 12,
