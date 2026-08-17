@@ -24,8 +24,10 @@ import fs from 'node:fs';
 import {
     CryptWarden, TriCompiler, ProxyBoss, ObsidianArachnid, HydroidCloud,
     SkeletalMantis, PhantasmBoss, FrostAndFuel, SludgeGolem, MagmaWyrm,
-    GumoiWitness, LeviathanBoss,
+    GumoiWitness, LeviathanBoss, WITNESS_HEADS, WITNESS_DRAFTS,
 } from '../../src/game/bosses/roster.js';
+import { HERO_PALETTE } from '../../src/game/assets/palettes.js';
+import { KITS } from '../../src/game/levels/dungeon-kits.js';
 import { SandSpur } from '../../src/game/bosses/sand-spur.js';
 import { KineticCore } from '../../src/game/bosses/kinetic-core.js';
 import { BOSS_EMISSIVE_MAX, clampEmissive } from '../../src/game/bosses/base.js';
@@ -418,4 +420,113 @@ export function run(t) {
             `${legParts.length} leg parts, thickest ${thickest.toFixed(3)} `
             + '(0.5 means it fell back to the body resolution)');
     }
+
+    runWitness(t);
+}
+
+/**
+ * The GUMOI Witness — the seven-headed rebuild.
+ *
+ * Split out because it asserts three things the roster-wide loop above cannot:
+ * that the faces are the HERO'S, that the body is not the colour of its own
+ * room, and that the thing opens when it descends. The last is the one with
+ * teeth — it is the only tell the fight's single vulnerable window has, it
+ * lives entirely in `tickAI`, and nothing else in the suite drives a boss far
+ * enough to notice it going silent.
+ */
+export function runWitness(t) {
+    const boss = new GumoiWitness(new THREE.Scene(), { x: 0, y: 9.5, z: 0 });
+
+    t.ok('the Witness is seven heads', boss.heads?.length === WITNESS_HEADS,
+        `${boss.heads?.length} heads, WITNESS_HEADS=${WITNESS_HEADS}`);
+
+    // The clean draft is the hero, not a colour that resembles him. If anyone
+    // re-tints the player, the best-remembered face has to follow — that is the
+    // whole premise of the boss, and a hand-copied hex would silently stop
+    // being true.
+    t.ok('…and the best-remembered face is the hero\'s own skin',
+        WITNESS_DRAFTS[0].skin === HERO_PALETTE.skin,
+        `draft #{0} #${WITNESS_DRAFTS[0].skin.toString(16)} `
+        + `vs hero #${HERO_PALETTE.skin.toString(16)}`);
+
+    // ── Not the colour of its own room ─────────────────────────────────────
+    // The body this replaced was `ABYSS_COLORS.neon` — 0xff40c8 — and the kit
+    // for `beat-13-gumoi` sets `accent: 0xff40c8`. The second-to-last boss in
+    // the game was painted the exact colour of its own arena, and every gate in
+    // this file passed it. Distance in linear RGB, same 0.22 threshold
+    // `hero-readability.spec.mjs` uses for the reserved rim.
+    //
+    // READ OFF THE VERTICES, NOT THE MATERIAL, and that is not a detail. The
+    // first version of this check walked `material.color` — and every boss
+    // material here is built `vertexColors: true` with no `color` set, so it
+    // read pure white fourteen times and passed. Painting the core the room's
+    // exact magenta on purpose did not fail it. A gate that cannot fail is
+    // worse than no gate, because it reports safety.
+    //
+    // `buildVoxelGeo` bakes colour through `THREE.Color.setHex`, which converts
+    // sRGB to the linear working space on the way in — that is why a "dark
+    // brown" arrives as (6,4,2) of 255. The accent therefore needs NO explicit
+    // conversion: `new THREE.Color(hex)` has already done it, and calling
+    // `convertSRGBToLinear()` on top converted it twice, landing the room's own
+    // magenta 0.27 away from itself and letting the counterfactual through a
+    // second time.
+    const accent = new THREE.Color(KITS['beat-13-gumoi'].accent);
+    const clashes = [];
+    const seen = new Set();
+    boss.root.traverse((o) => {
+        const attr = o.isMesh && o.geometry?.getAttribute?.('color');
+        if (!attr) return;
+        for (let i = 0; i < attr.count; i++) {
+            const r = attr.getX(i), g = attr.getY(i), b = attr.getZ(i);
+            const key = `${(r * 64) | 0},${(g * 64) | 0},${(b * 64) | 0}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const d = Math.hypot(r - accent.r, g - accent.g, b - accent.b);
+            if (d < 0.22) {
+                clashes.push(`rgb(${r.toFixed(2)},${g.toFixed(2)},${b.toFixed(2)}) `
+                    + `d=${d.toFixed(2)}`);
+            }
+        }
+    });
+    t.ok('…and none of it is painted the colour of its own room',
+        clashes.length === 0, clashes.slice(0, 4).join(', ') || 'none');
+
+    // ── It opens when it comes down ────────────────────────────────────────
+    // Driven through the real condition. `busy` is a getter over `action`, so
+    // this pins `action` — assigning `busy` fails silently and would leave this
+    // assertion measuring a boss that never opened. (That exact mistake cost a
+    // wasted portrait pass; see `tests/qa/boss-portraits.mjs`.)
+    const player = {
+        root: { position: { x: 0, y: 1.95, z: 4 } },
+        health: { hp: 6, maxHp: 6, dead: false, damage: () => ({ accepted: true }) },
+        state: { facingVec: { x: 0, z: -1 } },
+    };
+    const spread = () => {
+        let far = 0;
+        for (const h of boss.heads) far = Math.max(far, h.position.length());
+        return far;
+    };
+    for (let i = 0; i < 60; i++) boss.tickAI(1 / 60, player, null);
+    const shut = spread();
+    for (let i = 0; i < 60; i++) {
+        if (!boss.action) boss.action = { name: 'probe-open' };
+        boss.tickAI(1 / 60, player, null);
+    }
+    const open = spread();
+    t.ok('…and it visibly opens when it descends to cast',
+        open > shut * 1.2,
+        `shut ${shut.toFixed(2)} -> open ${open.toFixed(2)} `
+        + `(+${(((open / shut) - 1) * 100).toFixed(0)}%)`);
+
+    // The light is part of the same tell, and it is a separate failure: the
+    // heads could travel while the core stayed dark, which reads as the body
+    // wobbling rather than unclenching.
+    t.ok('…and the core lights through the gap it just made',
+        boss.core.material.emissiveIntensity > 0.2,
+        `emissiveIntensity ${boss.core.material.emissiveIntensity.toFixed(3)}`);
+
+    boss.action = null;
+    for (let i = 0; i < 90; i++) boss.tickAI(1 / 60, player, null);
+    t.ok('…and it shuts again afterwards', spread() < shut * 1.1,
+        `reclosed to ${spread().toFixed(2)} against a shut ${shut.toFixed(2)}`);
 }

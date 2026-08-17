@@ -1,8 +1,8 @@
 # The boss pass — what is left, and exactly how to do it
 
-Six of fourteen are rebuilt and owner-approved: Crypt Warden, Obsidian
-Arachnid, Magma Wyrm, Leviathan Core, Phantasm, Sludge Golem. The Skeletal
-Mantis needs nothing and never did. **Seven remain.**
+Seven of fourteen are rebuilt and owner-approved: Crypt Warden, Obsidian
+Arachnid, Magma Wyrm, Leviathan Core, Phantasm, Sludge Golem, GUMOI Witness.
+The Skeletal Mantis needs nothing and never did. **Six remain.**
 
 This document is the method that survived those six, the traps each one cost,
 and a per-boss plan with the numbers already measured. It exists because the
@@ -70,9 +70,11 @@ bare slab with a head on it. **Every limb must break the silhouette of whatever
 is above it.**
 
 **5. Same hue as the room = invisible.** The Wyrm was orange on the magma floor;
-the Golem was `ABYSS_COLORS.sludge` in the sludge room; the Witness is magenta
-in a magenta room *right now*. Check the kit in `levels/dungeon-kits.js` before
-picking a palette, and go dark against it with the accent in the seams.
+the Golem was `ABYSS_COLORS.sludge` in the sludge room; the Witness was
+`0xff40c8` in a room whose accent is `0xff40c8`. Check the kit in
+`levels/dungeon-kits.js` before picking a palette, and go dark against it with
+the accent in the seams. Now gated for beat 13 by `runWitness` in
+`boss-bodies.spec.mjs`; the other thirteen are still on trust.
 
 **6. Span is a fight number, not an art number.** `boss-reach-e2e` measures
 whether there is anywhere to stand that is outside the body and still in range.
@@ -85,39 +87,123 @@ so bodies built wide across X presented their narrow side. It now re-parks the
 player every frame over 150 ticks. *If a boss looks inexplicably wrong, suspect
 the instrument before the model — that has been the answer more often than not.*
 
+**8. Same IDEA as the room is invisible too.** Trap 5 one level up, and it cost
+a whole discarded design. The first Witness rebuild was glyph plates with a scan
+bar; the kit for that room is already `index_rails`, `glyph_stacks`,
+`scan_lines` and an `index_scan` atmosphere. *Read the kit's `structural` and
+`dressing` lists before designing the boss, not just before picking its colours
+— whatever is in them is what the boss must not be made of.*
+
+**9. A body with a front needs an axis to keep it.** The Witness rolled on X and
+Y at once, which is fine for a featureless disc and fatal for anything with a
+face: with an X roll no direction stays "up", so nothing can be aimed and half
+of it always looks at the floor. Spend the second axis on aiming and keep one
+slow turn.
+
+**10. `bodyRadius` is a p85 over VERTICES, on a body warmed for 2s.** Two traps
+in one. Mass distribution decides it, not size: a ring of parts puts every
+vertex at the rim and fails at the same overall width a solid body passes at,
+and adding mass at the centre does nothing unless it also outvotes the existing
+vertices. And because `boss-bodies.spec` runs 40 `update` steps first, a boss
+that changes shape when it attacks is graded in its ATTACKING pose — which is
+right, but it is not what `boss-silhouette.mjs` reports. *Tune against the spec.*
+
+**11. A gate that reads `material.color` on a voxel mesh reads white.** Every
+`boss-models` builder is `vertexColors: true` with no `color` set, so colour
+lives in the geometry's `color` attribute. The first room-clash check walked
+materials, found white fourteen times, and passed a boss painted the room's
+exact magenta on purpose. `THREE.Color(hex)` already converts sRGB to linear —
+converting again moved the accent 0.27 away from itself and let the same
+counterfactual through a second time. *Break every new gate before trusting it.*
+
 ---
 
-## 3. The seven, in the order to do them
+## 3. The rest, in the order to do them
 
 Sizes are from the roster shoot; bands are from `boss-reach-e2e` (floor 0.6).
 
-### 13 — GUMOI Witness · **do this first**
+### 13 — GUMOI Witness · **DONE** (2026-08-16)
 
-*Now:* a plain bright-magenta ball, 5.63 wide, 24% of frame. **The room's accent
-is `0xff40c8` — the same magenta.** The second-to-last boss in the game is
-painted the colour of its own arena.
+*Was:* a plain bright-magenta ball, 5.63 wide, 24% of frame — and the room's
+accent is `0xff40c8`, **the same magenta**. The second-to-last boss in the game
+was painted the colour of its own arena, and every gate in `boss-bodies.spec`
+passed it.
 
 *Does:* `index-sweep` (a scanning lane), `cite-slam` / `cite-cone` /
-`cite-breath` — it performs telegraphs **borrowed from earlier bosses** — and
-`bolt`. Its own comment calls it *The Eye That Renders*. It hovers ~7 units up,
-which is why it is exempt in `boss-reach-e2e` (a floor-level probe cannot reach
-it); `boss-quality-e2e` covers it instead.
+`cite-breath` — it performs telegraphs **borrowed from earlier bosses**, quoted
+from those bosses' own exported constants — and `bolt`. It hovers ~9 units up
+and drops to head height only to cast, which is why it is exempt in
+`boss-reach-e2e`; `boss-quality-e2e` covers it instead.
 
-*Build:* **an index, not an eye** — the Leviathan is already the eye and two in
-a row would read as one boss twice. A suspended **card catalogue mid-explosion**:
-a dense dark core with flat glyph-plates hanging around it at different radii and
-angles, held in place by nothing. A hard bright **scan bar** across the plates is
-the `index-sweep` drawn on the body. When it cites, plates turn edge-on and
-flare — the quotation made visible.
+*Built:* **seven heads fused into one clenched mass, every one of them a draft
+of the player's face at a different stage of being forgotten.** Not invented —
+assembled out of three things the source already said:
 
-*Palette:* near-black indigo plates, edges lit in the room's magenta so it reads
-*against* the arena rather than into it. Cold white for the scan bar.
+- the overworld line for this beat is *"Seven voices aggregate"*
+  (`narrative/thread-data.js`);
+- GUMOI is the thing that has rebuilt the player after every death in the
+  campaign, out of a memory that degrades — `reconstitution-copy.js` runs from
+  *"Again. I still remember enough of you"* to *"One clean memory remains"*;
+- the kit for `beat-13-gumoi` builds the room itself out of `displaced_copies`.
 
-*Constraints:* it hovers, so the plate spread is cheap — no floor-level reach
-band to protect. Keep the core small; the plates carry the silhouette. Watch the
-bloom cap (0.55) since this one wants a lot of edge light.
+`WITNESS_DRAFTS` is that reconstitution ladder turned into four palettes: the
+hero's own skin, then the warmth leaving it, then the eyes going out, then a
+face most of the way back into the core that was trying to build it. Three more
+heads never got a face at all. The remembered ones are built by
+`createActorRig(HERO_RIG)` — the hero's actual head, same as the Phantasm, so a
+re-proportioned player carries through instead of drifting.
 
-*Risk:* low. No reach gate, no directional armour. **Effort: one sitting.**
+**It opens when it comes down.** The fight's only vulnerable window is the
+descent, and that was legible *only as altitude*, which at a 70.7° pitch is
+close to unreadable. The heads now splay and the core lights whenever `busy` is
+true — one condition driving the descent and the tell, so they cannot drift
+apart. Deliberately **not** wired to `BossBase.weakOpen`: that pays a real 2x
+and would roughly halve the fight, since the descent is the only window there
+is. It says *"your sword works now"*, which is already true. Wiring it is one
+line and is the owner's call.
+
+*Measured:* **5.50 wide shut (23% of frame), 6.89 open (29%)** — the heads
+travel +42%, which is unmistakable at gameplay size. Hitbox ratio **0.79**
+against a 0.75 floor.
+
+⚠ **That margin is thin, and the gate is subtler than it looks.**
+`boss-bodies.spec` warms every boss for 2s of `update` before measuring, so for
+this body it grades the **open** pose, not the resting one — correct (a swing at
+an extended head should connect) but easy to misread. The QA probe measures the
+resting body and reports 2.45 where the spec reports 2.63; tuning against the
+probe over-clenched this boss by two passes. **Re-run the spec, not the probe,
+after any change to `r0` or the open factor.**
+
+*What it cost — four traps, three of them new:*
+
+1. **The first idea was worse and had to be thrown out.** It was an exploded
+   card catalogue: glyph plates on a dark core with a scan bar. The kit for this
+   room is *already* `index_rails`, `glyph_stacks`, `scan_lines` and an
+   `index_scan` atmosphere — the boss would have been built out of its own
+   wallpaper. **This is trap 5 one level up: same IDEA as the room is invisible
+   too, not just the same hue.** Read the kit before designing, not just before
+   picking colours.
+2. **Trap 1 caught me with the warning about trap 1 in the comment above it.**
+   A `0x241b3a` core under 0.30 of violet emissive photographed as a flat
+   lavender ball — albedo lands near 0.02 in linear light and the emissive near
+   0.16, eight times stronger.
+3. **A two-axis tumble and a face cannot coexist.** With an X roll there is no
+   direction that stays "up", so heads cannot be aimed and half of them always
+   look at the floor; the first shoot came back as a cluster of dark blue
+   craniums. The X rate was spent on aiming the faces up 45° instead, leaving a
+   slow survey turn. **A body with a front needs an axis to keep it.**
+4. **`bodyRadius` is a p85 over vertices, so mass distribution decides it, not
+   size.** A ring of heads put every vertex out at the rim: ratio 0.67 against a
+   0.75 floor at the *same overall width* the old ball passed at. Growing the
+   core did nothing — the four rig heads carry most of the vertices. The heads
+   had to come in, which the design wanted anyway (shut is a knot; the span
+   belongs to the open).
+
+*Guarded by:* `runWitness` in `boss-bodies.spec.mjs` — seven heads, the clean
+draft is `HERO_PALETTE.skin` itself, **no material within 0.22 linear of the
+room's accent** (the gate the old body should have failed), and the open drives
+`tickAI` for real and asserts the heads travel >20%, the core lights, and it
+shuts again.
 
 ### 10 — Frost & Fuel
 
@@ -212,8 +298,8 @@ valuable one and should not be allowed to crowd out the rest:
 
 | item | state |
 |---|---|
-| Distribution live (Pages + a release) | **blocked on a push** — the only item nothing else can substitute for |
-| Boss silhouettes | 6 of 14 done; 7 planned here; 1 exempt |
+| Distribution live (Pages + a release) | **pushed, still dark** — `v0.4.0` is on the remote and `enablement: true` is in `pages.yml`, but `sumosizedginger.github.io/Sovereign-Scar/` still 404s (checked 2026-08-16). Next check is the Actions log for `pages.yml`; if it is still refusing, the fallback is one click in Settings → Pages → Source: GitHub Actions |
+| Boss silhouettes | **7 of 14 done**; 6 planned here; 1 needs nothing |
 | Occlusion | not started — agreed to land BEFORE the combo work |
 | Combo system | not started, riskiest item in v1 |
 | 80% room variation (wall/ceiling height) | not started |
@@ -222,11 +308,11 @@ valuable one and should not be allowed to crowd out the rest:
 | Doc truth pass + licence line | camera correction done; licence line outstanding |
 | Tester round folded back in | waiting on distribution |
 
-**Seven sittings of boss work is a lot of runway.** If the choice is between
+**Six sittings of boss work is a lot of runway.** If the choice is between
 finishing the roster and getting the game in front of testers, testers win —
-five of the six rebuilt bosses have never been seen by anyone in an actual
+six of the seven rebuilt bosses have never been seen by anyone in an actual
 fight, and this project's entire history says the fight is where the real
 defects are.
 
-*Suggested interleave:* the Witness (worst offender, one sitting) → push and
-tester round → occlusion → the remaining six bosses in the gaps.
+*Suggested interleave:* ~~the Witness~~ (done) → push and tester round →
+occlusion → the remaining six bosses in the gaps.

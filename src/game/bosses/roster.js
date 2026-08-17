@@ -50,7 +50,7 @@ export class CryptWarden extends BossBase {
         // A grave-marker that stood up.
         //
         // ARRANGED FOR THE PLAN VIEW, because that is the only view this game
-        // has. At a 56° pitch the camera reads a footprint, not a portrait:
+        // has. At a 70.7° pitch the camera reads a footprint, not a portrait:
         // mass that extends OUTWARD becomes the silhouette and mass that hangs
         // DOWNWARD disappears under whatever is above it. The old body was a
         // 1.6-wide box with a helm on top and a sword out to one side, which
@@ -134,7 +134,7 @@ export class CryptWarden extends BossBase {
         // `faceToward`'s "a mesh built head-forward along +Z" — and it is the
         // highest thing on the body, so from overhead it draws on top of
         // everything and points at wherever 120° of frontal cone is about to
-        // land. Tall and thin rather than long and thin, so the 56° camera sees
+        // land. Tall and thin rather than long and thin, so the 70.7° camera sees
         // a blade of gold rather than the end of a stick.
         const fin = voxBox(0.13, 0.34, 1.00, CRUST_COLORS.goldLeaf, CRUST_COLORS.goldLeaf, 0.5);
         fin.position.set(0, 2.44, 0.20);
@@ -2976,28 +2976,294 @@ export const LASH_OUTER = 5.6;
 export const DIVE_R = 3.0;
 
 // ─── Beat 13 — GUMOI Witness ────────────────────────────────────────────────
+
+/** "Seven voices aggregate." — the overworld line that names this thing. */
+export const WITNESS_HEADS = 7;
+
+/**
+ * The Witness's drafts of the player, best-remembered first.
+ *
+ * This is the reconstitution ladder made into a body. `reconstitutionLine()`
+ * degrades what GUMOI says over your corpse as your charges run out — "Again.
+ * I still remember enough of you", then "The Link is losing detail. Stop making
+ * me rebuild your hands", then "One clean memory remains" — and these are the
+ * same steps in colour: the hero's own skin, then the warmth leaving it, then
+ * the eyes going out, then a face that has sunk most of the way back into the
+ * core that was trying to build it.
+ *
+ * Only skin, hair and the eye keys move; everything else is spread from
+ * HERO_PALETTE for the reason the Phantasm does it. This is supposed to be the
+ * player's head, and a copied constant drifts the first time anyone touches the
+ * hero.
+ *
+ * `eyeGlow` is how a draft's eyes go out, rather than hiding `rig.eyes`: the
+ * glow meshes take their colour from the palette, so a dead-black `eyeGlow`
+ * turns them into sockets and there is no child-index bookkeeping to get wrong.
+ */
+export const WITNESS_DRAFTS = [
+    {   // "Again. I still remember enough of you." — the clean one.
+        skin: 0xc8a88a, skinDark: 0xa07858, skinD2: 0x7a5840,
+        hair: 0x2a2030, hairDark: 0x140e18, hairLight: 0x4a3a50,
+        eyeWhite: 0xf0ebe4, pupil: 0x101018, eyeGlow: 0xffffff,
+    },
+    {   // Warmth going.
+        skin: 0xb0968e, skinDark: 0x8a7270, skinD2: 0x635256,
+        hair: 0x2b2136, hairDark: 0x16101e, hairLight: 0x483c54,
+        eyeWhite: 0xdcd4dc, pupil: 0x14101c, eyeGlow: 0xd8c8f0,
+    },
+    {   // Eyes out.
+        skin: 0x93818b, skinDark: 0x6e5f6c, skinD2: 0x4c414f,
+        hair: 0x2a2138, hairDark: 0x150f20, hairLight: 0x413650,
+        eyeWhite: 0x4c414f, pupil: 0x1a1226, eyeGlow: 0x000000,
+    },
+    {   // "One clean memory remains" — and this is not it.
+        skin: 0x6d6377, skinDark: 0x4f4759, skinD2: 0x36303f,
+        hair: 0x241c30, hairDark: 0x120c1a, hairLight: 0x362c44,
+        eyeWhite: 0x36303f, pupil: 0x140e1c, eyeGlow: 0x000000,
+    },
+];
+
+/**
+ * One of the Witness's heads, re-centred on its own geometry.
+ *
+ * `createActorRig` hands back a head PIVOT, not a centred mesh: the pivot is
+ * the neck socket, so the skull hangs above its own origin. Hung straight onto
+ * a radial direction, every face would swing out on a lever the length of a
+ * neck and the ring would sit visibly off-centre. Measured rather than nudged
+ * by a constant, because the head profile is scaled per actor and a literal
+ * offset drifts the moment the hero is re-proportioned.
+ */
+function witnessHead(obj) {
+    const holder = new THREE.Group();
+    obj.position.set(0, 0, 0);
+    obj.rotation.set(0, 0, 0);
+    holder.add(obj);
+    const box = new THREE.Box3().setFromObject(obj);
+    if (isFinite(box.min.y)) obj.position.sub(box.getCenter(new THREE.Vector3()));
+    return holder;
+}
+
 export class GumoiWitness extends BossBase {
     constructor(scene, position = { x: 0, y: 9.5, z: 0 }) {
-        // A flattened disc rather than a tetrahedron. The Witness is an EYE;
-        // a tetrahedron seen from directly above is a triangle, which is the
-        // one shape that says nothing about what it is.
-        const mesh = voxBlob(1.4, 0.5, 1.4,
-            ABYSS_COLORS.violet, ABYSS_COLORS.neon || 0x80ffc0, 0.55);
+        // SEVEN HEADS, ALL OF THEM YOURS, ALL OF THEM REMEMBERED WRONG.
+        //
+        // It was a flattened violet disc, on the reasoning that the Witness is
+        // an EYE and a tetrahedron from directly above is a triangle. The eye
+        // half of that is now spent — beat 14's Leviathan is an eye, and two
+        // eyes back to back read as one boss twice — and the disc half never
+        // worked anyway: it photographed as a plain magenta ball at 24% of
+        // frame, in a room whose accent is `0xff40c8`, THE SAME MAGENTA. The
+        // second-to-last boss in the game was painted the colour of its own
+        // arena.
+        //
+        // The replacement is not invented. Three things the source already
+        // says:
+        //
+        //   - the overworld line for this beat is "Seven voices aggregate";
+        //   - GUMOI is the thing that has rebuilt the player after every death
+        //     in the campaign, out of a memory that degrades — see
+        //     `narrative/reconstitution-copy.js`, ending at "One clean memory
+        //     remains";
+        //   - the kit for `beat-13-gumoi` builds the room itself out of
+        //     `displaced_copies`.
+        //
+        // So: seven heads fused into one clenched mass, every one of them a
+        // draft of the player's face at a different stage of being forgotten,
+        // hanging in a room made of its own rejected attempts. Not one eye —
+        // seven watchers, which is what a thing called the Witness should be,
+        // and which makes the Leviathan afterwards land as a collapse rather
+        // than a repeat.
+        //
+        // AND THE FIRST IDEA FOR THIS REBUILD WAS WORSE. It was an exploded
+        // card catalogue: glyph plates on a dark core with a scan bar across
+        // them. The kit for this room is already `index_rails`, `glyph_stacks`,
+        // `scan_lines` and an `index_scan` atmosphere — the boss would have
+        // been built out of its own wallpaper. Trap 5 in `docs/BOSS-PASS.md`
+        // says same hue as the room is invisible; this is the same trap one
+        // level up. Same IDEA as the room is invisible too.
+        const mesh = new THREE.Group();
+
+        // The core: the thing doing the remembering.
+        //
+        // THE FIRST BUILD WALKED STRAIGHT INTO TRAP 1 with the warning about
+        // trap 1 written directly above it. A near-black `0x241b3a` under 0.30
+        // of violet emissive is not a dark core with a glow — the albedo lands
+        // around 0.02 in linear light and the emissive around 0.16, eight times
+        // stronger, so it photographed as a big flat lavender ball with some
+        // heads stuck to it. The albedo is lifted until it can actually be seen,
+        // and the emissive is dropped to almost nothing: this thing is SHUT, and
+        // a shut thing does not leak. What light there is arrives in `tickAI`,
+        // when the gaps open.
+        const core = voxBlob(0.70, 0.70, 0.70, 0x3a2f52,
+            ABYSS_COLORS.violetHot, 0.05, null, LIMB_VOX_PER_UNIT);
+        mesh.add(core);
+
+        // Faces point outward and UP, and the reason is the camera.
+        //
+        // The first spread was a Fibonacci sphere — seven directions distributed
+        // evenly over the whole ball, which is the correct answer to "spread
+        // seven points" and the wrong answer to this. Half of them pointed at
+        // the floor, and the photograph came back as a cluster of dark blue
+        // craniums with two faces in it: at a 70.7° pitch the camera is nearly
+        // overhead, so a head only shows a FACE if it is looking upward. A head
+        // looking outward shows the back of its skull.
+        //
+        // So: one head straight up — the clean memory, staring at nothing — and
+        // six on a ring, tilted up 49°. From this camera the ring reads
+        // three-quarter, which is better than flat-on anyway; it is a crowd
+        // looking in seven directions rather than a flower.
+        //
+        // This also spends the X tumble, deliberately. See `tickAI`.
+        const heads = [];
+        const RING_EL = 0.78;
+        for (let i = 0; i < WITNESS_HEADS; i++) {
+            // Remembered faces take the even ring slots and blanks the odd
+            // ones, so the three that never got a face are spread through the
+            // crowd instead of sitting together on one side of it.
+            const slot = i <= 3 ? (i - 1) * 2 : (i - 4) * 2 + 1;
+            const a = (slot / (WITNESS_HEADS - 1)) * Math.PI * 2;
+            const dir = i === 0
+                ? new THREE.Vector3(0, 1, 0)
+                : new THREE.Vector3(
+                    Math.cos(a) * Math.cos(RING_EL),
+                    Math.sin(RING_EL),
+                    Math.sin(a) * Math.cos(RING_EL)).normalize();
+
+            let holder;
+            if (i < WITNESS_DRAFTS.length) {
+                // A REMEMBERED one — the hero's actual head, via the hero's
+                // actual rig call. Same reasoning as the Phantasm: an imitation
+                // of the player's proportions is not the player's proportions,
+                // and the owner can tell. The rest of the rig is never added to
+                // a scene and is left to the collector.
+                const rig = createActorRig({
+                    ...HERO_RIG,
+                    palette: { ...HERO_PALETTE, ...WITNESS_DRAFTS[i] },
+                    // The hero's azure rim is inherited on purpose — these are
+                    // his head, and the mark that says "this is you" belongs on
+                    // them. Its STRENGTH is not: 0.9 exists so one figure can
+                    // never be lost in a crowded room, and at that weight it
+                    // washed every face navy blue and buried the skin the whole
+                    // idea depends on. Turned down to a tell rather than a coat
+                    // of paint. (`hero-readability.spec.mjs` reserves the rim
+                    // COLOUR against `ENEMY_PALETTES`, which this is not — and
+                    // the Phantasm, built from the same rig, already carries it.)
+                    rimStrength: 0.28,
+                });
+                holder = witnessHead(rig.head);
+                holder.userData.draft = i;
+            } else {
+                // AN ABANDONED one — it never got a face. Built at limb
+                // resolution because at this radius the 6-per-unit body grid
+                // would give it four voxels to be a skull with.
+                const d = WITNESS_DRAFTS[WITNESS_DRAFTS.length - 1];
+                holder = witnessHead(voxBlob(0.30, 0.36, 0.30,
+                    d.skinD2, ABYSS_COLORS.violet, 0.05, null, LIMB_VOX_PER_UNIT));
+                holder.userData.draft = -1;
+            }
+            // Kept on the head rather than restated in `tickAI`, which leans the
+            // speaking one off its own base scale every frame. Two copies of
+            // this number is two copies that drift.
+            holder.userData.baseScale = i < WITNESS_DRAFTS.length ? 2.15 : 1.0;
+            holder.scale.setScalar(holder.userData.baseScale);
+            holder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+            holder.userData.dir = dir;
+            mesh.add(holder);
+            heads.push(holder);
+        }
+
         super(scene, {
             id: 'gumoi_witness', name: 'GUMOI Witness', hp: 18,
             hitRadius: 1.3, contactRadius: 1.7, position, mesh, phaseThresholds: [0.6, 0.3],
         });
         this.castCd = 2.0;
         this.flickerBoost = 0;
+        this.core = core;
+        this.heads = heads;
+        // How far open the mass is, 0 shut and 1 splayed. Smoothed, so the
+        // heads travel rather than snap.
+        this.openness = 0;
         this.presenceScale(1.60);
+        // Placed after `presenceScale`, which multiplies `root.scale` — the
+        // radius the heads orbit at is in the mesh's own space and must not be
+        // scaled twice.
+        for (const h of this.heads) {
+            h.userData.r0 = 1.44;
+            h.position.copy(h.userData.dir).multiplyScalar(1.44);
+        }
     }
     onPhaseChange(phase) {
         this.castCd = Math.max(0.8, 2.2 - phase * 0.4);
         this.flickerBoost = phase * 0.25;
     }
     tickAI(dt, player, game) {
-        this.mesh.rotation.x += dt * (0.5 + this.phase * 0.3);
-        this.mesh.rotation.y += dt * (0.8 + this.phase * 0.2);
+        // ── The open ────────────────────────────────────────────────────────
+        // It opens WHEN IT COMES DOWN, and the two are the same condition
+        // rather than two timers that can drift: `busy` is what drives the
+        // descent below, and it is what drives this.
+        //
+        // This is a reachability cue, NOT a weak point, and the distinction is
+        // deliberate. `BossBase.weakOpen` exists and pays a real 2x, and the
+        // rule there is that a modelled glowing weak point has to mean it —
+        // so this body does not model one. What the open says is "your sword
+        // works now", which is already true and is the entire fight: this thing
+        // hangs 9 units up where the vertical gate in `hitboxCheck` rejects
+        // every melee weapon in the game, and drops to head height only to
+        // cast. That was previously legible ONLY as altitude, which at a 70.7°
+        // top-down pitch is close to unreadable. A body that visibly unclenches
+        // when it enters sword range is the tell the fight never had.
+        //
+        // (Wiring `weakOpen` to this is a one-line change and a real balance
+        // decision — it would roughly halve the fight, because the descent is
+        // the only window there is. Left to the owner.)
+        const want = this.busy ? 1 : 0;
+        this.openness += (want - this.openness) * Math.min(1, dt * 6);
+        for (const h of this.heads) {
+            h.position.copy(h.userData.dir)
+                .multiplyScalar(h.userData.r0 * (1 + 0.42 * this.openness));
+        }
+        // The core lights through the gaps as they widen, and the mass slows as
+        // it opens — a thing that stops turning has settled on you.
+        if (this.core?.material) {
+            this.core.material.emissiveIntensity = 0.05 + 0.42 * this.openness;
+        }
+        // IT TURNS, IT DOES NOT TUMBLE — and that is a swap, not a trim. This
+        // body used to roll on X and Y at once, which is fine for a featureless
+        // disc and fatal for a face: an X roll means no direction stays "up", so
+        // the heads cannot be aimed anywhere and half of them are always looking
+        // at the floor. The X rate is spent on the aiming instead (see the
+        // constructor), and what is left is a slow survey turn — a thing looking
+        // around a room, which is what a Witness does. It slows as it opens,
+        // because a thing that stops turning has settled on you.
+        const spin = 1 - 0.7 * this.openness;
+        this.mesh.rotation.y += dt * (0.8 + this.phase * 0.2) * spin;
+        // A shallow nod, so it is never a rigid ornament. Amplitude is small
+        // enough that no face rolls out of view.
+        this.mesh.rotation.x = Math.sin(this.t * 0.9) * 0.09;
+        // ── The one that speaks ─────────────────────────────────────────────
+        // Whichever face is closest to looking at the player leans out while
+        // the thing is casting. Its moves are all quotations of other bosses,
+        // so the body should at least show which mouth the quotation is coming
+        // out of.
+        if (player && this.heads.length) {
+            const q = this.mesh.getWorldQuaternion(new THREE.Quaternion());
+            const to = new THREE.Vector3(
+                player.root.position.x - this.root.position.x, 0,
+                player.root.position.z - this.root.position.z);
+            if (to.lengthSq() > 1e-6) to.normalize();
+            let best = null, bestDot = -Infinity;
+            const w = new THREE.Vector3();
+            for (const h of this.heads) {
+                w.copy(h.userData.dir).applyQuaternion(q);
+                const d = w.dot(to);
+                if (d > bestDot) { bestDot = d; best = h; }
+            }
+            for (const h of this.heads) {
+                const base = h.userData.baseScale;
+                const lean = h === best ? 1 + 0.18 * this.openness : 1;
+                h.scale.setScalar(base * lean);
+            }
+        }
         // ── Descend to strike ───────────────────────────────────────────────
         // The Witness hovers out of reach and only comes down to cast — and it
         // is still down, at head height, all through its recovery. That descent

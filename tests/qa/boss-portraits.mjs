@@ -76,6 +76,8 @@ const CAM_PITCH = Math.atan2(CAM_HEIGHT, CAM_BACK);
 const arg = (k) => (process.argv.find((a) => a.startsWith(`--${k}=`)) || '').split('=')[1];
 const SET = arg('set') || 'current';
 const ONLY = arg('only') || '';
+// Photograph the roster mid-action instead of at rest — see the settle loop.
+const OPEN = process.argv.includes('--open');
 const OUT = path.join('docs', 'media', 'bosses', SET);
 
 const chrome = findChromeVerbose();
@@ -103,7 +105,7 @@ try {
     await page.waitForFunction(() => !!window.__sovereignScar, { timeout: 60000 });
     await sleep(400);
 
-    const shots = await page.evaluate(async (only, cam) => {
+    const shots = await page.evaluate(async (only, cam, forceOpen) => {
         const THREE = await import('three');
         const R = await import('/src/game/bosses/roster.js');
         const { SandSpur } = await import('/src/game/bosses/sand-spur.js');
@@ -201,9 +203,31 @@ try {
             // boss that has to come 2 radians round at 1.6 rad/s simply does not
             // finish — it photographs mid-turn, which is how a body built wide
             // across X ends up presenting its narrow side to the lens.
+            // `--open` PHOTOGRAPHS THE BOSS MID-ACTION.
+            //
+            // Bodies that change shape when they attack were, until now,
+            // unphotographable: the settle loop leaves a boss idle, so the
+            // portrait only ever shows its resting pose. The GUMOI Witness
+            // splays open when it descends to cast and that open IS the tell
+            // for the only window its fight has — judging it from a resting
+            // shot is judging half a model.
+            //
+            // `action` is what gets pinned, and it has to be `action` — `busy`
+            // is a GETTER over it (`this.action != null`), so the obvious
+            // `boss.busy = true` assigns to a property with no setter, fails
+            // silently in this non-strict page context, and hands back a
+            // resting shot that looks exactly like a working one. It reported
+            // the identical 5.80 width as the closed pass, which is the only
+            // reason it was caught.
+            //
+            // A whole action is not started because `startAction` wants a level
+            // and a telegraph layer this harness has not got. Pinning the field
+            // `busy` actually reads is the real condition rather than a mime of
+            // it.
             for (let i = 0; i < 150; i++) {
                 player.root.position.x = root.position.x;
                 player.root.position.z = root.position.z + 4.5;
+                if (forceOpen && !boss.action) boss.action = { name: 'probe-open' };
                 try { boss.tickAI?.(1 / 60, player, null); } catch (_) { /* needs fuller ctx */ }
                 boss.t = (boss.t || 0) + 1 / 60;
             }
@@ -277,7 +301,7 @@ try {
         }
         renderer.dispose();
         return out;
-    }, ONLY, { pitch: CAM_PITCH, fov: CAM_FOV, dist: CAM_DIST });
+    }, ONLY, { pitch: CAM_PITCH, fov: CAM_FOV, dist: CAM_DIST }, OPEN);
 
     fs.mkdirSync(OUT, { recursive: true });
     const write = (file, dataUrl) =>
