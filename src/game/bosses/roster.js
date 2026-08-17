@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import {
     BossBase, bossHit, laneMesh, discMesh, haloMesh, moveToward, BOSS_EMISSIVE_MAX,
+    pushTrail, trailAt, seedTrail,
 } from './base.js';
 import { sfx } from '../../audio/synth.js';
 import { ABYSS_COLORS, CRUST_COLORS } from '../assets/palettes.js';
@@ -3129,6 +3130,27 @@ export class SludgeGolem extends BossBase {
 export const SLING_R = 2.4;
 export const SPAWN_LIFE = 9.0;
 
+/**
+ * How far back along its own path each of the Wyrm's segments sits, in WORLD
+ * units of arc — the distance from the head, not a number of ticks.
+ *
+ * THE GAPS TAPER WITH THE BODY, AND THEY ARE SHORTER THAN THE BODIES THEY
+ * SEPARATE. That is the whole difference between a serpent and a string of
+ * beads, and it is the one thing the frame-strided version got right by
+ * accident at the frame rate it was photographed at. Measured against the
+ * segments' own widths — 2.18, 1.92, 1.67, 1.41, 0.90 world units — each step
+ * here is a little over half the pair it joins, so consecutive bodies overlap
+ * and the animal is continuous while still visibly articulated. Spaced to
+ * CLEAR each other instead (the spider rule: mass needs air around it) the
+ * wyrm photographs as five rocks with the head parked nearby; that rule does
+ * not transfer to something that is meant to be one animal.
+ *
+ * The first step is the largest because the skull is: the head group measures
+ * 5.0 units end to end, so segment 1 sits inside its rear rather than behind
+ * it, which is where a snake's neck is.
+ */
+export const WYRM_ARC = [0, 1.6, 2.75, 3.75, 4.6, 5.3];
+
 // ─── Beat 12 — Magma Wyrm ───────────────────────────────────────────────────
 export class MagmaWyrm extends BossBase {
     constructor(scene, position = { x: 0, z: -4 }) {
@@ -3150,6 +3172,27 @@ export class MagmaWyrm extends BossBase {
         const body = new THREE.Group();
         const segs = [];
         const LAVA = 0xff4010;
+        // THE HEAT IS NOT THE ROOM'S ORANGE. Every glowing part of this wyrm —
+        // the maw and all five dorsal fins — was `0xff5a18` in a room whose kit
+        // accent is `0xff5520`: 0.013 apart in linear space, which is the same
+        // colour. That is two fifths of the body painted the exact hue of the
+        // ember pools, the wall trim and the floor lights it swims between, and
+        // it is the trap that caught five of fourteen bosses in this pass.
+        //
+        // Hotter, not different. Lava's crust is black and its fissures run
+        // yellow-white, so a serpent that is the SOURCE of the heat should be
+        // the brightest thing in its own room rather than the same temperature
+        // as the decor. This reads against the ember-brown floor on value as
+        // well as hue, which orange-on-orange never could.
+        //
+        // GOLD, NOT CREAM. The first attempt at this was `0xffd166`, and it
+        // photographed as four bright slabs lying on a dark body rather than as
+        // a ridge running down one — at 0.55 emissive a pale colour stops being
+        // a highlight on the animal and becomes the subject of the picture.
+        // This is 0.42 from the room's accent, which is all the separation the
+        // clash needs, and still reads as molten rather than as paint.
+        const HEAT = 0xffbe3d;
+        const HEAT_GLOW = 0xff9a28;
         for (let i = 0; i < 6; i++) {
             const s = new THREE.Group();
             if (i === 0) {
@@ -3179,7 +3222,7 @@ export class MagmaWyrm extends BossBase {
                 // The maw glows; the head does not. A forward-pointing snout
                 // foreshortens to nothing at this camera, so the head has to be
                 // read by its WIDTH and by where the light is, not its length.
-                const jaw = voxBox(0.46, 0.14, 0.48, 0xff5a18, LAVA, 0.5);
+                const jaw = voxBox(0.46, 0.14, 0.48, HEAT, HEAT_GLOW, 0.5);
                 jaw.position.set(0, -0.28, 0.56);
                 // Swept BACK, not up: from a near-overhead camera a horn that
                 // rises is a dot, and a horn that lies along the body is a line.
@@ -3234,6 +3277,18 @@ export class MagmaWyrm extends BossBase {
                 // find. This runs 0.52 to 0.12: the neck is two-thirds of the
                 // head and the tail is a fifth of it, which is what makes the
                 // shape point somewhere.
+                // THE TAPER HAS TO SURVIVE THE GRID. These five radii were
+                // authored 0.46 → 0.188, a body that more than halves; built on
+                // the 6-per-unit body grid they came out 1.17, 0.83, 0.83, 0.83
+                // and 0.50 units wide, because `cells()` rounds a radius to
+                // whole voxels and under half a unit there are only three whole
+                // voxels to round to. Segments 2, 3 and 4 were IDENTICAL, and
+                // segment 3 was 63% wider than it was asked to be — the taper
+                // that makes the shape point somewhere existed only in the
+                // source. Limb resolution has the room to spell it: 0.94, 0.83,
+                // 0.72, 0.61, 0.39. (Third time in this pass: the Hydroid's
+                // orbs and the Proxy's hoop were both rounded into the wrong
+                // body by the same call.)
                 const r = 0.46 - (i - 1) * 0.068;
                 // Basalt, not lava. Beat 12's floor IS orange magma, so an
                 // orange boss on it is the actor/floor contrast problem in its
@@ -3241,12 +3296,20 @@ export class MagmaWyrm extends BossBase {
                 // this very region. A cooled-crust body with the heat showing
                 // only through the ridges reads as hotter than a uniformly
                 // bright one, and it reads AGAINST the ground instead of into it.
-                const seg = voxBlob(r, r * 0.72, r * 1.05, 0x2e1208, LAVA, 0.10);
+                const seg = voxBlob(r, r * 0.72, r * 1.05, 0x2e1208, LAVA, 0.10,
+                    undefined, LIMB_VOX_PER_UNIT);
                 // A dorsal ridge on every segment. Thin enough to need limb
                 // resolution, and the reason it is here: from above, a row of
                 // fins running down a curve is what separates a spine from a
                 // sausage. It costs nothing in reach — it grows upward.
-                const fin = voxBox(0.11, 0.36 - i * 0.04, r * 1.55, 0xff5a18, LAVA, 0.5,
+                // SHORTER THAN THE GAP IT SITS IN. At `r * 1.55` each fin was
+                // 1.65 world units long against a 1.6-unit step between
+                // segments, so consecutive fins touched and the five of them
+                // photographed as ONE unbroken gold bar down the animal —
+                // which is the opposite of the job. The fins exist to say where
+                // one body ends and the next begins, and they can only do that
+                // with dark between them.
+                const fin = voxBox(0.11, 0.40 - i * 0.045, r * 0.78, HEAT, HEAT_GLOW, 0.5,
                     undefined, LIMB_VOX_PER_UNIT);
                 fin.position.set(0, r * 0.62, 0);
                 s.add(seg, fin);
@@ -3287,15 +3350,31 @@ export class MagmaWyrm extends BossBase {
             ? 1.0
             : 1.3 + Math.sin(this.pathT * 3) * 0.3;
         // Body chain trails the head through the world.
-        this._wake = this._wake || [];
-        this._wake.unshift({ x: this.root.position.x, z: this.root.position.z });
-        if (this._wake.length > this.segs.length * 26 + 2) this._wake.pop();
+        //
+        // BY ARC LENGTH, NOT BY FRAMES. `_wake[i * 22]` is twenty-two ticks of
+        // history per segment, and a tick is not a distance. Measured across
+        // frame rates, the six bodies spanned 3.92 units at 30fps, 2.85 at
+        // 60fps and 0.70 at 144fps — the same animal, one a serpent and one a
+        // pile inside its own skull, with several segments sitting at exactly
+        // 0.00 from each other because the clamp handed them all the same
+        // sample. This boss was "fixed" once by widening the stride from 5 to
+        // 22, which moved the frame rate at which it looks right rather than
+        // removing the dependency on one.
+        this._wake = this._wake
+            || seedTrail([], this.root.position.x, this.root.position.z, WYRM_ARC[5]);
+        pushTrail(this._wake, this.root.position.x, this.root.position.z);
+        // Segment positions are LOCAL to the group whose origin is the head —
+        // and that group carries the 1.4 presence scale, so a world delta
+        // written straight in comes out 40% further than it was measured and
+        // the body does not sit where the wyrm has been. Divided once, here, at
+        // the layer that owns the scale.
+        const k = this.root.scale.x || 1;
         for (let i = 1; i < this.segs.length; i++) {
-            const s = this._wake[Math.min(this._wake.length - 1, i * 22)];
+            const s = trailAt(this._wake, WYRM_ARC[i]);
             if (!s) continue;
-            // Segment positions are LOCAL to the group whose origin is the head.
             this.segs[i].position.set(
-                s.x - this.root.position.x, -i * 0.05, s.z - this.root.position.z
+                (s.x - this.root.position.x) / k, -i * 0.05,
+                (s.z - this.root.position.z) / k
             );
         }
         // ── POINT THE HEAD WHERE THE FIRE GOES ──────────────────────────────
@@ -3454,6 +3533,11 @@ export class MagmaWyrm extends BossBase {
                 const c = this.clampArena(px + Math.cos(a) * 4.5, pz + Math.sin(a) * 4.5);
                 this.root.position.x = c.x;
                 this.root.position.z = c.z;
+                // The dive TELEPORTS, so the wake is re-laid at the new place.
+                // Left alone, the trail would hold a single chord across the
+                // arena and the body would still be draped over the hole it
+                // came out of until it had swum its own length again.
+                seedTrail(this._wake, c.x, c.z, WYRM_ARC[5]);
                 sfx.stomp();
             },
         });

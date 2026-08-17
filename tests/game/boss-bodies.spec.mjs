@@ -24,14 +24,16 @@ import fs from 'node:fs';
 import {
     CryptWarden, TriCompiler, ProxyBoss, ObsidianArachnid, HydroidCloud,
     SkeletalMantis, PhantasmBoss, FrostAndFuel, SludgeGolem, MagmaWyrm,
-    GumoiWitness, LeviathanBoss, WITNESS_HEADS, WITNESS_DRAFTS,
+    GumoiWitness, LeviathanBoss, WITNESS_HEADS, WITNESS_DRAFTS, WYRM_ARC,
 } from '../../src/game/bosses/roster.js';
 import { HERO_PALETTE } from '../../src/game/assets/palettes.js';
 import { KITS } from '../../src/game/levels/dungeon-kits.js';
 import { LEVELS } from '../../src/game/levels/registry.js';
-import { SandSpur, SEG_GAP, trailAt } from '../../src/game/bosses/sand-spur.js';
+import { SandSpur, SEG_GAP } from '../../src/game/bosses/sand-spur.js';
 import { KineticCore } from '../../src/game/bosses/kinetic-core.js';
-import { BOSS_EMISSIVE_MAX, clampEmissive } from '../../src/game/bosses/base.js';
+import {
+    BOSS_EMISSIVE_MAX, clampEmissive, trailAt, pushTrail, seedTrail, TRAIL_STEP,
+} from '../../src/game/bosses/base.js';
 import {
     VOX_PER_UNIT, LIMB_VOX_PER_UNIT, voxBox, voxSphere, voxBlade,
 } from '../../src/game/bosses/boss-models.js';
@@ -174,16 +176,14 @@ const ROOM_CLASH = {
     // correct answer artistically. Recorded rather than silently skipped so
     // that the reason is attached to the number.
     skeletal_mantis: 0.62,   // measured 59.3% at 0.001 from #e8e0d0
-    // OUTSTANDING. `docs/BOSS-PASS.md` lists "the Wyrm was orange on the magma
-    // floor" as a FIXED example of this trap, and it is not fixed — two fifths
-    // of the body is still within 0.013 of the pyre accent. The boss is owner-
-    // approved as it stands, so this is pinned at its current value rather than
-    // changed unasked. Revisit with the owner.
-    magma_wyrm: 0.42,        // measured 39.7% at 0.013 from #ff5520
-    // (The Sand Spur was here at 0.90 — 88.8% at 0.014, the worst on the
-    // roster. Its rebuild put it at 0.0% and 0.345 away, so the entry is gone
-    // rather than loosened: an exemption that is no longer earned is removed,
-    // which is the only direction a ratchet is allowed to move.)
+    // (Two entries have been REMOVED rather than loosened, which is the only
+    // direction a ratchet is allowed to move. The Sand Spur was here at 0.90 —
+    // 88.8% at 0.014, the worst on the roster — and its rebuild put it at 0.0%,
+    // 0.345 away. The Magma Wyrm was here at 0.42: every glowing part of it,
+    // the maw and all five dorsal fins, was `0xff5a18` against a pyre accent of
+    // `0xff5520`, 0.013 apart, which is the same colour. Repainting the heat
+    // yellow-white — hotter than the room rather than the same temperature as
+    // it — put it at 0.0% and 0.541 away.)
 };
 
 /** p85 horizontal radius of the visible body, measured from the root's own XZ. */
@@ -530,6 +530,7 @@ export function run(t) {
     runTriCompiler(t);
     runSandSpur(t);
     runKineticCore(t);
+    runMagmaWyrm(t);
 }
 
 /**
@@ -886,6 +887,175 @@ export function runTriCompiler(t) {
  * its phases, so a fixed frame stride stretches the animal apart as the fight
  * escalates. It samples by ARC LENGTH now, and that is what these check.
  */
+/**
+ * The Magma Wyrm — the same length whatever the frame rate, and a taper that
+ * exists in the geometry rather than only in the source.
+ *
+ * All three of this boss's defects were invisible to every gate in this file
+ * and to the game itself, because each one is about a number's UNITS:
+ *
+ *   * Its chain sampled `_wake[i * 22]` — twenty-two TICKS of history per
+ *     segment. Measured, the six bodies spanned 3.92 world units at 30fps and
+ *     0.70 at 144fps. The serpent existed at the frame rate it was tuned at and
+ *     nowhere else, and several segments sat at exactly 0.00 from each other
+ *     because the clamp handed them all the same sample.
+ *   * Its five radii were authored 0.46 → 0.188 and built 1.17, 0.83, 0.83,
+ *     0.83, 0.50 — `cells()` rounds a radius to whole voxels, and below half a
+ *     unit the 6-per-unit body grid has three of them. Three of the five
+ *     segments came out IDENTICAL.
+ *   * Its maw and all five fins were `0xff5a18` in a room whose accent is
+ *     `0xff5520` — 0.013 apart, the same colour. That one is gated by
+ *     `ROOM_CLASH` above, where the Wyrm's exemption has been deleted.
+ *
+ * The first two are checked here in the units that were wrong: world distance
+ * measured at three frame rates, and built width measured off the mesh.
+ */
+export function runMagmaWyrm(t) {
+    const player = () => ({
+        root: { position: { x: 0, y: 1.95, z: 6 } },
+        health: { hp: 6, maxHp: 6, dead: false, damage: () => ({ accepted: true }) },
+        state: { facingVec: { x: 0, z: -1 } },
+    });
+    // Six seconds of the same swim, sampled at three frame rates. The player
+    // orbits so the head actually travels — a wyrm held still lays no path and
+    // every segment collapses onto it, which would pass a length check by
+    // reporting zero for all three.
+    //
+    // MEASURED AGAINST THE TEST'S OWN RECORD OF THE PATH. Two obvious measures
+    // are both wrong here. Head-to-tail distance is a CHORD, so it reads 8.81
+    // at 30fps and 7.92 at 144fps for a chain that is behaving perfectly —
+    // the wyrm simply turns a slightly different curve when the integrator is
+    // stepped differently, and phase 2 circles harder still. Summing the gaps
+    // has a milder version of the same fault. What the fix actually promises is
+    // that segment `i` sits `WYRM_ARC[i]` units back ALONG THE PATH THE HEAD
+    // TOOK, so that is what is checked — against a path this test records
+    // itself, every tick, rather than against the boss's own gated trail, which
+    // is half the machinery under test.
+    const swim = (fps, phase) => {
+        const boss = new MagmaWyrm(new THREE.Scene(), P);
+        boss.phase = phase;
+        const p = player();
+        const dt = 1 / fps;
+        const path = [];   // newest first
+        for (let i = 0; i < Math.round(6 * fps); i++) {
+            const a = (i * dt / 6) * Math.PI * 2;
+            p.root.position.x = Math.sin(a) * 7;
+            p.root.position.z = Math.cos(a) * 7;
+            try { boss.tickAI(dt, p, {}); } catch (_) { /* headless gaps */ }
+            path.unshift({ x: boss.root.position.x, z: boss.root.position.z });
+        }
+        const k = boss.root.scale.x;
+        // Arc length from the head back to the recorded point nearest each
+        // segment. Cumulative distances are built once so this stays linear.
+        const cum = [0];
+        for (let i = 1; i < path.length; i++) {
+            cum[i] = cum[i - 1]
+                + Math.hypot(path[i].x - path[i - 1].x, path[i].z - path[i - 1].z);
+        }
+        const err = [];
+        let tightest = Infinity;
+        for (let i = 1; i < boss.segs.length; i++) {
+            const w = {
+                x: boss.root.position.x + boss.segs[i].position.x * k,
+                z: boss.root.position.z + boss.segs[i].position.z * k,
+            };
+            let best = 0, bestD = Infinity;
+            for (let j = 0; j < path.length; j++) {
+                const d = Math.hypot(path[j].x - w.x, path[j].z - w.z);
+                if (d < bestD) { bestD = d; best = j; }
+            }
+            err.push(cum[best] - WYRM_ARC[i]);
+            const a2 = boss.segs[i - 1].position, b2 = boss.segs[i].position;
+            tightest = Math.min(tightest, Math.hypot(a2.x - b2.x, a2.z - b2.z) * k);
+        }
+        return { err, tightest, boss };
+    };
+    const runs = [swim(30, 1), swim(60, 1), swim(144, 1), swim(30, 2), swim(144, 2)];
+    const worst = Math.max(...runs.map((r) => Math.max(...r.err.map(Math.abs))));
+    t.ok('every segment sits where it was asked to, at 30fps, 60fps and 144fps',
+        worst < 0.35,
+        `worst placement error ${worst.toFixed(3)} units against arcs of ` +
+        `${WYRM_ARC.slice(1).join(', ')}`);
+    const tightest = Math.min(...runs.map((r) => r.tightest));
+    t.ok('…so no two bodies share a position', tightest > 0.4,
+        `tightest centre gap ${tightest.toFixed(2)}`);
+
+    // ── The taper is in the mesh, not in the source ────────────────────────
+    // Collapsed to the origin so each box is the BODY, not where the chain put
+    // it. Widths are measured in X: the fins run along Z and the head's horns
+    // sweep back, so Z is the one axis that does not describe the body.
+    const shape = new MagmaWyrm(new THREE.Scene(), P);
+    for (const s of shape.segs) s.position.set(0, 0, 0);
+    shape.root.position.set(0, 0, 0);
+    shape.root.rotation.set(0, 0, 0);
+    shape.root.updateWorldMatrix(true, true);
+    const widths = shape.segs.map((s) =>
+        new THREE.Box3().setFromObject(s).getSize(new THREE.Vector3()).x);
+    // A real step, not merely "not wider". Quantisation ties are the failure
+    // being guarded against, and `>=` would let 0.833, 0.833, 0.833 through the
+    // moment anyone rounded a hair the other way.
+    let step = Infinity;
+    for (let i = 2; i < widths.length; i++) step = Math.min(step, widths[i - 1] - widths[i]);
+    t.ok('the Wyrm tapers in the geometry, not only in the numbers it asked for',
+        step > 0.15, `widths ${widths.map((w) => w.toFixed(2)).join(', ')} — ` +
+        `narrowest step ${step.toFixed(2)}`);
+    t.ok('…and the head is the widest thing on it', widths[0] > widths[1] * 1.5,
+        `head ${widths[0].toFixed(2)} vs neck ${widths[1].toFixed(2)}`);
+
+    // ── The shared trail behaves in the units it claims ────────────────────
+    const still = [];
+    for (let i = 0; i < 50; i++) pushTrail(still, i * 0.001, 0);
+    t.ok('a stationary body does not flood its trail with one repeated point',
+        still.length === 1, `${still.length} samples after 50 still ticks`);
+    const moving = [];
+    for (let i = 0; i < 50; i++) pushTrail(moving, i * 0.5, 0);
+    t.ok('…and a moving one records the path', moving.length === 50, `${moving.length}`);
+    const seeded = seedTrail([], 3, -2, WYRM_ARC[WYRM_ARC.length - 1]);
+    let arc = 0;
+    for (let i = 1; i < seeded.length; i++) {
+        arc += Math.hypot(seeded[i].x - seeded[i - 1].x, seeded[i].z - seeded[i - 1].z);
+    }
+    // A seed of N copies of one point has zero arc length: `trailAt` walks off
+    // the end of it and hands every segment the head. That is what the Sand
+    // Spur did after every dive.
+    t.ok('a seeded trail has real length, not N copies of one point',
+        arc >= WYRM_ARC[WYRM_ARC.length - 1] - TRAIL_STEP,
+        `${arc.toFixed(2)} units of arc across ${seeded.length} samples`);
+
+    // ── The dive teleports, so the wake has to move with it ────────────────
+    // Driven through `update`, not `tickAI`. `_dive` calls `startAction` without
+    // passing a player, so it takes its target from `_actionPlayer` — which
+    // only `update` ever sets. Off a hand-driven tickAI the dive is refused at
+    // `if (def.aim && !target) return false`, nothing moves, and a test that
+    // only checked the tail afterwards would report a pass for a move that
+    // never happened.
+    const dived = new MagmaWyrm(new THREE.Scene(), P);
+    dived.phase = 2;
+    const p2 = player();
+    for (let i = 0; i < 180; i++) {
+        const a = (i / 180) * Math.PI * 2;
+        p2.root.position.x = Math.sin(a) * 7;
+        p2.root.position.z = Math.cos(a) * 7;
+        try { dived.update(1 / 60, p2, {}); } catch (_) { /* headless gaps */ }
+    }
+    dived.action = null;   // whatever it was mid-way through is not the subject
+    const from = { x: dived.root.position.x, z: dived.root.position.z };
+    try {
+        dived._dive(p2);
+        for (let i = 0; i < 600 && dived.action; i++) dived.update(1 / 60, p2, {});
+    } catch (_) { /* headless gaps */ }
+    const jumped = Math.hypot(dived.root.position.x - from.x, dived.root.position.z - from.z);
+    // GUARD FIRST. The teleport happens inside the dive's `strike`, and if that
+    // throws in this harness the tail assertion below would pass by never
+    // having been tested.
+    t.ok('the dive relocates the Wyrm in this harness', jumped > 1,
+        `moved ${jumped.toFixed(2)} units`);
+    const tv = dived.segs[dived.segs.length - 1].position;
+    t.ok('…and the body surfaces with it instead of staying over the hole',
+        Math.hypot(tv.x, tv.z) * dived.root.scale.x <= WYRM_ARC[WYRM_ARC.length - 1] + 0.5,
+        `tail ${(Math.hypot(tv.x, tv.z) * dived.root.scale.x).toFixed(2)} behind the head`);
+}
+
 export function runSandSpur(t) {
     // The sampler on its own, against a trail whose geometry is known exactly:
     // a straight line one unit per step. Then "2.5 units back" has a right
@@ -926,6 +1096,24 @@ export function runSandSpur(t) {
     t.ok('the Sand Spur\'s segments do not sit inside each other',
         tightest > SEG_GAP * 0.6,
         `tightest centre gap ${tightest.toFixed(2)} against a target of ${SEG_GAP}`);
+
+    // AND AGAIN AFTER EVERY DIVE. `_surfaceAt` used to refill the trail with
+    // `segments.length * 6` copies of the surfacing point, which has zero arc
+    // length — `trailAt` walks straight off the end of it and hands every
+    // segment the head, so the Spur came up as a stack of six bodies and stayed
+    // that way until it had swum its own length again. That is most of the
+    // fight: this boss surfaces, is beached, and dives, on a loop.
+    boss._surfaceAt(6, -4);
+    boss.submerged = false;
+    try { boss.tickAI(1 / 60, player, {}); } catch (_) { /* headless gaps */ }
+    let surfaced = Infinity;
+    for (let i = 1; i < boss.segments.length; i++) {
+        const a2 = boss.segments[i - 1].position, b2 = boss.segments[i].position;
+        surfaced = Math.min(surfaced, Math.hypot(a2.x - b2.x, a2.z - b2.z));
+    }
+    t.ok('…and it surfaces as an animal rather than as a stack',
+        surfaced > SEG_GAP * 0.6,
+        `tightest gap ${surfaced.toFixed(2)} on the frame after surfacing`);
 
     // The weak seam is the "hit here" sign for the beached window the whole
     // fight is built around, and it was authored at y=0.42 — inside the maw

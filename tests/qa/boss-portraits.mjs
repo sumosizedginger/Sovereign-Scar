@@ -411,6 +411,17 @@ try {
     }
     console.log(`\n  → ${OUT}/  (${shots.filter((s) => !s.error).length * 2} images)`);
     console.log(`  page errors: ${errors.length}`);
+    // A FILTER THAT MATCHES NOTHING HAS TO SAY SO. `--only` selects on the beat
+    // NUMBER, and `--only=magma-wyrm` rendered zero bosses, printed the camera
+    // banner and the usual "page errors: 0", and exited clean. A probe that
+    // reports a successful run of nothing is worse than one that crashes: the
+    // images on disk are then whatever was there before, and they get read as
+    // the result of the change that was just made.
+    if (ONLY && !shots.length) {
+        console.error(`\n  !! --only=${ONLY} matched no boss. It selects on the ` +
+            'beat number (01…14), not the slug. Nothing was rendered.');
+        process.exitCode = 2;
+    }
     if (errors.length) for (const e of errors.slice(0, 5)) console.log(`    ${e}`);
 } finally {
     await browser.close();

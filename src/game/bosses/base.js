@@ -1698,6 +1698,70 @@ export function moveToward(pos, target, speed, dt, resolve) {
     return d;
 }
 
+// ── Segmented bodies ───────────────────────────────────────────────────────
+//
+// Two bosses are a chain of segments following the head's own path — the Sand
+// Spur and the Magma Wyrm — and both shipped the SAME bug independently,
+// sampling their trail by FRAME COUNT (`trail[i * 5]` and `wake[i * 22]`).
+// Frames are not a distance. What that stride is worth in world units depends
+// on the frame rate and on the boss's speed, neither of which is fixed:
+// measured, the Wyrm's six bodies spanned 3.9 units at 30fps and 0.70 at
+// 144fps — the same animal, one a serpent and one a pile.
+//
+// The Spur was fixed first and the fix was not swept here, which is how the
+// second one survived. So the machinery lives in ONE place now: a trail that
+// samples by distance rather than by tick, and a lookup that walks it by arc
+// length. Both are frame-rate-independent by construction, and the next
+// segmented body gets them for free instead of reinventing the defect.
+
+/** Minimum world distance between stored trail samples. */
+export const TRAIL_STEP = 0.08;
+/** Samples kept. At TRAIL_STEP apart this is ≥ 20 units of path, whatever the
+ *  frame rate — the old frame-counted caps held 10.8 units at 144fps and were
+ *  quietly short of the Spur's own 12.5-unit body. */
+export const TRAIL_MAX = 260;
+
+/**
+ * Record the head's position, if it has moved far enough to be worth a sample.
+ *
+ * Gating on DISTANCE rather than storing every tick is what makes the history
+ * hold a fixed length of PATH: 260 samples is 20+ units at any frame rate,
+ * where 400 per-frame samples was 2.8 seconds — which is a different distance
+ * at 30fps than at 144fps, and a different one again in phase 2.
+ */
+export function pushTrail(trail, x, z, step = TRAIL_STEP, max = TRAIL_MAX) {
+    const head = trail[0];
+    if (head && Math.hypot(x - head.x, z - head.z) < step) return trail;
+    trail.unshift({ x, z });
+    while (trail.length > max) trail.pop();
+    return trail;
+}
+
+/** The point `dist` world units back along a trail of {x,z} samples. */
+export function trailAt(trail, dist) {
+    if (!trail.length) return null;
+    let acc = 0;
+    for (let k = 1; k < trail.length; k++) {
+        acc += Math.hypot(trail[k].x - trail[k - 1].x, trail[k].z - trail[k - 1].z);
+        if (acc >= dist) return trail[k];
+    }
+    return trail[trail.length - 1];
+}
+
+/**
+ * A straight tail laid behind `(x, z)`, pointing along -Z.
+ *
+ * Without this the chain is empty on the frame the boss appears and every
+ * segment clamps to the same single sample — six bodies stacked on the head,
+ * for as long as it takes to move a body length. Both chained bosses spawn in
+ * view of the player.
+ */
+export function seedTrail(trail, x, z, length, step = TRAIL_STEP) {
+    trail.length = 0;
+    for (let k = 0; k * step <= length; k++) trail.push({ x, z: z - k * step });
+    return trail;
+}
+
 /** Utility: bounce inside axis-aligned arena. */
 export function bounceArena(pos, vel, center, radius) {
     const minX = center.x - radius, maxX = center.x + radius;

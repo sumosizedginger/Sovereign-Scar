@@ -60,6 +60,16 @@ voxel, so at `VOX_PER_UNIT = 6` everything from 0.12 to 0.34 comes out at
 `LIMB_VOX_PER_UNIT` (18) to `voxBox` / `voxBlob` / `voxSphere` / `voxSpike` for
 anything meant to read as a line.
 
+**2b. The same rounding eats GRADIENTS, not just thin parts** (found 2026-08-17,
+and it is the more expensive half). `cells()` rounds a radius to whole voxels, so
+below half a unit the body grid offers three sizes and nothing between. The
+Wyrm's five segments were authored 0.46 → 0.188, a body that more than halves,
+and built **1.17, 0.83, 0.83, 0.83, 0.50** — three of five identical, one of them
+63% wider than asked. Nothing looked thin, nothing hit the 0.5 floor, and the
+taper simply was not there. *The Hydroid's orbs and the Proxy's hoop were the
+same call.* **A series of sizes needs enough voxels to spell the difference
+between its members**: check what was built, never what was typed.
+
 **3. Width across the screen is the only free axis.** A boss facing the player
 sits at `rotation.y = 0`, so world **+X runs across frame at full length** while
 **+Z runs at the lens** and is crushed by the 70.7° pitch. Three separate limbs
@@ -76,7 +86,9 @@ is above it.**
 the Golem was `ABYSS_COLORS.sludge` in the sludge room; the Witness was
 `0xff40c8` in a room whose accent is `0xff40c8`. Check the kit in
 `levels/dungeon-kits.js` before picking a palette, and go dark against it with
-the accent in the seams.
+the accent in the seams. **Or go hotter:** the Wyrm's fix was not a different
+hue but a higher temperature — gold fissures on black crust, brighter than the
+ember pools it swims past rather than the same colour as them.
 
 **Now gated across the whole roster, and the measurement was worth taking.**
 `boss-bodies.spec` checks every boss against its own kit accent — the kit looked
@@ -86,26 +98,29 @@ call:
 
 | | nearest | share |
 |---|---|---|
-| ten bosses | 0.25 – 0.97 | **0.0%** |
+| thirteen bosses | 0.25 – 0.97 | **0.0%** |
 | Skeletal Mantis | 0.001 | 59.3% |
-| Magma Wyrm | 0.013 | 39.7% |
 
 There is no middle ground, because the defect is always the same mechanical
 act: the kit's accent constant gets typed into the boss. **Five of fourteen did
-it** — the Witness, the Proxy and the Sand Spur are fixed (the Spur went from
-88.8% at 0.014 to 0.0% at 0.345, and its entry was REMOVED rather than
-loosened); the other two are pinned at their measured value as ceilings that
-still fail if they get worse.
+it** — the Witness, the Proxy, the Sand Spur and the Magma Wyrm are all fixed
+and their entries REMOVED rather than loosened (the Spur went from 88.8% at
+0.014 to 0.0% at 0.345; the Wyrm from 39.7% at 0.013 to 0.0% at 0.411). One
+exemption remains, recorded with its reason.
 
 - **Mantis — accepted.** It is the reference silhouette and the one body nobody
   has asked to change. It reads on SHAPE, which is exactly the property that
   makes sharing a hue survivable, and a bone skeleton in the Bone Forest is the
   right answer anyway. *A gate that failed the best boss on the roster would be
   the wrong gate.*
-- **Wyrm — outstanding.** This document listed "the Wyrm was orange on the magma
-  floor" as a FIXED example of this trap. **It is not fixed**: two fifths of the
-  body is still within 0.013 of the pyre accent. The model is owner-approved, so
-  it is pinned rather than changed unasked. Raise with the owner.
+- **Wyrm — fixed 2026-08-17.** This document had listed "the Wyrm was orange on
+  the magma floor" as a FIXED example of this trap while two fifths of the body
+  sat within 0.013 of the pyre accent — the maw and all five dorsal fins were
+  `0xff5a18` against a kit accent of `0xff5520`. The heat is gold now
+  (`0xffbe3d`), 0.411 away: **hotter than the room rather than the same
+  temperature as it**, which is also what lava actually looks like — black
+  crust, white-hot fissures. *A doc claiming a fix is not a fix; this entry
+  existed for four days because nobody measured the thing the sentence named.*
 - **Sand Spur — fixed.** It was the worst on the roster at 88.8%; the rebuild
   put it at 0.0%, so the exemption is gone. An exemption that is no longer
   earned gets removed, which is the only direction a ratchet may move.
@@ -515,7 +530,17 @@ second body in the game built the same way.
 Frames were the wrong unit regardless: this boss's speed runs 3.9 → 5.7 across
 its phases, so a fixed frame stride silently stretches the animal apart as the
 fight escalates. It samples by **arc length** now (`SEG_GAP = 2.5`, a little
-over one body), which is speed-independent. *The Wyrm is still counting frames.*
+over one body), which is speed-independent.
+
+**And the fix left the same units error in the buffer behind it** (found
+2026-08-17, while fixing the Wyrm). The trail was capped at 400 SAMPLES — 2.8
+seconds at 144fps, which is 10.8 units of path against a 12.5-unit animal, so
+the tail clamped short at high frame rates. Worse, `_surfaceAt` refilled the
+trail with `segments.length * 6` copies of one point, which has **zero arc
+length**: `trailAt` walks off the end of it and hands every segment the head, so
+the Spur came up as a stack of six bodies after *every dive* — which is most of
+the fight. Both are gone; the trail lives in `base.js` now and gates on
+distance, so 260 samples is 20+ units of path at any frame rate.
 
 **The weak seam was inside the head.** Authored at `y = 0.42`, within the maw
 blob — the "hit here" sign for the window the entire fight is built around was
@@ -526,9 +551,10 @@ own maws.
 
 *Guarded by:* `runSandSpur` in `boss-bodies.spec.mjs` — `trailAt` sampling by
 distance (tested against a straight line whose answer is known exactly, rather
-than by driving a boss), the shipped chain not sitting inside itself, and the
-seam proud of the head. Restoring the five-frame stride fails the first;
-returning the seam to `y = 0.42` fails the last.
+than by driving a boss), the shipped chain not sitting inside itself, the chain
+still spread on the frame after it surfaces, and the seam proud of the head.
+Restoring the five-frame stride fails the first; restoring the six-copies seed
+fails the third; returning the seam to `y = 0.42` fails the last.
 
 ### 04 — Kinetic Core · **DONE** (2026-08-17)
 
@@ -583,6 +609,53 @@ with edges of only 1.46 and 1.08. Grow first, measure, then shape.
 *Risk:* medium — these are the three with the most unusual movement, and two are
 outside `roster.js`. **Effort: one sitting each, three total.**
 
+### 12 — Magma Wyrm · **REVISITED** (2026-08-17)
+
+Not a rebuild — the body was owner-approved. Three defects, all of them a number
+in the wrong UNITS, and all three invisible to every gate in the suite.
+
+**It wore the room.** The maw and all five dorsal fins were `0xff5a18` against a
+pyre accent of `0xff5520` — 0.013 apart in linear space, which is the same
+colour, on two fifths of the body. Repainted gold (`0xffbe3d`, 0.411 away):
+**hotter than the room instead of the same temperature as it**, which is what
+lava is anyway — black crust, white-hot fissures.
+
+**The taper was rounded away by the voxel grid.** The five segment radii are
+authored 0.46 → 0.188 and they built 1.17, 0.83, 0.83, 0.83, 0.50 units wide:
+`cells()` rounds a radius to whole voxels, and under half a unit the 6-per-unit
+body grid has three of them to round to. **Segments 2, 3 and 4 were identical**
+and segment 3 was 63% wider than it asked for — the taper that gives the shape a
+direction existed only in the source. At limb resolution it is 2.18, 1.92, 1.67,
+1.41, 0.90 world units, strictly narrowing. *Third time this pass: the Hydroid's
+orbs and the Proxy's hoop were rounded into the wrong body by the same call.*
+
+**The chain counted frames.** `_wake[i * 22]` is twenty-two TICKS of history per
+segment. Measured, the six bodies spanned **3.92 units at 30fps, 2.85 at 60fps
+and 0.70 at 144fps** — the same animal, one a serpent and one a pile inside its
+own skull, with several segments at exactly 0.00 from each other because the
+clamp handed them all the same sample. This boss had been "fixed" once by
+widening the stride from 5 to 22, which moved the frame rate at which it looks
+right rather than removing the dependence on one. It samples by arc length now
+(`WYRM_ARC`), and `_dive` re-lays the wake where it surfaces so the body does not
+stay draped over the hole it came out of.
+
+**Two things the pictures caught that the numbers approved.** The first arc I
+chose spaced the segments to CLEAR each other — the spider rule — and it
+photographed as five rocks with a head parked nearby. Continuity is correct for a
+serpent; the gaps are shorter than the bodies they join now, so it overlaps into
+one animal. Then the fins, at `r * 1.55`, were **longer than the gaps between
+them** and merged into a single unbroken gold bar down the back — the exact
+opposite of their job, which is to say where one body ends. Shortened to
+`r * 0.78`, there is dark between them.
+
+*Guarded by:* `runMagmaWyrm` in `boss-bodies.spec.mjs`. The placement assertion
+measures each segment's arc distance back along **a path the test records
+itself**, at 30/60/144fps in both phases — worst error 0.22 units. Note what it
+does *not* measure: head-to-tail distance is a chord, and a chord reads 8.81 at
+30fps and 7.92 at 144fps for a chain behaving perfectly, because the wyrm turns
+a slightly different curve when the integrator is stepped differently. *Two
+plausible instruments were wrong before the third one was right.*
+
 ### 08 — Skeletal Mantis · **do nothing**
 
 It reads instantly and always did. It is the reference: splayed scythes with
@@ -598,7 +671,7 @@ valuable one and should not be allowed to crowd out the rest:
 | item | state |
 |---|---|
 | Distribution live (Pages + a release) | **pushed, still dark** — `v0.4.0` is on the remote and `enablement: true` is in `pages.yml`, but `sumosizedginger.github.io/Sovereign-Scar/` still 404s (checked 2026-08-16). Next check is the Actions log for `pages.yml`; if it is still refusing, the fallback is one click in Settings → Pages → Source: GitHub Actions |
-| Boss silhouettes | **DONE** — 13 rebuilt, 1 (Mantis) needed nothing |
+| Boss silhouettes | **DONE** — 13 rebuilt, 1 (Mantis) needed nothing, Wyrm revisited 08-17 |
 | Occlusion | not started — agreed to land BEFORE the combo work |
 | Combo system | not started, riskiest item in v1 |
 | 80% room variation (wall/ceiling height) | not started |

@@ -17,7 +17,9 @@
 // was no reason to move and no way to lose.
 
 import * as THREE from 'three';
-import { BossBase, bossHit, BOSS_EMISSIVE_MAX } from './base.js';
+import {
+    BossBase, bossHit, BOSS_EMISSIVE_MAX, pushTrail, trailAt, seedTrail,
+} from './base.js';
 import { DestructibleVoxelMesh } from '../world/destructible-voxel-mesh.js';
 import { fillBox } from '../../voxel/helpers.js';
 import { CRUST_COLORS } from '../assets/palettes.js';
@@ -51,21 +53,10 @@ export const WAKE_CD = 1.0;
 // segments read as separate plates with floor visible between them — which is
 // the only reason the Skeletal Mantis reads, and it holds at every speed.
 //
-// (The Magma Wyrm has the same frame-stride construction, widened to 22 when it
-// had this exact bug. It is the only other body in the game built this way, and
-// it is still counting frames.)
+// (The Magma Wyrm had the same frame-stride construction, widened to 22 when it
+// had this exact bug. `trailAt` and the trail itself now live in `base.js` and
+// both bosses use them, so there is no longer a second copy to forget.)
 export const SEG_GAP = 2.5;
-
-/** The point `dist` world units back along a trail of {x,z} samples. */
-export function trailAt(trail, dist) {
-    if (!trail.length) return null;
-    let acc = 0;
-    for (let k = 1; k < trail.length; k++) {
-        acc += Math.hypot(trail[k].x - trail[k - 1].x, trail[k].z - trail[k - 1].z);
-        if (acc >= dist) return trail[k];
-    }
-    return trail[trail.length - 1];
-}
 
 export const BREACH_R = 4.5;
 export const BREACH_TIME = 1.6;
@@ -166,7 +157,12 @@ export class SandSpur extends BossBase {
         };
         this.speed = opts.speed || 3.4;
         this.segments = [];
-        this.trail = [];
+        // Seeded, not empty: an empty trail has no arc length, so the first
+        // frame stacks every segment on the head. Defensive rather than
+        // load-bearing — the Spur constructs submerged and `_surfaceAt` re-lays
+        // the trail before anyone sees it — so it has no counterfactual, which
+        // is recorded here rather than left looking like an untested fix.
+        this.trail = seedTrail([], pts[0].x, pts[0].z, (opts.segments || 6) * SEG_GAP);
         const n = opts.segments || 6;
         for (let i = 0; i < n; i++) {
             const mesh = i === 0 ? buildSpurHead() : buildSpurSegment(i, n);
@@ -358,8 +354,12 @@ export class SandSpur extends BossBase {
     _surfaceAt(x, z) {
         this.root.position.x = x;
         this.root.position.z = z;
-        this.trail.length = 0;
-        for (let i = 0; i < this.segments.length * 6; i++) this.trail.push({ x, z });
+        // A STRAIGHT tail, not six copies of one point. Filling the trail with
+        // the same {x,z} gives it zero arc length, so `trailAt` walks off the
+        // end and hands every segment the surfacing point — the Spur came up
+        // as a stack of six bodies after every dive and stayed that way until
+        // it had travelled its own length again.
+        seedTrail(this.trail, x, z, this.segments.length * SEG_GAP);
     }
 
     tickAI(dt, player) {
@@ -405,11 +405,14 @@ export class SandSpur extends BossBase {
         // This is the Magma Wyrm's bug, exactly: its chain "trailed 0.28 apart
         // while being 2.4 across" and was fixed by widening the stride to 22
         // with a matching history cap. That fix was never swept across to here
-        // — the second body in the game built the same way.
-        this.trail.unshift({ x: this.root.position.x, z: this.root.position.z });
-        // Long enough to hold the whole animal at its slowest, capped so a
-        // stationary Spur cannot grow an unbounded history.
-        if (this.trail.length > 400) this.trail.pop();
+        // — the second body in the game built the same way. Both use the shared
+        // trail in `base.js` now, so there is one implementation to be right.
+        //
+        // The 400-sample cap this replaces was ALSO a frame count: 2.8 seconds
+        // of history, which at 144fps is 10.8 units of path against a 12.5-unit
+        // animal. The fix for the stride left the same units error in the
+        // buffer behind it.
+        pushTrail(this.trail, this.root.position.x, this.root.position.z);
 
         const beached = this.staggered;
         for (let i = 0; i < this.segments.length; i++) {
