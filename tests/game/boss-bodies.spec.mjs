@@ -423,6 +423,7 @@ export function run(t) {
 
     runWitness(t);
     runFrostAndFuel(t);
+    runHydroid(t);
 }
 
 /**
@@ -638,4 +639,73 @@ export function runFrostAndFuel(t) {
     });
     t.ok('…and its ice half is not painted the colour of its ice room',
         clashes.length === 0, clashes.slice(0, 4).join(', ') || 'none');
+}
+
+/**
+ * Hydroid Cloud — the swarm that has to stay a swarm.
+ *
+ * The failure this replaced was not a colour or a proportion: twelve orbs of
+ * radius up to 0.51 sat 0.63 apart on their own ring, so they INTERSECTED and
+ * the swarm rendered as one solid lump. That is a relationship between two
+ * numbers written 60 lines apart — the radii in the constructor and the spread
+ * in `tickAI` — and nothing in the suite could see it. It can now.
+ */
+export function runHydroid(t) {
+    const boss = new HydroidCloud(new THREE.Scene(), { x: 0, y: 1.8, z: 0 });
+    const player = {
+        root: { position: { x: 0, y: 1.95, z: 7 } },
+        health: { hp: 6, maxHp: 6, dead: false, damage: () => ({ accepted: true }) },
+        state: { facingVec: { x: 0, z: -1 } },
+    };
+
+    /** Smallest gap between any two orbs' surfaces, in the ring's own space. */
+    const tightest = () => {
+        let worst = Infinity;
+        for (let i = 0; i < boss.orbs.length; i++) {
+            for (let j = i + 1; j < boss.orbs.length; j++) {
+                const a = boss.orbs[i], b = boss.orbs[j];
+                a.geometry.computeBoundingSphere();
+                b.geometry.computeBoundingSphere();
+                const gap = a.position.distanceTo(b.position)
+                    - a.geometry.boundingSphere.radius - b.geometry.boundingSphere.radius;
+                if (gap < worst) worst = gap;
+            }
+        }
+        return worst;
+    };
+
+    for (let i = 0; i < 30; i++) boss.tickAI(1 / 60, player, null);
+    t.ok('the Hydroid\'s swarm has background between its drops',
+        tightest() > 0, `tightest surface gap ${tightest().toFixed(3)}`);
+
+    // ── The bell is not a roof ─────────────────────────────────────────────
+    // Trap 4: a solid canopy over the orbs would delete them at this pitch,
+    // which is exactly how the Golem's first humanoid build photographed as a
+    // bare slab. The bell has to stay INSIDE the orbit it hangs from.
+    const bellR = (() => {
+        const box = new THREE.Box3().setFromObject(boss.bell);
+        return Math.max(box.max.x - box.min.x, box.max.z - box.min.z) / 2;
+    })();
+    const orbitR = Math.min(...boss.orbs.map((o) => Math.hypot(o.position.x, o.position.z)));
+    t.ok('…and its bell sits inside the ring rather than over it',
+        bellR < orbitR, `bell half-width ${bellR.toFixed(2)} vs nearest orb ${orbitR.toFixed(2)}`);
+
+    // ── Phase 2 must not undo it ───────────────────────────────────────────
+    // Phase 2 adds eight orbs AND widens the ring, in two different methods.
+    // Either one changing alone re-fuses the swarm.
+    boss.hp = boss.maxHp * 0.2;
+    boss._checkPhase();
+    for (let i = 0; i < 30; i++) boss.tickAI(1 / 60, player, null);
+    t.ok('…and phase 2 grows the swarm without re-fusing it',
+        boss.orbs.length > 12 && tightest() > 0,
+        `${boss.orbs.length} orbs, tightest gap ${tightest().toFixed(3)}`);
+
+    // ── The bell pumps before it rains ─────────────────────────────────────
+    const open = boss.bell.scale.x;
+    boss.action = { name: 'rainfall' };
+    for (let i = 0; i < 60; i++) boss.tickAI(1 / 60, player, null);
+    t.ok('…and the bell gathers before it sheds',
+        boss.bell.scale.x < open * 0.9 && boss.bell.scale.y > 1,
+        `x ${open.toFixed(2)} -> ${boss.bell.scale.x.toFixed(2)}, `
+        + `y ${boss.bell.scale.y.toFixed(2)}`);
 }

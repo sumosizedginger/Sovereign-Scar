@@ -1,10 +1,10 @@
 # The boss pass — what is left, and exactly how to do it
 
-Eight of fourteen are rebuilt: Crypt Warden, Obsidian Arachnid, Magma Wyrm,
-Leviathan Core, Phantasm, Sludge Golem, GUMOI Witness, Frost & Fuel. The
-Skeletal Mantis needs nothing and never did. **Five remain.**
+Nine of fourteen are rebuilt: Crypt Warden, Obsidian Arachnid, Magma Wyrm,
+Leviathan Core, Phantasm, Sludge Golem, GUMOI Witness, Frost & Fuel, Hydroid
+Cloud. The Skeletal Mantis needs nothing and never did. **Four remain.**
 
-This document is the method that survived those eight, the traps each one cost,
+This document is the method that survived those nine, the traps each one cost,
 and a per-boss plan with the numbers already measured. It exists because the
 first three bosses took four to six passes each and the last three took two —
 almost all of the difference was knowing the things written down here.
@@ -270,24 +270,61 @@ the side its own element lands** (driven through the real move and read as a
 world-space cross product, never as the sign of a rotation angle), and the
 room-colour gate with the two maws exempted. Swapping the heads' sides fails it.
 
-### 07 — Hydroid Cloud
+### 07 — Hydroid Cloud · **DONE** (2026-08-17)
 
-*Now:* twelve orbs, 4.7 wide, reading as a cloud/ring. Band **3.37**, the most
-generous on the roster.
+*Was:* twelve orbs on a ring, 4.7 wide — and at radii up to 0.51 on a spread of
+1.2 they sat 0.63 apart centre-to-centre, so they **intersected**. The swarm
+photographed as one solid blue kidney bean. The subtitle is *The Weeping Swarm*.
 
-*Does:* `orb-shed` (a pulse centred on the cloud) and `rainfall` (phase 2). The
-orbs are real and are animated individually.
+*Does:* `pulse` / `storm_pulse` centred on the cloud, `orb-shed` (three motes
+seeded around the *player*), `rainfall` (phase 2), plus falling droplets.
 
-*Build:* **a jellyfish.** Keep all twelve orbs — they are the mechanic — but
-give them something to hang from: a translucent bell above, with the orbs slung
-beneath as a curtain. The bell contracts before `rainfall`, which turns the
-tell into anatomy. From overhead you read a bright ring with beads under it.
+*Built:* **a jellyfish.** The shape came from the move, not from taste: the
+pulse is centred on the cloud and its own comment says the answer is *"get out
+from under it"* — so the body is a thing you are UNDER. A pale bell, the twelve
+drops ringing it, five uneven tendrils trailing out. 5.81 wide, 24% of frame,
+hitbox ratio 0.78, **band 1.23** (down from 3.37 — the old visible edge was
+0.91 because the body was one small lump; it is 3.05 now, and 1.23 is still
+twice the floor).
 
-*Constraints:* the orbs are positioned by `tickAI` every frame; the bell must be
-a sibling, not a parent, or it will fight the orbit maths. Same lesson as the
-Wyrm's chain.
+**The bell is a ring with a small cap, not a dome**, and that is trap 4
+verbatim: a solid canopy over twelve orbs is a roof, and at this pitch a roof
+deletes everything under it. `runHydroid` asserts the bell stays *inside* the
+orbit rather than over it.
 
-*Risk:* low. **Effort: one sitting.**
+**The bell gathers before it rains** — it narrows and deepens off the same
+`action.name` that fires the move, so the tell cannot drift from the thing it
+tells.
+
+*What it cost:*
+
+1. **The orbit was pre-squashed on the axis the camera already crushes.** The
+   positions ran `sin(a) * r * 0.7`, foreshortening Z twice, so the ring
+   photographed as a horizontal line with a clump at each end. Removed — the
+   70.7° pitch supplies the ellipse for free. **See trap 3: that `* 0.7` is the
+   same mistake as pushing a limb "forward to use the depth", written as maths
+   instead of as a position.**
+2. **Six equal spokes is a snowflake.** Straight tendrils at even spacing read
+   as a crystal; five at uneven lengths never resolve into a symmetry. A
+   tangential sweep was tried and reverted — bending the run spaced the segments
+   apart and the strands photographed as loose dice. *Contiguity beats curve.*
+3. **The spacing arithmetic was only true if the radii were true.** Phase 2 still
+   overlapped by 0.016 after the numbers said it would not, because on the
+   6-per-unit grid `cells()` rounds 0.27 and 0.32 to the same two cells — both
+   build at 0.333. Moving the orbs to `LIMB_VOX_PER_UNIT` made the requested
+   radius the built radius and fixed both phases without touching the spread.
+4. **Thirty tendril segments at limb resolution are a lot of vertices, all at
+   the far end of the body**, which dragged the p85 to a 0.70 ratio against a
+   0.75 floor. Trailing threads the player cannot hit are precisely what that
+   statistic exists to catch, so the tendrils shortened and the ring came inside
+   the hitbox — and then the *bell* shrank rather than the swarm, because the
+   bell is the part that is not the mechanic.
+
+*Guarded by:* `runHydroid` in `boss-bodies.spec.mjs` — **the swarm has
+background between its drops** (smallest surface-to-surface gap over every pair,
+in both phases, which is the defect this rebuild existed to fix and was
+invisible to the whole suite before), the bell sits inside the ring, phase 2
+grows the swarm without re-fusing it, and the bell gathers before it sheds.
 
 ### 05 — The Proxy
 
@@ -341,7 +378,7 @@ valuable one and should not be allowed to crowd out the rest:
 | item | state |
 |---|---|
 | Distribution live (Pages + a release) | **pushed, still dark** — `v0.4.0` is on the remote and `enablement: true` is in `pages.yml`, but `sumosizedginger.github.io/Sovereign-Scar/` still 404s (checked 2026-08-16). Next check is the Actions log for `pages.yml`; if it is still refusing, the fallback is one click in Settings → Pages → Source: GitHub Actions |
-| Boss silhouettes | **8 of 14 done**; 5 planned here; 1 needs nothing |
+| Boss silhouettes | **9 of 14 done**; 4 planned here; 1 needs nothing |
 | Occlusion | not started — agreed to land BEFORE the combo work |
 | Combo system | not started, riskiest item in v1 |
 | 80% room variation (wall/ceiling height) | not started |
@@ -355,5 +392,5 @@ playthrough turned up is fixed.** More testers are being lined up by the owner;
 that is in hand and is not a reason to hold up the roster. Do not keep
 re-proposing it.
 
-*Suggested interleave:* ~~the Witness~~ ~~Frost & Fuel~~ (both done) →
-occlusion → the remaining five bosses in the gaps.
+*Suggested interleave:* ~~the Witness~~ ~~Frost & Fuel~~ ~~Hydroid Cloud~~ (done)
+→ occlusion → the Proxy and the three small ones in the gaps.

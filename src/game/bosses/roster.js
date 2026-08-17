@@ -1460,11 +1460,100 @@ export class ObsidianArachnid extends BossBase {
 // ─── Beat 07 — Hydroid Cloud ────────────────────────────────────────────────
 export class HydroidCloud extends BossBase {
     constructor(scene, position = { x: 0, z: -6 }) {
+        // A JELLYFISH: A BELL YOU STAND UNDER, AND THE DROPS IT SHEDS.
+        //
+        // It was twelve orbs on a ring and nothing else, and at a spread of 1.2
+        // with radii up to 0.51 they overlapped their own neighbours — so the
+        // "swarm" photographed as one lumpy blue kidney bean. The subtitle is
+        // *The Weeping Swarm*.
+        //
+        // THE SHAPE COMES FROM THE MOVE. Its pulse is centred on the cloud and
+        // its own comment says the answer is "get out from under it" — so the
+        // body should be a thing you are UNDER. A bell says that before the
+        // telegraph draws. The drops hanging off it are the swarm, and the rain
+        // it sheds is the weeping.
+        //
+        // THE BELL IS A RING, NOT A DOME, and that is trap 4 verbatim: a solid
+        // canopy over twelve orbs is a roof, and at a 70.7° pitch a roof
+        // deletes everything under it — which is exactly how the Golem's first
+        // humanoid build photographed as a bare slab. A rim with a small cap
+        // leaves the orbit visible outside it.
         const body = new THREE.Group();
+
+        const BELL_MASS = 0x4a6b74, BELL_RIM = 0xa6cbd2, TENDRIL = 0x8fb3ba;
+        const bell = new THREE.Group();
+        bell.position.y = 0.62;
+        body.add(bell);
+        // Kept DARK on purpose. The room's kit accent is `0x4a9fd4` and the
+        // orbs are already a hot cyan; a pale bell in a blue sluice would be
+        // the Wyrm-on-magma problem again. Mass dark, light in the drops.
+        const cap = voxBlob(0.76, 0.50, 0.76, BELL_MASS, 0x000000, 0,
+            { transparent: true, opacity: 0.9 });
+        bell.add(cap);
+        const rim = voxRing(0.80, 0.14, BELL_RIM, BELL_RIM, 0.08,
+            { transparent: true, opacity: 0.85 });
+        rim.rotation.x = Math.PI / 2;
+        rim.position.y = -0.26;
+        bell.add(rim);
+        // Lobes hanging off the rim: the scalloped edge that makes a dome read
+        // as a bell rather than as a bowl.
+        for (let i = 0; i < 8; i++) {
+            const a = (i / 8) * Math.PI * 2;
+            const lobe = voxBlob(0.20, 0.28, 0.20, BELL_RIM, 0x000000, 0,
+                { transparent: true, opacity: 0.8 });
+            lobe.position.set(Math.cos(a) * 0.80, -0.40, Math.sin(a) * 0.80);
+            bell.add(lobe);
+        }
+
+        // Tendrils, trailing PAST the orbit so they carry the silhouette. At
+        // limb resolution — at the body grid a 0.1 strand comes back 0.5 thick
+        // and the whole point is that they read as threads (trap 2).
+        const tendrils = [];
+        // FIVE, AND NOT ALL THE SAME LENGTH. Six equal spokes at even spacing
+        // is a snowflake, which is a crystal and not an animal. An odd count
+        // with uneven reach never resolves into a symmetry the eye can name.
+        // Shortened after `boss-bodies.spec` put the hitbox ratio at 0.70
+        // against a 0.75 floor: 30 tendril segments at limb resolution are a
+        // large share of this body's vertices and they all sit at the far end
+        // of it, so they drag the p85 outward hard (trap 10). Trailing threads
+        // the player cannot hit are exactly the thing that statistic exists to
+        // catch, so the art moved rather than the fight number.
+        const REACH = [0.94, 0.70, 1.04, 0.77, 0.88];
+        for (let i = 0; i < 5; i++) {
+            const a = (i / 5) * Math.PI * 2 + 0.4;
+            const reach = REACH[i];
+            const strand = new THREE.Group();
+            for (let s = 0; s < 6; s++) {
+                const u = s / 5;
+                const seg = voxBox(0.17, 0.30, 0.17, TENDRIL, 0x000000, 0,
+                    { transparent: true, opacity: 0.9 - u * 0.35 }, LIMB_VOX_PER_UNIT);
+                // OUTWARD far more than downward. A strand that hangs straight
+                // down is a single voxel from directly above — the run has to
+                // happen across the screen, which is the only axis this camera
+                // gives away for free (trap 3).
+                // Straight and CONTIGUOUS. A tangential sweep was tried and
+                // reverted: bending the run spaced the segments apart and the
+                // strands photographed as a scatter of loose dice. Contiguity
+                // is what makes a row of boxes read as one strand, and it is
+                // worth more here than the nicer curve.
+                const rr = 0.84 + u * reach;
+                seg.position.set(Math.cos(a) * rr, -0.30 - u * 0.42,
+                    Math.sin(a) * rr);
+                strand.add(seg);
+            }
+            body.add(strand);
+            tendrils.push(strand);
+        }
+
         const orbs = [];
         // Phase 1 starts with 12 orbs; phase 2 grows the swarm (see onPhaseChange).
+        // SMALLER THAN THEY WERE. Twelve spheres of radius up to 0.51 on a ring
+        // of 1.2 sit 0.63 apart centre to centre — they intersected, which is
+        // why a swarm rendered as a solid lump. `tickAI` widens the ring to
+        // match; the two numbers only mean anything against each other.
         for (let i = 0; i < 12; i++) {
-            const o = voxSphere(0.35 + (i % 3) * 0.08, 0x3060a0, 0x40c0ff, 1.2, { transparent: true, opacity: 0.85 });
+            const o = voxSphere(0.22 + (i % 3) * 0.05, 0x3060a0, 0x40c0ff, 1.2,
+                { transparent: true, opacity: 0.85 }, LIMB_VOX_PER_UNIT);
             body.add(o);
             orbs.push(o);
         }
@@ -1475,6 +1564,9 @@ export class HydroidCloud extends BossBase {
             position, mesh: body, phaseThresholds: [0.4],
         });
         this.orbs = orbs;
+        this.bell = bell;
+        this.tendrils = tendrils;
+        this._bellK = 1;
         this.pulseCd = 2.5;
         this._rain = [];
         this.presenceScale(1.55);
@@ -1514,7 +1606,8 @@ export class HydroidCloud extends BossBase {
         // Grow the swarm (+8 orbs) so the silhouette clearly changes
         const add = 8;
         for (let i = 0; i < add; i++) {
-            const o = voxSphere(0.28 + (i % 3) * 0.06, 0x40a0c0, 0x80fff0, 0.55, { transparent: true, opacity: 0.92 });
+            const o = voxSphere(0.19 + (i % 3) * 0.04, 0x40a0c0, 0x80fff0, 0.55,
+                { transparent: true, opacity: 0.92 }, LIMB_VOX_PER_UNIT);
             this.root.add(o);
             this.orbs.push(o);
         }
@@ -1527,18 +1620,41 @@ export class HydroidCloud extends BossBase {
         this._checkPhase?.();
 
         const p2 = this.phase >= 2;
-        const spread = (p2 ? 2.0 : 1.2) + Math.sin(this.t) * (p2 ? 0.55 : 0.3);
+        // Widened with the orbs' shrink: 12 drops of radius ~0.27 on a ring
+        // of 1.55 sit 0.81 apart, so there is background between them. That gap
+        // IS the swarm — the Mantis reads for the same one reason.
+        const spread = (p2 ? 2.4 : 1.55) + Math.sin(this.t) * (p2 ? 0.55 : 0.3);
         const spin = p2 ? 1.35 : 0.8;
         for (let i = 0; i < this.orbs.length; i++) {
             const a = this.t * spin + i * (Math.PI * 2 / this.orbs.length);
             const elev = Math.sin(this.t * (p2 ? 3 : 2) + i) * (p2 ? 0.75 : 0.5);
             const r = spread * (1 + (i % 4) * 0.04);
+            // A CIRCLE, NOT AN ELLIPSE. The `* 0.7` here squashed the orbit
+            // along Z — the same axis a 70.7° camera already crushes — so the
+            // swarm was foreshortened twice and photographed as a horizontal
+            // line with a clump at each end. Left round, the pitch supplies the
+            // ellipse on its own and the ring reads as a ring.
             this.orbs[i].position.set(
                 Math.cos(a) * r,
                 elev,
-                Math.sin(a) * r * 0.7
+                Math.sin(a) * r
             );
             this.orbs[i].visible = true;
+        }
+
+        // THE BELL PUMPS BEFORE IT RAINS.
+        //
+        // A jellyfish moves by contracting, and this one's rain is announced by
+        // an action already — so the announcement gets a body. Driven off the
+        // same `action.name` that fires the move, so the tell cannot drift away
+        // from the thing it tells. It narrows and deepens rather than simply
+        // shrinking: a bell gathering, not a bell going away.
+        const gathering = this.action?.name === 'rainfall'
+            || this.action?.name === 'storm_pulse';
+        this._bellK += ((gathering ? 0.74 : 1) - this._bellK) * Math.min(1, dt * 5);
+        if (this.bell) {
+            this.bell.scale.set(this._bellK, 2 - this._bellK, this._bellK);
+            for (const s of this.tendrils) s.scale.set(this._bellK, 2 - this._bellK, this._bellK);
         }
 
         // Phase-2 rain droplets
