@@ -404,15 +404,63 @@ export class TriCompiler {
             // cap after that clamp landed — which is the "sweep every place"
             // trap, in its purest form: the fix was correct and one of the
             // fifteen things it was supposed to cover was not a subclass.
-            const mesh = voxBlob(0.95, 0.95, 0.95, opts.color || CRUST_COLORS.slate,
-                opts.emissive || 0x40c0ff, BOSS_EMISSIVE_MAX * 0.55);
+            // A SPINDLE WHORL, NOT A BALL.
+            //
+            // The three cores were identical featureless spheres, lit all over
+            // at 0.55 of the cap — which is trap 1 (a body that is emissive
+            // everywhere has no form, just a colour) and says nothing about a
+            // boss whose subtitle is *Three Minds, One Sentence*.
+            //
+            // The dungeon is the Eastern Spindle and the beams run core to
+            // core, so that is what these are: three whorls spinning one thread
+            // between them. A whorl is the weighted disc on a spindle — from a
+            // 70.7° camera it reads as a disc with a shaft through it, which is
+            // a shape, where a sphere reads as a dot at any size.
+            //
+            // NOT MACHINERY. This kit dresses itself in `gear_bays`, `rails`,
+            // `capacitors` and `cable_coils` and its `bossRule` is
+            // `central_machine`; three more machined objects would vanish into
+            // the room (trap 8). Cut stone with one hot aperture instead.
+            const STONE = opts.color || CRUST_COLORS.slateDark;
+            const RIM = CRUST_COLORS.slate;
+            const GLOW = opts.emissive || 0x40c0ff;
+            const mesh = new THREE.Group();
+            const whorl = voxBlob(0.92, 0.40, 0.92, STONE, 0x000000, 0);
+            mesh.add(whorl);
+            // The shaft, standing proud above and below the whorl so the thing
+            // has a top. Limb resolution — at the body grid a 0.15 shaft comes
+            // back 0.5 thick and swallows its own disc (trap 2).
+            const shaft = voxBox(0.30, 2.35, 0.30, RIM, 0x000000, 0,
+                undefined, LIMB_VOX_PER_UNIT);
+            mesh.add(shaft);
+            // THREE fins, not six ribs. Six evenly spaced teeth around a disc
+            // is a COG, and this room is dressed with `gear_bays` and `rails` —
+            // the boss would have been built out of its own scenery, which is
+            // the trap that cost the Witness an entire discarded design. Three
+            // reads as cut stone, and echoes the thing the boss is: three.
+            for (let k = 0; k < 3; k++) {
+                const a = (k / 3) * Math.PI * 2 + 0.5;
+                const fin = voxBox(0.28, 0.34, 0.74, RIM, 0x000000, 0,
+                    undefined, LIMB_VOX_PER_UNIT);
+                fin.position.set(Math.cos(a) * 0.72, 0.05, Math.sin(a) * 0.72);
+                fin.rotation.y = -a + Math.PI / 2;
+                mesh.add(fin);
+            }
+            // THE APERTURE — where this core's beam leaves it, and the ONLY lit
+            // part. `update` drives its intensity through the charge/spend
+            // cycle, so the light that tells you the state of the fight is now
+            // a feature on the body instead of the whole body.
+            const glow = voxBox(0.52, 0.26, 0.30, GLOW, GLOW,
+                BOSS_EMISSIVE_MAX * 0.42, undefined, LIMB_VOX_PER_UNIT);
+            glow.position.set(0, 0.04, 0.88);
+            mesh.add(glow);
+
             mesh.position.set(c.x, c.y != null ? c.y : 1.4, c.z);
             mesh.scale.setScalar(1.35); // S6 (P1-5): silhouette ≥ 2.4 units
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
+            mesh.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
             scene.add(mesh);
             const core = {
-                root: mesh, mesh, hitRadius: 1.15,
+                root: mesh, mesh, glow, hitRadius: 1.15,
                 hp: opts.hpPerCore || 4, maxHp: opts.hpPerCore || 4,
                 state: { current: 'IDLE' },
                 managedBySystem: true,
@@ -422,7 +470,10 @@ export class TriCompiler {
                     sfx.kick();
                     // Hit flash, capped. Was 2.8 against a bloom threshold
                     // of 0.85 — the flash was a white-out, not a flash.
-                    mesh.material.emissiveIntensity = BOSS_EMISSIVE_MAX;
+                    // On the aperture, because `mesh` is a group now and a
+                    // group has no material — this line would have thrown on
+                    // every hit landed on this boss.
+                    glow.material.emissiveIntensity = BOSS_EMISSIVE_MAX;
                 },
                 onDeath() {
                     mesh.visible = false;
@@ -431,8 +482,10 @@ export class TriCompiler {
                 update() {},
                 dispose() {
                     if (mesh.parent) mesh.parent.remove(mesh);
-                    mesh.geometry.dispose();
-                    mesh.material.dispose();
+                    mesh.traverse((o) => {
+                        o.geometry?.dispose?.();
+                        o.material?.dispose?.();
+                    });
                 },
             };
             return core;
@@ -567,12 +620,31 @@ export class TriCompiler {
             c.mesh.position.y = spent
                 ? 1.15 + Math.sin(this.t * 3 + i) * 0.08   // sunk to head height
                 : c.home.y + Math.sin(this.t * 2 + i) * 0.25;
-            c.mesh.rotation.y += dt * (1 + i * 0.3);
+            // THE APERTURE POINTS AT THE CORE ITS BEAM RUNS TO.
+            //
+            // These used to free-spin (`rotation.y += dt * (1 + i * 0.3)`),
+            // which is fine for a sphere and impossible for a body with a
+            // front — trap 9. The beam is drawn from this core to `next`, so
+            // aiming there makes the lit facet the thing the thread comes off,
+            // and it means KILLING A CORE VISIBLY RE-AIMS ITS NEIGHBOUR: the
+            // survivor swings round to the next one still standing. That
+            // consequence was always in the rules and never on screen.
+            const aimAt = (() => {
+                for (let k = 1; k < this.cores.length; k++) {
+                    const n = this.cores[(i + k) % this.cores.length];
+                    if (n.state.current !== 'DEAD') return n.mesh.position;
+                }
+                return null;
+            })();
+            if (aimAt) {
+                c.mesh.rotation.y = Math.atan2(
+                    aimAt.x - c.mesh.position.x, aimAt.z - c.mesh.position.z);
+            }
             // Three states, and the READ between them is what matters, not the
             // absolute level: charging flickers hot, spent goes dull, idle
             // breathes. Expressed as fractions of the cap so the contrast
             // survives while the frame stops blowing out.
-            c.mesh.material.emissiveIntensity = BOSS_EMISSIVE_MAX * (charging
+            c.glow.material.emissiveIntensity = BOSS_EMISSIVE_MAX * (charging
                 ? 0.82 + Math.sin(this.t * 22) * 0.18
                 : spent ? 0.14 : 0.42 + Math.sin(this.t * 4 + i) * 0.16);
             // Open window: spent cores take double and stop shielding.

@@ -1,11 +1,11 @@
 # The boss pass — what is left, and exactly how to do it
 
-Ten of fourteen are rebuilt: Crypt Warden, Obsidian Arachnid, Magma Wyrm,
-Leviathan Core, Phantasm, Sludge Golem, GUMOI Witness, Frost & Fuel, Hydroid
-Cloud, The Proxy. The Skeletal Mantis needs nothing and never did.
-**Three remain — and they are the three small ones.**
+Eleven of fourteen are rebuilt: Crypt Warden, Tri-Compiler, Obsidian Arachnid,
+Magma Wyrm, Leviathan Core, Phantasm, Sludge Golem, GUMOI Witness, Frost & Fuel,
+Hydroid Cloud, The Proxy. The Skeletal Mantis needs nothing and never did.
+**Two remain: the Sand Spur and the Kinetic Core.**
 
-This document is the method that survived those ten, the traps each one cost,
+This document is the method that survived those eleven, the traps each one cost,
 and a per-boss plan with the numbers already measured. It exists because the
 first three bosses took four to six passes each and the last three took two —
 almost all of the difference was knowing the things written down here.
@@ -114,8 +114,19 @@ moving the ART; a hitbox is a fight number. Held weapons count as silhouette.
 **7. The probe was shooting mid-turn** (fixed 2026-08-16). It parked the player
 once and ticked 40 frames; a boss needing 2 radians at 1.6 rad/s never finished,
 so bodies built wide across X presented their narrow side. It now re-parks the
-player every frame over 150 ticks. *If a boss looks inexplicably wrong, suspect
-the instrument before the model — that has been the answer more often than not.*
+player every frame over 150 ticks.
+
+**And it was lying about the Tri-Compiler in two more ways** (fixed
+2026-08-17). That boss is the only one that does not extend `BossBase`: its
+`root` is `cores[0].root`, so the shot framed one core of three, and it exposes
+`update` rather than `tickAI`, so `boss.tickAI?.()` matched nothing and the
+assembly was never ticked at all. The optional chain made the second one silent.
+Corrected, the boss went from "2.93 wide, 12% of frame" to **10.33 wide, 43%** —
+from the smallest thing on the roster to the largest.
+
+*If a boss looks inexplicably wrong, suspect the instrument before the model.
+Across this pass that has been the answer more often than not, and every time it
+was, the instrument was quietly measuring something other than the boss.*
 
 **8. Same IDEA as the room is invisible too.** Trap 5 one level up, and it cost
 a whole discarded design. The first Witness rebuild was glyph plates with a scan
@@ -406,11 +417,55 @@ straight onto them, so an uncloned decoy would make the Proxy fade itself out
 every time it marked its own doubles), the real face unchanged by that marking,
 and the room-colour gate on `0xd4a84b`.
 
-### 02 · 03 · 04 — Tri-Compiler, Sand Spur, Kinetic Core
+### 02 — Tri-Compiler · **DONE** (2026-08-17)
 
-*Now:* 2.93, 3.62 and 2.88 wide — **12–15% of frame**, the three smallest on the
-roster. They do not read as bosses mainly because they are *small*, and two of
-them live in their own files (`sand-spur.js`, `kinetic-core.js`).
+⚠ **THE PROBE WAS LYING ABOUT THIS BOSS, TWICE.** It is the one boss that does
+not extend `BossBase`: it sets `this.root = this.cores[0].root` and exposes
+`update` rather than `tickAI`. So every portrait ever taken of it framed **one
+core of three**, and `boss.tickAI?.()` matched nothing and silently skipped it,
+meaning the assembly was never ticked — cores parked at their spawn points,
+never gathered onto their ring. *"2.93 wide, 12% of frame, they do not read as
+bosses mainly because they are small"* was a measurement of a third of a boss
+that had never moved. Photographed properly it is **10.33 wide, 43% of frame**,
+the largest thing on the roster. Both defects are fixed in
+`tests/qa/boss-portraits.mjs`; the optional chain is why the second one was
+quiet.
+
+*Was:* three identical featureless slate spheres, emissive over their whole
+surface at 0.55 of the cap — trap 1 in its purest form, a body lit everywhere
+has no form, only a colour.
+
+*Does:* the trio orbits a hub, widens its ring until the beam net is about to
+cross you, holds (that freeze is the tell), sweeps, then browns out at double
+damage. `converge` every third cycle. Phase 2 parks them wide so the three beams
+become sweeping walls, and killing a core removes a wall.
+
+*Built:* **three spindle whorls spinning one thread.** The dungeon is the
+Eastern Spindle and the subtitle is *Three Minds, One Sentence*, so each core is
+a cut-stone whorl on a shaft with a single hot **aperture** — the one lit part,
+and the point the beam leaves from. Hitbox ratio 0.86.
+
+**The aperture aims at the core its beam runs to**, which is trap 9 for the
+third time this pass: they used to free-spin at `rotation.y += dt * (1 + i*0.3)`,
+so nothing on them could be aimed. And it buys a consequence the fight always
+had and never showed — **killing a core visibly swings its neighbour onto the
+next one still standing.**
+
+*Note on the room:* first pass gave the whorls six evenly spaced rim ribs, which
+is a **cog** — in a kit dressed with `gear_bays` and `rails`. Trap 8, caught in
+the photograph. Three fins instead: cut stone, and it echoes what the boss is.
+
+*Guarded by:* `runTriCompiler` in `boss-bodies.spec.mjs` — each aperture aimed at
+its beam's destination as a **dot product against the real bearing, never the
+sign of an angle**, the re-aim on a core's death, and only the aperture lit.
+Restoring the free spin fails the first two; lighting the whorl fails the third.
+
+### 03 · 04 — Sand Spur, Kinetic Core
+
+*Now:* 3.62 and 2.88 wide — the two smallest on the roster. **Re-measure both
+before designing**: the probe fixes above changed what the Tri-Compiler's numbers
+meant entirely, and `SandSpur` and `KineticCore` are the other two bosses that
+live outside `roster.js`.
 
 *Does:* the Tri-Compiler is a three-core assembly with a beam cycle and a
 `converge` slam; the Spur burrows and surfaces (`sand-wake`, `breach`); the Core
@@ -439,7 +494,7 @@ valuable one and should not be allowed to crowd out the rest:
 | item | state |
 |---|---|
 | Distribution live (Pages + a release) | **pushed, still dark** — `v0.4.0` is on the remote and `enablement: true` is in `pages.yml`, but `sumosizedginger.github.io/Sovereign-Scar/` still 404s (checked 2026-08-16). Next check is the Actions log for `pages.yml`; if it is still refusing, the fallback is one click in Settings → Pages → Source: GitHub Actions |
-| Boss silhouettes | **10 of 14 done**; 3 planned here; 1 needs nothing |
+| Boss silhouettes | **11 of 14 done**; 2 planned here; 1 needs nothing |
 | Occlusion | not started — agreed to land BEFORE the combo work |
 | Combo system | not started, riskiest item in v1 |
 | 80% room variation (wall/ceiling height) | not started |
@@ -454,4 +509,4 @@ that is in hand and is not a reason to hold up the roster. Do not keep
 re-proposing it.
 
 *Suggested interleave:* ~~the Witness~~ ~~Frost & Fuel~~ ~~Hydroid Cloud~~
-~~the Proxy~~ (done) → occlusion → the three small ones in the gaps.
+~~the Proxy~~ ~~Tri-Compiler~~ (done) → occlusion → the Spur and the Core.

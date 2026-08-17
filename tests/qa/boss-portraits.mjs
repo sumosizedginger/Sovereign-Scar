@@ -166,6 +166,21 @@ try {
             // photographs as one lumpy ball. That is not the boss either; it is
             // an artefact of the harness standing still, and judging the model
             // from it would send the redesign after a problem it does not have.
+            // NOT EVERY BOSS HAS `tickAI`.
+            //
+            // Thirteen extend `BossBase` and this probe pokes `tickAI` directly
+            // to avoid needing a level and a telegraph layer. `TriCompiler`
+            // does not extend it — it exposes `update` — so `boss.tickAI?.()`
+            // matched nothing and silently did nothing, and every portrait of
+            // that boss was a picture of an assembly that had never been
+            // ticked: cores parked at their spawn points, never gathered onto
+            // their ring, never spun. The optional chain is why it was quiet.
+            const drive = (b, p) => {
+                try {
+                    if (typeof b.tickAI === 'function') b.tickAI(1 / 60, p, null);
+                    else if (typeof b.update === 'function') b.update(1 / 60, p, {});
+                } catch (_) { /* needs fuller ctx */ }
+            };
             const player = {
                 root: { position: { x: 0, y: 1.95, z: 4 } },
                 health: { hp: 6, maxHp: 6, dead: false, damage: () => ({ accepted: true }) },
@@ -177,7 +192,7 @@ try {
                 const a = (i / 150) * Math.PI * 1.6;
                 player.root.position.x = Math.sin(a) * 4.5;
                 player.root.position.z = Math.cos(a) * 4.5;
-                try { boss.tickAI?.(1 / 60, player, null); } catch (_) { /* needs fuller ctx */ }
+                drive(boss, player);
                 boss.t = (boss.t || 0) + 1 / 60;
             }
             // THEN BRING THE PLAYER TO THE CAMERA AND LET THE BOSS TURN.
@@ -228,14 +243,25 @@ try {
                 player.root.position.x = root.position.x;
                 player.root.position.z = root.position.z + 4.5;
                 if (forceOpen && !boss.action) boss.action = { name: 'probe-open' };
-                try { boss.tickAI?.(1 / 60, player, null); } catch (_) { /* needs fuller ctx */ }
+                drive(boss, player);
                 boss.t = (boss.t || 0) + 1 / 60;
             }
 
+            // PHOTOGRAPH EVERY CORE, NOT `root`.
+            //
+            // `TriCompiler` is a trio, and `this.root = this.cores[0].root` —
+            // so every portrait of it ever taken has been a picture of one
+            // third of the boss, framed tight on a single sphere. That is where
+            // "2.93 wide, 12% of frame, they do not read as bosses mainly
+            // because they are small" came from: a measurement of a third.
+            const subjects = (boss.cores?.length
+                ? boss.cores.map((c) => c.root).filter(Boolean)
+                : [root]);
             const shotScene = new THREE.Scene();
-            shotScene.add(root);
+            for (const s of subjects) shotScene.add(s);
 
-            const box = new THREE.Box3().setFromObject(root);
+            const box = new THREE.Box3();
+            for (const s of subjects) box.expandByObject(s);
             const c = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
             const extent = Math.max(size.x, size.y, size.z, 1);

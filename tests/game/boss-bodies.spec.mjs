@@ -512,6 +512,7 @@ export function run(t) {
     runFrostAndFuel(t);
     runHydroid(t);
     runProxy(t);
+    runTriCompiler(t);
 }
 
 /**
@@ -797,4 +798,59 @@ export function runProxy(t) {
     // roster-wide gate in `run` now measures every boss against its own kit
     // accent, reports the share and the nearest distance, and holds the three
     // known offenders at a ceiling. One instrument beats four copies of it.)
+}
+
+/**
+ * The Tri-Compiler — three whorls spinning one thread.
+ *
+ * Two claims worth pinning, and the first one is a claim about world-space
+ * direction made through a rotation, which is the shape of claim that has
+ * silently shipped backwards in this repo before. It is checked as a dot
+ * product against the real bearing, never as the sign of an angle.
+ */
+export function runTriCompiler(t) {
+    const scene = new THREE.Scene();
+    const boss = new TriCompiler(scene, [{ x: -5, z: -4 }, { x: 5, z: -4 }, { x: 5, z: 4 }]);
+    const player = {
+        root: { position: { x: 0, y: 1.95, z: 0 } },
+        health: { hp: 6, maxHp: 6, dead: false, damage: () => ({ accepted: true }) },
+        state: { facingVec: { x: 0, z: -1 } },
+    };
+    for (let i = 0; i < 60; i++) boss.update(1 / 60, player);
+
+    // Where a core's lit facet actually points, in the world.
+    const facing = (c) => new THREE.Vector3(0, 0, 1)
+        .applyQuaternion(c.mesh.getWorldQuaternion(new THREE.Quaternion()));
+    const bearing = (from, to) => new THREE.Vector3(
+        to.mesh.position.x - from.mesh.position.x, 0,
+        to.mesh.position.z - from.mesh.position.z).normalize();
+    const aimsAt = (from, to) => facing(from).setY(0).normalize().dot(bearing(from, to));
+
+    t.ok('each Tri-Compiler core aims its aperture at the core its beam runs to',
+        boss.cores.every((c, i) => aimsAt(c, boss.cores[(i + 1) % 3]) > 0.99),
+        boss.cores.map((c, i) => aimsAt(c, boss.cores[(i + 1) % 3]).toFixed(3)).join(', '));
+
+    // ── Killing a core re-aims its neighbour ───────────────────────────────
+    // The fight already rewarded focus fire — a dead core removes a wall — and
+    // nothing on screen said so. The survivor swinging round to the next one
+    // still standing is that rule made visible, so it is a rule now.
+    boss.cores[1].state.current = 'DEAD';
+    for (let i = 0; i < 30; i++) boss.update(1 / 60, player);
+    t.ok('…and killing a core swings its neighbour onto the next one standing',
+        aimsAt(boss.cores[0], boss.cores[2]) > 0.99,
+        `core 0 → core 2: ${aimsAt(boss.cores[0], boss.cores[2]).toFixed(3)}`);
+
+    // ── Only the aperture is lit ───────────────────────────────────────────
+    // These were spheres emissive over their whole surface at 0.55 of the cap,
+    // which is trap 1: a body lit everywhere has no form, only a colour. The
+    // light belongs to the one facet that means something.
+    const lit = [];
+    boss.cores[0].mesh.traverse((o) => {
+        if (!o.isMesh || !o.material?.emissive) return;
+        if ((o.material.emissive.getHex?.() ?? 0) === 0) return;
+        if ((o.material.emissiveIntensity || 0) > 0.01) lit.push(o);
+    });
+    t.ok('…and only its aperture is lit, not the whole stone',
+        lit.length === 1 && lit[0] === boss.cores[0].glow,
+        `${lit.length} lit part(s) of ${boss.cores[0].mesh.children.length}`);
 }
