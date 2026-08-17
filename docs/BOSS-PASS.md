@@ -74,10 +74,37 @@ is above it.**
 the Golem was `ABYSS_COLORS.sludge` in the sludge room; the Witness was
 `0xff40c8` in a room whose accent is `0xff40c8`. Check the kit in
 `levels/dungeon-kits.js` before picking a palette, and go dark against it with
-the accent in the seams. **Three of the fourteen turned out to be painted their
-own room, two of them on the EXACT hex** — the Witness's `0xff40c8` and the
-Proxy's `0xd4a84b`. Gated now for beats 13, 10, 07 and 05; the other ten are
-still on trust, and on this hit rate that is worth not trusting.
+the accent in the seams.
+
+**Now gated across the whole roster, and the measurement was worth taking.**
+`boss-bodies.spec` checks every boss against its own kit accent — the kit looked
+up through `LEVELS[].bossId` rather than a typed table — and reports the share
+of the body within 0.12 of it. The result is bimodal and leaves no judgement
+call:
+
+| | nearest | share |
+|---|---|---|
+| ten bosses | 0.25 – 0.97 | **0.0%** |
+| Sand Spur | 0.014 | 88.8% |
+| Skeletal Mantis | 0.001 | 59.3% |
+| Magma Wyrm | 0.013 | 39.7% |
+
+There is no middle ground, because the defect is always the same mechanical
+act: the kit's accent constant gets typed into the boss. **Five of fourteen did
+it** — the Witness and the Proxy are fixed; the other three are pinned at their
+measured value as ceilings that still fail if they get worse.
+
+- **Mantis — accepted.** It is the reference silhouette and the one body nobody
+  has asked to change. It reads on SHAPE, which is exactly the property that
+  makes sharing a hue survivable, and a bone skeleton in the Bone Forest is the
+  right answer anyway. *A gate that failed the best boss on the roster would be
+  the wrong gate.*
+- **Wyrm — outstanding.** This document listed "the Wyrm was orange on the magma
+  floor" as a FIXED example of this trap. **It is not fixed**: two fifths of the
+  body is still within 0.013 of the pyre accent. The model is owner-approved, so
+  it is pinned rather than changed unasked. Raise with the owner.
+- **Sand Spur — outstanding**, and the worst on the roster. Beat 03 is still to
+  be rebuilt; 88.8% is the number that rebuild has to beat.
 
 **6. Span is a fight number, not an art number.** `boss-reach-e2e` measures
 whether there is anywhere to stand that is outside the body and still in range.

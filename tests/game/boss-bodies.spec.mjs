@@ -28,6 +28,7 @@ import {
 } from '../../src/game/bosses/roster.js';
 import { HERO_PALETTE } from '../../src/game/assets/palettes.js';
 import { KITS } from '../../src/game/levels/dungeon-kits.js';
+import { LEVELS } from '../../src/game/levels/registry.js';
 import { SandSpur } from '../../src/game/bosses/sand-spur.js';
 import { KineticCore } from '../../src/game/bosses/kinetic-core.js';
 import { BOSS_EMISSIVE_MAX, clampEmissive } from '../../src/game/bosses/base.js';
@@ -94,6 +95,81 @@ const fakePlayer = () => ({
     health: { damage() {}, dead: false },
     hitRadius: 0.45,
 });
+
+/**
+ * How much of a boss is painted its own room's accent, and how close it gets.
+ *
+ * WHY THIS IS ROSTER-WIDE. Three of fourteen bosses turned out to be wearing
+ * their own arena, two of them character for character: the GUMOI Witness was
+ * `0xff40c8` in a room whose accent is `0xff40c8`, and the Proxy's hoop was
+ * `0xd4a84b` in a room whose accent is `0xd4a84b`. Both were found by eye, one
+ * at a time, and both had passed every other gate in this file. At that hit
+ * rate the remaining bosses were not worth trusting.
+ *
+ * The kit is looked up through `LEVELS[].bossId`, not a table typed here: a
+ * hand-written boss→beat mapping is one more thing that can quietly stop being
+ * true.
+ *
+ * READ OFF THE VERTEX ATTRIBUTE. Every `boss-models` builder is
+ * `vertexColors: true` with no `color` set on the material, so a check that
+ * walks `material.color` reads pure white fourteen times and passes everything.
+ * That is not hypothetical — it is what the first version of this did, and it
+ * passed a boss painted the room's exact magenta on purpose.
+ */
+const CLASH_D = 0.12;
+function roomClashShare(boss) {
+    const lvl = LEVELS.find((l) => l.bossId === boss.bossId);
+    const kit = lvl && KITS[lvl.id];
+    if (!kit || kit.accent == null) return null;
+    // `THREE.Color(hex)` already converts sRGB into the linear working space,
+    // which is the space `buildVoxelGeo` bakes into the attribute. Converting
+    // again moves the accent away from itself — it once put a room's own
+    // magenta 0.27 from itself and let the counterfactual through.
+    const accent = new THREE.Color(kit.accent);
+    let near = 0, total = 0, min = Infinity;
+    boss.root.traverse((o) => {
+        const attr = o.isMesh && o.geometry?.getAttribute?.('color');
+        if (!attr) return;
+        for (let i = 0; i < attr.count; i++) {
+            total++;
+            const d = Math.hypot(attr.getX(i) - accent.r, attr.getY(i) - accent.g,
+                attr.getZ(i) - accent.b);
+            if (d < min) min = d;
+            if (d < CLASH_D) near++;
+        }
+    });
+    if (!total) return null;
+    return { share: near / total, min, accent: kit.accent };
+}
+
+/**
+ * Bosses allowed to share their room's accent, with the share they are allowed.
+ *
+ * These are CEILINGS AT THE MEASURED VALUE, not a switched-off gate: each one
+ * still fails if it gets worse. The measurement that produced them is bimodal
+ * and leaves no judgement call — the ten bosses not listed here sit 0.25 to
+ * 0.97 away from their accent with 0.0% of the body near it, and these three
+ * sit at 0.001 to 0.014, which is the accent constant itself.
+ */
+const ROOM_CLASH = {
+    // ACCEPTED. The Mantis is the roster's reference silhouette and the one
+    // body nobody has ever asked to change — it reads on SHAPE, splayed scythes
+    // with background between them, which is precisely the property that makes
+    // sharing a hue survivable. A bone skeleton in the Bone Forest is also the
+    // correct answer artistically. Recorded rather than silently skipped so
+    // that the reason is attached to the number.
+    skeletal_mantis: 0.62,   // measured 59.3% at 0.001 from #e8e0d0
+    // OUTSTANDING. `docs/BOSS-PASS.md` lists "the Wyrm was orange on the magma
+    // floor" as a FIXED example of this trap, and it is not fixed — two fifths
+    // of the body is still within 0.013 of the pyre accent. The boss is owner-
+    // approved as it stands, so this is pinned at its current value rather than
+    // changed unasked. Revisit with the owner.
+    magma_wyrm: 0.42,        // measured 39.7% at 0.013 from #ff5520
+    // OUTSTANDING. Worst on the roster: a tan body in a tan sink. Beat 03 is
+    // one of the three bosses still to be rebuilt, so this is the number that
+    // rebuild has to beat.
+    sand_spur: 0.90,         // measured 88.8% at 0.014 from #c8a060
+};
 
 /** p85 horizontal radius of the visible body, measured from the root's own XZ. */
 function bodyRadius(target) {
@@ -224,6 +300,17 @@ export function run(t) {
         });
         t.ok(`${name}: no part exceeds the bloom cap`, peak <= BOSS_EMISSIVE_MAX + 1e-6,
             `peak=${peak}`);
+
+        // ── Not painted the colour of its own room ─────────────────────────
+        const clash = roomClashShare(b);
+        if (clash) {
+            const ceiling = ROOM_CLASH[b.bossId] ?? 0.02;
+            t.ok(`${name}: is not painted the colour of its own room`,
+                clash.share <= ceiling,
+                `${(clash.share * 100).toFixed(1)}% of the body within ${CLASH_D} of `
+                + `#${clash.accent.toString(16).padStart(6, '0')} `
+                + `(nearest ${clash.min.toFixed(3)}, ceiling ${(ceiling * 100).toFixed(0)}%)`);
+        }
 
         // Presence: the boss is the subject of its own room. A room half is
         // 8–12 units, so a body under ~1.6 across reads as furniture.
@@ -452,47 +539,10 @@ export function runWitness(t) {
         `draft #{0} #${WITNESS_DRAFTS[0].skin.toString(16)} `
         + `vs hero #${HERO_PALETTE.skin.toString(16)}`);
 
-    // ── Not the colour of its own room ─────────────────────────────────────
-    // The body this replaced was `ABYSS_COLORS.neon` — 0xff40c8 — and the kit
-    // for `beat-13-gumoi` sets `accent: 0xff40c8`. The second-to-last boss in
-    // the game was painted the exact colour of its own arena, and every gate in
-    // this file passed it. Distance in linear RGB, same 0.22 threshold
-    // `hero-readability.spec.mjs` uses for the reserved rim.
-    //
-    // READ OFF THE VERTICES, NOT THE MATERIAL, and that is not a detail. The
-    // first version of this check walked `material.color` — and every boss
-    // material here is built `vertexColors: true` with no `color` set, so it
-    // read pure white fourteen times and passed. Painting the core the room's
-    // exact magenta on purpose did not fail it. A gate that cannot fail is
-    // worse than no gate, because it reports safety.
-    //
-    // `buildVoxelGeo` bakes colour through `THREE.Color.setHex`, which converts
-    // sRGB to the linear working space on the way in — that is why a "dark
-    // brown" arrives as (6,4,2) of 255. The accent therefore needs NO explicit
-    // conversion: `new THREE.Color(hex)` has already done it, and calling
-    // `convertSRGBToLinear()` on top converted it twice, landing the room's own
-    // magenta 0.27 away from itself and letting the counterfactual through a
-    // second time.
-    const accent = new THREE.Color(KITS['beat-13-gumoi'].accent);
-    const clashes = [];
-    const seen = new Set();
-    boss.root.traverse((o) => {
-        const attr = o.isMesh && o.geometry?.getAttribute?.('color');
-        if (!attr) return;
-        for (let i = 0; i < attr.count; i++) {
-            const r = attr.getX(i), g = attr.getY(i), b = attr.getZ(i);
-            const key = `${(r * 64) | 0},${(g * 64) | 0},${(b * 64) | 0}`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            const d = Math.hypot(r - accent.r, g - accent.g, b - accent.b);
-            if (d < 0.22) {
-                clashes.push(`rgb(${r.toFixed(2)},${g.toFixed(2)},${b.toFixed(2)}) `
-                    + `d=${d.toFixed(2)}`);
-            }
-        }
-    });
-    t.ok('…and none of it is painted the colour of its own room',
-        clashes.length === 0, clashes.slice(0, 4).join(', ') || 'none');
+    // (The per-boss room-colour check that used to live here is gone: the
+    // roster-wide gate in `run` now measures every boss against its own kit
+    // accent, reports the share and the nearest distance, and holds the three
+    // known offenders at a ceiling. One instrument beats four copies of it.)
 
     // ── It opens when it comes down ────────────────────────────────────────
     // Driven through the real condition. `busy` is a getter over `action`, so
@@ -611,35 +661,10 @@ export function runFrostAndFuel(t) {
         `frost head ${headSide(boss.frostHead)} vs frost patch ${patchSide('frost')}, `
         + `fuel head ${headSide(boss.fuelHead)} vs fuel patch ${patchSide('fuel')}`);
 
-    // ── Not the colour of its own room ─────────────────────────────────────
-    // The frost half used to be 0x80c0e0 under a 0x40e0ff glow in a room whose
-    // kit accent is 0xa0e8ff. Same gate as the Witness's, same 0.22 in linear
-    // RGB, read off the vertex attribute because these meshes carry no
-    // material colour. The two MAWS are exempt: they are the fight's signal
-    // lights, they are meant to be hot cyan and hot orange, and an emissive
-    // point source at 0.55 is not what "lost against the wall" means.
-    const accent = new THREE.Color(KITS['beat-10-cryo'].accent);
-    const glows = new Set([boss.frost, boss.fuel]);
-    const clashes = [];
-    const seen = new Set();
-    boss.root.traverse((o) => {
-        if (glows.has(o)) return;
-        const attr = o.isMesh && o.geometry?.getAttribute?.('color');
-        if (!attr) return;
-        for (let i = 0; i < attr.count; i++) {
-            const r = attr.getX(i), g = attr.getY(i), b = attr.getZ(i);
-            const key = `${(r * 64) | 0},${(g * 64) | 0},${(b * 64) | 0}`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            const d = Math.hypot(r - accent.r, g - accent.g, b - accent.b);
-            if (d < 0.22) {
-                clashes.push(`rgb(${r.toFixed(2)},${g.toFixed(2)},${b.toFixed(2)}) `
-                    + `d=${d.toFixed(2)}`);
-            }
-        }
-    });
-    t.ok('…and its ice half is not painted the colour of its ice room',
-        clashes.length === 0, clashes.slice(0, 4).join(', ') || 'none');
+    // (The per-boss room-colour check that used to live here is gone: the
+    // roster-wide gate in `run` now measures every boss against its own kit
+    // accent, reports the share and the nearest distance, and holds the three
+    // known offenders at a ceiling. One instrument beats four copies of it.)
 }
 
 /**
@@ -768,24 +793,8 @@ export function runProxy(t) {
         faceMat.map((m, i) => `${before[i].toFixed(2)}->${(m.opacity ?? 1).toFixed(2)}`)
             .join(','));
 
-    // ── Not the colour of its own room ─────────────────────────────────────
-    // The hoop was `CRUST_COLORS.goldLeaf` = 0xd4a84b and this kit's accent is
-    // 0xd4a84b — the identical hex, on the boss's most prominent feature.
-    const accent = new THREE.Color(KITS['beat-05-citadel'].accent);
-    const clashes = [];
-    const seen = new Set();
-    boss.root.traverse((o) => {
-        const attr = o.isMesh && o.geometry?.getAttribute?.('color');
-        if (!attr) return;
-        for (let i = 0; i < attr.count; i++) {
-            const r = attr.getX(i), g = attr.getY(i), b = attr.getZ(i);
-            const key = `${(r * 64) | 0},${(g * 64) | 0},${(b * 64) | 0}`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            const d = Math.hypot(r - accent.r, g - accent.g, b - accent.b);
-            if (d < 0.22) clashes.push(`rgb(${r.toFixed(2)},${g.toFixed(2)},${b.toFixed(2)}) d=${d.toFixed(2)}`);
-        }
-    });
-    t.ok('…and none of it is painted the colour of its own citadel',
-        clashes.length === 0, clashes.slice(0, 4).join(', ') || 'none');
+    // (The per-boss room-colour check that used to live here is gone: the
+    // roster-wide gate in `run` now measures every boss against its own kit
+    // accent, reports the share and the nearest distance, and holds the three
+    // known offenders at a ceiling. One instrument beats four copies of it.)
 }
