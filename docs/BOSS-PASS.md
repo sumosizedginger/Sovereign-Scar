@@ -1,10 +1,11 @@
 # The boss pass — what is left, and exactly how to do it
 
-Nine of fourteen are rebuilt: Crypt Warden, Obsidian Arachnid, Magma Wyrm,
+Ten of fourteen are rebuilt: Crypt Warden, Obsidian Arachnid, Magma Wyrm,
 Leviathan Core, Phantasm, Sludge Golem, GUMOI Witness, Frost & Fuel, Hydroid
-Cloud. The Skeletal Mantis needs nothing and never did. **Four remain.**
+Cloud, The Proxy. The Skeletal Mantis needs nothing and never did.
+**Three remain — and they are the three small ones.**
 
-This document is the method that survived those nine, the traps each one cost,
+This document is the method that survived those ten, the traps each one cost,
 and a per-boss plan with the numbers already measured. It exists because the
 first three bosses took four to six passes each and the last three took two —
 almost all of the difference was knowing the things written down here.
@@ -73,8 +74,10 @@ is above it.**
 the Golem was `ABYSS_COLORS.sludge` in the sludge room; the Witness was
 `0xff40c8` in a room whose accent is `0xff40c8`. Check the kit in
 `levels/dungeon-kits.js` before picking a palette, and go dark against it with
-the accent in the seams. Now gated for beats 13 and 10 by `runWitness` and
-`runFrostAndFuel` in `boss-bodies.spec.mjs`; the other twelve are still on trust.
+the accent in the seams. **Three of the fourteen turned out to be painted their
+own room, two of them on the EXACT hex** — the Witness's `0xff40c8` and the
+Proxy's `0xd4a84b`. Gated now for beats 13, 10, 07 and 05; the other ten are
+still on trust, and on this hit rate that is worth not trusting.
 
 **6. Span is a fight number, not an art number.** `boss-reach-e2e` measures
 whether there is anywhere to stand that is outside the body and still in range.
@@ -326,24 +329,55 @@ in both phases, which is the defect this rebuild existed to fix and was
 invisible to the whole suite before), the bell sits inside the ring, phase 2
 grows the swarm without re-fusing it, and the bell gathers before it sheds.
 
-### 05 — The Proxy
+### 05 — The Proxy · **DONE** (2026-08-17)
 
-*Now:* a blob with a gold ring, 5.47 wide. Band **0.84** at 90° — the tightest
-of the remaining, so this one has the least room to grow.
+*Was:* a violet ball wearing an enormous gold hoop, 5.47 wide. The hoop was
+`CRUST_COLORS.goldLeaf` = `0xd4a84b`; the `beat-05-citadel` kit accent is
+`0xd4a84b`. **The identical hex, on the boss's most prominent feature, in its
+own room** — the same defect as the Witness's magenta, and the second time this
+pass a boss turned out to be painted its own arena.
 
 *Does:* `bolt`, `mirror-volley`, and `proxy-swap` (phase 3) — *it changes bodies
-mid-wind-up*. Its own note: **the BODY lies, the GROUND never does.**
+mid-wind-up*. Its own note: **the BODY lies, the GROUND never does.** The
+subtitle is *Voice of the Leviathan*.
 
-*Build:* **a funeral mask with nobody behind it** — a hanging gold face inside
-its existing tilted ring, with a dark drape suggesting a body that is not there.
-The decoys are identical masks, so "which one is real" becomes a question you
-can ask by looking. The mask is the lie; the telegraph on the floor stays honest.
+*Built:* **a death mask with nothing behind it.** Bone plate, hollow sockets, a
+drape where a body would be, and **the mouth is the light**. That last part is
+the whole design: `_markRealBody` already marked the true body by brightness, so
+putting the brightness on a mouth makes the fairness cue anatomical — *the one
+that is speaking is the one you can hit.* Ringed by the hoop, kept because
+`bolt` uses its brightness as the wind-up tell, but thinned to a hoop and
+recoloured to the Leviathan's violet. 7.19 wide, 30% of frame, hitbox ratio 0.79.
 
-*Constraints:* band 0.84 leaves **0.24 of growth** before the floor. This is a
-re-shape, not an enlargement. Keep the ring — it is already the best part.
+**The decoys are now the same body.** They were 0.9 blobs against a 1.1 core
+wearing a ring, so *"which one is real"* was answered by silhouette before
+brightness ever mattered — the mechanic was decoration on a question nobody had
+to ask. Real and decoy are built by the same `buildProxyMask()`.
 
-*Risk:* medium, purely because of the tight band. Measure after every change.
-**Effort: one sitting.**
+*What it cost:*
+
+1. **`voxRing` had no `res` parameter**, so its tube clamped at one body cell —
+   the thinnest possible hoop was half a world unit before presence scaling,
+   which is why the old one dominated the boss. Threaded through, like every
+   other builder.
+2. **A hoop stood upright and rolled on Z tumbles**, and the portrait caught it
+   slicing diagonally across the face. Laid flat and spun about its own axis it
+   reads as an ellipse from this pitch, never crosses the mask, and is the same
+   width in every frame.
+3. **The core spun on two axes**, which is fine for a ball and impossible for a
+   face. Trap 9 again.
+4. **I reintroduced the exact defect I was removing, one line later.**
+   `buildProxyMask` scales its group to 1.5 and `_spawnClones` then *assigned*
+   presence over the top instead of multiplying, so every decoy came out 1.5×
+   smaller than the body it is meant to be indistinguishable from. The spec
+   caught it on its first run.
+
+*Guarded by:* `runProxy` in `boss-bodies.spec.mjs` — decoys the same size as the
+real body, only the real one's mouth lit, **no decoy sharing a material with the
+real body** (they come from shared builders and `_markRealBody` writes opacity
+straight onto them, so an uncloned decoy would make the Proxy fade itself out
+every time it marked its own doubles), the real face unchanged by that marking,
+and the room-colour gate on `0xd4a84b`.
 
 ### 02 · 03 · 04 — Tri-Compiler, Sand Spur, Kinetic Core
 
@@ -378,7 +412,7 @@ valuable one and should not be allowed to crowd out the rest:
 | item | state |
 |---|---|
 | Distribution live (Pages + a release) | **pushed, still dark** — `v0.4.0` is on the remote and `enablement: true` is in `pages.yml`, but `sumosizedginger.github.io/Sovereign-Scar/` still 404s (checked 2026-08-16). Next check is the Actions log for `pages.yml`; if it is still refusing, the fallback is one click in Settings → Pages → Source: GitHub Actions |
-| Boss silhouettes | **9 of 14 done**; 4 planned here; 1 needs nothing |
+| Boss silhouettes | **10 of 14 done**; 3 planned here; 1 needs nothing |
 | Occlusion | not started — agreed to land BEFORE the combo work |
 | Combo system | not started, riskiest item in v1 |
 | 80% room variation (wall/ceiling height) | not started |
@@ -392,5 +426,5 @@ playthrough turned up is fixed.** More testers are being lined up by the owner;
 that is in hand and is not a reason to hold up the roster. Do not keep
 re-proposing it.
 
-*Suggested interleave:* ~~the Witness~~ ~~Frost & Fuel~~ ~~Hydroid Cloud~~ (done)
-→ occlusion → the Proxy and the three small ones in the gaps.
+*Suggested interleave:* ~~the Witness~~ ~~Frost & Fuel~~ ~~Hydroid Cloud~~
+~~the Proxy~~ (done) → occlusion → the three small ones in the gaps.

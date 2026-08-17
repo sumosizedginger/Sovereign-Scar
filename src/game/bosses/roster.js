@@ -798,17 +798,130 @@ function pointNearSegment(p, a, b, thresh) {
 }
 
 // ─── Beat 05 — The Proxy ────────────────────────────────────────────────────
+// The Proxy's palette. Bone and cold violet, chosen AGAINST the citadel: that
+// kit's accent is `0xd4a84b` and it dresses itself in `kintsugi_seams`, so gold
+// on this boss is invisible twice over. Violet is the Leviathan's own colour
+// (`beat-14-leviathan` accent `0x8b5cf6`) — which is whose voice this is.
+const PROXY_HOOP = 0xb9a6e8;
+const MASK_BONE = 0xd8cfb8;
+const MASK_SHADE = 0x9a917c;
+const MASK_HOLLOW = 0x171320;
+
+/**
+ * One Proxy mask — the true body and every decoy are built by this, which is
+ * the point.
+ *
+ * The decoys used to be 0.9 blobs while the boss was a 1.1 core wearing a
+ * ring, so "which one is real" was answered by SHAPE before brightness ever
+ * mattered and the whole proxy mechanic was decoration. Identical bodies put
+ * the question back where `_markRealBody` intends it: the real one is the one
+ * whose mouth is lit.
+ *
+ * The face is pitched back 41°. A mask standing upright presents its top edge
+ * to a 70.7° camera and reads as a plank — the same lesson the Witness's seven
+ * heads cost, and the reason its eyes and mouth are on a tilted plane here.
+ */
+function buildProxyMask() {
+    const group = new THREE.Group();
+    // Authored small and scaled once, so every number below stays readable and
+    // the decoys cannot drift from the real body by being built at a different
+    // size. The old boss got its 5.47 width almost entirely from a half-unit
+    // gold band; with the band thinned to a hoop the mask has to carry the
+    // presence itself.
+    group.scale.setScalar(1.5);
+    const face = new THREE.Group();
+    face.rotation.x = -0.72;
+    group.add(face);
+
+    const plate = voxBlob(0.80, 1.00, 0.24, MASK_BONE, 0x000000, 0);
+    face.add(plate);
+
+    const brow = voxBox(1.26, 0.15, 0.18, MASK_SHADE, 0x000000, 0,
+        undefined, LIMB_VOX_PER_UNIT);
+    brow.position.set(0, 0.44, 0.16);
+    face.add(brow);
+
+    // Sockets, not eyes. Nothing is behind this.
+    for (const sx of [-1, 1]) {
+        const socket = voxBox(0.30, 0.22, 0.16, MASK_HOLLOW, 0x000000, 0,
+            undefined, LIMB_VOX_PER_UNIT);
+        socket.position.set(sx * 0.32, 0.16, 0.20);
+        face.add(socket);
+    }
+
+    // THE MOUTH IS THE LIGHT, and it is what `this.core` points at, because
+    // `_markRealBody` drives `core.material.opacity` and `emissiveIntensity`
+    // to say which body is the real one. Putting that on the mouth makes the
+    // cue mean something: the Proxy is the Voice, and the one that is speaking
+    // is the one you can hit.
+    const mouth = voxBox(0.44, 0.28, 0.18, ABYSS_COLORS.violetHot,
+        ABYSS_COLORS.violetHot, 0.55, { transparent: true }, LIMB_VOX_PER_UNIT);
+    mouth.position.set(0, -0.44, 0.22);
+    face.add(mouth);
+
+    // The hollow behind the face. A mask is only a mask if you can tell there
+    // is no head in it.
+    const hollow = voxBlob(0.62, 0.80, 0.26, MASK_HOLLOW, 0x000000, 0);
+    hollow.position.set(0, -0.02, -0.24);
+    face.add(hollow);
+
+    // A drape where a body would be, trailing off rather than ending.
+    for (let i = 0; i < 3; i++) {
+        const u = i / 2;
+        const drape = voxBlob(0.50 - u * 0.20, 0.32, 0.28 - u * 0.10,
+            MASK_HOLLOW, 0x000000, 0,
+            { transparent: true, opacity: 0.8 - u * 0.34 });
+        drape.position.set(0, -0.92 - i * 0.46, -0.20 - i * 0.14);
+        group.add(drape);
+    }
+
+    group.userData.mouth = mouth;
+    return { group, mouth };
+}
+
 export class ProxyBoss extends BossBase {
     constructor(scene, position = { x: 0, z: -3 }) {
+        // A DEATH MASK WITH NOTHING BEHIND IT.
+        //
+        // It was a violet ball wearing an enormous gold hoop, and the hoop was
+        // `CRUST_COLORS.goldLeaf` — `0xd4a84b`. The kit accent for
+        // `beat-05-citadel` is `0xd4a84b`. Not a near miss: THE IDENTICAL HEX,
+        // on the most prominent feature of the boss, in its own room. Same
+        // defect the Witness had in magenta.
+        //
+        // The subtitle is *Voice of the Leviathan* — this thing is a
+        // mouthpiece, something the final boss speaks through — and its whole
+        // mechanic is that it swaps bodies with decoys while `_markRealBody`
+        // marks the true one by BRIGHTNESS. So: a face, and the light is its
+        // mouth. The one that is speaking is the one you can hit. That turns
+        // the fairness cue into anatomy instead of a brightness slider.
+        //
+        // Bone, not gold. The room is a gilt citadel dressed in
+        // `kintsugi_seams` and lit by a gold accent; a gold mask in it is trap
+        // 5, and a mask made of gilt cracks would be trap 8 on top. Pale bone
+        // against gold reads on value, which is the one channel that room
+        // leaves free.
         const body = new THREE.Group();
-        const core = voxBlob(1.1, 1.1, 1.1, 0x3a2860, ABYSS_COLORS.violetHot, 1.5);
-        const ring = voxRing(1.6, 0.12, CRUST_COLORS.goldLeaf, CRUST_COLORS.goldLeaf, 1.8);
-        ring.rotation.x = Math.PI / 2;
-        body.add(core, ring);
+        const mask = buildProxyMask();
+        const core = mask.mouth;
+        body.add(mask.group);
+        // The hoop stays — it is the best thing this boss had, and `bolt` uses
+        // its brightness as the wind-up tell. Thinner (at limb resolution, see
+        // `voxRing`) and no longer the room's own colour.
+        const ring = voxRing(1.62, 0.055, PROXY_HOOP, PROXY_HOOP, 1.8,
+            undefined, LIMB_VOX_PER_UNIT);
+        // FLAT, AND SPUN ABOUT ITS OWN AXIS. Stood upright and rolled on Z
+        // it tumbled — the portrait caught it slicing diagonally across the
+        // mask, and the boss's own width swung with the frame. Lying flat it
+        // reads as an ellipse from this pitch, never crosses the face, and is
+        // the same size in every photograph.
+        ring.position.y = -0.15;
+        body.add(ring);
         super(scene, {
             id: 'proxy', name: 'The Proxy', hp: 16, hitRadius: 1.3,
             contactRadius: 1.7, position, mesh: body, phaseThresholds: [0.55, 0.25],
         });
+        this.mask = mask.group;
         this.core = core;
         this.ring = ring;
         this.clones = [];
@@ -823,15 +936,34 @@ export class ProxyBoss extends BossBase {
     _spawnClones(phase) {
         for (const c of this.clones) {
             if (c.parent) c.parent.remove(c);
-            c.geometry?.dispose(); c.material?.dispose();
+            c.traverse((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
         }
         this.clones = [];
         const n = phase >= 3 ? 3 : 2;
         for (let i = 0; i < n; i++) {
-            const m = voxBlob(0.9, 0.9, 0.9, 0x2a1840, ABYSS_COLORS.violet, 0.9, { transparent: true, opacity: 0.45 });
+            // THE SAME BUILDER AS THE REAL ONE. Decoys used to be plain 0.9
+            // blobs against a 1.1 core wearing a ring, so the answer to "which
+            // is real" was its silhouette and `_markRealBody`'s brightness cue
+            // was decoration on top of a question nobody had to ask.
+            const m = buildProxyMask().group;
+            // Every material cloned, because these come out of shared builders
+            // and `_markRealBody` dims each decoy by writing opacity straight
+            // onto them — without this, dimming a decoy dims the real Proxy's
+            // face too.
+            m.traverse((o) => {
+                if (!o.isMesh || !o.material) return;
+                o.material = o.material.clone();
+                o.material.transparent = true;
+            });
             m.position.copy(this.root.position);
             m.position.x += Math.cos(i * 2) * 3;
             m.position.z += Math.sin(i * 2) * 3;
+            // MULTIPLY, do not replace. `buildProxyMask` already scales the
+            // group to 1.5, so assigning presence over the top threw that away
+            // and every decoy came out at 1.5x smaller than the body it is
+            // supposed to be indistinguishable from — the exact defect this
+            // rebuild set out to remove, reintroduced one line later.
+            m.scale.multiplyScalar(this.root.scale.x || 1);
             this.scene.add(m);
             this.clones.push(m);
         }
@@ -846,9 +978,16 @@ export class ProxyBoss extends BossBase {
             this.core.material.opacity = 1;
             this.core.material.emissiveIntensity = BOSS_EMISSIVE_MAX;
         }
+        // A decoy is the same body with the light out. Its mouth goes dark and
+        // its face goes thin — brightness is still the tell, it is just carried
+        // by a face now instead of by the whole object.
         for (const c of this.clones) {
-            c.material.opacity = 0.4;
-            c.material.emissiveIntensity = BOSS_EMISSIVE_MAX * 0.45;
+            c.traverse((o) => {
+                if (!o.isMesh || !o.material) return;
+                o.material.opacity = 0.55;
+            });
+            const m = c.userData.mouth;
+            if (m?.material) m.material.emissiveIntensity = BOSS_EMISSIVE_MAX * 0.12;
         }
     }
     /** Swap world positions with a decoy so the hittable body relocates. */
@@ -865,9 +1004,16 @@ export class ProxyBoss extends BossBase {
         sfx.phase();
     }
     tickAI(dt, player) {
-        this.ring.rotation.z += dt * (1 + this.phase * 0.5);
-        this.core.rotation.y += dt * 0.8;
-        this.core.rotation.x += dt * 0.3;
+        this.ring.rotation.y += dt * (1 + this.phase * 0.5);
+        // THE MASK DOES NOT TUMBLE. The core used to spin on two axes, which is
+        // fine for a ball and impossible for a face: with an X roll no
+        // direction stays up, so the eyes and mouth point wherever the frame
+        // happened to land (trap 9). The hoop keeps the motion; the face keeps
+        // an orientation, and `faceToward` keeps `state.facingVec` true with it.
+        if (player) this.faceToward(player, dt, 2.6);
+        // Decoys turn to watch you too. A decoy that stares off into the room
+        // while the real one looks at you is a tell nobody authored.
+        for (const c of this.clones) c.rotation.y = this.root.rotation.y;
         this.castCd -= dt;
         if (this.phase >= 2) {
             this._shuffleT = (this._shuffleT || 0) + dt;
@@ -894,7 +1040,6 @@ export class ProxyBoss extends BossBase {
                 c.position.x = this.root.position.x + Math.cos(a) * 3.5;
                 c.position.z = this.root.position.z + Math.sin(a) * 3.5;
                 c.position.y = 1.4 + Math.sin(this.t * 3 + i) * 0.4;
-                c.rotation.y += dt;
             }
         }
         if (this.phase < 2) {
@@ -904,7 +1049,6 @@ export class ProxyBoss extends BossBase {
                 c.position.x = this.root.position.x + Math.cos(a) * 3.5;
                 c.position.z = this.root.position.z + Math.sin(a) * 3.5;
                 c.position.y = 1.4 + Math.sin(this.t * 3 + i) * 0.4;
-                c.rotation.y += dt;
             }
         }
         if (player && this.actionCd <= 0 && !this.busy) {

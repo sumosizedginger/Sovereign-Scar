@@ -424,6 +424,7 @@ export function run(t) {
     runWitness(t);
     runFrostAndFuel(t);
     runHydroid(t);
+    runProxy(t);
 }
 
 /**
@@ -708,4 +709,83 @@ export function runHydroid(t) {
         boss.bell.scale.x < open * 0.9 && boss.bell.scale.y > 1,
         `x ${open.toFixed(2)} -> ${boss.bell.scale.x.toFixed(2)}, `
         + `y ${boss.bell.scale.y.toFixed(2)}`);
+}
+
+/**
+ * The Proxy — the mask, and the decoys that have to be the same mask.
+ *
+ * `_markRealBody`'s comment says brightness marks the real one. That was only
+ * ever half true: the decoys were 0.9 blobs and the boss was a 1.1 core wearing
+ * a ring, so the answer was its SILHOUETTE and the brightness cue sat on top of
+ * a question nobody had to ask. These assertions are what make the mechanic
+ * real rather than intended.
+ */
+export function runProxy(t) {
+    const boss = new ProxyBoss(new THREE.Scene(), { x: 0, y: 1.5, z: 0 });
+    // Snapshot the real face BEFORE any decoy exists.
+    const faceMat = [];
+    boss.mask.traverse((o) => { if (o.isMesh && o.material) faceMat.push(o.material); });
+    const before = faceMat.map((m) => m.opacity ?? 1);
+    boss._spawnClones(3);
+
+    const sizeOf = (o) => {
+        o.updateWorldMatrix(true, true);
+        const b = new THREE.Box3().setFromObject(o);
+        return b.getSize(new THREE.Vector3());
+    };
+    const real = sizeOf(boss.mask);
+    const decoy = sizeOf(boss.clones[0]);
+    t.ok('the Proxy\'s decoys are the same body as the Proxy',
+        boss.clones.length === 3
+        && Math.abs(real.x - decoy.x) < 0.05 && Math.abs(real.y - decoy.y) < 0.05,
+        `real ${real.x.toFixed(2)}x${real.y.toFixed(2)} `
+        + `vs decoy ${decoy.x.toFixed(2)}x${decoy.y.toFixed(2)}`);
+
+    // The tell, stated as a rule rather than as a hope: the one that is
+    // speaking is the one you can hit.
+    const realMouth = boss.core.material.emissiveIntensity;
+    const decoyMouths = boss.clones.map((c) => c.userData.mouth.material.emissiveIntensity);
+    t.ok('…and only the real one\'s mouth is lit',
+        decoyMouths.every((e) => e < realMouth * 0.5),
+        `real ${realMouth.toFixed(2)} vs decoys ${decoyMouths.map((e) => e.toFixed(2)).join(',')}`);
+
+    // ── Dimming a decoy must not dim the Proxy ─────────────────────────────
+    // The mask parts come out of shared builders, so a decoy built without
+    // cloning its materials shares them with the real body — and
+    // `_markRealBody` writes opacity straight onto every decoy mesh. The boss
+    // would fade itself out every time it marked its own doubles, and the tell
+    // would invert. Caught by looking rather than by playing, so it is pinned.
+    const decoyMat = [];
+    boss.clones[0].traverse((o) => { if (o.isMesh && o.material) decoyMat.push(o.material); });
+    const shared = faceMat.filter((m) => decoyMat.includes(m));
+    t.ok('…and no decoy shares a material with the real body',
+        shared.length === 0, `${shared.length} shared of ${faceMat.length}`);
+    // Compared against what this body looked like BEFORE any decoy existed,
+    // not against "opaque" — the drape is authored translucent on purpose, and
+    // a test that demanded solidity would have been asserting a coincidence.
+    t.ok('…so marking the decoys leaves the Proxy\'s own face untouched',
+        faceMat.every((m, i) => Math.abs((m.opacity ?? 1) - before[i]) < 1e-6),
+        faceMat.map((m, i) => `${before[i].toFixed(2)}->${(m.opacity ?? 1).toFixed(2)}`)
+            .join(','));
+
+    // ── Not the colour of its own room ─────────────────────────────────────
+    // The hoop was `CRUST_COLORS.goldLeaf` = 0xd4a84b and this kit's accent is
+    // 0xd4a84b — the identical hex, on the boss's most prominent feature.
+    const accent = new THREE.Color(KITS['beat-05-citadel'].accent);
+    const clashes = [];
+    const seen = new Set();
+    boss.root.traverse((o) => {
+        const attr = o.isMesh && o.geometry?.getAttribute?.('color');
+        if (!attr) return;
+        for (let i = 0; i < attr.count; i++) {
+            const r = attr.getX(i), g = attr.getY(i), b = attr.getZ(i);
+            const key = `${(r * 64) | 0},${(g * 64) | 0},${(b * 64) | 0}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const d = Math.hypot(r - accent.r, g - accent.g, b - accent.b);
+            if (d < 0.22) clashes.push(`rgb(${r.toFixed(2)},${g.toFixed(2)},${b.toFixed(2)}) d=${d.toFixed(2)}`);
+        }
+    });
+    t.ok('…and none of it is painted the colour of its own citadel',
+        clashes.length === 0, clashes.slice(0, 4).join(', ') || 'none');
 }

@@ -155,9 +155,15 @@ export function voxBlob(rx, ry, rz, color, emissive, ei, extras, res = VOX_PER_U
  * drop-in. A torus standing upright is a ring you see edge-on from a top-down
  * camera, i.e. a bar. Lying flat it is a ring, which is what "ring" was for.
  */
-export function voxRing(radius, tube, color, emissive, ei, extras) {
+export function voxRing(radius, tube, color, emissive, ei, extras, res = VOX_PER_UNIT) {
+    // `res` threaded for the same reason it was threaded through every other
+    // builder here: `T` clamps at one cell, so on the 6-per-unit body grid the
+    // thinnest possible ring is three cells across — half a world unit, before
+    // any presence scaling. The Proxy's hoop was authored at 0.12 and rendered
+    // as a 0.5-unit band that dominated the whole boss. A ring meant to read as
+    // a hoop rather than as a tyre has to be built at limb resolution.
     const m = new Map();
-    const R = cells(radius), T = Math.max(1, cells(tube));
+    const R = cells(radius, res), T = Math.max(1, cells(tube, res));
     const h = Math.max(1, Math.round(T * 0.8));
     for (let y = -h; y <= h; y++) {
         for (let x = -R - T; x <= R + T; x++) {
@@ -167,7 +173,7 @@ export function voxRing(radius, tube, color, emissive, ei, extras) {
             }
         }
     }
-    return meshFromMap(m, emissive, ei, extras);
+    return meshFromMap(m, emissive, ei, extras, res);
 }
 
 /**
