@@ -2281,143 +2281,111 @@ export const TWIN_OFFSET = 3.4;
 // ─── Beat 11 — Sludge Golem ─────────────────────────────────────────────────
 export class SludgeGolem extends BossBase {
     constructor(scene, position = { x: 0, z: 0 }) {
-        // A THING THAT IS MADE OF WHAT IT THROWS.
+        // A GOLEM: BROAD, UPRIGHT, TWO-ARMED.
         //
-        // It lobs sludge that lands as a pool, it lunges, and at half health it
-        // sheds two smaller golems. All of that was delivered by one green
-        // ball — and worse, a green ball in a GREEN ROOM: beat 11's kit is
-        // `sludge 0x66803c` with a `0x8fb060` accent, and the boss was
-        // `ABYSS_COLORS.sludge` itself. It was painted the exact colour of the
-        // floor it stands on, which is the ΔL* failure this project has now
-        // measured on the Pyre floor and the Abyss both.
+        // The previous build hunched it round one enormous sling arm and the
+        // owner's read was "a teapot" — which is exactly what a body with one
+        // spout and one handle is. A golem is a made MAN: shoulders, a head
+        // between them, two arms hanging, legs planted. The Warden already
+        // proved that structure survives this camera, so the answer was to use
+        // it rather than to keep re-arranging a lump.
         //
-        // So the mass goes bog-dark and the ACID goes in the cracks. A cooled,
-        // wet, peat-black body reads against that room; the light in it says
-        // what it is made of without competing with the ground.
-        // MEASURED, NOT PICKED. The builders bake colour as vertex data and the
-        // renderer works in LINEAR light, so 0x2b2015 — a perfectly reasonable
-        // dark brown on a colour picker — arrives in the mesh as (6, 4, 2) out
-        // of 255. Against an albedo that close to black, 0.05 of acid-green
-        // emissive is not a tint, it is the dominant term: the first build came
-        // out olive and I had painted it brown. Both values below are lifted so
-        // the body has something to reflect WITH, and the emissive is taken off
-        // the mass entirely — light lives in the seams and the core, which is
-        // the whole design anyway.
+        // What stays lopsided is WEIGHT, not anatomy — the right arm is longer
+        // and ends in a heavier fist because that is the one it slings with.
+        // Asymmetry inside a symmetric frame reads as character; asymmetry
+        // instead of a frame reads as a mistake.
+        //
+        // Colour: measured, not picked. The builders bake vertex colour and the
+        // renderer works in LINEAR light, so a "dark brown" of 0x2b2015 lands as
+        // (6,4,2) of 255 and any emissive on the mass becomes the dominant hue —
+        // an earlier pass painted this thing brown and rendered it olive. The
+        // bog tones below are lifted so there is something to reflect with, and
+        // the acid lives only in the seams, the drips and the core.
+        //
+        // Beat 11's kit is `sludge` with a 0x8fb060 accent, and this boss used
+        // to be `ABYSS_COLORS.sludge` itself: painted the colour of its own
+        // floor. Peat-dark against that room is the whole reason it is visible.
         const BOG = 0x6a5236;
         const BOG_DEEP = 0x46341f;
         const ACID = 0x9ed94a;
         const mesh = new THREE.Group();
+        const L = LIMB_VOX_PER_UNIT;
 
-// HUNCHED, WIDE AND LOW — because height is nearly free at this camera
-        // and width is everything. Four builds of this boss were TALL: torso
-        // over hips over legs, stacked up a vertical axis that a 70-degree
-        // camera compresses into nothing. What that produced was a brown
-        // column with a green top, and the 'legs' I kept looking for were
-        // projecting straight down the screen where the body already was.
-        // Spread the same mass sideways and forward instead and the thing
-        // finally occupies the plane the player is looking at.
-        //
-        // Lopsided on purpose. Symmetry reads as architecture; a body that
-        // carries its weight on one side reads as something that has to heave
-        // itself around, which is what this fight looks like.
-        // Narrow, so the sling arm has BACKGROUND beside it. The first two
-        // builds gave this boss a 1.05 torso and hung the arm at 1.06 — the
-        // arm began inside the body and the pair fused into one club. Air
-        // between a limb and the mass is what made the spider read, and it is
-        // the same rule here.
-        const torso = voxBlob(1.02, 0.52, 0.92, BOG, 0x000000, 0, { flatShading: true });
-        torso.position.set(0.04, 0.30, -0.04);
-        const haunch = voxBlob(0.92, 0.42, 0.82, BOG_DEEP, 0x000000, 0, { flatShading: true });
-        haunch.position.set(-0.02, -0.16, -0.30);
+        // WIDE ACROSS X, because that is the only axis this camera gives full
+        // length to: at rotation.y = 0 world +X runs across the screen while +Z
+        // runs at the lens and is crushed by the 70-degree pitch. Three bosses
+        // in this pass have now lost limbs to being pushed "forward".
+// NARROWER THAN THE ARMS IT CARRIES. A wide plate at the TOP of a body
+        // is a roof: at 70 degrees it occludes everything under it, and the
+        // first humanoid build hung both arms at 1.06 INSIDE a plate spanning
+        // 1.25, so the boss photographed as a bare slab with a head on it.
+        // Every limb has to break the shoulder's own footprint or the camera
+        // never sees it.
+        const shoulders = voxBox(1.88, 0.44, 0.76, BOG, 0x000000, 0);
+        shoulders.position.set(0, 0.74, -0.04);
 
-        // The hump, and the hole in it. The top of this boss is the surface the
-        // camera sees most, so the thing it swallowed is exposed THERE rather
-        // than buried in a chest nobody will ever be level with. It is also
-        // what divides when the golem splits, so the fight's biggest moment is
-        // already drawn on the body before it happens.
-        // A hump, not a head — but lifted clear of the shoulders all the same.
-        // The notch under it is what stops the whole upper body reading as one
-        // lump, which is the only thing the Warden's three passes actually
-        // taught that transfers to a creature.
-        const hump = voxBlob(0.56, 0.34, 0.50, BOG_DEEP, 0x000000, 0, { flatShading: true });
-        hump.position.set(-0.02, 0.68, -0.30);
-        // Not one bright cube — a cluster, sunk into the shoulder and ringed
-        // by the crust it broke through. A single glowing block reads as a
-        // gem set into the model; broken pieces read as something lodged.
+        // Head small and lifted, so there is a notch under it. The notch is
+        // most of what makes a pile read as a figure.
+        const head = voxBlob(0.40, 0.34, 0.40, BOG_DEEP, 0x000000, 0,
+            { flatShading: true });
+        head.position.set(0.02, 1.22, 0.04);
+
+        const torso = voxBlob(0.78, 0.62, 0.66, BOG, 0x000000, 0, { flatShading: true });
+        torso.position.set(0, 0.20, -0.02);
+        const hips = voxBlob(0.66, 0.34, 0.58, BOG_DEEP, 0x000000, 0, { flatShading: true });
+        hips.position.set(0, -0.38, -0.04);
+
+        // The core, lodged where the shoulders meet — the top surface this
+        // camera sees most of, and the thing that divides when it splits.
         const core = new THREE.Group();
         for (let i = 0; i < 3; i++) {
-            const c = voxBlob(0.19 - i * 0.04, 0.09, 0.17 - i * 0.03, ACID, ACID, 0.5);
-            c.position.set(-0.16 + i * 0.17, (i % 2) * 0.06, 0.06 - i * 0.10);
+            const c = voxBlob(0.19 - i * 0.04, 0.10, 0.17 - i * 0.03, ACID, ACID, 0.5,
+                undefined, L);
+            c.position.set(-0.17 + i * 0.18, (i % 2) * 0.06, 0.04 - i * 0.09);
             core.add(c);
         }
-        // PROUD OF THE SURFACE, not sunk in it. Buried in the hump it was
-        // invisible from the one angle that matters.
-        core.position.set(-0.02, 0.86, -0.28);
+        core.position.set(0.04, 0.92, 0.16);
 
-        // The sling arm — long, heavy, and reaching. Its length is capped by
-        // the fight, not by taste: `boss-reach-e2e` gives this boss room out to
-        // an edge of ~3.5 before there is nowhere to stand, and the fist below
-        // lands at 3.15.
-// LIMB RESOLUTION, or none of the dimensions below are real. At the body
-        // resolution every extent under ~0.34 rounds up to 0.5, so a 0.30-thick
-        // arm and a 0.32-thick hand come out the same chunky slab, adjacent
-        // parts fuse, and four passes of moving them around changed nothing I
-        // could see. Same defect as the spider's legs; I wrote that finding
-        // down and then failed to apply it to the next boss I built.
-        const armUpper = voxBox(1.06, 0.30, 0.34, BOG, 0x000000, 0,
-            undefined, LIMB_VOX_PER_UNIT);
-// ACROSS the view, never toward it. Measured: with the boss facing the
-        // player it sits at rotation.y = 0, so world +X is screen-horizontal at
-        // full length while world +Z runs at the camera and is crushed by the
-        // 70-degree pitch. A previous pass pushed both arms 0.5 FORWARD to
-        // 'use the depth' and simply foreshortened them into stubs — the same
-        // mistake as the Warden's blade and the Wyrm's snout, third time.
-        armUpper.position.set(0.98, 0.46, 0.02);
-        armUpper.rotation.set(0, 0, -0.06);
-        const fist = voxBlob(0.46, 0.40, 0.44, BOG, 0x000000, 0,
-            { flatShading: true }, LIMB_VOX_PER_UNIT);
-        fist.position.set(1.56, 0.30, 0.06);
+        // Both arms hang from the ends of the yoke with air beside them. The
+        // sling arm is longer and heavier; the other is a real arm, not a stub.
+        const armL = voxBox(0.30, 1.04, 0.34, BOG, 0x000000, 0, undefined, L);
+        armL.position.set(-1.34, 0.16, 0.02);
+        armL.rotation.z = 0.12;
+        const fistL = voxBlob(0.32, 0.30, 0.34, BOG, 0x000000, 0,
+            { flatShading: true }, L);
+        fistL.position.set(-1.48, -0.44, 0.02);
 
-        // The other arm never grew. Asymmetry is the silhouette.
-// The withered arm still has to EXIST in the outline. A thin box at
-        // the shoulder was invisible from above, which left the whole body
-        // weighted one way and reading as a club with a lump on it rather
-        // than as something with two arms, one of which lost the argument.
-        const armSmall = voxBox(0.74, 0.20, 0.22, BOG_DEEP, 0x000000, 0,
-            undefined, LIMB_VOX_PER_UNIT);
-        armSmall.position.set(-0.92, 0.46, 0.02);
-        armSmall.rotation.set(0, 0, 0.16);
-        const handSmall = voxBlob(0.24, 0.20, 0.22, BOG_DEEP, 0x000000, 0,
-            { flatShading: true }, LIMB_VOX_PER_UNIT);
-        handSmall.position.set(-1.44, 0.34, 0.04);
+        const armR = voxBox(0.38, 1.22, 0.42, BOG, 0x000000, 0, undefined, L);
+        armR.position.set(1.40, 0.04, 0.02);
+        armR.rotation.z = -0.10;
+        const fistR = voxBlob(0.46, 0.42, 0.48, BOG, 0x000000, 0,
+            { flatShading: true }, L);
+        fistR.position.set(1.54, -0.62, 0.04);
 
-        const legL = voxBox(0.34, 0.44, 0.38, BOG_DEEP, 0x000000, 0,
-            undefined, LIMB_VOX_PER_UNIT);
-        legL.position.set(-0.58, -0.44, 0.10);
-        const legR = voxBox(0.36, 0.42, 0.40, BOG_DEEP, 0x000000, 0,
-            undefined, LIMB_VOX_PER_UNIT);
-        legR.position.set(0.62, -0.46, 0.08);
+        const legL = voxBox(0.40, 0.72, 0.44, BOG_DEEP, 0x000000, 0, undefined, L);
+        legL.position.set(-0.40, -0.94, 0.02);
+        const legR = voxBox(0.42, 0.70, 0.46, BOG_DEEP, 0x000000, 0, undefined, L);
+        legR.position.set(0.42, -0.96, 0.02);
 
-        mesh.add(torso, haunch, hump, core, armUpper, fist, armSmall, handSmall,
-            legL, legR);
+        mesh.add(shoulders, head, torso, hips, core,
+            armL, fistL, armR, fistR, legL, legR);
 
-        // Seams of light where the crust has split, and drips hanging off the
-        // heavy side. Thin enough to need limb resolution — at the body
-        // resolution none of these could be narrower than half a unit and the
-        // whole point is that they are cracks, not stripes.
+        // Seams of light where the crust has split, and drips off the heavy
+        // side. Limb resolution, or none of these widths are real — at the body
+        // resolution everything under ~0.34 rounds up to the same 0.5 slab.
         const SEAMS = [
-            [0.34, 0.52, 0.42, 0.09, 0.46], [-0.10, 0.10, 0.44, 0.08, 0.60],
-            [0.62, -0.18, 0.40, 0.07, 0.38], [0.10, 0.62, -0.62, 0.08, 0.42],
+            [0.30, 0.34, 0.40, 0.09, 0.44], [-0.24, 0.02, 0.42, 0.08, 0.52],
+            [0.00, 0.62, -0.50, 0.08, 0.34], [-0.62, 0.46, 0.30, 0.07, 0.30],
         ];
         for (const [x, y, z, w, h] of SEAMS) {
-            const seam = voxBox(w, h, w, ACID, ACID, 0.45, undefined, LIMB_VOX_PER_UNIT);
+            const seam = voxBox(w, h, w, ACID, ACID, 0.45, undefined, L);
             seam.position.set(x, y, z);
             mesh.add(seam);
         }
         for (let i = 0; i < 4; i++) {
-            const drip = voxBox(0.11, 0.30 + (i % 2) * 0.16, 0.11, BOG_DEEP, ACID, 0.30,
-                undefined, LIMB_VOX_PER_UNIT);
-            drip.position.set(0.55 + i * 0.36, -0.52 - (i % 2) * 0.12, 0.10 - (i % 3) * 0.16);
+            const drip = voxBox(0.10, 0.26 + (i % 2) * 0.14, 0.10, BOG_DEEP, ACID, 0.30,
+                undefined, L);
+            drip.position.set(0.72 + i * 0.22, -0.74 - (i % 2) * 0.14, 0.06 - (i % 3) * 0.12);
             mesh.add(drip);
         }
         super(scene, {

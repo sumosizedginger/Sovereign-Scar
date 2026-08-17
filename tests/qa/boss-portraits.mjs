@@ -191,9 +191,19 @@ try {
             // Relative to where the boss ACTUALLY ended up, not to the world
             // origin: these things move while they are ticked, and a player
             // parked at a fixed point leaves the boss facing off into the room.
-            player.root.position.x = root.position.x;
-            player.root.position.z = root.position.z + 4.5;
-            for (let i = 0; i < 40; i++) {
+            // EVERY FRAME, not once. These bosses lunge and strafe while they
+            // are ticked: a player parked once gets left behind, the boss ends
+            // up facing sideways, and a body built wide across X photographs
+            // with that width running away from the lens. The Golem came out as
+            // a vertical slab that way and read as a teapot — a defect entirely
+            // in this probe, on a model that was fine.
+            // Long enough for any turn rate to converge: 40 ticks is 0.67s, and a
+            // boss that has to come 2 radians round at 1.6 rad/s simply does not
+            // finish — it photographs mid-turn, which is how a body built wide
+            // across X ends up presenting its narrow side to the lens.
+            for (let i = 0; i < 150; i++) {
+                player.root.position.x = root.position.x;
+                player.root.position.z = root.position.z + 4.5;
                 try { boss.tickAI?.(1 / 60, player, null); } catch (_) { /* needs fuller ctx */ }
                 boss.t = (boss.t || 0) + 1 / 60;
             }
