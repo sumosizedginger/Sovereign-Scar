@@ -1,11 +1,13 @@
 # The boss pass — what is left, and exactly how to do it
 
-Twelve of fourteen are rebuilt: Crypt Warden, Tri-Compiler, Sand Spur, Obsidian
-Arachnid, Magma Wyrm, Leviathan Core, Phantasm, Sludge Golem, GUMOI Witness,
-Frost & Fuel, Hydroid Cloud, The Proxy. The Skeletal Mantis needs nothing and
-never did. **One remains: the Kinetic Core.**
+**ALL THIRTEEN ARE REBUILT**, and the Skeletal Mantis — which needs nothing and
+never did — is the fourteenth. The boss pass is finished.
 
-This document is the method that survived those twelve, the traps each one cost,
+This document stays as the method and the trap list, because the traps are not
+about bosses: they are about this camera, this renderer and these instruments,
+and the next body anyone builds in this game will meet them again.
+
+It is the method that survived all thirteen, the traps each one cost,
 and a per-boss plan with the numbers already measured. It exists because the
 first three bosses took four to six passes each and the last three took two —
 almost all of the difference was knowing the things written down here.
@@ -528,12 +530,46 @@ than by driving a boss), the shipped chain not sitting inside itself, and the
 seam proud of the head. Restoring the five-frame stride fails the first;
 returning the seam to `y = 0.42` fails the last.
 
-### 04 — Kinetic Core
+### 04 — Kinetic Core · **DONE** (2026-08-17)
 
-*Now:* 2.88 wide — the smallest left. **Re-measure before designing.** Three
-separate instruments turned out to be measuring a fraction of a multi-part boss
-this session, and `KineticCore` is the last of the three that live outside
-`roster.js`.
+*Was:* a plain pale-blue ball, 2.88 wide, the smallest on the roster — in a file
+whose **first line** calls it a "bouncing spiked sphere". It had no spikes. Its
+weak lamp sat at `y = -0.78`, **directly underneath**, where a 70.7° camera
+never sees it: the one light that says *hit here* was occluded by the boss it
+belongs to for the entire fight.
+
+*Does:* ricochets off the arena walls throwing a `shockring` from each impact,
+and `fission` (phase 3) sheds orb pairs.
+
+*Built:* **a spiked iron mine that points where it is going.** The subtitle is
+*Momentum Made Hunger* — this thing is only dangerous because it is moving, so
+the fact its body must carry is WHICH WAY. `vx`/`vz` are already the truth of
+that, so the shell aims along them and every wall bounce becomes a **visible
+flip** instead of a change of address. Dark iron against the Sky's pale
+`0xbfe0ff`, blunt spurs, two swept fins, and the weak lamp riding the trailing
+face where it can be seen. 3.66 wide, band 1.03, hitbox ratio 0.77.
+
+**Two groups, because the spin had to survive the aim.** The rotor keeps every
+existing spin including the `rotation.x += dt * 18` charge tell; the shell
+carries the fins, the lamp, and the heading. Aiming the whole body would have
+eaten that tell — spinning the whole body is what stopped anything being
+aimable, which is trap 9 for the **fourth** time this pass.
+
+⚠ **Its fight numbers cap how spiky it can be, and that is the honest limit
+here.** `hitRadius` is 0.95. Spikes reaching 2.0 from the centre put the player
+among them unable to connect — the Crypt Warden's "stand inside it to hit it"
+defect — and measured, that body came in at a p85 radius of 1.45 against 0.95,
+a ratio of 0.67 well under the floor. Growing the ball to outvote them does not
+work either: eight spikes at limb resolution carry enough vertices to drag the
+percentile out on their own. So the spurs are short and thick. **A properly
+bristling Core needs a larger `hitRadius`, which is a fight number and the
+owner's call, not an art decision.**
+
+*Guarded by:* `runKineticCore` in `boss-bodies.spec.mjs` — the shell aimed along
+its own velocity as a world-space dot product, and the weak lamp clear of the
+mass rather than slung under it, checked against the ball's measured radius
+instead of a magic number. Removing the aim fails the first; returning the lamp
+to `y = -0.78` fails the second.
 
 *Does:* the Tri-Compiler is a three-core assembly with a beam cycle and a
 `converge` slam; the Spur burrows and surfaces (`sand-wake`, `breach`); the Core
@@ -562,7 +598,7 @@ valuable one and should not be allowed to crowd out the rest:
 | item | state |
 |---|---|
 | Distribution live (Pages + a release) | **pushed, still dark** — `v0.4.0` is on the remote and `enablement: true` is in `pages.yml`, but `sumosizedginger.github.io/Sovereign-Scar/` still 404s (checked 2026-08-16). Next check is the Actions log for `pages.yml`; if it is still refusing, the fallback is one click in Settings → Pages → Source: GitHub Actions |
-| Boss silhouettes | **12 of 14 done**; 1 planned here; 1 needs nothing |
+| Boss silhouettes | **DONE** — 13 rebuilt, 1 (Mantis) needed nothing |
 | Occlusion | not started — agreed to land BEFORE the combo work |
 | Combo system | not started, riskiest item in v1 |
 | 80% room variation (wall/ceiling height) | not started |
@@ -577,4 +613,4 @@ that is in hand and is not a reason to hold up the roster. Do not keep
 re-proposing it.
 
 *Suggested interleave:* ~~the Witness~~ ~~Frost & Fuel~~ ~~Hydroid Cloud~~
-~~the Proxy~~ ~~Tri-Compiler~~ ~~Sand Spur~~ (done) → occlusion → the Core.
+the boss pass is **finished**. Next is occlusion, then the combo system.

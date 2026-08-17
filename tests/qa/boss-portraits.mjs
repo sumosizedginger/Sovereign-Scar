@@ -303,6 +303,7 @@ try {
             for (const c of boss.cores || []) push(c.root || c.mesh);
             for (const s of boss.segments || []) push(s);
             for (const s of boss.segs || []) push(s);
+            for (const s of boss.splits || []) push(s.mesh || s);
             const under = (anc, o) => {
                 for (let p = o.parent; p; p = p.parent) if (p === anc) return true;
                 return false;

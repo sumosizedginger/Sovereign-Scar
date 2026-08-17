@@ -3,7 +3,16 @@
 import * as THREE from 'three';
 import { BossBase, bounceArena, BOSS_EMISSIVE_MAX } from './base.js';
 import { sfx } from '../../audio/synth.js';
-import { voxBlob, voxSphere } from './boss-models.js';
+import {
+    voxBlob, voxBox, voxSphere, voxSpike, LIMB_VOX_PER_UNIT,
+} from './boss-models.js';
+
+// Dark iron, and deliberately nothing like the Sky's pale `0xbfe0ff` accent —
+// this room is lit shafts and cloud cards, so the boss goes heavy and dark
+// against it. Light stays in the weak lamp, off the mass (trap 1).
+const IRON = 0x3a3f47;
+const IRON_EDGE = 0x7d8794;
+const IRON_GLOW = 0x305070;
 
 // SHOCKRING — the wall bounce, made into a rhythm.
 //
@@ -30,15 +39,88 @@ export const FISSION_CD = 6.0;
 
 export class KineticCore extends BossBase {
     constructor(scene, collisionWorld, center, opts = {}) {
-        // Bright enough to read on the raised corona plate under top-down cam.
-        // Dark slate + low emissive used to vanish into floor/bloom.
-        const mesh = voxBlob(0.95, 0.95, 0.95, 0x8a96a8, 0x305070, 0.55,
+        // A SPIKED CORE THAT POINTS WHERE IT IS GOING.
+        //
+        // This file's own first line calls it a "bouncing spiked sphere". It
+        // was a sphere. No spikes, no direction, no features — the smallest
+        // body on the roster at 2.88 across, and a pale blue-grey ball in a
+        // pale blue sky room.
+        //
+        // The subtitle is *Momentum Made Hunger*: this thing is dangerous only
+        // because it is moving, so the one fact its body must carry is WHICH
+        // WAY. `vx`/`vz` are already the truth of that, and aiming the shell
+        // along them turns every wall bounce into a visible flip instead of a
+        // change of address.
+        //
+        // Two groups, because the spin has to survive the aim. The outer shell
+        // holds the swept fins and the weak point and is aimed; the rotor holds
+        // the spiked mass and keeps every existing spin, including the
+        // `rotation.x += dt * 18` charge tell. Aiming the whole body would have
+        // eaten that tell; spinning the whole body is what stopped anything
+        // being aimable in the first place (trap 9).
+        const mesh = new THREE.Group();
+        const rotor = new THREE.Group();
+        mesh.add(rotor);
+
+        const ball = voxBlob(1.20, 1.20, 1.20, IRON, IRON_GLOW, 0.16,
             { metalness: 0.55, roughness: 0.32 });
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        const weak = voxSphere(0.32, 0xffe080, 0xffd060, 0.55);
-        weak.position.set(0, -0.78, 0);
+        rotor.add(ball);
+        // Spikes: the thing the header always said this was. Limb resolution,
+        // or a 0.2 spike comes back half a unit thick and the ball just gets
+        // lumpy (trap 2).
+        for (let i = 0; i < 8; i++) {
+            const a = (i / 8) * Math.PI * 2;
+            const tilt = (i % 2) ? 0.5 : -0.5;
+            // BASED OUTSIDE THE BALL. At 0.72 with a 0.92 ball the base sat
+            // inside the mass and only 0.32 of the point showed — the spikes
+            // this file has always claimed to have were interior geometry
+            // (trap 12). Seated on the surface, they carry the silhouette.
+            // BLUNT SPURS, NOT NEEDLES, and the length is set by the fight
+            // rather than by taste. `hitRadius` here is 0.95: spikes reaching
+            // 2.0 from the centre put the player among them and unable to
+            // connect, which is the Crypt Warden's "stand inside it to hit it"
+            // defect. Measured at that length the p85 body radius was 1.45
+            // against 0.95, a ratio of 0.67 — well under the 0.75 floor.
+            //
+            // Growing the ball instead was tried and does NOT buy the length
+            // back: eight spikes at limb resolution carry enough vertices to
+            // drag the percentile out on their own. So they are short and
+            // thick, which reads as a mine rather than a sea urchin anyway.
+            const spike = voxSpike(1.05, 0.30, IRON_EDGE, 0x000000, 0,
+                { metalness: 0.5, roughness: 0.4 }, LIMB_VOX_PER_UNIT);
+            spike.position.set(Math.cos(a) * 1.02, Math.sin(tilt) * 0.74,
+                Math.sin(a) * 1.02);
+            spike.rotation.y = Math.atan2(Math.cos(a), Math.sin(a));
+            spike.rotation.x = -tilt;
+            rotor.add(spike);
+        }
+
+        // Three fins swept BACK from the direction of travel, on the shell that
+        // does not spin. From overhead they make an arrowhead, which is the
+        // read: you can see where it is about to be.
+        for (const sx of [-1, 1]) {
+            const fin = voxBox(0.14, 0.50, 1.15, IRON_EDGE, 0x000000, 0,
+                { metalness: 0.5, roughness: 0.4 }, LIMB_VOX_PER_UNIT);
+            fin.position.set(sx * 0.58, 0.02, -1.02);
+            fin.rotation.y = sx * -0.55;
+            mesh.add(fin);
+        }
+
+        // THE WEAK POINT COMES OUT FROM UNDERNEATH.
+        //
+        // It was at y = -0.78 — directly below the body, at a camera pitched
+        // 70.7°, which means the one light that says "hit here" was occluded by
+        // the boss it belongs to for the entire fight. It rides the TRAILING
+        // face now: visible from above, and it means the exposed side is the
+        // one you are chasing rather than the one running you down.
+        //
+        // Purely a move of the mesh. `BossBase` resolves this window in TIME
+        // through `weakOpen`, not by position — its own comment says so — so
+        // the fight is untouched by where the lamp sits.
+        const weak = voxSphere(0.40, 0xffe080, 0xffd060, 0.55);
+        weak.position.set(0, 0.12, -1.30);
         mesh.add(weak);
+        mesh.traverse((o) => { o.castShadow = true; o.receiveShadow = true; });
 
         // Corona plate tops at y≈2 (y=1 voxel). Hover centre above the plate so
         // the sphere never sinks into geometry mid-bob (looked like “disappearing”).
@@ -61,6 +143,7 @@ export class KineticCore extends BossBase {
         this.radius = opts.arenaRadius || 8;
         this.hoverY = hoverY;
         this.weak = weak;
+        this.rotor = rotor;
         this.vx = 4.5;
         this.vz = 3.2;
         this.splits = [];
@@ -168,7 +251,7 @@ export class KineticCore extends BossBase {
         if (this.busy) {
             const a = this.action;
             if (a.stage === 'windup') {
-                this.root.rotation.x += dt * 18; // spinning up in place
+                this.rotor.rotation.x += dt * 18; // spinning up in place
                 this.root.position.y = this.hoverY;
             } else {
                 // Travel the charge over the first slice of the recovery
@@ -179,7 +262,7 @@ export class KineticCore extends BossBase {
                     this.root.position.x += dsh.dir.x * step;
                     this.root.position.z += dsh.dir.z * step;
                     dsh.left -= step;
-                    this.root.rotation.x += dt * 24;
+                    this.rotor.rotation.x += dt * 24;
                     this.root.position.y = this.hoverY;
                     if (player && !player.health?.dead && !dsh.hit) {
                         if (Math.hypot(
@@ -254,8 +337,13 @@ export class KineticCore extends BossBase {
         this.vz = vel.z;
         this.root.position.x = pos.x;
         this.root.position.z = pos.z;
-        this.root.rotation.x += dt * (3 + this.phase);
-        this.root.rotation.z += dt * (2.2 + this.phase * 0.4);
+        this.rotor.rotation.x += dt * (3 + this.phase);
+        this.rotor.rotation.z += dt * (2.2 + this.phase * 0.4);
+        // AND THE SHELL POINTS ALONG THE TRAVEL. Cheap, honest — `vx`/`vz` are
+        // the actual state — and it is the whole reason this body has a front:
+        // a boss that hurts you by moving should show you which way it is
+        // going, and its bounces become visible flips rather than teleports.
+        if (this.vx || this.vz) this.root.rotation.y = Math.atan2(this.vx, this.vz);
         // Bob around hover height (never below the arena plate top).
         const bob = Math.sin(this.t * 4) * (0.28 + this.phase * 0.04);
         this.root.position.y = this.hoverY + bob;

@@ -529,6 +529,7 @@ export function run(t) {
     runProxy(t);
     runTriCompiler(t);
     runSandSpur(t);
+    runKineticCore(t);
 }
 
 /**
@@ -934,4 +935,46 @@ export function runSandSpur(t) {
     t.ok('…and its weak seam sits proud of the head rather than inside it',
         boss.weak.position.y > (maw ? maw.position.y : 0),
         `seam y ${boss.weak.position.y} vs nearest mass y ${maw && maw.position.y}`);
+}
+
+/**
+ * The Kinetic Core — a body that points where it is going, and a lamp you can
+ * see.
+ */
+export function runKineticCore(t) {
+    const boss = new KineticCore(new THREE.Scene(), null, P);
+    const player = {
+        root: { position: { x: 0, y: 1.95, z: 6 } },
+        health: { hp: 6, maxHp: 6, dead: false, damage: () => ({ accepted: true }) },
+        state: { facingVec: { x: 0, z: -1 } },
+    };
+    for (let i = 0; i < 90; i++) {
+        try { boss.tickAI(1 / 60, player, {}); } catch (_) { /* headless gaps */ }
+        boss.t = (boss.t || 0) + 1 / 60;
+    }
+
+    // Aimed along its own velocity, checked as a dot product in world space —
+    // never as the sign of an angle. This is the whole point of the body: a
+    // boss that hurts you by MOVING should show which way, and its bounces
+    // become visible flips instead of teleports.
+    const fwd = new THREE.Vector3(0, 0, 1)
+        .applyQuaternion(boss.root.getWorldQuaternion(new THREE.Quaternion()))
+        .setY(0).normalize();
+    const vel = new THREE.Vector3(boss.vx, 0, boss.vz).normalize();
+    t.ok('the Kinetic Core points along its own velocity',
+        fwd.dot(vel) > 0.99, `dot ${fwd.dot(vel).toFixed(3)}`);
+
+    // ── The weak lamp is not underneath the boss ───────────────────────────
+    // It was authored at y = -0.78, directly below the body. At a 70.7° camera
+    // that is occluded by the boss it belongs to, for the whole fight — the one
+    // light that says "hit here" could never be seen. Checked against the mass
+    // it hangs off rather than against a magic number.
+    const ball = boss.rotor.children.find((o) => o.isMesh);
+    ball.geometry.computeBoundingSphere();
+    const ballR = ball.geometry.boundingSphere.radius;
+    const w = boss.weak.position;
+    t.ok('…and its weak lamp is clear of the mass, not slung under it',
+        Math.hypot(w.x, w.z) > ballR && w.y > -ballR * 0.5,
+        `lamp at (${w.x.toFixed(2)}, ${w.y.toFixed(2)}, ${w.z.toFixed(2)}) `
+        + `against a body radius of ${ballR.toFixed(2)}`);
 }

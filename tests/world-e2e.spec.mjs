@@ -660,6 +660,36 @@ export async function run(t) {
             const p = s.player;
             const out = {};
             const settle = (ms) => new Promise((r) => setTimeout(r, ms));
+            // Reconstitution runs on the live rAF loop, and `deathTimer`
+            // accumulates dt CLAMPED to 0.05 before it may pass 1.4 s. Below
+            // 20 fps that clamp makes game time run slower than wall time, so
+            // the wall-clock price of a death is 28/fps seconds — a function of
+            // frame rate, not of time. A fixed 3 s sleep therefore bets that
+            // this machine holds above ~9.3 fps for the whole sequence, and
+            // headless swiftshader measures ~11.5 fps here IDLE (the waitMs in
+            // the diagnostics below is that number, live). A fifth of a frame's
+            // worth of contention loses the bet, and the spec then reads the
+            // player still dead at the exact y the fixture put them. Wait for
+            // the signal instead. `setSpawn` places the body and enters the
+            // room before `fullRestore` clears `dead`, all inside one
+            // synchronous block, so `!dead` seen from out here is a respawn
+            // that has already finished — no settling delay to guess at.
+            //
+            // narrative-systems-e2e.spec.mjs hit this same clamp and fixed it
+            // with page.waitForFunction; this block is one big evaluate, so the
+            // poll lives in the page instead. 15 s covers down to ~1.9 fps and
+            // keeps both waits inside the CDP protocol timeout.
+            const waitFor = async (label, cond, timeoutMs = 15000) => {
+                const t0 = Date.now();
+                for (;;) {
+                    let ok = false;
+                    try { ok = !!cond(); } catch (_) { ok = false; }
+                    const ms = Date.now() - t0;
+                    if (ok) return { ms, timedOut: null };
+                    if (ms >= timeoutMs) return { ms, timedOut: `waited ${ms}ms for ${label}` };
+                    await settle(16);
+                }
+            };
             s.game.atTitle = false; s.game.paused = false; s.menu.close();
 
             // Overworld, on a screen far from the load-time spawn
@@ -673,13 +703,17 @@ export async function run(t) {
             p.physics.resetVelocity(); p.physics.grounded = true;
             await settle(300);
             out.owScreen = lvl.currentRoomId();
-            p.health.damage(p.health.max, 0);
-            await settle(3000);
+            const owKilled = p.health.damage(p.health.max, 0).dead;
+            const owWait = await waitFor('overworld respawn (!player.health.dead)', () => !p.health.dead);
             out.owRespawn = {
                 screen: lvl.currentRoomId(),
                 y: p.root.position.y, dead: p.health.dead,
                 onSolid: lvl.getVoxelAt(p.root.position.x, p.root.position.y - 1.0, p.root.position.z),
+                killed: owKilled, waitMs: owWait.ms, timedOut: owWait.timedOut,
             };
+            // Not the same kind of wait: this one is an observation window, not
+            // a race. It asks whether the next stretch of play drops the player
+            // out of the world, so its duration IS the thing being measured.
             await settle(1500);
             out.owStable = { y: p.root.position.y, vy: p.physics.vy, dead: p.health.dead };
 
@@ -692,12 +726,13 @@ export async function run(t) {
             p.rig.position.set((wr.minX + wr.maxX) / 2, 1.95, (wr.minZ + wr.maxZ) / 2);
             p.physics.resetVelocity(); p.physics.grounded = true;
             await settle(300);
-            p.health.damage(p.health.max, 0);
-            await settle(3000);
+            const dgKilled = p.health.damage(p.health.max, 0).dead;
+            const dgWait = await waitFor('dungeon respawn (!player.health.dead)', () => !p.health.dead);
             out.dgRespawn = {
                 room: d.currentRoomId(),
                 y: p.root.position.y, dead: p.health.dead,
                 onSolid: d.getVoxelAt(p.root.position.x, p.root.position.y - 1.0, p.root.position.z),
+                killed: dgKilled, waitMs: dgWait.ms, timedOut: dgWait.timedOut,
             };
             return out;
         });
