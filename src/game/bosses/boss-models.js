@@ -141,10 +141,10 @@ export function voxBox(w, h, d, color, emissive, ei, extras, res = VOX_PER_UNIT)
  * actually wanted (Dodecahedron / Icosahedron / squashed Sphere all read the
  * same from 17.5 units up, which is to say: as a blob).
  */
-export function voxBlob(rx, ry, rz, color, emissive, ei, extras) {
+export function voxBlob(rx, ry, rz, color, emissive, ei, extras, res = VOX_PER_UNIT) {
     const m = new Map();
-    fillEllipsoid(m, 0, 0, 0, cells(rx), cells(ry), cells(rz), color);
-    return meshFromMap(m, emissive, ei, extras);
+    fillEllipsoid(m, 0, 0, 0, cells(rx, res), cells(ry, res), cells(rz, res), color);
+    return meshFromMap(m, emissive, ei, extras, res);
 }
 
 /**

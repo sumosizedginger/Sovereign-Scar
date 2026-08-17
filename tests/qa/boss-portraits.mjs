@@ -178,6 +178,25 @@ try {
                 try { boss.tickAI?.(1 / 60, player, null); } catch (_) { /* needs fuller ctx */ }
                 boss.t = (boss.t || 0) + 1 / 60;
             }
+            // THEN BRING THE PLAYER TO THE CAMERA AND LET THE BOSS TURN.
+            //
+            // In a fight the camera sits behind the player, so a boss that
+            // faces the player is facing the CAMERA — the player sees bosses
+            // front-on, essentially always. Leaving the orbit wherever it
+            // stopped photographed every turning boss at whatever
+            // three-quarter angle the loop happened to end on, and three of
+            // these redesigns have been judged from that. Parking the player
+            // between the boss and the lens for the last half-second is what
+            // the fight actually looks like.
+            // Relative to where the boss ACTUALLY ended up, not to the world
+            // origin: these things move while they are ticked, and a player
+            // parked at a fixed point leaves the boss facing off into the room.
+            player.root.position.x = root.position.x;
+            player.root.position.z = root.position.z + 4.5;
+            for (let i = 0; i < 40; i++) {
+                try { boss.tickAI?.(1 / 60, player, null); } catch (_) { /* needs fuller ctx */ }
+                boss.t = (boss.t || 0) + 1 / 60;
+            }
 
             const shotScene = new THREE.Scene();
             shotScene.add(root);
