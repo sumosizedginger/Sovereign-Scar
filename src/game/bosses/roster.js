@@ -1899,7 +1899,59 @@ export class SkeletalMantis extends BossBase {
 // ─── Beat 09 — Phantasm (full class) ────────────────────────────────────────
 export class PhantasmBoss extends BossBase {
     constructor(scene, position = { x: 0, z: -4 }) {
-        const mesh = voxBlob(1.0, 1.0, 1.0, ABYSS_COLORS.violet, ABYSS_COLORS.violetHot, 0.55, { transparent: true, opacity: 0.9 });
+        // YOU, HOLLOWED OUT.
+        //
+        // This boss mirrors your movement, inverts your facing, and its own
+        // line is "I wear your facing. I wear your fear." All of which was
+        // delivered by a floating violet ball. The identity was already written
+        // and the model said none of it.
+        //
+        // So it is a PERSON: the hero's proportions — head, shoulders, two
+        // arms, two legs — with nothing in them. Featureless, near-black, and
+        // lit only by a single seam where a face should be. The horror is not
+        // a monster; it is recognising your own outline coming at you, which
+        // is a thing the player already knows how to read because they have
+        // been looking at that shape for fourteen dungeons.
+        const VOID = 0x33244d;
+        // The hero reads at this camera because of COLOUR STRUCTURE — a pale
+        // head over a red torso — not because a humanoid silhouette survives
+        // being seen from 70 degrees up. It does not; the Warden proved that.
+        // So the thing that wears your facing wears your PALETTE, drained of
+        // its blood: the same pale crown, the same block of colour at the
+        // chest, both pulled toward the violet it is made of.
+        const PALE = 0x9c8fb8;
+        const DRAINED = 0x53284e;
+        const SEAM = ABYSS_COLORS.violetHot;
+        const ghost = { transparent: true, opacity: 0.9 };
+        const mesh = new THREE.Group();
+
+        const head = voxBlob(0.31, 0.35, 0.28, PALE, SEAM, 0.14, ghost);
+        head.position.y = 1.06;
+        // The seam. Vertical, on the front of a blank head — a crack in
+        // something wearing a face rather than a face.
+        const seam = voxBox(0.11, 0.46, 0.10, SEAM, SEAM, 0.5,
+            { ...ghost }, LIMB_VOX_PER_UNIT);
+        seam.position.set(0, 1.08, 0.27);
+
+        const torso = voxBlob(0.46, 0.56, 0.25, DRAINED, SEAM, 0.12, ghost);
+        torso.position.y = 0.34;
+        const pelvis = voxBox(0.36, 0.22, 0.22, VOID, SEAM, 0.10, ghost);
+        pelvis.position.y = -0.06;
+
+        const armL = voxBox(0.14, 0.94, 0.16, VOID, SEAM, 0.10, ghost);
+        armL.position.set(-0.66, 0.28, 0);
+        armL.rotation.z = 0.10;
+        const armR = voxBox(0.14, 0.94, 0.16, VOID, SEAM, 0.10, ghost);
+        armR.position.set(0.66, 0.28, 0);
+        armR.rotation.z = -0.10;
+
+        const legL = voxBox(0.17, 0.86, 0.19, VOID, SEAM, 0.10, ghost);
+        legL.position.set(-0.17, -0.62, 0);
+        const legR = voxBox(0.17, 0.86, 0.19, VOID, SEAM, 0.10, ghost);
+        legR.position.set(0.17, -0.62, 0);
+
+        mesh.add(head, seam, torso, pelvis, armL, armR, legL, legR);
+
         super(scene, {
             id: 'phantasm', name: 'Phantasm', hp: 12,
             hitRadius: 0.9, contactRadius: 1.4, position, mesh, phaseThresholds: [0.5],
@@ -1919,9 +1971,17 @@ export class PhantasmBoss extends BossBase {
         this.manifested = this.busy || Math.floor(this.phaseTimer / cycle) % 2 === 0;
         this.canHit = this.manifested;
         this.hitRadius = this.manifested ? (this.baseHitRadius || 0.9) : 0;
-        this.mesh.material.opacity = this.manifested ? 0.92 : 0.12;
+        // Every part fades, not one material — the body is a figure now, and a
+        // half-visible ghost with one solid limb is worse than no fade at all.
+        const op = this.manifested ? 0.92 : 0.12;
+        this.mesh.traverse((o) => { if (o.isMesh && o.material) o.material.opacity = op; });
         this.root.position.y = (1.5) + Math.sin(this.t * 2) * 0.45;
-        this.root.rotation.y += dt * (this.manifested ? 1 : 2.5);
+        // Slowed hard. A blob spinning at ~57°/s was fine; a PERSON spinning at
+        // that rate is a rotisserie, and it fights the one thing this boss is
+        // about — that the figure facing you is shaped like you. Cosmetic only:
+        // nothing reads this boss's rotation (it carries no directional
+        // armour), and the drift still says "not quite alive".
+        this.root.rotation.y += dt * (this.manifested ? 0.22 : 0.7);
         this.mirrorCd -= dt;
         if (player && this.manifested) {
             // Mirror facing / chase inverted
@@ -2930,12 +2990,89 @@ export const SCAN_W = 2.0;
 // ─── Beat 14 — Leviathan (full phases) ──────────────────────────────────────
 export class LeviathanBoss extends BossBase {
     constructor(scene, position = { x: 0, y: 2.5, z: 0 }) {
-        const mesh = voxSphere(2.0, 0x1a1028, ABYSS_COLORS.neon || 0x60ffe0, 0.55, { metalness: 0.55, roughness: 0.35 });
+        // AN EYE IN A BROKEN CROWN.
+        //
+        // The last boss in the game was one sphere. Its own comment said "the
+        // biggest thing in it" and it was a ball — the final image of a
+        // fourteen-dungeon campaign, and the thing that has spent the whole
+        // game rebuilding the world while wearing dead men's faces.
+        //
+        // So: an eye, held inside rings that do not quite line up. The rings
+        // are what it has swallowed, and in phase 3 it manifests three fallen
+        // bosses — the crown coming apart is the fight's own last move, drawn
+        // on the body before it happens.
+        //
+        // THE IRIS SITS ON TOP, tilted forward. At this camera you are looking
+        // at the crown of a boss's head, never its face; an eye built facing
+        // +Z would spend the entire fight staring at the floor beyond you. On
+        // top it holds your gaze from the one angle the game has.
+        // COLD, not hot. `ABYSS_COLORS.neon` is 0xff40c8 — magenta — and the
+        // first build of this came out a flat pink disc, every part the same
+        // hue as every other. Beat 14's room is Abyss violet, so a violet boss
+        // dissolves into it (the same ΔL* failure the Wyrm had on the magma
+        // floor). Machine cyan reads AGAINST the room, and this thing is a
+        // system that rebuilds the world, not a creature that lives in it.
+        const GLOW = ABYSS_COLORS.ice || 0xa0e8ff;
+        const LENS = CRUST_COLORS.consoleGlow || 0x7fe0ff;
+        const mesh = new THREE.Group();
+        // AN APERTURE, NOT AN EYEBALL. A glowing sphere-on-a-sphere came out as
+        // one teal smudge: same hue, same value, nothing to separate. What the
+        // camera can read from directly overhead is a bright RING around a dark
+        // hole — which is both what an iris is and what a lens is, and this
+        // boss is a machine that watches. The globe and the cage stay almost
+        // black so the only light on the model is the part that looks at you.
+        const sclera = voxSphere(1.28, 0x0a0713, 0x000000, 0,
+            { metalness: 0.55, roughness: 0.35 });
+        const iris = voxRing(0.56, 0.15, LENS, LENS, 0.5);
+        iris.position.set(0, 1.12, 0.30);
+        iris.rotation.x = -0.32;
+        const pupil = voxSphere(0.36, 0x000000, GLOW, 0.10);
+        pupil.position.set(0, 1.16, 0.31);
+        mesh.add(sclera, iris, pupil);
+
+        // Three rings, none of them agreeing with the others. `voxRing` lies
+        // flat, so tilting each one gives an armillary cage rather than three
+        // hoops stacked like a barrel.
+        // Radii spread far enough apart to stay separate. The first attempt put
+        // all three within 0.25 of each other and they fused into one solid
+        // annulus — a donut, not a cage. Each ring is ~0.5 thick, so anything
+        // closer than that reads as a single band.
+        const rings = [];
+        const RING = [
+            { r: 1.18, t: 0.00, s: 0.00 },
+            { r: 1.56, t: 0.90, s: 0.28 },
+            { r: 1.94, t: -0.58, s: 1.02 },
+        ];
+        for (const spec of RING) {
+            const ring = voxRing(spec.r, 0.12, 0x342e46, LENS, 0.10);
+            ring.rotation.set(spec.t, 0, spec.s);
+            mesh.add(ring);
+            rings.push(ring);
+        }
+        // Shards, so the crown reads as BROKEN rather than as engineering.
+        for (let i = 0; i < 5; i++) {
+            const a = (i / 5) * Math.PI * 2 + 0.4;
+            const shard = voxSpike(0.58, 0.14, 0x342e46, LENS, 0.12,
+                undefined, LIMB_VOX_PER_UNIT);
+            shard.position.set(Math.cos(a) * 1.32, -0.30 + (i % 2) * 0.6,
+                Math.sin(a) * 1.32);
+            shard.rotation.set(0.5, -a, 0);
+            mesh.add(shard);
+        }
+
         super(scene, {
             id: 'leviathan', name: 'Leviathan Core', hp: 28,
             hitRadius: 2.0, contactRadius: 2.4, contactDamage: 2,
             position, mesh, phaseThresholds: [0.66, 0.33],
         });
+        // Held because the body is a Group now: `tickAI` used to spin
+        // `this.mesh` and pulse `this.mesh.material`, neither of which a Group
+        // has. The rings spin and the pupil pulses instead — which is what
+        // should have been moving all along, since a rotating eyeball reads as
+        // a bug and a rotating cage reads as a threat.
+        this.rings = rings;
+        this.iris = iris;
+        this.pupil = pupil;
         this.wrapAmount = 0.3;
         this.decoys = [];
         this.gravityPhase = 0;
@@ -2966,8 +3103,15 @@ export class LeviathanBoss extends BossBase {
         }
     }
     tickAI(dt, player, game) {
-        this.mesh.rotation.y += dt * (0.4 + this.phase * 0.2);
-        this.mesh.rotation.x += dt * 0.15;
+        // The cage turns, the eye does not. Each ring on its own rate and axis
+        // so they slide through one another instead of moving as one object.
+        for (let i = 0; i < this.rings.length; i++) {
+            const r = this.rings[i];
+            const rate = 0.4 + this.phase * 0.2 + i * 0.22;
+            if (i % 2) r.rotation.y += dt * rate;
+            else r.rotation.z += dt * rate * 0.6;
+            r.rotation.x += dt * 0.15 * (i === 1 ? -1 : 1);
+        }
         this.root.position.y = 2.2 + Math.sin(this.t * 1.2) * 0.4;
         this.wrapAmount = 0.25 + this.phase * 0.18 + Math.sin(this.t) * 0.05;
         if (game?.level) game.level.wrap = this.wrapAmount;
@@ -3030,8 +3174,9 @@ export class LeviathanBoss extends BossBase {
         // The final boss pulsed between 0.9 and 2.1 every frame, which is the
         // pulse `CERTIFICATION.md` blames for boss-room luminance swinging by
         // dozens of points between samples. Same rhythm, inside the cap.
-        this.mesh.material.emissiveIntensity =
-            BOSS_EMISSIVE_MAX * (0.72 + Math.sin(this.t * 5) * 0.28);
+        const beat = BOSS_EMISSIVE_MAX * (0.72 + Math.sin(this.t * 5) * 0.28);
+        this.pupil.material.emissiveIntensity = beat;
+        this.iris.material.emissiveIntensity = beat * 0.85;
     }
     dispose() {
         for (const d of this.decoys) {
