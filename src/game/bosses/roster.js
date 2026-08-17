@@ -2576,6 +2576,36 @@ export class MagmaWyrm extends BossBase {
                 s.x - this.root.position.x, -i * 0.05, s.z - this.root.position.z
             );
         }
+        // ── POINT THE HEAD WHERE THE FIRE GOES ──────────────────────────────
+        //
+        // Reported from play: "his breath weapon shot out at me from the side
+        // of his head." The breath was always AIMED correctly — `dir` below is
+        // computed to the player — but nothing ever turned the mesh, so the
+        // mouth faced wherever the group happened to sit while the jet left the
+        // cheek. A telegraph that does not agree with the body drawing it is
+        // the same failure as one that does not agree with its hitbox.
+        //
+        // THE ROOT CANNOT BE ROTATED TO FIX THIS, which is why it never was:
+        // the segment offsets written just above are WORLD deltas assigned into
+        // LOCAL space, so any yaw on the group would swing the whole tail with
+        // it and the chain would stop trailing where the wyrm has actually
+        // been. Each segment is turned individually instead, which the chain
+        // maths does not care about at all.
+        const breathing = this.busy && this.action?.name === 'breath';
+        const faceX = breathing ? this._aimDir?.x
+            : (player ? player.root.position.x - this.root.position.x : 0);
+        const faceZ = breathing ? this._aimDir?.z
+            : (player ? player.root.position.z - this.root.position.z : 0);
+        if (faceX || faceZ) this.segs[0].rotation.y = Math.atan2(faceX, faceZ);
+        // Each body segment looks at the one ahead of it, so the dorsal ridge
+        // follows the curve of the wake instead of every fin facing north.
+        for (let i = 1; i < this.segs.length; i++) {
+            const ahead = this.segs[i - 1].position;
+            const here = this.segs[i].position;
+            const ax = ahead.x - here.x, az = ahead.z - here.z;
+            if (ax || az) this.segs[i].rotation.y = Math.atan2(ax, az);
+        }
+
         // Align hit to the head's world position. Written every tick because
         // the Wyrm's root IS its head segment and the segment chain rewrites
         // positions; scaled from `baseHitRadius` so a presence change carries,
@@ -2595,6 +2625,11 @@ export class MagmaWyrm extends BossBase {
             // DIVE (phase 2): it submerges into the caldera and comes up
             // somewhere else, leaving fire where it left.
             if (this.phase >= 2 && this._rand() < 0.3) { this._dive(player); return; }
+            // Held so the head can hold its aim through the wind-up and the
+            // strike. Without it the head would keep tracking a moving player
+            // while the cone stayed where it was committed, and the mouth would
+            // drift off the fire again — the same defect one frame later.
+            this._aimDir = dir;
             this.startAction({
                 name: 'breath',
                 windup: 0.75,

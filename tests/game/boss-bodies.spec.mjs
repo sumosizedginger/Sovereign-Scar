@@ -277,6 +277,37 @@ export function run(t) {
             t.ok(`${name}: …and the head is the widest segment, so the shape aims`,
                 headR > neckR * 1.05,
                 `head=${headR.toFixed(2)} next=${neckR.toFixed(2)}`);
+
+            // THE BREATH LEAVES THE MOUTH. Found by playing, not by any of
+            // this: "his breath weapon shot out at me from the side of his
+            // head." The jet was aimed at the player the whole time; the HEAD
+            // was never turned, so the fire left the cheek. Nothing in the
+            // suite could see it, because every assertion about this boss was
+            // about where the cone LANDS and none about where it starts.
+            //
+            // Driven, not constructed: tick the real boss with a player parked
+            // off to one side and check the head's forward vector ends up
+            // pointing at them. The bug is "the head never turns", so a fixture
+            // that sets the rotation itself would prove nothing.
+            const wyrm = build();
+            wyrm._awake = true;
+            const px = 6, pz = -3;
+            const wp = {
+                root: { position: { x: px, y: 1.95, z: pz } },
+                health: { hp: 6, maxHp: 6, dead: false, damage: () => ({ accepted: true }) },
+                state: { facingVec: { x: 0, z: -1 } },
+            };
+            for (let i = 0; i < 90; i++) {
+                try { wyrm.tickAI(1 / 60, wp); } catch (_) { /* no game ctx */ }
+                wyrm.t = (wyrm.t || 0) + 1 / 60;
+            }
+            const want = Math.atan2(px - wyrm.root.position.x, pz - wyrm.root.position.z);
+            const got = wyrm.segs[0].rotation.y;
+            let off = Math.abs(((got - want + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+            t.ok(`${name}: its head points at what it is breathing at`,
+                off < 0.35,
+                `head yaw ${got.toFixed(2)} vs bearing ${want.toFixed(2)} — off by `
+                + `${(off * 180 / Math.PI).toFixed(0)}°`);
         }
 
         // A glow light was derived, so the boss lights its arena instead of
