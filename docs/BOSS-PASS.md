@@ -672,7 +672,7 @@ valuable one and should not be allowed to crowd out the rest:
 |---|---|
 | Distribution live (Pages + a release) | **pushed, still dark** — `v0.4.0` is on the remote and `enablement: true` is in `pages.yml`, but `sumosizedginger.github.io/Sovereign-Scar/` still 404s (checked 2026-08-16). Next check is the Actions log for `pages.yml`; if it is still refusing, the fallback is one click in Settings → Pages → Source: GitHub Actions |
 | Boss silhouettes | **DONE** — 13 rebuilt, 1 (Mantis) needed nothing, Wyrm revisited 08-17 |
-| Occlusion | not started — agreed to land BEFORE the combo work |
+| Occlusion | **DONE 2026-08-17** — combat line of sight (`src/combat/line-of-sight.js`); attacks, boss cones and bolts all stop at walls. Landed before the combo work as agreed |
 | Combo system | not started, riskiest item in v1 |
 | 80% room variation (wall/ceiling height) | not started |
 | In-engine key art + composed title camera | not started |
@@ -686,4 +686,14 @@ that is in hand and is not a reason to hold up the roster. Do not keep
 re-proposing it.
 
 *Suggested interleave:* ~~the Witness~~ ~~Frost & Fuel~~ ~~Hydroid Cloud~~
-the boss pass is **finished**. Next is occlusion, then the combo system.
+the boss pass is **finished**, and so is ~~occlusion~~. Next is the combo
+system.
+
+**Two arena findings fell out of the occlusion work**, and they are placement,
+not bodies, so they are recorded here rather than fixed unasked. Measured at
+each boss's spawn, the player has open ground to attack from on all eight sides
+for eight of the bosses — but only **three** for the Proxy (beat 05) and
+**two** for the Magma Wyrm (beat 12). Both spawn with arena wall or room
+dressing inside a weapon's reach on most sides. It is not a softlock: bosses
+circle away from their spawn in the first second. It does mean the opening
+exchange of those two fights is fought in a corner.

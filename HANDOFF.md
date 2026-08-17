@@ -187,9 +187,16 @@ with `git ls-remote` rather than trusting this sentence.
 >   the room's east wall and continuing out of frame. The drawing and the hit
 >   agree with each other, which is what this session was for; they agree about
 >   something that goes through walls. In practice this means pillars and
->   terraces do not cover you from either ray weapon. **Left unfixed on
+>   terraces do not cover you from either ray weapon. ~~**Left unfixed on
 >   purpose** — adding occlusion changes every attack in the game including all
->   fourteen bosses, and that is a design call for the owner, not a bug fix.
+>   fourteen bosses, and that is a design call for the owner, not a bug fix.~~
+>   **FIXED 2026-08-17** (`src/combat/line-of-sight.js`). The estimate was the
+>   thing that was wrong: counted, 37 of the 40 boss and enemy resolution sites
+>   reach three units or less, and a two-unit swing is not blocked anywhere in
+>   the campaign in 336 sampled directions. What actually changes is three
+>   player moves (10/12/16), three boss cones (4.5–8) and projectiles, which
+>   were unbounded. One uniform rule, because below two units it costs nothing.
+>   *A scope estimate is a hypothesis too* — see [[count-do-not-cite]].
 
 
 ## What to do next
