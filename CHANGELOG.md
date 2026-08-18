@@ -5,6 +5,69 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### The frame breathes with the fight, and three probes were wrong
+
+A pass at the five remaining AAA items. Every one of them was measured before
+it was built, and in four cases the measurement changed the plan.
+
+**The arena camera opens, it does not tighten.** The ticket asked for a push-in
+when a room seals. The frame at the shipped rig reaches 6.80 up-screen and 6.18
+down-screen on the plane the characters stand on — a 13-unit window, in arenas
+17 to 23 units across — and three of the five enemy kinds already attack from
+beyond it. Tightening would have bought drama by hiding more of the fight, so a
+sealed room widens instead, by as much as the fight is spread out and no more.
+The cap is what it costs the hero: +2.0 buys 27% more frame area for 10% of a
+34 px character. A fight at melee range costs nothing at all.
+
+**Rooms have an outline.** 108 rooms were 108 squares because the perimeter was
+built from one `half`. A room may now name a `cut`; beat 06 Quarry is authored,
+six rooms losing 6–13% of their square. The cut is filled with solid rock rather
+than left as a hole, which is what let it land on a shipped campaign — every
+placement check in the codebase already asks the voxel map, so all of them
+refuse it without being told outlines exist.
+
+**The overworld's start screen had no ground.** `makeProtector` keeps a radius-6
+disc clear at every screen's centre; measured, it held 0 of 109 cells with any
+mass on them, and the camera frame is 13 units deep. Terracing was already
+running out there — the exclusion everyone assumed existed never did — but every
+shape is sized off `half`, and at the screens' half of 23 they land 21 units
+out. Relief at frame scale, plus per-region ground weathering the overworld
+could never have had because that system was keyed on the dungeon kit.
+scarfield's luminance spread went 11 to 46.
+
+**Off-screen attackers are marked at the frame edge**, for exactly the duration
+of their wind-up, in the telegraph ring's own colour. Not a radar: it appears
+only for a committed attack, because the camera provably cannot fix this — hero
+size and frame depth are the same knob.
+
+**The 34 px hero is costed, and the answer is to leave the camera alone.** Hero
+height × frame depth is constant at 1206 across the whole range of fov and
+distance. Pitch is the one lever that is not a straight trade, and it is a
+cliff: occlusion is ~1% from 78° to 66° and **8.29% at 60°**. The shipped 70.7°
+sits on the safe side, and the only free move buys 4%.
+
+#### Three instruments were wrong
+
+- `content-density.mjs` matched enemy arrays with a regex requiring the closing
+  bracket at twelve spaces of indentation. Twenty-two arrays are written on one
+  line. It reported **47 encounter rooms against a real 65**, a mean encounter
+  of 3.26 against 2.35, and four single-enemy rooms against twenty-four. The
+  "56% of rooms do nothing" premise came from it; the true figure is fourteen,
+  and all fourteen are dungeon entrances, which is a pattern rather than a gap.
+- `contrast-probe.mjs` samples the level's START screen, so "the overworld is
+  flat" was a statement about one of forty-nine. Three of four screens shot for
+  the before/after already had spreads of 97 to 136.
+- The new capture probe read the live WebGL canvas and reported 0.0 luminance
+  for every frame — the renderer does not preserve its drawing buffer — and
+  then wrote its statistics into an empty directory.
+
+And the pictures corrected the overworld's colour three times while the contrast
+metric scored all three attempts at 46-47. A value-break number cannot tell a
+material that belongs from one that does not.
+
+Suite 5929 → 6147 assertions. 64 counterfactuals across four new specs, all red,
+all restored byte for byte.
+
 ### ULTRA made the player look worse than LOW, and it was one flag
 
 Reported from play with two screenshots. Ultra was identical to high except for
