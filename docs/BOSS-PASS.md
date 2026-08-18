@@ -656,6 +656,49 @@ does *not* measure: head-to-tail distance is a chord, and a chord reads 8.81 at
 a slightly different curve when the integrator is stepped differently. *Two
 plausible instruments were wrong before the third one was right.*
 
+### 03 — Sand Spur · **body REBUILT** (2026-08-17)
+
+Reported from play: *"sand boss model looks weird."* Measured, three things,
+and the third had been true since the boss shipped.
+
+**It was six round barrels.** Every segment built at **x/z = 1.00** — a sphere
+squashed slightly in Y. Round is the one shape that cannot say which way an
+animal points, and this camera reads width and nothing else (trap 3). They are
+ribs now: 0.52 as deep as they are wide, which is the proportion a segmented
+animal reads by from overhead.
+
+**The taper was quantised away** — authored 1.18 → 0.66 and built 2.17, 2.17,
+1.83, 1.83, 1.50. Two pairs of identical twins, trap 2b again, three days after
+the same call did it to the Magma Wyrm. Built at limb resolution the five
+widths are 2.11, 1.85, 1.64, 1.38, 1.16.
+
+**The pale plates read as windows.** Three light rectangles laid flat on a dark
+barrel is a porthole, which is why the owner's screenshot looks like oil drums.
+The pale is spent on paired lateral **spurs** now — what the boss is named
+after, and from overhead a spine is a line where a plate is a smudge.
+
+**AND NOTHING HAD EVER TURNED IT.** Every segment sat at `rotation.y = 0` for
+the entire fight, including the head — so the mandible star that is this boss's
+whole identity faced due south whatever direction it was swimming. A sphere does
+not care, which is why it survived; a rib is broadside to its own travel. The
+chain follows the wake now and the head faces where it is going.
+
+That fix found a second heading writer at the end of `tickAI`, un-normalised
+(magnitude 0.65, not 1) and 4.5° off the mesh on a curve. **A heading belongs to
+one layer** — same lesson as the grapple's margin. One writer now.
+
+`SEG_GAP` went 2.5 → **0.65**: it meant "a little over one body" when a body was
+a 2.2-deep barrel, and the ribs are 0.85 deep. They have to OVERLAP rather than
+touch, because the chain turns hard and adjacent ribs pivot their outer corners
+apart — which is exactly how a woodlouse's tergites are built.
+
+*Guarded by:* `runSandSpur` — ribs measurably wider than deep, a taper with a
+real step between every pair, the head still widest, every rib pointing at the
+one ahead, and `facingVec` in step with the mesh. Five counterfactuals, all red.
+
+*Still open:* the head's skull swallows its own mandibles (trap 12) — the star
+reads lit but the silhouette is a bulb with bristles. Not reported, not touched.
+
 ### 08 — Skeletal Mantis · **do nothing**
 
 It reads instantly and always did. It is the reference: splayed scythes with

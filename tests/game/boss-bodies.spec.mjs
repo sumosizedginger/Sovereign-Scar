@@ -1115,6 +1115,77 @@ export function runSandSpur(t) {
         surfaced > SEG_GAP * 0.6,
         `tightest gap ${surfaced.toFixed(2)} on the frame after surfacing`);
 
+    // ── The body is RIBS, and they follow the chain ────────────────────────
+    //
+    // Reported from play as "the sand boss model looks weird". Measured, it was
+    // six round barrels: every segment built at x/z = 1.00, with the authored
+    // taper rounded into two pairs of identical twins by the body grid (2.17,
+    // 2.17, 1.83, 1.83, 1.50). Round is the one shape that cannot say which way
+    // an animal is pointing, and this camera only reads width.
+    //
+    // The rotation assertion is the one that would not have existed before the
+    // rebuild: nothing had EVER turned this boss's segments, and a sphere does
+    // not care. A rib does — unturned, it is broadside to its own direction of
+    // travel — and so did the head, whose mandible star faced due south for the
+    // whole fight.
+    {
+        const shape = new SandSpur(new THREE.Scene(), null, particles, [{ x: 0, z: 0 }]);
+        const widths = [], depths = [];
+        for (const seg of shape.segments) {
+            seg.position.set(0, 0, 0);
+            seg.rotation.set(0, 0, 0);
+            seg.updateWorldMatrix(true, true);
+            const sz = new THREE.Box3().setFromObject(seg).getSize(new THREE.Vector3());
+            widths.push(sz.x); depths.push(sz.z);
+        }
+        let widest = 0;
+        for (let i = 1; i < widths.length; i++) widest = Math.max(widest, depths[i] / widths[i]);
+        t.ok('the Spur body segments are ribs, not barrels', widest < 0.6,
+            `deepest is ${(widest * 100).toFixed(0)}% of its own width; `
+            + `x ${widths.slice(1).map((w) => w.toFixed(2)).join(', ')}`);
+        let step = Infinity;
+        for (let i = 2; i < widths.length; i++) step = Math.min(step, widths[i - 1] - widths[i]);
+        t.ok('…and they taper in the geometry, not only in the source', step > 0.1,
+            `narrowest step ${step.toFixed(2)} across ${widths.slice(1).map((w) => w.toFixed(2)).join(', ')}`);
+        t.ok('…with the head still the widest thing on it', widths[0] > widths[1] * 1.15,
+            `head ${widths[0].toFixed(2)} vs first rib ${widths[1].toFixed(2)}`);
+    }
+    {
+        // Driven along a curve, every plate must point at the one ahead of it.
+        const turn = new SandSpur(new THREE.Scene(), null, particles, [{ x: 0, z: 0 }]);
+        const pl = {
+            root: { position: { x: 0, y: 1.95, z: 6 } },
+            health: { hp: 6, maxHp: 6, dead: false, damage: () => ({ accepted: true }) },
+            state: { facingVec: { x: 0, z: -1 } },
+        };
+        for (let i = 0; i < 240; i++) {
+            const a2 = (i / 120) * Math.PI;
+            pl.root.position.x = Math.sin(a2) * 7;
+            pl.root.position.z = Math.cos(a2) * 7;
+            turn.submerged = false;
+            try { turn.tickAI(1 / 60, pl, {}); } catch (_) { /* headless gaps */ }
+            turn.t = (turn.t || 0) + 1 / 60;
+        }
+        let worst = 0;
+        for (let i = 1; i < turn.segments.length; i++) {
+            const ahead = turn.segments[i - 1].position, here = turn.segments[i].position;
+            const want = Math.atan2(ahead.x - here.x, ahead.z - here.z);
+            let d = Math.abs(turn.segments[i].rotation.y - want);
+            while (d > Math.PI) d = Math.abs(d - Math.PI * 2);
+            worst = Math.max(worst, d);
+        }
+        t.ok('every rib faces the one ahead of it', worst < 0.02,
+            `worst heading error ${(worst * 180 / Math.PI).toFixed(1)} deg`);
+        // And the head faces its own travel rather than a fixed compass point.
+        t.ok('…and the head faces where it is going',
+            Math.abs(turn.segments[0].rotation.y) > 1e-6,
+            `head rotation.y ${turn.segments[0].rotation.y.toFixed(3)}`);
+        const fv = turn.state.facingVec;
+        t.ok('…with facingVec kept in step with it, so the cones aim where it looks',
+            !!fv && Math.abs(Math.atan2(fv.x, fv.z) - turn.segments[0].rotation.y) < 0.02,
+            fv ? `facing ${Math.atan2(fv.x, fv.z).toFixed(3)} vs mesh ${turn.segments[0].rotation.y.toFixed(3)}` : 'none');
+    }
+
     // The weak seam is the "hit here" sign for the beached window the whole
     // fight is built around, and it was authored at y=0.42 — inside the maw
     // blob, i.e. interior geometry nobody could see (trap 12).

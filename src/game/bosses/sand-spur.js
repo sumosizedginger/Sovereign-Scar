@@ -49,14 +49,29 @@ export const WAKE_CD = 1.0;
 // SPEED-DEPENDENT: this boss's speed goes 3.9 → 5.7 across its phases, so a
 // fixed frame stride silently stretches the animal apart as the fight escalates.
 //
-// Sampling by arc length fixes both. 2.5 is a little over one body, so the
-// segments read as separate plates with floor visible between them — which is
-// the only reason the Skeletal Mantis reads, and it holds at every speed.
+// Sampling by arc length fixes both, and the number is "a little over one
+// body" — the segments read as separate plates with floor visible between
+// them, which is the only reason the Skeletal Mantis reads, and it holds at
+// every speed.
+//
+// 2.5 was that number while the segments were round barrels 2.2 deep. They are
+// RIBS now (see `buildSpurSegment`), roughly 0.85 deep along the chain, so 2.5
+// left a unit and a half of empty sand per joint and 1.35 still left half a
+// unit — which is 60% of a rib, and photographed as six plates scattered near
+// each other rather than one animal.
+//
+// And they have to OVERLAP, not merely touch, which 0.95 did not. A rib is wide
+// across and short along, so when the chain turns — and this boss turns hard,
+// it tracks you — adjacent ribs pivot and their outer corners separate. That is
+// exactly how a woodlouse's tergites are built: each plate slides under the one
+// ahead so the animal can curl without coming apart. 0.65 against a 0.85 rib is
+// a fifth of a plate of overlap, and it holds through the tightest turn the
+// strafe can produce.
 //
 // (The Magma Wyrm had the same frame-stride construction, widened to 22 when it
 // had this exact bug. `trailAt` and the trail itself now live in `base.js` and
 // both bosses use them, so there is no longer a second copy to forget.)
-export const SEG_GAP = 2.5;
+export const SEG_GAP = 0.65;
 
 export const BREACH_R = 4.5;
 export const BREACH_TIME = 1.6;
@@ -115,21 +130,56 @@ function buildSpurHead() {
 }
 
 /** A body ring: tapering, with a back ridge so the chain has a direction. */
+/**
+ * One body segment: a RIB, not a barrel.
+ *
+ * Reported from play as "the sand boss model looks weird", and the measurement
+ * agreed twice over.
+ *
+ * IT WAS ROUND. Every segment built at x/z = 1.00 — a sphere flattened a little
+ * in Y — so from a camera 70.7 degrees above it, the body was five identical
+ * balls with no direction in them. A real segmented animal reads from overhead
+ * because each plate is WIDE ACROSS the body and SHORT ALONG it; that is the
+ * only axis this camera gives away for free (trap 3), and the old shape spent
+ * none of it. These are 0.52 as deep as they are wide.
+ *
+ * AND THE TAPER WAS NOT THERE. Authored 1.18 down to 0.66, the six segments
+ * built 2.17, 2.17, 1.83, 1.83 and 1.50 units wide — two pairs of identical
+ * twins, because `cells()` rounds a radius to whole voxels and the body grid
+ * has nothing between them (trap 2b, the same defect the Magma Wyrm had). Limb
+ * resolution has the room to spell it.
+ *
+ * THE PALE PLATES WERE READING AS WINDOWS. Three light rectangles laid flat on
+ * a dark barrel is a porthole, which is why the owner's screenshot looks like a
+ * row of oil drums. The pale is spent on SPURS now — paired lateral spines,
+ * swept back, which is both what this boss is named after and the one kind of
+ * detail that survives at this angle: from overhead a spine is a line, and a
+ * plate is a smudge.
+ */
 function buildSpurSegment(i, n) {
     const g = new THREE.Group();
     const u = i / Math.max(1, n - 1);
-    const r = 1.18 - u * 0.52;
-    const ring = voxBlob(r, 0.58 - u * 0.18, r, CARAPACE, 0x000000, 0, { roughness: 0.9 });
+    const rx = 0.90 - u * 0.52;              // across the screen — the free axis
+    const rz = rx * 0.52;                    // along the chain — a rib, not a ball
+    const ring = voxBlob(rx, 0.42 - u * 0.16, rz, CARAPACE, 0x000000, 0,
+        { roughness: 0.9 }, LIMB_VOX_PER_UNIT);
     g.add(ring);
-    // Three plates along the back. They break the silhouette of the ring they
-    // sit on rather than hiding inside it (trap 4), and they are what makes a
-    // row of blobs read as one segmented animal.
-    for (const sx of [-1, 0, 1]) {
-        const plate = voxBox(0.30, 0.26, 0.62 - u * 0.2, PLATE, 0x000000, 0,
+    // A dark lip at the leading edge of each rib. It is the join between one
+    // plate and the next, and it is what stops a tapering chain reading as one
+    // smooth cone once the segments overlap.
+    const lip = voxBox(rx * 1.7, 0.20, rz * 0.55, CARAPACE_DARK, 0x000000, 0,
+        { roughness: 1 }, LIMB_VOX_PER_UNIT);
+    lip.position.set(0, 0.16 - u * 0.06, rz * 0.72);
+    g.add(lip);
+    // Paired spurs, swept back and out. Thin enough to need limb resolution;
+    // long enough to break the rib's own silhouette rather than sit inside it
+    // (trap 4). They shorten down the body with everything else.
+    for (const sx of [-1, 1]) {
+        const spur = voxSpike(0.86 - u * 0.42, 0.13 - u * 0.04, PLATE, 0x000000, 0,
             { roughness: 0.9 }, LIMB_VOX_PER_UNIT);
-        plate.position.set(sx * r * 0.62, 0.34 - u * 0.08, 0);
-        plate.rotation.z = sx * -0.35;
-        g.add(plate);
+        spur.position.set(sx * rx * 0.78, 0.06, -rz * 0.15);
+        spur.rotation.set(0, Math.atan2(sx, -0.55), 0);
+        g.add(spur);
     }
     return g;
 }
@@ -414,12 +464,54 @@ export class SandSpur extends BossBase {
         // buffer behind it.
         pushTrail(this.trail, this.root.position.x, this.root.position.z);
 
+        // NOTHING HAS EVER TURNED THIS BOSS, and until now nothing had to.
+        //
+        // Every segment sat at `rotation.y = 0` for the whole fight. That was
+        // invisible while they were round barrels — a sphere has no wrong way
+        // up — but it was never harmless: the HEAD is a star of four mandibles
+        // and it faced due south whatever direction the animal was travelling,
+        // which is the Magma Wyrm's "his breath came out of the side of his
+        // head" defect in a shape that could not show it.
+        //
+        // It stops being survivable the moment the body is made of ribs. A rib
+        // is wide across and thin along, so an unturned one is broadside to its
+        // own direction of travel, and six of them photograph as scattered
+        // plates lying near each other rather than as one animal.
+        //
+        // Each segment is turned INDIVIDUALLY, and that is deliberate: these
+        // are scene-level objects holding world positions, so nothing here
+        // depends on a parent's frame. `faceToward` is used for the head rather
+        // than a hand-rolled lerp, because writing `rotation.y` directly leaves
+        // `state.facingVec` stale — the trap the Warden's comment warns about.
         const beached = this.staggered;
         for (let i = 0; i < this.segments.length; i++) {
             const s = this.segments[i];
             if (i > 0) {
                 const sample = trailAt(this.trail, i * SEG_GAP);
                 if (sample) { s.position.x = sample.x; s.position.z = sample.z; }
+                // Look at the segment ahead, so the row of ribs follows the
+                // curve of the wake instead of every plate facing north.
+                const ahead = this.segments[i - 1].position;
+                const ax = ahead.x - s.position.x, az = ahead.z - s.position.z;
+                if (ax || az) s.rotation.y = Math.atan2(ax, az);
+            } else {
+                // The head points where it is GOING, read off its own wake —
+                // not at the player, which would have it swim sideways with its
+                // face turned. A body length back is far enough to be a heading
+                // rather than this frame's jitter.
+                const behind = trailAt(this.trail, SEG_GAP * 1.4);
+                if (behind) {
+                    const hx = s.position.x - behind.x, hz = s.position.z - behind.z;
+                    if (Math.hypot(hx, hz) > 1e-4) {
+                        s.rotation.y = Math.atan2(hx, hz);
+                        // Kept in step, because `state.facingVec` is what the
+                        // cone attacks and the guard filter read. A rotation
+                        // written without it is a boss whose picture and whose
+                        // aim disagree.
+                        const n = Math.hypot(hx, hz);
+                        this.state.facingVec = { x: hx / n, z: hz / n };
+                    }
+                }
             }
             if (this.submerged) {
                 s.position.y = -0.4;
@@ -465,11 +557,15 @@ export class SandSpur extends BossBase {
             this.burrow.mesh.visible = !this.submerged;
         }
 
-        const fv = {
-            x: this.segments[0].position.x - (this.segments[1]?.position.x || 0),
-            z: this.segments[0].position.z - (this.segments[1]?.position.z || 0),
-        };
-        this.state.facingVec = fv;
+        // `state.facingVec` is set ONCE, up in the segment loop, beside the
+        // rotation it has to agree with.
+        //
+        // There were two writers. This one ran last and overwrote the other,
+        // from head-minus-first-segment — a baseline that used to be 2.5 units
+        // long and is 0.65 now that the ribs overlap, and that was never
+        // normalised, so it handed out a "unit" vector of magnitude 0.65. The
+        // two disagreed by 4.5 degrees on a curve. A heading belongs to exactly
+        // one layer; the same lesson the grapple's margin taught.
     }
 
     /** Contact only bites while it is actually out of the sand. */
