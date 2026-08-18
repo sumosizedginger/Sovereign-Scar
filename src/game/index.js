@@ -66,6 +66,7 @@ import { patchOverworld } from './world/keys.js';
 import { DeathEcho } from './world/death-echo.js';
 import { updateRoomLightFlicker } from './world/room-lights.js';
 import { updateDressingSway } from './world/dressing.js';
+import { threatEdge } from './fx/threat-edge.js';
 import { TitleCamera } from './ui/title-camera.js';
 import { AnchorThread } from './narrative/anchor-thread.js';
 import { reconstitutionLine } from './narrative/reconstitution-copy.js';
@@ -561,6 +562,7 @@ function loadLevel(id) {
     // whose first arena happens to share a name with the last one's would be
     // read as "still the same seal" and swallow its own flinch.
     sealedRoomWas = null;
+    threatEdge.clear(); // an arrow must not survive into a world it points at nothing in
     camRig.height = CAM_HEIGHT;
     camRig.back = camRig.height * 0.35;
     camRig.snapTo(player.root.position);
@@ -1630,6 +1632,12 @@ function frame() {
         updateDressingSway(ambientT);
         localLights.update(player.root.position); // Ticket G: budget nearest lights
         camRig.update(sdt, player.root.position);
+        // AFTER the rig, never before. The mark is a projection of a world
+        // point through THIS frame's camera; running it first would place every
+        // arrow using last frame's matrix, which is invisible while walking and
+        // wrong exactly when the camera is moving — a room transition, a boss
+        // push-in, the arena widen. The frames where being told matters most.
+        threatEdge.update(sdt, camera);
 
         impactFx.update(sdt);
 

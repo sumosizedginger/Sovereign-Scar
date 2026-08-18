@@ -11,6 +11,7 @@ import { ENEMY_PALETTES } from './assets/palettes.js';
 import { sfx } from '../audio/synth.js';
 import { gsfx } from './audio/sfx-bank.js';
 import { at as audioAt } from '../audio/spatial.js';
+import { threatEdge } from './fx/threat-edge.js';
 import { getActiveRunMode } from './kernel/run-mode.js';
 import { coach } from './ui/coach.js';
 import { inGuardArc } from './combat/guard.js';
@@ -167,6 +168,19 @@ export const WEB_SLOW = 0.4;
 export const CENSE_R = 7.0;
 export const CENSE_HEAL = 1.5;
 export const CENSE_SHIELD = 1.4;
+
+/**
+ * The telegraph ring's colour, as CSS, for the screen-edge mark.
+ *
+ * The ring and the arrow have to be the same colour or they read as two
+ * different warnings — the frost kinds telegraph pale blue and the weaver's
+ * strand is paler still, and an orange arrow for either would be a lie about
+ * what is coming.
+ */
+function telegraphCss(hex) {
+    const n = Number.isFinite(hex) ? hex : 0xff5533;
+    return `#${(n & 0xffffff).toString(16).padStart(6, '0')}`;
+}
 
 export class Enemy {
     /**
@@ -618,6 +632,18 @@ export class Enemy {
         // Placed here in the base rather than at the eight call sites that build
         // windups, for the same reason `BossBase` places its own.
         audioAt(this.rig?.position, () => sfx.whoosh());
+        // …and the same cue for the eye, when the body making it is outside the
+        // frame. `tests/qa/arena-frame.mjs` measured that three of the five
+        // kinds act from beyond it — a lancer at 7, a censer at 9, a weaver at
+        // 11, against a frame that reaches 6.2 on its shallow axis — and
+        // `tests/qa/hero-scale.mjs` showed no camera setting fixes that, because
+        // frame depth and the hero's on-screen size are the same knob.
+        //
+        // Here rather than at the eight call sites, for the same reason the
+        // whoosh above is: this is the one place every committed attack in the
+        // bestiary passes through, so a new enemy kind gets it by existing.
+        // `threatEdge` decides for itself whether the attacker is on screen.
+        threatEdge.mark(this.rig?.position, dur, telegraphCss(opts.color));
         return true;
     }
 
