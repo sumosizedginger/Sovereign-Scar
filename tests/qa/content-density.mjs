@@ -242,7 +242,20 @@ const wsrc = rd('src/game/combat/weapons.js');
 const melee = (wsrc.match(/^export const \w+ = arcMove/gm) || []).length;
 console.log('\n▸ PLAYER VERBS');
 const charged = (wsrc.match(/^\s{4}charge: \{$/gm) || []).length;
-console.log(`    melee weapons      ${melee}   (one attack button, no combo)`);
+// COUNTED, not asserted. This line read "one attack button, no combo" for a
+// while after `src/game/combat/combo.js` shipped — a probe that describes the
+// game from memory is the thing this file exists to replace.
+const comboSteps = (() => {
+    try {
+        const src = fs.readFileSync(path.join(ROOT, 'src/game/combat/combo.js'), 'utf8');
+        const m = src.match(/COMBO_STEPS\s*=\s*(\d+)/);
+        return m ? Number(m[1]) : 0;
+    } catch (_) { return 0; }
+})();
+console.log(`    melee weapons      ${melee}   ` +
+    (comboSteps > 1
+        ? `(one attack button, ${comboSteps}-step combo derived per weapon)`
+        : '(one attack button, no combo)'));
 console.log(`    charged moves      ${charged}   ${charged >= melee
     ? '(one per weapon)' : '← NOT every weapon has one'}`);
 const psrc = rd('src/game/player.js');
