@@ -53,13 +53,17 @@ Two of those names carry a lesson worth spelling out:
 
 ---
 
-## One thing that is *not* here
+## Everything is here
 
-`.gitignore` excludes `docs/media/player/*/*-clean.png` — the HUD-hidden twins of
-the player captures, about 20 MB. That predates the decision to keep this
-directory as a teaching record, and the reasoning at the time was that
-`certification/` already covers HUD-free frames. Regenerate them with
-`node tests/qa/player-captures.mjs` if you want them.
+There is no `.gitignore` rule under this directory. There was one — it excluded
+the 44 HUD-hidden `-clean` twins of the player captures, on the reasoning that
+`certification/` already covers HUD-free frames — and it was removed, because a
+comparison set with a third of its frames missing is not a comparison set. The
+HUD frame, the greyscale twin and the clean twin are three views of one decision
+and they are worth more together than apart.
+
+Cloning the whole history is a few hundred megabytes. If you only want to play
+or build the game, `git clone --depth 1` skips it.
 
 ---
 
