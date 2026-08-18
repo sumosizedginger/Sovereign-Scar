@@ -193,7 +193,7 @@ scripts/            static server, icon builder, Pages stage + validate
 electron/           desktop shell (opens a window at the loopback server)
 types/              ambient .d.ts for the one global the game writes
 .github/workflows/  tests · pages deploy · tagged desktop release
-docs/media/         gate screenshots + certification captures
+docs/media/         every change judged by eye, kept — see docs/media/README.md
 ```
 
 Configuration worth knowing about: `eslint.config.js` (correctness rules and a

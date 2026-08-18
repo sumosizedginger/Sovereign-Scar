@@ -1,0 +1,413 @@
+{
+  "shots": [
+    {
+      "name": "title",
+      "world": false,
+      "why": "the first frame anyone sees",
+      "screen": "title",
+      "title": "SOVEREIGN SCAR",
+      "rows": 7,
+      "labels": [
+        "Begin",
+        "New Game",
+        "Altar Travel",
+        "Settings",
+        "Witness Scores",
+        "Controls",
+        "Credits"
+      ],
+      "notes": [
+        "Finish the campaign"
+      ],
+      "rect": {
+        "x": 470,
+        "y": 329,
+        "w": 340,
+        "h": 203,
+        "coverage": 0.075
+      },
+      "file": "docs\\media\\menus\\title.png",
+      "lum": {
+        "backdrop": {
+          "mean": 11.5,
+          "p50": 10,
+          "p99": 29.9,
+          "max": 84.5
+        },
+        "panel": {
+          "mean": 21.2,
+          "p50": 20.7,
+          "p99": 72.6,
+          "max": 90
+        }
+      }
+    },
+    {
+      "name": "pause",
+      "world": true,
+      "why": "drawn over gameplay — the hard case",
+      "screen": "pause",
+      "title": "PAUSED",
+      "rows": 7,
+      "labels": [
+        "Run mode: MEDIUM",
+        "Resume",
+        "Altar Travel",
+        "Settings",
+        "Witness Scores",
+        "Controls",
+        "Quit to Title"
+      ],
+      "notes": [],
+      "rect": {
+        "x": 443,
+        "y": 268,
+        "w": 394,
+        "h": 237,
+        "coverage": 0.101
+      },
+      "file": "docs\\media\\menus\\pause.png",
+      "lum": {
+        "backdrop": {
+          "mean": 7.4,
+          "p50": 5,
+          "p99": 16.6,
+          "max": 85.6
+        },
+        "panel": {
+          "mean": 4.7,
+          "p50": 3.1,
+          "p99": 69.5,
+          "max": 90
+        }
+      }
+    },
+    {
+      "name": "settings",
+      "world": true,
+      "why": "sliders, toggles, selects",
+      "screen": "settings",
+      "title": "SETTINGS",
+      "rows": 11,
+      "labels": [
+        "Master volume",
+        "Music volume",
+        "SFX volume",
+        "Quality",
+        "Reduce screen shake",
+        "Reduce flashes",
+        "Reduce motion",
+        "Reduce horror audio",
+        "Mono audio",
+        "Show play timer",
+        "←/→ adjust · Enter toggle · Esc back"
+      ],
+      "notes": [
+        "hit flashes, damage vignette, and the flicker shader",
+        "shorter swing arcs, calmer camera",
+        "mutes whispers and sub-bass — never text",
+        "centres all sound — for one-sided hearing"
+      ],
+      "rect": {
+        "x": 380,
+        "y": 210,
+        "w": 520,
+        "h": 353,
+        "coverage": 0.199
+      },
+      "file": "docs\\media\\menus\\settings.png",
+      "lum": {
+        "backdrop": {
+          "mean": 7.3,
+          "p50": 5,
+          "p99": 16.9,
+          "max": 85.6
+        },
+        "panel": {
+          "mean": 8.2,
+          "p50": 3.1,
+          "p99": 90,
+          "max": 90
+        }
+      }
+    },
+    {
+      "name": "controls",
+      "world": true,
+      "why": "the longest screen",
+      "screen": "controls",
+      "title": "CONTROLS",
+      "rows": 12,
+      "labels": [
+        "WASD / Arrows move + face · Space / J attack · Shift / K dash",
+        "RMB / B guard (tap = parry) · T lock on · Y switch target · Q/R cycle weapon",
+        "E / F interact · G grapple · V memory vial · C entropy dust · Tab map · M mirror travel",
+        "[ / ] previous / next beat · Enter advance story · N mute · P / Esc pause · ? hold for controls",
+        "Gamepad",
+        "Left stick move + face · Right stick aim · A attack · B dash",
+        "RT guard (tap = parry) · LT lock on · L3 switch target · LB / RB cycle weapon",
+        "X interact · Y grapple · Select map · D-up mirror travel",
+        "A advance story · Start pause",
+        "Back"
+      ],
+      "notes": [],
+      "rect": {
+        "x": 362,
+        "y": 215,
+        "w": 557,
+        "h": 342,
+        "coverage": 0.207
+      },
+      "file": "docs\\media\\menus\\controls.png",
+      "lum": {
+        "backdrop": {
+          "mean": 7.3,
+          "p50": 5,
+          "p99": 16.9,
+          "max": 85.6
+        },
+        "panel": {
+          "mean": 4.3,
+          "p50": 3.1,
+          "p99": 36.2,
+          "max": 85.6
+        }
+      }
+    },
+    {
+      "name": "scores",
+      "world": true,
+      "why": "mostly empty on a fresh save",
+      "screen": "scores",
+      "title": "WITNESS SCORES",
+      "rows": 9,
+      "labels": [
+        "MEDIUM",
+        "No witnessed runs.",
+        "HARD",
+        "No witnessed runs.",
+        "SURVIVAL",
+        "No witnessed runs.",
+        "EASY",
+        "No witnessed runs.",
+        "Back"
+      ],
+      "notes": [],
+      "rect": {
+        "x": 443,
+        "y": 253,
+        "w": 394,
+        "h": 267,
+        "coverage": 0.114
+      },
+      "file": "docs\\media\\menus\\scores.png",
+      "lum": {
+        "backdrop": {
+          "mean": 7.4,
+          "p50": 5,
+          "p99": 16.9,
+          "max": 85.6
+        },
+        "panel": {
+          "mean": 3.7,
+          "p50": 3.1,
+          "p99": 30.2,
+          "max": 85.6
+        }
+      }
+    },
+    {
+      "name": "beats",
+      "world": true,
+      "why": "Altar Travel",
+      "screen": "beats",
+      "title": "BEAT SELECT",
+      "rows": 16,
+      "labels": [
+        "The Scarred Crust",
+        "01 Crypt Breach",
+        "02 Eastern Spindle",
+        "03 Duval Sink",
+        "04 Sky Monument",
+        "05 Citadel of the Proxy",
+        "06 Bleeding Quarry",
+        "07 Sluice of Tears",
+        "08 Bone Forest",
+        "09 Ruined Town",
+        "10 Cryo Vault",
+        "11 Rot Mire",
+        "12 Pyre Peak",
+        "13 GUMOI Tower",
+        "14 Leviathan Core",
+        "Enter to travel · Esc back"
+      ],
+      "notes": [
+        "🔒",
+        "🔒",
+        "🔒",
+        "🔒",
+        "🔒",
+        "🔒",
+        "🔒",
+        "🔒",
+        "🔒",
+        "🔒",
+        "🔒",
+        "🔒",
+        "🔒",
+        "🔒",
+        "🔒"
+      ],
+      "rect": {
+        "x": 443,
+        "y": 151,
+        "w": 394,
+        "h": 470,
+        "coverage": 0.201
+      },
+      "file": "docs\\media\\menus\\beats.png",
+      "lum": {
+        "backdrop": {
+          "mean": 7.3,
+          "p50": 5,
+          "p99": 16.9,
+          "max": 85.6
+        },
+        "panel": {
+          "mean": 4.4,
+          "p50": 3.1,
+          "p99": 42.3,
+          "max": 83.3
+        }
+      }
+    },
+    {
+      "name": "altar",
+      "world": true,
+      "why": "the shop",
+      "screen": "altar",
+      "title": "RECONSTITUTION ALTAR",
+      "rows": 13,
+      "labels": [
+        "Scar Shards: 0",
+        "Edge  □□",
+        "Ghost-step  □□",
+        "Long-arm  □□",
+        "Shard Magnet  □□",
+        "Anchor Reservoir  □□",
+        "Kintsugi Shell  □□",
+        "Echo Lens  □",
+        "Full repair",
+        "Memory Vial refill",
+        "Reconstitution Charge",
+        "Buoyancy Mesh",
+        "Leave"
+      ],
+      "notes": [
+        "+25% weapon damage — 60 shards",
+        "+0.10s dash i-frames — 50 shards",
+        "+3 grapple range — 40 shards",
+        "+50% soul-mote attraction speed — 35 shards",
+        "+1 Memory Vial slot — 70 shards",
+        "-15% environmental damage — 90 shards",
+        "Marks nearby memory seams — 80 shards",
+        "20 shards",
+        "25 shards",
+        "60 shards",
+        "Deep-fluid traversal · 180 shards"
+      ],
+      "rect": {
+        "x": 408,
+        "y": 181,
+        "w": 464,
+        "h": 411,
+        "coverage": 0.207
+      },
+      "file": "docs\\media\\menus\\altar.png",
+      "lum": {
+        "backdrop": {
+          "mean": 7.3,
+          "p50": 5,
+          "p99": 17.7,
+          "max": 85.6
+        },
+        "panel": {
+          "mean": 4.4,
+          "p50": 3.1,
+          "p99": 40.2,
+          "max": 85.6
+        }
+      }
+    },
+    {
+      "name": "runMode",
+      "world": false,
+      "why": "difficulty choice, reached from New Game",
+      "screen": "runMode",
+      "title": "CHOOSE THE LINK'S MEMORY",
+      "rows": 7,
+      "labels": [
+        "Starting a mode erases the current campaign. Settings remain.",
+        "Easy",
+        "Medium",
+        "Hard",
+        "Survival",
+        "Survival is one life. Death seals the save. No second draft.",
+        "Keep the current run"
+      ],
+      "notes": [
+        "Infinite lives. Enemy HP 70%. Damage 60%. No shard loss. Full guidance.",
+        "5 reconstructions per expedition. Baseline combat. 10% carried shard risk.",
+        "3 reconstructions. Enemy HP 120%. Damage 135%. Faster threats. 20% carried shard risk.",
+        "One life. Enemy HP 110%. Damage 150%. Death seals this campaign."
+      ],
+      "rect": {
+        "x": 337,
+        "y": 270,
+        "w": 606,
+        "h": 233,
+        "coverage": 0.153
+      },
+      "file": "docs\\media\\menus\\runMode.png",
+      "lum": {
+        "backdrop": {
+          "mean": 7.5,
+          "p50": 5,
+          "p99": 17.5,
+          "max": 85.6
+        },
+        "panel": {
+          "mean": 6.2,
+          "p50": 3,
+          "p99": 68.4,
+          "max": 90
+        }
+      }
+    }
+  ],
+  "errors": [],
+  "firstFrame": [
+    {
+      "el": "canvas",
+      "z": "auto",
+      "rect": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "text": ""
+    },
+    {
+      "el": "ss-menu",
+      "z": "40",
+      "rect": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "text": "SOVEREIGN SCAR The Wound That Remembers √π ⊗ ∞ ⊗ τ² ▶ Begin New Game A"
+    }
+  ]
+}

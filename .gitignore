@@ -20,15 +20,3 @@ dist-pages/
 # HUD-free frames. Regenerate with `node tests/qa/player-captures.mjs --set=…`.
 docs/media/player/*/*-clean.png
 
-# Working frames from `tests/qa/wall-height-probe.mjs`. The probe is a real,
-# named instrument and is committed; its output is five pictures of one room,
-# re-shot every time a wall height moves, and is a record of nothing.
-docs/media/wall-height/
-
-# Working frames from `tests/qa/title-shot.mjs`, same reason as the wall-height
-# set: the probe is committed, its output is a picture of one screen re-shot on
-# every change to the shot.
-docs/media/title/
-
-# Working frames from `tests/qa/quality-hero.mjs` and `aberration-cost.mjs`.
-docs/media/quality/
