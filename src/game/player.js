@@ -25,6 +25,21 @@ import { GuardController, GUARD_SPEED_MULT } from './combat/guard.js';
 import { LockOnController } from './combat/lock-on.js';
 import { coach } from './ui/coach.js';
 import { INPUT_BUFFER } from './input.js';
+import {
+    comboMove, chains, COMBO_STEPS, COMBO_WINDOW,
+} from './combat/combo.js';
+
+/**
+ * How fast a smear rotates while it lives, in radians/sec, signed by the step.
+ *
+ * `ArcSmear` spins the fan about its own centre, so this is the visible
+ * HANDEDNESS of a stroke: positive sweeps one way, negative the other. Kept
+ * small — 1.6 rad/s over a 0.12s smear is about 11 degrees of travel — because
+ * the fan is already drawn at the move's true arc and a smear that rotated far
+ * would sweep the picture off the ground the hit test covers, which is the one
+ * thing this project will not do with a telegraph.
+ */
+const SMEAR_SWEEP = 1.6;
 
 /**
  * Half-width of the Light Caster's uncharged ray, in world units.
@@ -136,6 +151,12 @@ export class Player {
         // Phase C. Three numbers and one object, all of them readable from
         // outside so the HUD and the specs share the player's own state rather
         // than re-deriving it.
+        // The melee string. `comboStep` is the step the NEXT press will play,
+        // `_sinceSwing` how long ago the last one was. Both live on the player
+        // rather than in the combo module because they are per-hero state and
+        // the module is a pure derivation — see combat/combo.js.
+        this.comboStep = 0;
+        this._sinceSwing = Infinity;
         this.chargeT = 0;          // seconds the attack button has been held
         this.chargeArmed = false;  // has crossed CHARGE_TIME (drives the cue)
         this.chargeStrike = null;  // { t, weapon, charge } — committed, locked
@@ -245,8 +266,25 @@ export class Player {
         this._dashAttackHit = null;
     }
 
+    /**
+     * Is a press right now the next step of a live string?
+     *
+     * Read by the input gate as well as by `tryAttack`, because the two have to
+     * agree: the gate is what lets a press through DURING the recovery of the
+     * previous swing, and a string that `tryAttack` would continue but the gate
+     * refuses is a string that only exists in this file.
+     */
+    comboReady() {
+        return this.comboStep > 0 && chains(this._sinceSwing);
+    }
+
     tryAttack(enemies, destructibles, opts = {}) {
-        if (this.attackCd > 0 || this.health.dead) return [];
+        // The cooldown gate yields to a live string. That is the whole point of
+        // a combo — the second press lands inside the first swing's recovery,
+        // which is exactly what `attackCd` exists to forbid. It yields to
+        // nothing else: outside the window `comboReady` is false and this is
+        // the same gate it always was.
+        if ((this.attackCd > 0 && !this.comboReady()) || this.health.dead) return [];
         const weapon = getWeapon(this.inventory.activeWeapon);
         if (weapon.ray) {
             // Light Caster ray — handled by caller with LightLineSystem ideally
@@ -292,29 +330,59 @@ export class Player {
             return hits;
         }
 
-        this.attackCd = weapon.cooldown || 0.3;
+        // ── The string ──────────────────────────────────────────────────────
+        //
+        // Which step this press is depends on how long ago the last one was,
+        // and NOTHING ELSE — not on whether it connected. A string that only
+        // advanced on a hit would break every time the player whiffed the first
+        // swing of an approach, which is the swing most likely to whiff.
+        //
+        // `move` replaces `weapon` from here down, and it has to replace it
+        // EVERYWHERE: the cooldown, the smear's radius and arc, the sweep, the
+        // hit test and the damage all come off one object, because a finisher
+        // that resolves 2.34 units while drawing 1.8 is the same defect as a
+        // boss telegraph that lies.
+        const step = this.comboReady() ? this.comboStep : 0;
+        const move = comboMove(weapon, step);
+        this.comboStep = (step + 1) % COMBO_STEPS;
+        this._sinceSwing = 0;
+
+        this.attackCd = move.cooldown || 0.3;
         // Body commits to the same swing the smear draws: snap windup,
         // strike matching the 0.12s smear life, settle within the cooldown.
         this.animator?.attack(this.inventory.activeWeapon, {
             windup: 0.07,
             strikeDur: 0.12,
-            recover: Math.max(0.12, (weapon.cooldown || 0.3) - 0.19),
+            recover: Math.max(0.12, (move.cooldown || 0.3) - 0.19),
         });
         gsfx.attack(this.inventory.activeWeapon);
         this.arcSmear.spawn({
             position: this.rig.position,
             facingVec: this.state.facingVec,
-            radius: weapon.range || 1.8,
+            radius: move.range || 1.8,
             // The weapon's OWN arc, not the pool's default 110 degrees. The fan
             // still under-draws the rectangle's far corners and still leaves the
             // hole at the hilt — that is what makes it read as a sword rather
             // than a pie — but it no longer covers ground the swing cannot reach.
-            arc: weapon.arcRad,
-            color: weapon.smearColor || 0x7fe0ff,
+            arc: move.arcRad,
+            color: move.smearColor || 0x7fe0ff,
+            // The return stroke sweeps back the other way. This is the only
+            // thing separating the three pictures at a glance, and without it a
+            // string reads as one swing getting bigger.
+            spin: (move.sweep || 1) * SMEAR_SWEEP,
         });
 
-        const hits = combatSweep(this, enemies, weapon, this.physics.getVoxelAt);
-        for (const h of hits) applyHit(h, weapon, this);
+        // THE FINISHER CARRIES YOU. Applied through the physics body rather
+        // than by writing the position, so it is resolved against the world
+        // like any other motion — a lunge that teleported through a wall would
+        // undo the line-of-sight work in the move directly above it.
+        if (move.push) {
+            const fv = this.state.facingVec;
+            this.physics.applyImpulse(fv.x * move.push * 4, 0, fv.z * move.push * 4);
+        }
+
+        const hits = combatSweep(this, enemies, move, this.physics.getVoxelAt);
+        for (const h of hits) applyHit(h, move, this);
 
         if (weapon.shatter && destructibles) {
             const fv = this.state.facingVec;
@@ -690,6 +758,19 @@ export class Player {
         this.health.update(dt);
         this.arcSmear.update(dt);
         if (this.attackCd > 0) this.attackCd -= dt;
+        // The string's clock. Advanced here rather than from a timestamp so it
+        // runs on the GAMEPLAY clock — the same one hitstop and pause already
+        // bend — and so a spec can drive a string deterministically without
+        // sleeping. Left at Infinity until the first swing, which is what makes
+        // a fresh player's first press an opener rather than a resumed string.
+        //
+        // NOTE THAT THE STEP IS NOT RESET HERE, and that is deliberate rather
+        // than an omission. A line doing it was written first and a
+        // counterfactual proved it could not fail: `chains()` already refuses
+        // anything past the window, so a stale `comboStep` is unreachable —
+        // the next press reads as an opener and rewrites it. An extra guard
+        // that cannot be observed is a line nobody can maintain honestly.
+        if (this._sinceSwing < COMBO_WINDOW * 4) this._sinceSwing += dt;
         if (this.dashCd > 0) this.dashCd -= dt;
 
         // Z4: resolve the lock first — the facing it produces has to be in hand
@@ -871,7 +952,7 @@ export class Player {
             input.consumeAttack();
             input.consumeDash();
         } else {
-            if (this.attackCd <= 0 && input.consumeAttack(INPUT_BUFFER)) {
+            if ((this.attackCd <= 0 || this.comboReady()) && input.consumeAttack(INPUT_BUFFER)) {
                 // Mid-dash, the same press means something else. Phase C's
                 // second half: the dash gets an offensive spend.
                 if (this.dashTimer > 0) this.tryDashAttack(enemies);

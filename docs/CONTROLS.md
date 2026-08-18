@@ -39,6 +39,30 @@ ground it is about to strike, and damage is resolved only when that ring
 expires — against where you are *then*. Walk out of the ring or dash through it
 and the blow whiffs. Slain enemies drop hearts, more often when you are hurt.
 
+### The string
+
+Attack again while the last swing is still settling and you get the **next step
+of a string**, not another copy of the same swing:
+
+| step | what it is |
+|---|---|
+| **1 — opener** | the weapon exactly as it has always been |
+| **2 — backhand** | the return stroke. Same reach, a **third wider**, swept the other way — it catches the enemy the opener turned you past |
+| **3 — finisher** | committed: **30% more reach, nearly double damage**, twice the knockback, and it **carries you forward** |
+
+The window is **0.10s to 0.45s** after the previous swing. Earlier than that is
+mashing through a swing that has not resolved and does nothing; later and you
+start a fresh string. A press per second is three openers, so the string is
+something you commit to, not something you get for free.
+
+**The finisher is the decision.** It closes distance you may not want closed,
+and it costs recovery — the swing after it cannot come out for nearly twice as
+long as usual. That is the trade for the damage.
+
+Every step is derived from the weapon you are holding, so the Heavy Mallet's
+string is a mallet's and the Bare Strike's is a fist's. The Light Caster has no
+string: it is a ray, and rays point rather than swing.
+
 ### Guard and parry
 
 **You have to find the shield first.** The Bulwark Shield lies on the
