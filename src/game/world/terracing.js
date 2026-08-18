@@ -30,6 +30,24 @@ import { fillBox } from '../../voxel/helpers.js';
 export const KEEPOUT = 2;
 /** Rooms below this get nothing — a ledge in a corridor is an obstacle. */
 export const MIN_HALF = 8;
+/**
+ * At or above this, a room is tiled with several small rises instead of given
+ * one shape.
+ *
+ * 16 rather than a round number: the camera frame reaches about 10.8 units to
+ * the side and 6.8 away, so a room whose half-extent is 16 is already wider
+ * than anything the player can see at once. Below that a single shape still
+ * reads as the shape of the room, which is what it is for.
+ */
+export const LARGE_HALF = 16;
+/**
+ * Spacing of the rises on a large room, in cells.
+ *
+ * Smaller than the frame's shallow axis (13 cells deep) on purpose, so there is
+ * always relief in shot however the player is standing. Larger than a body, so
+ * the result is terrain rather than rubble.
+ */
+export const LARGE_PITCH = 11;
 
 /**
  * Which shape a room gets, derived from its id so a dungeon is varied but a
@@ -61,6 +79,18 @@ function shapeFor(roomId) {
 export function terraceRoom(pmap, room, roomId, color, isBlocked = () => false) {
     const half = room.half || 0;
     if (half < MIN_HALF) return 0;
+    // A SCREEN IS NOT A ROOM, and one shape stretched across it is invisible.
+    //
+    // Every shape below is parameterised off `half`, which is right for the
+    // dungeons they were written for (half 8-11: `rim` lands at d=6..9, just
+    // inside the frame edge). The overworld's screens are half 23. At that size
+    // `rim` puts its shelf 21 units out and `dais` makes a fifteen-wide plateau
+    // — measured, the overworld carried 0 of 109 cells with any mass on them
+    // within radius 6 of where the player arrives, while the camera frame is
+    // only 13 units deep. All the relief existed and none of it was ever on
+    // screen, which is a large part of why the overworld metered a p10-to-p90
+    // spread of 11 against 68 to 189 in the dungeons.
+    if (half >= LARGE_HALF) return terraceLarge(pmap, half, roomId, color, isBlocked);
     const shape = shapeFor(roomId);
     let placed = 0;
     const put = (x, z, top) => {
@@ -106,4 +136,60 @@ export function terraceRoom(pmap, room, roomId, color, isBlocked = () => false) 
         }
     }
     return placed;
+}
+
+/**
+ * Relief for a room bigger than the camera can see at once.
+ *
+ * A grid of small rises at `LARGE_PITCH`, each one seeded from the room id and
+ * its own grid cell, so a screen is varied, a cell is stable across visits and
+ * across spec runs, and neighbouring screens do not repeat.
+ *
+ * Same rule as everything else in this file: platform map, one cell at a time,
+ * `isBlocked` obeyed per cell. Nothing here can make anywhere unreachable.
+ */
+function terraceLarge(pmap, half, roomId, color, isBlocked) {
+    let placed = 0;
+    const put = (x, z, top) => {
+        if (Math.abs(x) > half - 1 || Math.abs(z) > half - 1) return;
+        if (isBlocked(x, z)) return;
+        fillBox(pmap, x, x, 1, top, z, z, color);
+        placed++;
+    };
+    const lim = Math.floor((half - 2) / LARGE_PITCH);
+    for (let gx = -lim; gx <= lim; gx++) {
+        for (let gz = -lim; gz <= lim; gz++) {
+            const seed = hashOf(`${roomId}:${gx}:${gz}`);
+            // A quarter of the cells stay flat. Relief everywhere is its own
+            // kind of uniform, and the gaps are where a fight has room.
+            if ((seed >>> 3) % 4 === 0) continue;
+            // Jittered off the lattice so the result is not visibly a grid.
+            const cx = gx * LARGE_PITCH + ((seed >>> 5) % 7) - 3;
+            const cz = gz * LARGE_PITCH + ((seed >>> 9) % 7) - 3;
+            const r = 2 + ((seed >>> 13) % 3);          // 2..4
+            const two = ((seed >>> 17) % 3) === 0;      // a third get a second step
+            for (let x = -r; x <= r; x++) {
+                for (let z = -r; z <= r; z++) {
+                    const d = Math.max(Math.abs(x), Math.abs(z));
+                    if (d > r) continue;
+                    // Stepped, not a plinth: the outer ring is one cell, the
+                    // core of a taller rise is two. A one-cell step is what the
+                    // body climbs, so every ring is reachable from the one
+                    // outside it.
+                    put(cx + x, cz + z, two && d <= r - 2 ? 2 : 1);
+                }
+            }
+        }
+    }
+    return placed;
+}
+
+/** FNV-1a, matching `shapeFor` — one hash in this file, not two. */
+function hashOf(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
 }

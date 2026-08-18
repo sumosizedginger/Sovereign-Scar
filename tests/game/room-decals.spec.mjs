@@ -17,6 +17,7 @@
 // and the bound is asserted rather than left to whoever edits the table next.
 
 import { applyRoomDecals, WEATHERING, WEATHERED_KITS } from '../../src/game/world/room-decals.js';
+import { REGIONS } from '../../src/game/overworld/world7.js';
 import { KITS } from '../../src/game/levels/dungeon-kits.js';
 import { buildRoomFloor } from '../../src/game/world/level-builder.js';
 import { fillBox } from '../../src/voxel/helpers.js';
@@ -171,9 +172,29 @@ export function run(t) {
         const missing = kitNames.filter((n) => !WEATHERING[n]);
         t.ok('every dungeon kit declares weathering', missing.length === 0,
             missing.join(', '));
-        const orphan = WEATHERED_KITS.filter((n) => !kitNames.includes(n));
-        t.ok('no weathering entry names a kit that does not exist',
+        // TWO CLASSES OF ENTRY, and the check got stronger rather than looser
+        // when the second arrived. Dungeon entries name a kit. Overworld
+        // entries are `ow:<region>` and name one of the eight regions in
+        // `world7.js` — that level has no kit at all, which is why its
+        // forty-nine screens were the only places in the game receiving no
+        // weathering.
+        const owNames = Object.keys(REGIONS).map((r) => `ow:${r}`);
+        const orphan = WEATHERED_KITS.filter(
+            (n) => !kitNames.includes(n) && !owNames.includes(n));
+        t.ok('no weathering entry names a kit or region that does not exist',
             orphan.length === 0, orphan.join(', '));
+        // …and the reverse, which is the half that actually bites: a region
+        // renamed in world7.js would silently stop being weathered.
+        const unweathered = owNames.filter((n) => !WEATHERED_KITS.includes(n));
+        t.ok('every overworld region declares weathering',
+            unweathered.length === 0, unweathered.join(', '));
+        t.ok('…and there are eight of them',
+            owNames.length === 8, `${owNames.length}: ${Object.keys(REGIONS).join(', ')}`);
+        // The namespace exists because three region ids are one capital letter
+        // from a kit name. If that prefix were ever dropped, `quarry` would
+        // resolve against `Quarry` on any case-insensitive lookup.
+        t.ok('overworld entries stay namespaced',
+            owNames.every((n) => n.startsWith('ow:')));
 
         for (const [name, s] of Object.entries(WEATHERING)) {
             t.ok(`${name} coverage is bounded`, s.coverage > 0 && s.coverage <= 0.45,

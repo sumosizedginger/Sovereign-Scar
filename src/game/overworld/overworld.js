@@ -174,6 +174,12 @@ export function createOverworld(ctx, screensDef, opts = {}) {
                 );
             })(),
             wallColor: mood === 'abyss' ? ABYSS_COLORS.abyssWall : CRUST_COLORS.slate,
+            // Ground weathering, per region (`room-decals.js`). Carried across
+            // explicitly because this object is rebuilt field by field rather
+            // than spread from the screen — anything not named here is silently
+            // dropped, which is exactly how the first attempt at this landed
+            // with no effect and no error.
+            weathering: s.weathering,
             onBake: s.onBake,
             doors: (s.edges || []).map((e) => ({
                 to: e.to,

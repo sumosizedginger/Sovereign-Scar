@@ -68,6 +68,40 @@ export const WEATHERING = {
     GUMOI: { color: 0x7a2a60, coverage: 0.24, strength: 0.28, where: 'wall' },
     // Deep-water staining.
     Leviathan: { color: 0x2c2a48, coverage: 0.28, strength: 0.30, where: 'both' },
+
+    // ── The overworld's eight regions ──────────────────────────────────────
+    //
+    // HEAVIER THAN ANY DUNGEON'S, deliberately, and the reason is geometry
+    // rather than taste. `makeProtector` keeps a radius-6 disc clear at the
+    // centre of every screen so the spawn and the door lanes always work —
+    // measured, that disc holds **0 of 109 cells with any mass on them**. The
+    // camera frame reaches 6.2 units toward the lens and 6.8 away, so standing
+    // where the player arrives, the entire vertical extent of the frame is
+    // inside the empty disc. There is no wall, no ceiling and no prop in shot.
+    //
+    // Nothing SOLID may go there, by design. Weathering is colour only — it
+    // recolours voxels that already exist and never adds, removes or moves one
+    // — so it is the one thing that can put variation where the player is
+    // actually standing without touching a route.
+    //
+    // Coverage and strength were set with `tests/qa/contrast-probe.mjs` open,
+    // and capped at the 0.45 this table's own spec enforces — past that a decal
+    // stops being weathering and becomes the floor colour.
+    // Each colour is chosen for VALUE separation from its region floor, not for
+    // hue: a wash the same brightness as the ground is invisible from 17 metres
+    // up, which is the mistake the Abyss palette already made once.
+    // NAMESPACED, and not for tidiness. Three of the eight region ids are one
+    // capital letter away from a dungeon kit — `quarry`/`Quarry`,
+    // `spindle`/`Spindle`, `pyre`/`Pyre` — and a lookup that silently found the
+    // wrong one would put iron bleed on a clay field and be very hard to see.
+    'ow:tombfields': { color: 0x4a4438, coverage: 0.40, strength: 0.44, where: 'both' },
+    'ow:spindle': { color: 0x22262c, coverage: 0.38, strength: 0.44, where: 'both' },
+    'ow:sinklands': { color: 0x6a4a2c, coverage: 0.42, strength: 0.44, where: 'both' },
+    'ow:citadel': { color: 0x3e3628, coverage: 0.36, strength: 0.44, where: 'both' },
+    'ow:quarry': { color: 0x241e26, coverage: 0.40, strength: 0.44, where: 'both' },
+    'ow:bonetown': { color: 0x4a4636, coverage: 0.40, strength: 0.44, where: 'both' },
+    'ow:cryomire': { color: 0x24323c, coverage: 0.40, strength: 0.44, where: 'both' },
+    'ow:pyre': { color: 0x3a2018, coverage: 0.42, strength: 0.44, where: 'both' },
 };
 
 /** Lattice size for the noise field, in cells. Bigger = broader patches. */
@@ -125,11 +159,19 @@ function mixHex(from, target, t) {
  */
 export function applyRoomDecals(map, room, kit, roomId = 'room', opts = {}) {
     if (opts.enabled === false) return 0;
-    const spec = WEATHERING[kit?.name];
+    // A ROOM MAY NAME ITS OWN, and that is what lets the overworld have any.
+    //
+    // Weathering was keyed on the KIT, and the overworld has no kit — so all
+    // forty-nine screens fell through this function untouched, which is a large
+    // part of why the overworld metered a p10-to-p90 spread of 11 against 68 to
+    // 189 in the dungeons. Its eight regions are not one kit and never will be,
+    // so the name comes off the screen instead.
+    const name = room?.weathering || kit?.name;
+    const spec = WEATHERING[name];
     if (!spec || !map?.size) return 0;
     const prof = wallProfile(room || {});
     const half = room?.half || 8;
-    const seed = seedOf(`${kit.name}:${roomId}`);
+    const seed = seedOf(`${name}:${roomId}`);
     // The cut-off that produces `coverage`: value noise is roughly uniform, so
     // taking the top `coverage` fraction of the field is just a threshold.
     const cut = 1 - spec.coverage;

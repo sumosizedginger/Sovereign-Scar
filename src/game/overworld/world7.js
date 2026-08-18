@@ -31,7 +31,13 @@ function rng(seed) {
 
 // ── Region table (bible §1.1/1.2 + §7): flavor per world zone ──────────────
 // Keyed by "band" — which zone a (row, col) falls into.
-const REGIONS = {
+/**
+ * Exported so `tests/game/room-decals.spec.mjs` can hold the eight overworld
+ * weathering entries against the eight regions that actually exist. A region
+ * with no weathering, or weathering for a region that was renamed, is silent
+ * otherwise — the screen just gets no ground variation and nothing says so.
+ */
+export const REGIONS = {
     tombfields: { // NW: beats 01–02 country — slate + bone
         crustFloor: CRUST_COLORS.clayField, crustAccent: CRUST_COLORS.limestone,
         abyssAccent: ABYSS_COLORS.goldVein, density: 0.5, enemies: ['sentinel'],
@@ -207,6 +213,7 @@ export function buildWorld7() {
                 screens[handAt[sid]] = {
                     ...src, edges: [...src.edges], grid: [8 + c, 8 + r],
                     track: region, // region composition (audio/tracks.js)
+                    weathering: `ow:${region}`, // room-decals.js WEATHERING
                 };
                 continue;
             }
@@ -217,6 +224,12 @@ export function buildWorld7() {
                 floorColor: R.crustFloor,
                 edges: [],
                 track: region, // region composition (audio/tracks.js)
+                // Ground weathering, per region. The overworld has no kit, so
+                // without this the screens are the only places in the game that
+                // get none — and they are the ones that need it most, because
+                // the protected disc at every screen's centre is guaranteed
+                // empty of geometry. See `room-decals.js`.
+                weathering: `ow:${region}`,
                 enemies: [],
             };
             // Grammar closures capture `s` so route/feature protection reads the
