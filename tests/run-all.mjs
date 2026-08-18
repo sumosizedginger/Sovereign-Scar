@@ -54,6 +54,7 @@ import { run as runBossFacing } from './game/boss-facing.spec.mjs';
 import { run as runLightLineBurns } from './game/light-line-burns.spec.mjs';
 import { run as runLicenceAgreement } from './game/licence-agreement.spec.mjs';
 import { run as runWallProfile } from './game/wall-profile.spec.mjs';
+import { run as runDressing } from './game/dressing.spec.mjs';
 import { run as runWallClimb } from './game/wall-climb.spec.mjs';
 import { run as runDashCommit } from './game/dash-commit.spec.mjs';
 import { run as runWedgeCrackProximity } from './game/wedge-crack-proximity.spec.mjs';
@@ -237,6 +238,7 @@ async function main() {
     runNamed('light-line-burns', runLightLineBurns);
     runNamed('licence-agreement', runLicenceAgreement);
     runNamed('wall-profile', runWallProfile);
+    runNamed('dressing', runDressing);
     runNamed('dash-commit', runDashCommit);
     runNamed('wedge-crack-proximity', runWedgeCrackProximity);
     runNamed('weak-points', runWeakPoints);

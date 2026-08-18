@@ -15,7 +15,9 @@ import { KITS as DUNGEON_KITS, applyKit, markTraversal } from '../levels/dungeon
 import { buildRoomLights, disposeRoomLights } from './room-lights.js';
 import { coach } from '../ui/coach.js';
 import { fillBox } from '../../voxel/helpers.js';
+import { vkey } from '../../voxel/core.js';
 import { wallProfile, wallTopAt, rakeRoom } from './wall-profile.js';
+import { buildDressing } from './dressing.js';
 import { stampMap } from '../assets/props.js';
 import { CRUST_COLORS, ABYSS_COLORS, MOOD_PRESETS } from '../assets/palettes.js';
 import { Enemy, DummyTarget, attachSplit } from '../enemy.js';
@@ -581,9 +583,21 @@ export function createDungeon(ctx, def, opts = {}) {
             DUNGEON_KITS[def.id], room, roomId, origin, scene, ctx.localLights
         );
 
+        // Hanging dressing — the third mesh, and the ONLY geometry in a room
+        // that may be displaced. It registers no solids and neither
+        // `getVoxelAt` branch below can see it, which is the whole reason it
+        // exists as a separate mesh rather than as voxels in `map`.
+        // Asked of the ROOM MAPS, in room-local cells — the same two maps the
+        // standing query reads. A piece that would grow through a kit prop or a
+        // terrace is skipped, which is also what keeps "no dressing cell is
+        // ever returned by getVoxelAt" a statement about dressing rather than
+        // about whatever it was clipping.
+        const dressing = buildDressing(scene, DUNGEON_KITS[def.id], room, roomId, origin,
+            (lx, ly, lz) => map.has(vkey(lx, ly, lz)) || !!pmap?.has?.(vkey(lx, ly, lz)));
+
         const rec = {
             built, platformBuilt, plugs: new Map(), enemies: [], room,
-            blockers: [], roomLights,
+            blockers: [], roomLights, dressing,
         };
         for (const b of room.blockers || []) {
             const rt = createBlockerRuntime(ctx, api, b, origin);
@@ -867,6 +881,7 @@ export function createDungeon(ctx, def, opts = {}) {
         // fixture is gone keeps lighting an empty room from a mesh that no
         // longer exists — and the pool has no way to notice.
         disposeRoomLights(rec.roomLights, ctx.localLights);
+        rec.dressing?.dispose?.();
         for (const rt of rec.blockers || []) { try { rt.dispose(); } catch (_) {} }
         for (const plug of rec.plugs.values()) plug.dispose();
         for (const e of rec.enemies) {
@@ -1633,6 +1648,7 @@ export function createDungeon(ctx, def, opts = {}) {
             rec.built.dispose();
             rec.platformBuilt?.dispose();
             disposeRoomLights(rec.roomLights, ctx.localLights);
+            rec.dressing?.dispose?.();
             for (const rt of rec.blockers || []) { try { rt.dispose(); } catch (_) {} }
             for (const plug of rec.plugs.values()) plug.dispose();
             for (const e of rec.enemies) e.dispose();
@@ -1865,6 +1881,18 @@ export function createDungeon(ctx, def, opts = {}) {
          */
         puzzleDefs(roomId) {
             return baked.get(roomId)?.puzzle || [];
+        },
+        /**
+         * A baked room's hanging dressing, or null.
+         *
+         * A seam, and it exists so the spec can read the map the GAME built
+         * rather than calling `stampDressing` again with the same arguments and
+         * checking its own output against itself. The invariant being held —
+         * that no dressing cell is ever returned by the room's voxel query —
+         * is about these cells, not about equivalent ones.
+         */
+        dressingFor(roomId) {
+            return baked.get(roomId)?.dressing || null;
         },
         // W6: room-graph view for the Tab map
         /**

@@ -45,6 +45,9 @@ export const KITS = {
         // so the room reads as a hole you are looking down into.
         // See world/wall-profile.js — the far wall is the one you look at.
         wallRise: 4,
+        // Hanging dressing: grave shrouds, from `predecessor_remains`. Only
+        // the far wall, only above the hero — see world/dressing.js.
+        sway: 'banner',
         structural: ['burial_rows', 'broken_consoles'], dressing: ['predecessor_remains', 'grave_dust'],
         emissive: 'cold_shaft', atmosphere: 'cold_motes', bossRule: 'sunken_dais',
     },
@@ -54,6 +57,9 @@ export const KITS = {
         // bays want a back wall that runs off the top of the frame.
         // See world/wall-profile.js — the far wall is the one you look at.
         wallRise: 5,
+        // Hanging dressing: the `cable_coils` this kit has always listed. Only
+        // the far wall, only above the hero — see world/dressing.js.
+        sway: 'cable',
         structural: ['gear_bays', 'rails'], dressing: ['capacitors', 'cable_coils'],
         emissive: 'capacitor_arc', atmosphere: 'sparks', bossRule: 'central_machine',
     },
@@ -64,6 +70,9 @@ export const KITS = {
         // the one idea the dungeon has.
         // See world/wall-profile.js — the far wall is the one you look at.
         wallRise: 2,
+        // Hanging dressing: drift cloth, caught on the sediment ribs. Only the
+        // far wall, only above the hero — see world/dressing.js.
+        sway: 'streamer',
         structural: ['sediment_ribs', 'wind_trenches'], dressing: ['buried_frames', 'drift_dust'],
         emissive: 'trench_glow', atmosphere: 'drifting_dust', bossRule: 'basin_low',
     },
@@ -74,6 +83,9 @@ export const KITS = {
         // architecture.
         // See world/wall-profile.js — the far wall is the one you look at.
         wallRise: 2,
+        // Hanging dressing: the `prayer_flags` this kit has always listed.
+        // Only the far wall, only above the hero — see world/dressing.js.
+        sway: 'streamer',
         structural: ['stepped_monuments', 'open_edges'], dressing: ['cloud_cards', 'prayer_flags'],
         emissive: 'vertical_shaft', atmosphere: 'light_shafts', bossRule: 'open_platform',
     },
@@ -83,6 +95,9 @@ export const KITS = {
         // pretender builds is the front of the building.
         // See world/wall-profile.js — the far wall is the one you look at.
         wallRise: 5,
+        // Hanging dressing: a pretender hangs banners; that is the whole beat.
+        // Only the far wall, only above the hero — see world/dressing.js.
+        sway: 'banner',
         structural: ['buttresses', 'false_facades'], dressing: ['kintsugi_seams', 'proxy_doubles'],
         emissive: 'seam_gold', atmosphere: 'motes', bossRule: 'mirrored_hall',
     },
@@ -92,6 +107,9 @@ export const KITS = {
         // face somebody quarried down through, and it should read as sheer.
         // See world/wall-profile.js — the far wall is the one you look at.
         wallRise: 6,
+        // Hanging dressing: hoist chains left on the braces. Only the far
+        // wall, only above the hero — see world/dressing.js.
+        sway: 'chain',
         structural: ['cut_strata', 'braces'], dressing: ['rubble', 'ore_carts'],
         emissive: 'mineral_seam', atmosphere: 'grit', bossRule: 'stepped_pit',
     },
@@ -104,6 +122,9 @@ export const KITS = {
         // the channels run toward the camera.
         // See world/wall-profile.js — the far wall is the one you look at.
         wallRise: 4,
+        // Hanging dressing: the `hanging_chains` this kit has always listed.
+        // Only the far wall, only above the hero — see world/dressing.js.
+        sway: 'chain',
         structural: ['channels', 'gates'], dressing: ['hanging_chains', 'wet_debris'],
         emissive: 'wet_reflection', atmosphere: 'drips', bossRule: 'flooded_channel',
     },
@@ -113,6 +134,9 @@ export const KITS = {
         // not ribs.
         // See world/wall-profile.js — the far wall is the one you look at.
         wallRise: 6,
+        // Hanging dressing: the `marrow_roots` this kit has always listed.
+        // Only the far wall, only above the hero — see world/dressing.js.
+        sway: 'root',
         structural: ['rib_vaults', 'marrow_roots'], dressing: ['bone_piles', 'pale_particulate'],
         emissive: 'marrow_glow', atmosphere: 'pale_dust', bossRule: 'rib_cathedral',
     },
@@ -122,6 +146,9 @@ export const KITS = {
         // should stand tall enough to have survived.
         // See world/wall-profile.js — the far wall is the one you look at.
         wallRise: 2,
+        // Hanging dressing: the `signage` this kit has always listed. Only the
+        // far wall, only above the hero — see world/dressing.js.
+        sway: 'banner',
         structural: ['streets', 'room_shells'], dressing: ['signage', 'domestic_debris'],
         emissive: 'window_glow', atmosphere: 'phantom_duplicates', bossRule: 'plaza',
     },
@@ -131,6 +158,9 @@ export const KITS = {
         // bottom of.
         // See world/wall-profile.js — the far wall is the one you look at.
         wallRise: 5,
+        // Hanging dressing: condenser lines, frozen where they hang. Only the
+        // far wall, only above the hero — see world/dressing.js.
+        sway: 'chain',
         structural: ['ice_fins', 'pipes'], dressing: ['condensers', 'frost_crust'],
         emissive: 'condenser_glow', atmosphere: 'vapor', bossRule: 'ice_atrium',
     },
@@ -140,6 +170,9 @@ export const KITS = {
         // left above the waterline.
         // See world/wall-profile.js — the far wall is the one you look at.
         wallRise: 2,
+        // Hanging dressing: the `roots` this kit has always listed. Only the
+        // far wall, only above the hero — see world/dressing.js.
+        sway: 'root',
         structural: ['shelves', 'drowned_furniture'], dressing: ['roots', 'sludge_bubbles'],
         emissive: 'bubble_glow', atmosphere: 'bubbles', bossRule: 'sunken_shelf',
     },
@@ -149,6 +182,9 @@ export const KITS = {
         // stand up but the vents look out.
         // See world/wall-profile.js — the far wall is the one you look at.
         wallRise: 3,
+        // Hanging dressing: ember ribbons off the vents. Only the far wall,
+        // only above the hero — see world/dressing.js.
+        sway: 'streamer',
         structural: ['vents', 'basalt_fans'], dressing: ['ember_pools', 'scoria'],
         emissive: 'ember_pool', atmosphere: 'heat_shimmer', bossRule: 'vent_ring',
     },
@@ -158,6 +194,9 @@ export const KITS = {
         // and the shelves go up.
         // See world/wall-profile.js — the far wall is the one you look at.
         wallRise: 6,
+        // Hanging dressing: loose index cable, off the rails. Only the far
+        // wall, only above the hero — see world/dressing.js.
+        sway: 'cable',
         structural: ['index_rails', 'displaced_copies'], dressing: ['scan_lines', 'glyph_stacks'],
         emissive: 'scan_line', atmosphere: 'index_scan', bossRule: 'index_court',
     },
@@ -167,6 +206,9 @@ export const KITS = {
         // the one above you.
         // See world/wall-profile.js — the far wall is the one you look at.
         wallRise: 5,
+        // Hanging dressing: spatial seams, hanging where the fold tore. Only
+        // the far wall, only above the hero — see world/dressing.js.
+        sway: 'cable',
         structural: ['folded_architecture', 'recursion_markers'], dressing: ['spatial_seams', 'echo_frames'],
         emissive: 'seam_violet', atmosphere: 'recursion', bossRule: 'folded_core',
     },

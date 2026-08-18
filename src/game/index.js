@@ -65,6 +65,7 @@ import { HeartDropManager, dropSite } from './world/heart-drops.js';
 import { patchOverworld } from './world/keys.js';
 import { DeathEcho } from './world/death-echo.js';
 import { updateRoomLightFlicker } from './world/room-lights.js';
+import { updateDressingSway } from './world/dressing.js';
 import { AnchorThread } from './narrative/anchor-thread.js';
 import { reconstitutionLine } from './narrative/reconstitution-copy.js';
 import { getRunMode, setActiveRunMode } from './kernel/run-mode.js';
@@ -1579,6 +1580,10 @@ function frame() {
         // being a painted rectangle.
         ambientT += sdt;
         updateRoomLightFlicker(ambientT);
+        // The room's banners, on the SAME clock as its lamps — one ambient time
+        // means the light on a piece of cloth and the cloth cannot drift out of
+        // step with each other over a long session.
+        updateDressingSway(ambientT);
         localLights.update(player.root.position); // Ticket G: budget nearest lights
         camRig.update(sdt, player.root.position);
 

@@ -5,6 +5,55 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Something in a room finally moves without being pushed
+
+`docs/HOW-TO-CLOSE-THE-GAP.md` §3 item 3 had been diagnosed three times, each
+wrong until the last, and the correct diagnosis ruled out both obvious routes.
+Decorative props are stamped INTO a room's voxel map and come out fused into one
+mesh, so there is no per-prop object to animate. Displacing them in the vertex
+shader does not work either: the room answers "is there ground here" from the
+voxel MAP, never the mesh, so a moved vertex leaves the player standing where
+the object used to be. Silent, and invisible in any still frame.
+
+So `src/game/world/dressing.js` builds a THIRD mesh per room, from its own map,
+registering no solids, consulted by neither `getVoxelAt` branch. It never calls
+`meshAndCollide` and never touches the collision world — it meshes its own
+geometry, which is why there is no `getVoxelAt` on it for anyone to wire up by
+mistake.
+
+Three rules make it safe rather than merely pretty. It hangs from the FAR wall
+only, which the fixed-yaw camera makes permanently the wall behind the hero, so
+it can never come between them and the lens — and which is also the one wall
+whose top is a single height, so the shader derives its droop from a uniform
+instead of a per-vertex attribute. It stops four cells above the floor, clear of
+the hero. And the motion is sums of sines about zero, under a third of a cell at
+the tip: measured across three dungeons, the dressing covers 6–11% of the frame
+and moves centre-crop luminance by at most 0.2 points and contrast by nothing.
+
+Each of the fourteen kits authors one hanging kind, and every one of the five is
+a noun the kit already declared and nothing ever built — `hanging_chains`,
+`cable_coils`, `prayer_flags`, `marrow_roots`, `signage`. 96 of 108 rooms carry
+something; 345 pieces in all.
+
+Two things the work turned up rather than assumed. The banners first hung level
+with the parapet and came back as bright gold LEDGES, which only showed up
+because the probe shoots each room twice with the dressing hidden and shown —
+they now hang a course lower, where the wall above shades them, and the accent
+runs as a stripe down the middle instead of across the whole panel. And the
+shadow census refused the meshes outright: three.js draws shadow maps with its
+own depth material, which knows nothing about a hook installed on the surface
+material, so the cloth swung and its shadow did not. The droop now goes into
+both passes, on the same uniform objects.
+
+`tests/game/dressing.spec.mjs` (71 assertions) gates the physics, not the
+picture, because the picture cannot show this failing. 16 counterfactuals; three
+found holes in the spec rather than the game — a stub shader that mimed the
+output of the material under test, an assertion that tested the depth-material
+factory instead of the wiring that uses it, and a mutation silently matching
+nothing because the working copy is CRLF and the search string was written with
+LF.
+
+
 ### Rooms have a front and a back now — and the hero stopped hiding behind them
 
 The camera has never rotated. `camera-rig.js` places the lens at

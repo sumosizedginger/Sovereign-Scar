@@ -719,7 +719,7 @@ valuable one and should not be allowed to crowd out the rest:
 | Combo system | **DONE 2026-08-17** — three-step string (opener / backhand / finisher) derived per weapon; `src/game/combat/combo.js` |
 | 80% room variation (wall/ceiling height) | **DONE 2026-08-17** — per-room far/near wall heights with the side walls ramping between (`src/game/world/wall-profile.js`); one authored `wallRise` per kit. Fell out of it: hero occlusion 7.93% → 0.83% of standable cells |
 | In-engine key art + composed title camera | not started |
-| Ambient sway (dressing mesh + vertex displacement) | not started |
+| Ambient sway (dressing mesh + vertex displacement) | **DONE 2026-08-17** — a third per-room mesh that registers no solids and neither `getVoxelAt` branch can see (`src/game/world/dressing.js`), drooped in the vertex stage and in the shadow pass; 345 hanging pieces across 96 of 108 rooms |
 | Doc truth pass + licence line | **DONE 2026-08-17** — MIT throughout, content included; `LICENSE`/`README`/`package.json` agree and `docs/LICENSING.md` is a decision record |
 | Tester round folded back in | waiting on distribution |
 
@@ -730,8 +730,8 @@ re-proposing it.
 
 *Suggested interleave:* ~~the Witness~~ ~~Frost & Fuel~~ ~~Hydroid Cloud~~
 the boss pass is **finished**, and so are ~~occlusion~~, the ~~combo system~~,
-~~room variation~~ and the ~~licence line~~. What is left on the v1 list is
-in-engine key art, ambient sway, and getting Pages to actually serve.
+~~room variation~~, the ~~licence line~~ and ~~ambient sway~~. What is left on
+the v1 list is in-engine key art and getting Pages to actually serve.
 
 **Two arena findings fell out of the occlusion work**, and they are placement,
 not bodies, so they are recorded here rather than fixed unasked. Measured at
