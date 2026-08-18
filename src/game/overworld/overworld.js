@@ -82,6 +82,15 @@ export const SCREEN_HALF = 23; // 47×47 cells ≈ the plan's 48-unit screens
  *   } }
  * }
  */
+/** A darker shade of a colour — see `terraceColor` below for why 0.78. */
+function shadeOf(hex, k) {
+    // CLAMPED, because `k` is used above 1 for the lit step edge and an
+    // unclamped 255 * 1.16 wraps into the next channel — a pale clay tread
+    // would come out green.
+    const c = (v) => Math.max(0, Math.min(255, Math.round(v * k)));
+    return (c((hex >> 16) & 255) << 16) | (c((hex >> 8) & 255) << 8) | c(hex & 255);
+}
+
 export function createOverworld(ctx, screensDef, opts = {}) {
     const levelId = opts.levelId || 'overworld';
     const saved = getOverworldState();
@@ -180,6 +189,30 @@ export function createOverworld(ctx, screensDef, opts = {}) {
             // dropped, which is exactly how the first attempt at this landed
             // with no effect and no error.
             weathering: s.weathering,
+            // RISEN GROUND IS THE SAME GROUND, A SHADE DARKER.
+            //
+            // Derived HERE, from `screenFloor`, and not from the region table,
+            // because the four hand-authored gate screens keep their own floor
+            // colour and would otherwise be given the shade of a floor they do
+            // not have — scarfield, the first screen a new player sees, came
+            // out with grey slabs on clay for exactly that reason.
+            //
+            // Third answer, and the pictures chose it. The default is the wall
+            // colour (masonry — concrete slabs dropped on a clay field) and the
+            // second attempt was the region's authored accent (rust, which read
+            // as painted panels). `tests/qa/contrast-probe.mjs` scored all three
+            // IDENTICALLY at 47: the metric cannot tell a material that belongs
+            // from one that does not, because both are a large value break
+            // against the floor. `docs/media/overworld/` is where the difference
+            // lives. Keeping the material and letting the step's own shadow do
+            // the separating is what makes it read as terrain.
+            terraceColor: shadeOf(screenFloor, 0.78),
+            // …and the step-edge mark is a LIGHTER shade of the same ground
+            // rather than the kit tread. Same reasoning: the affordance is
+            // worth keeping — a lit rim still reads as an edge you can step up
+            // — but it must be this ground catching the light, not a different
+            // material laid over it.
+            treadColor: shadeOf(screenFloor, 1.16),
             onBake: s.onBake,
             doors: (s.edges || []).map((e) => ({
                 to: e.to,

@@ -71,7 +71,33 @@ hero's **proportions**. Concretely, and in order of cheapness:
 skipped — **play it for two minutes** before deciding. That is the evidence this
 question actually needs.
 
-## 2. Rooms have relief but not shape (weeks — the big one)
+## 2. Rooms have relief but not shape (STARTED 2026-08-18 — beat 06 is shaped)
+
+> **Status.** The capability exists and one dungeon is authored, exactly as the
+> method below prescribes. `src/game/world/room-footprint.js` gives a room an
+> optional `cut`; the Quarry's six non-boss rooms each lose 6–13% of their
+> square. The traversal re-audit (step 3) is clean across the whole campaign:
+> door-reach 0 locked in, entry-safety 0 bad of 528 arrival points,
+> puzzle-reach 0, key-reachability 0. Step 4 — playing it — is still the
+> owner's, and steps 5 (the other thirteen dungeons) and boss arenas are open.
+>
+> Two findings worth carrying into the next dungeon:
+>
+> * **A cut on the SOUTH side costs occlusion.** The camera is fixed-yaw and
+>   looks from +Z, so near-half mass stands between the lens and the player.
+>   Moving what could move to the far half took beat 06 from 26 occluded cells
+>   to 20, against an uncut baseline of 13. Prefer far-half cuts.
+> * **The validator reads the room table, and the table is not the room.** A
+>   cut that severed the one-cell ring around `goldgash`'s blocker passed every
+>   static check and islanded a door; `tests/qa/door-reach.mjs` found it in the
+>   built world. Blockers now count as rock for the connectivity question, but
+>   the rule stands: bake it and measure the world.
+>
+> Boss arenas are deliberately left square — `api.halfSize` is the arena clamp
+> and it is the bounding box, so a cut would leave a fourteen-metre body a
+> legal place to stand that is solid rock. That needs the clamp to learn about
+> outlines first, and is its own ticket.
+
 
 **You were right and I was wrong**: 93% of rooms have raised floor, averaging
 17% of their area, some reaching six levels. The correction and the measurement
@@ -104,6 +130,9 @@ technically hard, which is exactly why it has been deferred twice.
 floor plan exactly as it is and raise **wall height variation** and add
 **ceiling-height changes** between rooms. It changes how a room feels on entry
 and cannot make anywhere unreachable, so it needs no traversal re-audit.
+**DONE 2026-08-17** — `src/game/world/wall-profile.js`, every kit has a
+`wallRise`, and hero occlusion fell from 7.93% to 0.83% of standable cells as a
+side effect of the near wall coming down.
 
 ---
 

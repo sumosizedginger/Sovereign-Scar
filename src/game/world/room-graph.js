@@ -566,7 +566,14 @@ export function createDungeon(ctx, def, opts = {}) {
                 }
             }
             terraceRoom(pmap, room, roomId,
-                room.wallColor || wallColor,
+                // A ROOM MAY NAME ITS OWN. The wall colour is the right default
+                // for a dungeon, where a rise is masonry of the same stone as
+                // the walls around it. It is wrong for the overworld: risen
+                // GROUND is ground, and the generic slate read as concrete
+                // slabs dropped on a clay field — visible in
+                // `docs/media/overworld/`, and invisible in the contrast number,
+                // which went UP because a foreign material is a big value break.
+                room.terraceColor || room.wallColor || wallColor,
                 (x, z) => {
                     // Never over a door or its approach, never over the spawn,
                     // and never over anything the room already built.
@@ -583,7 +590,17 @@ export function createDungeon(ctx, def, opts = {}) {
 
         // Z2: mark the rim of every climbable one-cell rise, so "can I get up
         // there" is answerable by looking instead of by walking into it.
-        markTraversal(map, pmap, DUNGEON_KITS[def.id]);
+        // A ROOM MAY SUPPLY ITS OWN TREAD, and the overworld needs to.
+        //
+        // `markTraversal` repaints the rim of every climbable one-cell rise so
+        // "can I get up there" is answerable by looking. In a dungeon that is a
+        // handful of rises and the pale tread is a signpost. The overworld now
+        // has dozens per screen, and a signpost on everything signposts
+        // nothing: the first capture of the relief pass came back with the
+        // ground reading as pale slabs, and it was this, not the terrace colour
+        // — which had already been changed twice chasing it.
+        markTraversal(map, pmap, DUNGEON_KITS[def.id]
+            || (room.treadColor ? { tread: room.treadColor } : null));
 
         const built = meshAndCollide(map, scene, collisionWorld, {
             origin,

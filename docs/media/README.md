@@ -49,6 +49,7 @@ Two of those names carry a lesson worth spelling out:
 | `title/` | The title screen, before and after it stopped being text on a rendered scene. | `node tests/qa/title-shot.mjs [level]` |
 | `quality/` | The hero at each graphics tier, and with each ultra-only effect switched off one at a time. `-aberration-*` is a sweep of chromatic aberration strength. **This set is the whole diagnosis of why ULTRA looked worse than LOW** — the numbers said the tiers were identical and the pictures did not. | `node tests/qa/quality-hero.mjs`<br>`node tests/qa/aberration-cost.mjs` |
 | `w-gate/` | Phase W gate screenshots. One-off. | `node tests/qa/gate-screens.mjs` |
+| `overworld/` | `before/` and `after/` of the overworld relief pass — four screens across four regions. The pair is the reason the claim behind that pass got corrected: only the START screen was flat, and only the start screen changed much. | `node tests/qa/overworld-shots.mjs [label]` |
 | `aaa/` | Reference frames from the presentation review. | — |
 
 ---
