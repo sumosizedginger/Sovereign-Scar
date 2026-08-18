@@ -17,6 +17,7 @@ import { coach } from '../ui/coach.js';
 import { fillBox } from '../../voxel/helpers.js';
 import { vkey } from '../../voxel/core.js';
 import { wallProfile, wallTopAt, rakeRoom } from './wall-profile.js';
+import { roomFootprint } from './room-footprint.js';
 import { buildDressing } from './dressing.js';
 import { stampMap } from '../assets/props.js';
 import { CRUST_COLORS, ABYSS_COLORS, MOOD_PRESETS } from '../assets/palettes.js';
@@ -243,6 +244,7 @@ export function walkableCells(room, origin, solidAt) {
 export function buildPerimeterWithDoors(map, room, color) {
     const half = room.half;
     const prof = wallProfile(room);
+    const fp = roomFootprint(room);
     const skip = new Set();
     for (const door of room.doors || []) {
         for (const c of doorCells(room, door)) skip.add(`${c.x},${c.z}`);
@@ -251,8 +253,21 @@ export function buildPerimeterWithDoors(map, room, color) {
         if (skip.has(`${x},${z}`)) return;
         fillBox(map, x, x, 1, wallTopAt(prof, z, half), z, z, color);
     };
-    for (let x = -half; x <= half; x++) { put(x, -half); put(x, half); }
-    for (let z = -half; z <= half; z++) { put(-half, z); put(half, z); }
+    // ONE PREDICATE FOR THE RING AND THE CUT.
+    //
+    // This used to walk the four edges of the square, which is the same set as
+    // `blocks()` for an unshaped room and gets a shaped one wrong in a way that
+    // is easy to miss: the cut would have no walls and the player would see the
+    // void through the side of the world. Asking the footprint what is solid
+    // means an L-shaped room's inner corner is built by the same line of code
+    // as its outer ones, so there is no second case to forget.
+    //
+    // Filling the cut SOLID rather than leaving a hole is what lets every other
+    // placement check in the codebase keep working untouched — they all consult
+    // this map. See the header of `room-footprint.js`.
+    for (let x = -half; x <= half; x++) {
+        for (let z = -half; z <= half; z++) if (fp.blocks(x, z)) put(x, z);
+    }
 }
 
 /**

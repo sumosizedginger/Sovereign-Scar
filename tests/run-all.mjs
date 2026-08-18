@@ -58,6 +58,7 @@ import { run as runDressing } from './game/dressing.spec.mjs';
 import { run as runTitleCamera } from './game/title-camera.spec.mjs';
 import { run as runQualityTiers } from './game/quality-tiers.spec.mjs';
 import { run as runArenaCamera } from './game/arena-camera.spec.mjs';
+import { run as runRoomFootprint } from './game/room-footprint.spec.mjs';
 import { run as runWallClimb } from './game/wall-climb.spec.mjs';
 import { run as runDashCommit } from './game/dash-commit.spec.mjs';
 import { run as runWedgeCrackProximity } from './game/wedge-crack-proximity.spec.mjs';
@@ -245,6 +246,7 @@ async function main() {
     runNamed('title-camera', runTitleCamera);
     runNamed('quality-tiers', runQualityTiers);
     runNamed('arena-camera', runArenaCamera);
+    runNamed('room-footprint', runRoomFootprint);
     runNamed('dash-commit', runDashCommit);
     runNamed('wedge-crack-proximity', runWedgeCrackProximity);
     runNamed('weak-points', runWeakPoints);

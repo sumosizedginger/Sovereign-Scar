@@ -83,6 +83,10 @@ export const BEAT06_DEF = {
             grid: [0, 0],
             half: 7,
             wallH: 4,
+            // The mouth of the quarry: both shoulders cut away so the room
+            // narrows to a five-cell throat at the door into the workings.
+            // You arrive in something that is already funnelling you.
+            cut: [{ corner: 'NE', w: 3, d: 3 }, { corner: 'NW', w: 3, d: 3 }],
             spawn: { x: 0, z: 4 },
             build(map, h) {
                 abyssTint(map);
@@ -105,6 +109,11 @@ export const BEAT06_DEF = {
             grid: [0, -1],
             half: 11,
             wallH: 4,
+            // The working face. The north end is stepped back on both sides,
+            // leaving the locked door at the end of a cut rather than in the
+            // middle of a wall — so the room states where it is going before
+            // the player has the key for it.
+            cut: [{ corner: 'NE', w: 5, d: 4 }, { corner: 'NW', w: 5, d: 4 }],
             build(map, h) {
                 abyssTint(map);
                 h.fillBox(map, 4, 8, 1, 3, -2, 2, ABYSS_COLORS.basalt);
@@ -143,6 +152,11 @@ export const BEAT06_DEF = {
             grid: [-1, -1],
             half: 8,
             wallH: 4,
+            // Cut back hard along the whole far wall, unevenly, so the face
+            // steps. The mallet sits in the open southern half — the tool of
+            // the room is in the part of it that was not taken. Both cuts are
+            // in the FAR half, where they cannot occlude the player.
+            cut: [{ corner: 'NW', w: 5, d: 4 }, { corner: 'NE', w: 3, d: 3 }],
             build(map, h) {
                 abyssTint(map);
             },
@@ -167,6 +181,12 @@ export const BEAT06_DEF = {
             grid: [1, -1],
             half: 7,
             wallH: 4,
+            // One corner taken, so the sifting pans read as laid out around
+            // rock rather than tiled across a square. NORTH-west, not south:
+            // the camera is fixed-yaw and looks from +Z, so a cut in the near
+            // half of a room stands between the lens and the player's head.
+            // Measured — see the occlusion note in `room-footprint.js`.
+            cut: [{ corner: 'NW', w: 4, d: 4 }],
             build(map, h) {
                 abyssTint(map);
                 h.fillBox(map, -4, 4, 0, 0, -4, 4, ABYSS_COLORS.goldVein); // sifting pans
@@ -209,6 +229,10 @@ export const BEAT06_DEF = {
             grid: [0, -2],
             half: 9,
             wallH: 4,
+            // Opposite corners, so the room is a dog-leg rather than a box:
+            // the altar and the key sit in the two pockets the cuts leave, at
+            // opposite ends of a diagonal you have to cross under fire.
+            cut: [{ corner: 'NE', w: 3, d: 3 }, { corner: 'SW', w: 3, d: 3 }],
             build(map, h) {
                 abyssTint(map);
                 h.fillBox(map, -7, -6, 1, 3, -3, 3, ABYSS_COLORS.basalt);
@@ -242,6 +266,14 @@ export const BEAT06_DEF = {
             grid: [-1, -2],
             half: 5,
             wallH: 4,
+            // DELIBERATELY UNSHAPED, and this is the room that taught the
+            // lesson. A `caster_dark` blocker already fills x-3..3 by z-3..3
+            // here, so the only floor is a one-cell ring around it — and two
+            // corner cuts severed that ring, islanding the door. The outline
+            // validator passed it, because it reads the room TABLE and a
+            // blocker is not in the table. `door-reach` caught it in the built
+            // world, which is the only place it was ever visible.
+            cut: [],
             build(map, h) {
                 h.fillBox(map, -3, 3, 0, 0, -3, 3, ABYSS_COLORS.goldVein);
             },
@@ -273,6 +305,15 @@ export const BEAT06_DEF = {
             grid: [0, -3],
             half: 8,
             wallH: 4,
+            // The room narrows as you come IN, not as you leave: both southern
+            // corners taken, so arriving from the deepcut you squeeze through
+            // and then the floor opens out in front of the boss door.
+            //
+            // South, and reluctantly. The far half is spoken for — the boss key
+            // sits behind a destructible vein wall at the north end — and a cut
+            // in the near half is the one place that costs occlusion. Kept to
+            // 3x3 each for that reason rather than the 4x4 they started as.
+            cut: [{ corner: 'SE', w: 3, d: 3 }, { corner: 'SW', w: 3, d: 3 }],
             build(map, h) {
                 abyssTint(map);
             },
@@ -307,6 +348,13 @@ export const BEAT06_DEF = {
             grid: [0, -4],
             half: 12,
             wallH: 5,
+            // DELIBERATELY UNSHAPED. A boss arena is clamped from `halfSize`,
+            // which is the bounding box — so a cut here would leave the
+            // Arachnid a legal place to stand that is solid rock, and the
+            // fourteen-metre body would be resolved out of it every frame.
+            // Shaping boss arenas is its own ticket and needs the clamp to
+            // learn about outlines first.
+            cut: [],
             build(map, h) {
                 abyssTint(map);
                 h.fillBox(map, -8, -7, 1, 3, -8, 7, ABYSS_COLORS.basalt);
