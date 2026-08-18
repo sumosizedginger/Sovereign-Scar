@@ -114,7 +114,8 @@ imprecise version would have sent weeks in the wrong direction:
   enough that no two neighbours match; not authored, so no room's shape means
   anything about that room.
 - **The perimeter is still a rectangle** in every room. The elevation varies
-  inside a box whose outline never does.
+  inside a box whose outline never does. **Not any more, on beat 06** — see the
+  update below.
 
 So the honest version of this item is: *the floors have relief; the SPACES do
 not have shape.* The fix is not "add verticality" — that shipped. It is
@@ -128,6 +129,39 @@ one thing that cannot be applied globally. Weeks, not days.
 *Lesson, logged:* I wrote a confident sentence about 99 rooms from looking at
 about six screenshots. "Count, do not cite" applies to my own prose hardest of
 all, and the owner having played the game beat my having read it.
+
+
+---
+
+#### UPDATE 2026-08-18 — the outline moves, on one dungeon
+
+`src/game/world/room-footprint.js`. A room keeps `half` as its bounding extent
+and may add a `cut`. Beat 06 Quarry is authored: six non-boss rooms, each losing
+6–13% of its square, in the order `HOW-TO-CLOSE-THE-GAP.md` §2 prescribes.
+
+Two things that were not obvious before doing it, both worth carrying into the
+next dungeon:
+
+- **A cut on the SOUTH side costs occlusion.** The camera is fixed-yaw and looks
+  from +Z, so near-half mass stands between the lens and the player's head.
+  Moving what could move to the far half took beat 06 from 26 occluded standable
+  cells to 20, against an uncut baseline of 13. Prefer far-half cuts; the near
+  half is the frame's foreground.
+- **A static validator cannot see the room.** A cut that severed the one-cell
+  ring around `goldgash`'s `caster_dark` blocker passed every check that reads
+  the room table, and islanded a door. `tests/qa/door-reach.mjs` caught it in the
+  built world. Blockers now count as rock for the connectivity question, and the
+  spec holds the exact cut that shipped the bug — but the rule stands: **bake it
+  and measure the world.**
+
+Boss arenas are deliberately still square. `api.halfSize` is the arena clamp and
+it is the bounding box, so a cut would leave a fourteen-metre body a legal place
+to stand that is solid rock. Shaping them needs the clamp to learn about
+outlines first, and is its own ticket.
+
+Traversal re-audit, whole campaign, after: `door-reach` 0 locked in,
+`entry-safety` 0 bad of 528 arrival points, `puzzle-reach` 0,
+`key-reachability` 0.
 
 ### 3. Nothing moves that you did not move
 
@@ -191,6 +225,27 @@ the elites and the arena seals are all already built.
 > 2026-08-12: **153 enemies across 108 rooms**, peaks running
 > `3 3 3 4 4 4 5 5 5 6 6 6 6 7` instead of three distinct values. See
 > `HOW-TO-CLOSE-THE-GAP.md` §5 for the working.
+>
+> **CORRECTED 2026-08-18 — the probe was miscounting rooms, and every "N rooms"
+> figure on this page came from it.** `content-density.mjs` matched enemy arrays
+> with a regex that required the closing bracket at exactly twelve spaces of
+> indentation; twenty-two of the campaign's arrays are written on one line and
+> were never counted as rooms. The enemy TOTAL was always right, because the
+> entry regex ran over whatever text the block match swallowed. The room count
+> was not:
+>
+> | | reported | actual |
+> |---|---|---|
+> | encounter rooms | 47 | **65** |
+> | mean encounter size | 3.26 | **2.35** |
+> | rooms holding exactly one | 4 | **24** |
+> | beat-08 peak | 7 | **5** |
+>
+> So "two enemies in a room is a skirmish" was, if anything, understated — a
+> quarter of the campaign's encounter rooms hold ONE. The peaks are
+> `3 3 3 4 4 4 5 5 5 6 6 6 6 7` in the table above and read
+> `3 3 3 4 4 4 5 5 5 6 6 6 6 7` corrected too, except beat 08, which is 5.
+> The probe now reads `BEAT_LIST` like every other one.
 >
 > **And this section asked the wrong question first.** Every number in it is
 > about how BIG a fight is; none of them asks whether any fight is *mandatory*.

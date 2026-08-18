@@ -65,6 +65,26 @@ And the pictures corrected the overworld's colour three times while the contrast
 metric scored all three attempts at 46-47. A value-break number cannot tell a
 material that belongs from one that does not.
 
+#### And the gate caught the pass that caused it
+
+Darkening the overworld's ground put ONE of the sixteen certification samples
+under the band: pyre, in the Abyss state, at 71.5 against a floor of 76, while
+the other fifteen sat between 81 and 108. Its grammar was already the darkest of
+the eight and the new ground darkens rather than lifts.
+
+Fixed in three measured steps, in that order, because the art should be the
+first thing to give: the scorch decal was pulled back (`0x3a2018` → `0x5a4038`,
+coverage 0.42 → 0.34), the terrace shade was made mood-aware (0.78 → 0.88 in
+Abyss, since those floors are already dark), and the last five percent went to
+`ABYSS_REGION_MULT`, which is the mechanism that already existed for exactly
+this. 71.5 → 73.3 → 75.5 → 79.8. All sixteen in band, contrast up almost
+everywhere.
+
+`tests/qa/overworld-lum.mjs` is new and is why that took minutes rather than
+hours — those sixteen samples were gated and there had been no way to see them
+outside a twenty-minute suite run. It reads `visual-sanity`'s own bands and
+samples its own pinned screens rather than carrying copies.
+
 Suite 5929 → 6147 assertions. 64 counterfactuals across four new specs, all red,
 all restored byte for byte.
 

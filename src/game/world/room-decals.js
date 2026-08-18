@@ -101,7 +101,13 @@ export const WEATHERING = {
     'ow:quarry': { color: 0x241e26, coverage: 0.40, strength: 0.44, where: 'both' },
     'ow:bonetown': { color: 0x4a4636, coverage: 0.40, strength: 0.44, where: 'both' },
     'ow:cryomire': { color: 0x24323c, coverage: 0.40, strength: 0.44, where: 'both' },
-    'ow:pyre': { color: 0x3a2018, coverage: 0.42, strength: 0.44, where: 'both' },
+    // PYRE IS THE ONE THAT HAD TO BE PULLED BACK, and the certification gate
+    // is what said so: at 0x3a2018 / 0.42 / 0.44 — the darkest colour of the
+    // eight at the highest coverage — the ABYSS state of this region metered
+    // 71.5 against a band floor of 76, while every other region sat at 81 to
+    // 107. The abyss floors are already dark, so the same scorch that reads as
+    // weathering on rust reads as underexposure on basalt.
+    'ow:pyre': { color: 0x5a4038, coverage: 0.34, strength: 0.36, where: 'both' },
 };
 
 /** Lattice size for the noise field, in cells. Bigger = broader patches. */

@@ -31,6 +31,28 @@ and are the ones to run when you want a number:
 Everything else without a leading `_` and without the UNMAINTAINED banner. Fine
 to run, fine to trust for the afternoon you run them in.
 
+Three added 2026-08-18, all of which changed a decision rather than confirming
+one — which is the only reason a probe is worth writing:
+
+- **`arena-frame`** — how much of a fight is on screen. It was written to pick
+  how far the arena camera should push IN and reported that the plan was
+  backwards: the frame is 13 world units deep against arenas 17 to 23 across,
+  and a lancer (7), a censer (9) and a weaver (11) all attack from outside it.
+  Prints hero pixels beside frame reach, because they are the same knob.
+- **`hero-scale`** — what making the hero bigger would cost. Hero height ×
+  frame depth is constant at 1206 across every fov and distance. Pitch is the
+  one lever that is not a straight trade and it is a cliff: occlusion is ~1%
+  from 78° down to 66° and **8.29% at 60°**.
+- **`overworld-lum`** — the sixteen overworld certification samples (one screen
+  per region × both mirror states) against `visual-sanity`'s own bands, in two
+  minutes instead of a twenty-minute suite run. Written because the relief pass
+  put pyre's Abyss state 4.5 points under the floor and iterating on that
+  against the full suite would have cost hours.
+- **`overworld-shots`** — before/after pairs of overworld screens, into
+  `docs/media/overworld/<label>/`. It corrected the claim it was built to
+  illustrate: "the overworld is flat" came from a probe that samples the START
+  screen, and three of the four screens shot already had spreads of 97 to 136.
+
 ### 3. Unmaintained one-off investigation harnesses — **do not cite**
 
 Nine files carry a banner saying so at the top:

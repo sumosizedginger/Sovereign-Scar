@@ -132,6 +132,24 @@ Pickup shape is chosen from `reward.type` first (Z7 made it data); label
 sniffing is only a fallback for pickups that predate it, kept in step with the
 identical fallback room-graph uses for scoring.
 
+**Camera framing** (`src/game/camera-framing.js`, DOM-free so specs can load
+it): two channels widen the frame and they compose with `max`, never a sum.
+`setSecondSubject` is the boss/lock-on subject — it slides the look target AND
+widens, capped at `SECOND_WIDEN_MAX` 7. `setArenaThreats` is the live enemies of
+a **sealed** room — widen only, never a look-target slide, capped at
+`ARENA_WIDEN_MAX` 2.0 because on-screen size goes as 1/distance and the hero is
+34 px wide. `sealPunch` is a half-second dip on its own channel, because a seal
+and a killing blow land on the same frame constantly and sharing `_kick` would
+let one eat the other. Measured with `tests/qa/arena-frame.mjs`.
+
+**Off-screen threat marks** (`src/game/fx/threat-edge.js`): a chevron at the
+frame edge for a committed attack whose attacker is outside it, for exactly the
+wind-up, in the telegraph ring's colour. Hooked at `Enemy._beginWindup`, the one
+choke point every attack routes through. It exists because three of the five
+kinds act from beyond the frame (lancer 7, censer 9, weaver 11, against a
+shallow-axis reach of 6.18) and no camera setting fixes that — frame depth and
+hero size are the same knob (`tests/qa/hero-scale.mjs`).
+
 ## Threat curve
 
 `world/threat-curve.js` is the single lever for campaign difficulty, applied in
@@ -194,6 +212,30 @@ adapter levels use.
 `boot_ledge`, `caster_dark` — each a build-time map edit + a runtime, declared
 per room/screen via `blockers: []`. Note: collision is 2-D, so `boot_ledge`
 is a hop-**over**, never a stand-on-top.
+
+**Room outline** (`src/game/world/room-footprint.js`): a room keeps `half` as
+its BOUNDING half-extent and may add `cut: [{corner|x0..z1}]`, rectangles of the
+playable square that are not floor. The cut is **filled with solid rock**, not
+left as a hole — that is what makes a non-square room safe on a shipped
+campaign, because every placement check here already consults the voxel map
+(props, the terrace lift, dressing, `walkableCells`, `nearestFreeEntry`, the
+reachability probes) and so refuses it without being told outlines exist.
+`buildPerimeterWithDoors` asks one predicate, `fp.blocks()`, for the wall ring
+and the cut together, so an L-shape's inner corner is built by the same line as
+its outer ones. `validateFootprint` refuses a cut that buries a door apron, a
+spawn, an authored body, drops the room below `MIN_AREA`, or splits it in two —
+its connectivity flood uses ONE seed, because seeding every door and asking
+whether every door was reached is a check that cannot fail. Blockers count as
+rock for that question. Authored on beat 06 only; boss arenas stay square
+because `api.halfSize` is the arena clamp and it is the bounding box.
+
+**Terracing** (`src/game/world/terracing.js`): rises go in the PLATFORM map,
+meshed without XZ solids, so a terrace is standable and never blocking and no
+arrangement can make anywhere unreachable. Rooms at or above `LARGE_HALF` (the
+overworld's screens, half 23) get a jittered grid of small rises at
+`LARGE_PITCH` instead of one room-sized shape — the shapes are parameterised off
+`half`, so at screen scale they landed 21 units out, outside a frame that is 13
+units deep.
 
 **Map** (`ui/map-screen.js`): Tab overlay fed by `level.mapData()`.
 

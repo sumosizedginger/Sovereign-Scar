@@ -49,6 +49,16 @@ const OVERWORLD_BASE_TUNE = {
 const ABYSS_REGION_MULT = {
     quarry: 1.12,
     spindle: 1.06,
+    // Added with the ground-relief pass. Pyre's Abyss screens metered 71.5
+    // against a band floor of 76 once the region carried scorch weathering and
+    // shaded terraces — it was the only one of the eight that fell out, because
+    // its grammar was already the darkest and the new ground darkens rather
+    // than lifts. The decal and the terrace shade were both pulled back first
+    // (0x3a2018 -> 0x5a4038, and the Abyss shade from 0.78 to 0.88), which got
+    // it to 75.5; this is the last five percent, and it belongs here rather
+    // than in the art because the art is now the same as the other seven
+    // regions' and it is the LIGHT that this region has always been short of.
+    pyre: 1.08,
     // A TRIM, not a lift — the first sub-1.0 entry here. Tombfields' Abyss
     // screens measured 129.8 / 129.9 / 130.1 across three runs against a band
     // ceiling of exactly 130, so whether the certification gate passed was
@@ -206,13 +216,19 @@ export function createOverworld(ctx, screensDef, opts = {}) {
             // against the floor. `docs/media/overworld/` is where the difference
             // lives. Keeping the material and letting the step's own shadow do
             // the separating is what makes it read as terrain.
-            terraceColor: shadeOf(screenFloor, 0.78),
+            // MOOD-AWARE, because a fixed fraction is not a fixed cost. The
+            // Abyss floors are already dark, so the 0.78 that reads as a step
+            // in daylight reads as underexposure at night — with the pyre
+            // weathering it took that region's abyss state to 71.5 against a
+            // certification floor of 76. The step still has to be visible, so
+            // it is a smaller bite rather than none.
+            terraceColor: shadeOf(screenFloor, mood === 'abyss' ? 0.88 : 0.78),
             // …and the step-edge mark is a LIGHTER shade of the same ground
             // rather than the kit tread. Same reasoning: the affordance is
             // worth keeping — a lit rim still reads as an edge you can step up
             // — but it must be this ground catching the light, not a different
             // material laid over it.
-            treadColor: shadeOf(screenFloor, 1.16),
+            treadColor: shadeOf(screenFloor, mood === 'abyss' ? 1.24 : 1.16),
             onBake: s.onBake,
             doors: (s.edges || []).map((e) => ({
                 to: e.to,
