@@ -101,7 +101,12 @@ the real bugs. See [REVIEW.md](REVIEW.md) §4.5.
   keys and locked doors, boss keys and boss doors, map pickups, secret rooms,
   Reconstitution Altars, and per-dungeon signature systems (gears, sand,
   multi-Y towers, grapple chasms, phantom walls, meltable ice, sludge pools,
-  magma vents, flicker gauntlets)
+  magma vents, flicker gauntlets). Rooms are not all squares — a room may cut
+  rectangles out of its own footprint, and the Quarry is authored that way
+- **A camera that frames the fight** — a sealed arena opens the frame by as
+  much as the fight is spread out and closes it again at knife range, capped by
+  what it costs a 34-px hero; an attack committed from outside the frame puts a
+  mark on the edge pointing at it, for exactly the length of its wind-up
 - **A full combat verb set** — telegraphed enemy attacks answered by a **guard
   that fully blocks and a 0.3 s parry** (once you find the Bulwark Shield partway through the
   first dungeon — before it, telegraphs have to be read and dodged), plus

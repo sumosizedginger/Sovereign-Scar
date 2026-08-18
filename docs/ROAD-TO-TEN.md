@@ -35,7 +35,7 @@ and are the factual basis for everything below.
 ```
 committed telegraphed attacks per boss   2.46   (was 1.00 — phase B, 2026-07-27)
 enemy group coordination                 none   (each enemy commits on its own cooldown)
-encounters                               119 enemies / 47 rooms, mean 2.53, peak 5
+encounters                               119 enemies / 47 rooms, mean 2.53, peak 5   [*]
 puzzle blockers per dungeon              1.5    (all 4 types ask "do you have the item?")
 pushable-block.js importers              0      (87 lines, finished, never placed)
 input buffering                          none   (a press during cooldown is discarded)
@@ -44,6 +44,17 @@ NPCs in the entire game                  0
 endings actually reachable               1 of 3
 kit design channels with code behind them 3 of 7
 ```
+
+> `[*]` **The room count in that line is wrong, and so is every "N rooms"
+> figure taken from this probe before 2026-08-18.** `content-density.mjs`
+> matched enemy arrays with a regex requiring the closing bracket at exactly
+> twelve spaces of indentation, and twenty-two of the campaign's arrays are
+> written on one line. Enemy TOTALS were always right; room counts were 28%
+> low, and the mean derived from them correspondingly high. On today's
+> campaign the true figures are 153 enemies across **65** rooms, mean **2.35**,
+> and 24 rooms holding exactly one. The argument in this section is unaffected
+> — if anything it is stronger.
+
 
 **An important correction to my own first pass.** "Every boss has one attack" is true of
 the *telegraphed, answerable* layer only. Several bosses have real identity in their
