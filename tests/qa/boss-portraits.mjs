@@ -261,7 +261,7 @@ try {
                 if (forceOpen) {
                     // `stage: 'recover'` because `staggered` is a getter over
                     // it, and that is the flag a boss's OPEN pose hangs off.
-                    // NOT for a boss that trails: pinning RECOVER [drive:][path]filename beaches
+                    // NOT for a boss that trails: pinning RECOVER beaches
                     // the Spur, and a beached Spur is motionless, which is the
                     // one thing that stops its chain spreading. Surfaced and
                     // swimming is the pose that shows the body.
