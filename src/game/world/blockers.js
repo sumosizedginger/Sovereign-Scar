@@ -24,6 +24,7 @@ import { CRUST_COLORS, ABYSS_COLORS } from '../assets/palettes.js';
 import { sfx } from '../../audio/synth.js';
 import { gsfx } from '../audio/sfx-bank.js';
 import { PushableBlock } from './pushable-block.js';
+import { coach } from '../ui/coach.js';
 import { plateHeld, socketFilled, traceBeam } from './puzzle-kit.js';
 
 /**
@@ -509,6 +510,25 @@ export function createBlockerRuntime(ctx, level, b, origin = { x: 0, z: 0 }) {
                 const cx = shroud.position.x, cz = shroud.position.z;
                 const near = Math.hypot(p.x - cx, p.z - cz) < 6;
                 const lit = near && game.player.inventory.activeWeapon === 'light_caster';
+                // SAY SO WHEN IT REFUSES.
+                //
+                // Reported from play as "black square prevents collection of
+                // bottle in dungeon 6". It does, and that is the design — the
+                // shroud is a real barrier and the Caster is what drops it —
+                // but nothing in the game ever said which. A player standing in
+                // front of it holding a mallet gets a black square, no reaction,
+                // and a reward they can see and cannot take. `ui/coach.js` opens
+                // by saying that a mechanic which can silently refuse input has
+                // to be able to say so; this was the loudest violation left.
+                //
+                // Gated on OWNING the Caster: told before you have it, the line
+                // is a spoiler for an item two dungeons away, and every shroud
+                // in the game sits after beat 02 where it is granted.
+                if (near && !lit && game.player.inventory.hasItem?.('light_caster')) {
+                    coach('caster-dark',
+                        'The dark will not burn back on its own. '
+                        + 'Equip the Light Caster and stand in it.');
+                }
                 const target = lit ? 0 : 0.85;
                 shroud.material.opacity += (target - shroud.material.opacity)
                     * Math.min(1, dt * 5);

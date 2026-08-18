@@ -78,6 +78,7 @@ import { run as runLightLines } from './game/light-lines.spec.mjs';
 import { run as runOcclusion } from './game/occlusion.spec.mjs';
 import { run as runLineOfSight } from './game/line-of-sight.spec.mjs';
 import { run as runCombo } from './game/combo.spec.mjs';
+import { run as runPlaytest0817 } from './game/playtest-2026-08-17.spec.mjs';
 import { run as runOverworldGrammar } from './game/overworld-grammar.spec.mjs';
 import { run as runMaterialHierarchy } from './game/material-hierarchy.spec.mjs';
 import { run as runDungeonKits } from './game/dungeon-kits.spec.mjs';
@@ -257,6 +258,7 @@ async function main() {
     runNamed('occlusion', runOcclusion);
     runNamed('line-of-sight', runLineOfSight);
     runNamed('combo', runCombo);
+    runNamed('playtest-2026-08-17', runPlaytest0817);
     runNamed('overworld-grammar', runOverworldGrammar);
     runNamed('material-hierarchy', runMaterialHierarchy);
     runNamed('dungeon-kits', runDungeonKits);

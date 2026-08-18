@@ -185,6 +185,41 @@ export function bossHit(player, amount, iFrameTime = 0.7, origin = null, attacke
  * glow light is derived from it, so a boss's light matches whatever the author
  * meant its hottest part to be.
  */
+/**
+ * Every root a boss keeps its body under.
+ *
+ * `boss.root` IS NOT THE BOSS for two of the fourteen, and that has now cost
+ * four separate bugs: `SandSpur.root` is `segments[0]`, its head, and the other
+ * five segments are siblings in the scene; `TriCompiler.root` is
+ * `cores[0].root`. The portrait probe, the room-colour gate and
+ * `__ssDebug.measure()` each grew their own copy of this walk after being
+ * caught measuring a third of a boss. The fourth was death itself — see
+ * `onDeath` — which hid the Spur's head and left twenty of its twenty-eight
+ * meshes lying in the arena. One implementation now.
+ */
+export function bossParts(boss) {
+    const out = [];
+    if (!boss) return out;
+    if (boss.root) out.push(boss.root);
+    for (const c of boss.cores || []) if (c.root) out.push(c.root);
+    for (const s of boss.segments || []) if (s) out.push(s);
+    for (const s of boss.segs || []) if (s) out.push(s);
+    for (const s of boss.splits || []) if (s) out.push(s);
+    // Defensive rather than load-bearing, and recorded as such: the Spur's
+    // mound is only shown while it is burrowed, and burrowed it cannot be hit,
+    // so at the moment of death it is already hidden. Its counterfactual
+    // therefore cannot fail. Kept because the next move that kills a boss from
+    // range would make it reachable, not because anything proves it today.
+    if (boss.mound) out.push(boss.mound);
+    // The Sand Spur drags a burrow hole under itself, owned by the boss (its
+    // `dispose` tears it down) but held one level deeper, inside a
+    // DestructibleVoxelMesh. Without this line death leaves a five-cell clay
+    // patch sitting in the arena — the last visible piece of a boss that is
+    // supposed to be gone.
+    if (boss.burrow?.mesh) out.push(boss.burrow.mesh);
+    return out;
+}
+
 export function clampEmissive(root, max = BOSS_EMISSIVE_MAX) {
     let peak = 0;
     let color = 0x000000;
@@ -390,7 +425,16 @@ export class BossBase {
             this.vulnerableMult = 1;
             this.clearTelegraph();
             this._hideRecoverCue();
-            if (this.root) this.root.visible = false;
+            // THE WHOLE BODY, not `this.root`.
+            //
+            // Reported from play: the sand boss "looks like this before you
+            // kill him, and stays like this after you kill him." It did.
+            // `this.root` is the Sand Spur's HEAD — its other five segments are
+            // siblings in the scene — so death hid eight of its twenty-eight
+            // meshes and left the rest of the animal lying in the arena, with
+            // its mound still crossing the floor. Measured: 20 visible after
+            // `onDeath`, on a boss the player has just killed.
+            for (const part of bossParts(this)) part.visible = false;
             sfx.shatter();
             juice.hitstop(0.25);
             juice.addTrauma(0.6);

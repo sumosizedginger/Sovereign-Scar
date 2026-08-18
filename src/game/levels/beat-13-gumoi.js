@@ -15,6 +15,7 @@ import { addKeyPickup } from '../world/keys.js';
 import { CRUST_COLORS, ABYSS_COLORS } from '../assets/palettes.js';
 import { GumoiWitness, attachBoss } from '../bosses/index.js';
 import { addAltar } from '../world/altar.js';
+import { attachLightLinesOnCast } from '../world/light-lines-on-cast.js';
 
 function spiral(map, h, cx, cz, height, color) {
     for (let lvl = 1; lvl <= height; lvl++) {
@@ -331,5 +332,20 @@ export function loadBeat13(ctx) {
         { speaker: 'GUMOI', text: 'I am the index of every wrong turn you took.' },
         { speaker: 'PREDECESSOR', text: 'Climb. When flicker spikes, dash. The Witness falls to persistence.' },
     ];
+    // THE STAFF STOPS WORKING IN EXACTLY ONE DUNGEON, AND IT IS THIS ONE.
+    //
+    // Reported from play: "level 13, my glowing lines left behind by the light
+    // caster do not show." They do not. The Vector Staff is granted in beat 12
+    // and the light-line system is attached in beats 12 and 14 — so 13 is the
+    // only dungeon in the game where the player owns the staff and casting
+    // leaves nothing behind. A permanent item that silently switches itself off
+    // for one dungeon and back on for the next reads as a broken item, not as
+    // level design, and the player is right.
+    attachLightLinesOnCast(level, ctx, {
+        weapon: 'light_caster',
+        requires: ['vector_staff'],
+        range: 10, life: 1.8, color: 0xffa040,
+    });
+
     return level;
 }
