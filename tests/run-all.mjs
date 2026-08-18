@@ -56,6 +56,7 @@ import { run as runLicenceAgreement } from './game/licence-agreement.spec.mjs';
 import { run as runWallProfile } from './game/wall-profile.spec.mjs';
 import { run as runDressing } from './game/dressing.spec.mjs';
 import { run as runTitleCamera } from './game/title-camera.spec.mjs';
+import { run as runQualityTiers } from './game/quality-tiers.spec.mjs';
 import { run as runWallClimb } from './game/wall-climb.spec.mjs';
 import { run as runDashCommit } from './game/dash-commit.spec.mjs';
 import { run as runWedgeCrackProximity } from './game/wedge-crack-proximity.spec.mjs';
@@ -241,6 +242,7 @@ async function main() {
     runNamed('wall-profile', runWallProfile);
     runNamed('dressing', runDressing);
     runNamed('title-camera', runTitleCamera);
+    runNamed('quality-tiers', runQualityTiers);
     runNamed('dash-commit', runDashCommit);
     runNamed('wedge-crack-proximity', runWedgeCrackProximity);
     runNamed('weak-points', runWeakPoints);

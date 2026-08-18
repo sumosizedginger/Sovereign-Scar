@@ -29,3 +29,6 @@ docs/media/wall-height/
 # set: the probe is committed, its output is a picture of one screen re-shot on
 # every change to the shot.
 docs/media/title/
+
+# Working frames from `tests/qa/quality-hero.mjs` and `aberration-cost.mjs`.
+docs/media/quality/

@@ -9,30 +9,14 @@ import {
 } from './renderer.js';
 import { setShadowMapSize } from './lights.js';
 import { clearEnvironment } from './environment.js';
+// The tier TABLE lives in a DOM-free module so specs can assert on it — this
+// file cannot be imported headlessly, because `renderer.js` reads
+// `window.innerWidth` at module scope. Re-exported so existing importers
+// (`skybox.js`, `mood-controller.js`) are unaffected.
+import { TIERS } from './quality-tiers.js';
 
-export const TIERS = {
-    low: {
-        pixelRatio: 1, bloom: false, bloomStrength: 0, shadowMap: 1024,
-        postExtras: false, aberration: false
-    },
-    med: {
-        pixelRatio: 1.5, bloom: true, bloomStrength: 0.7, shadowMap: 2048,
-        postExtras: false, aberration: false
-    },
-    high: {
-        // 4096: 2048 across a ±30 frustum is 2048/60 = ~34 texels per world
-        // unit, not the ~68 an earlier version of this comment claimed — the
-        // arithmetic dropped the factor of two on the frustum's full span. Thin
-        // either way for blocky geometry (graphics overhaul ticket 2), and the
-        // penumbra is derived from this number, so it had to be right.
-        pixelRatio: 2, bloom: true, bloomStrength: 0.9, shadowMap: 4096,
-        postExtras: true, aberration: false
-    },
-    ultra: {
-        pixelRatio: 2, bloom: true, bloomStrength: 1.2, shadowMap: 4096,
-        postExtras: true, aberration: true
-    }
-};
+export { TIERS };
+
 
 // MSAA sample count is fixed at composer-construction time (see renderer.js)
 // and is intentionally NOT re-tiered here — recreating the composer's render

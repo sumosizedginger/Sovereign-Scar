@@ -5,6 +5,64 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### ULTRA made the player look worse than LOW, and it was one flag
+
+Reported from play with two screenshots. Ultra was identical to high except for
+`aberration: true`, and that flag was the whole difference: the hero came back
+with a white fringe on the head and shoulders and a magenta tunic instead of a
+red one.
+
+`RGBShiftShader` samples red at `vUv + amount` and blue at `vUv - amount`, so
+the visible red-to-blue separation is **twice** the number in the source, as a
+fraction of the frame's width. At the shipped `0.0012` that is **3.07 px across
+a 1280-wide frame** — and the hero measures **34 px wide** at the gameplay
+camera. Nine percent of the whole character, on a figure whose arms are a few
+pixels across. A full-screen constant is a subtle rim on a 400 px character and
+a smear on a 34 px one, and the effect cannot tell which it is on. Same class as
+the actor outline that was pulled: an effect priced for a character several
+times this game's size.
+
+`renderer.js` had already written the warning — "even at a small amount it
+reads as a distracting fringe on high-contrast edges" — and disabled the pass by
+default. Nothing stopped the ultra tier turning it back on.
+
+| amount | split | % of hero width | |
+|---|---|---|---|
+| 0.0000 | 0.00 px | 0.0% | |
+| 0.0004 | 1.02 px | 3.0% | still reads as a red tunic |
+| 0.0008 | 2.05 px | 6.0% | |
+| 0.0012 | 3.07 px | 9.1% | shipped; a magenta smear |
+
+**Ultra no longer enables it**, and the constant dropped from 0.0012 to 0.0004
+at the same time, so turning the flag back on cannot reproduce the defect by
+itself. Ultra is now high with a stronger bloom — a tier that is better than the
+one below it.
+
+The tier table moved to `src/engine/quality-tiers.js`, which imports nothing.
+`quality.js` imports `renderer.js`, which reads `window.innerWidth` at module
+scope, so no headless spec could ever load the table — the reason this was
+guarded by nothing. `tests/game/quality-tiers.spec.mjs` (24 assertions) holds
+the **budget** rather than the flag: whether a tier wants a CRT cue is a look
+decision, but no tier may spend more than 1.2 px of channel split at 1280. It
+also refuses a knob that goes backwards as the tier goes up, and names anything
+the top tier alone turns on — which is where an unpriced effect hides, because
+almost nobody plays there. Eight counterfactuals.
+
+**Four instrument failures on the way there**, all mine, recorded because three
+of them produced confident wrong answers. Headless reports `devicePixelRatio` 1,
+so `Math.min(1, 2)` meant `pixelRatio` never differed between tiers and the
+first run declared all four identical. Pass isolation matched `/Shader/` against
+the constructor name and switched off five passes — including the colour grade,
+which `setQuality` does not restore — so every row after it described a
+different game. The screenshot was in device pixels while the sample coordinates
+were in CSS pixels, so it measured the corner of the frame. And the fringe
+metric sampled a ring that sat on the **sand**, which is brown and has a large
+R−B of its own; it read ~50 on every tier including with the effect switched
+off, and would have cleared the real culprit. The pictures found this; the
+numbers only agreed once the metric traced the figure's actual silhouette. The
+misleading column is gone rather than left to clear this bug a second time.
+
+
 ### The title screen is a photograph now
 
 `docs/HOW-TO-CLOSE-THE-GAP.md` §4 item 3 asks for "one image" behind the menu.

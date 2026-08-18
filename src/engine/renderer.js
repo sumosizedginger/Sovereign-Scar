@@ -1,6 +1,6 @@
 // src/engine/renderer.js
 // Purpose: WebGL renderer, scene, camera, fog, resize, 2.5D camera follow.
-// Dependencies: global THREE
+// Dependencies: global THREE, ./quality-tiers.js (post-processing constants)
 
 import * as THREE from 'three';
 import { getSetting } from './settings.js';
@@ -11,6 +11,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { FilmPass } from 'three/addons/postprocessing/FilmPass.js';
+import { ABERRATION_AMOUNT } from './quality-tiers.js';
 import { VignetteShader } from 'three/addons/shaders/VignetteShader.js';
 import { RGBShiftShader } from 'three/addons/shaders/RGBShiftShader.js';
 
@@ -112,10 +113,16 @@ composer.addPass(vignettePass);
 
 // Chromatic aberration: a CRT/retro cue, not a distortion — but even at a
 // small amount it reads as a distracting fringe on high-contrast edges
-// (checkerboards, grout lines). Disabled by default; the ULTRA quality tier
-// (Phase G) turns it on explicitly.
+// (checkerboards, grout lines). Disabled by default.
+//
+// THE WARNING ABOVE WAS RIGHT AND THE ULTRA TIER TURNED IT ON ANYWAY, which is
+// how the player model came to look worse on ultra than on low. The amount now
+// comes from `quality-tiers.js`, next to the measurement that prices it: the
+// separation is `2 * amount * frameWidth`, and the hero is 34 px wide.
+// No tier enables this today; the constant is kept safe so that turning one on
+// cannot reproduce the defect on its own.
 export const rgbShiftPass = new ShaderPass(RGBShiftShader);
-rgbShiftPass.uniforms.amount.value = 0.0012;
+rgbShiftPass.uniforms.amount.value = ABERRATION_AMOUNT;
 rgbShiftPass.enabled = false;
 composer.addPass(rgbShiftPass);
 
