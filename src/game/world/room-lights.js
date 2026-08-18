@@ -126,6 +126,41 @@ export function updateRoomLightFlicker(t) {
     }
 }
 
+/**
+ * Hold back any live fixture within `radius` of `centre`, and hand back a
+ * function that puts them all straight again.
+ *
+ * FOR THE TITLE SCREEN, and it exists because of a frame. Composing the shot
+ * and lighting the hero was not enough in the Bone Forest: the hero's respawn
+ * point sits a couple of metres from one of the room's own emissive fixtures,
+ * whose bloom swallowed them entirely. Body-vs-surround separation read 19.9 —
+ * its best score anywhere — on a picture with no visible character in it,
+ * because a white smear separates beautifully from a dark room.
+ *
+ * Scaling `base` rather than `source.intensity` is deliberate:
+ * `updateRoomLightFlicker` rewrites `intensity` from `base` every frame, so
+ * anything written to `intensity` here would survive exactly one frame.
+ *
+ * @param {{x:number,y:number,z:number}} centre
+ * @param {number} radius
+ * @param {number} scale  0..1
+ * @returns {() => void} restore
+ */
+export function dimFixturesNear(centre, radius, scale) {
+    const touched = [];
+    for (const f of liveFixtures) {
+        // A source is a plain {x,y,z,...} record, not an Object3D — reading
+        // `.position` off it returns undefined and dims nothing, silently.
+        const p = f.source;
+        if (!p || !Number.isFinite(p.x)) continue;
+        const d = Math.hypot(p.x - centre.x, p.y - centre.y, p.z - centre.z);
+        if (d > radius) continue;
+        touched.push([f, f.base]);
+        f.base = f.base * scale;
+    }
+    return () => { for (const [f, base] of touched) f.base = base; };
+}
+
 /** Test seam: how many fixtures are currently animated. */
 export function liveFixtureCount() {
     return liveFixtures.size;

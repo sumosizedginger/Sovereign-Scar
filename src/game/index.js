@@ -2,7 +2,7 @@
 // Architecture: all product code here; engine frozen except SS-027 drones.
 
 import * as THREE from 'three';
-import { scene, camera, renderer, composer, onResize, outputPass, vignettePass } from '../engine/renderer.js';
+import { scene, camera, renderer, composer, onResize, outputPass, vignettePass, bloomPass } from '../engine/renderer.js';
 import { initLights } from '../engine/lights.js';
 import { initQuality, setQuality, getQuality } from '../engine/quality.js';
 import { ParticleSystem } from '../engine/particles.js';
@@ -66,6 +66,7 @@ import { patchOverworld } from './world/keys.js';
 import { DeathEcho } from './world/death-echo.js';
 import { updateRoomLightFlicker } from './world/room-lights.js';
 import { updateDressingSway } from './world/dressing.js';
+import { TitleCamera } from './ui/title-camera.js';
 import { AnchorThread } from './narrative/anchor-thread.js';
 import { reconstitutionLine } from './narrative/reconstitution-copy.js';
 import { getRunMode, setActiveRunMode } from './kernel/run-mode.js';
@@ -1069,7 +1070,14 @@ let deathShown = false;
 let deathOutcome = null;
 let saveAcc = 0;
 let shardIncomeRemainder = 0;
-let titleDrift = 0;
+// The title screen's composed shot. Not a mode of `CameraRig` — that rig has a
+// job (follow a player, stay inside a room) and this one has the opposite job
+// (stand still, look like a photograph). See `ui/title-camera.js`.
+const titleCam = new TitleCamera();
+// The title trims the bloom while it is up — see `ui/title-camera.js`. Handed
+// in rather than imported there, so that module stays loadable without a DOM.
+titleCam.setBloom(bloomPass);
+let wasAtTitle = false;
 // Ambient clock, accumulated from the same scaled dt the world uses so the
 // lamps stop breathing when the world stops. Not `clock.getElapsedTime()`:
 // that would keep running through a pause and through the death overlay.
@@ -1219,15 +1227,20 @@ function frame() {
     if (dev.enabled) dev.update(dt, game);
     if (dev.enabled) witnessScore?.markUnranked?.();
 
-    // Title attract: slow orbit around the player while the world is frozen
+    // Title: a composed shot, not the gameplay camera doing a lap.
+    //
+    // The edge is detected HERE rather than at the five places that set
+    // `atTitle` — boot, `goToTitle`, `startNewGame`, and two menu handlers.
+    // Five call sites is five chances to add a sixth and forget, and the only
+    // symptom would be a title screen framed from the last shot's bearing.
+    if (game.atTitle !== wasAtTitle) {
+        if (game.atTitle) titleCam.reset();
+        else titleCam.restoreHero(player.root);
+        wasAtTitle = game.atTitle;
+    }
     if (game.atTitle) {
-        titleDrift += dt;
-        const c = player.root.position;
-        camRig.update(dt * 0.5, {
-            x: c.x + Math.sin(titleDrift * 0.1) * 5,
-            y: c.y,
-            z: c.z + Math.cos(titleDrift * 0.1) * 5,
-        });
+        titleCam.update(dt, camera, player.root.position,
+            game.level?.getVoxelAt, player.root, scene);
     }
 
     if (input.consumeLevelNext()) {

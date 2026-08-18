@@ -24,3 +24,8 @@ docs/media/player/*/*-clean.png
 # named instrument and is committed; its output is five pictures of one room,
 # re-shot every time a wall height moves, and is a record of nothing.
 docs/media/wall-height/
+
+# Working frames from `tests/qa/title-shot.mjs`, same reason as the wall-height
+# set: the probe is committed, its output is a picture of one screen re-shot on
+# every change to the shot.
+docs/media/title/

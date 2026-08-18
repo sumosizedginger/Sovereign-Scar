@@ -5,6 +5,64 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### The title screen is a photograph now
+
+`docs/HOW-TO-CLOSE-THE-GAP.md` §4 item 3 asks for "one image" behind the menu.
+Half of it was already done — `ui/menu.js` replaced a flat wash that metered
+L* 12.3 with a vignette, so the world is visible at all — and its own comment
+names the other half: **"the only subject in the frame (the hero, ~30px) sat
+dead centre directly behind the 44px wordmark."**
+
+Two faults, neither about art assets. The gameplay camera looks down at 70.7°,
+which is the right angle to read a room from and the worst angle to photograph
+a person from — a standing figure foreshortens into their own hat. And the menu
+is a centred column, so a centred subject is a covered subject.
+
+`src/game/ui/title-camera.js` is a second camera, not a mode of `CameraRig`.
+It drops to 26° and 11.5 metres and aims OFF the hero so they land in the left
+third. Measured with `tests/qa/title-shot.mjs`: **205 px, 28% of the frame's
+height, at NDC (−0.44, +0.10)**, never occluded, at every aspect ratio from 4:3
+to 32:9.
+
+The bearing is chosen rather than assumed. `pickAzimuth` walks 24 candidates
+against the level's own voxel field: the lens must be in open air, the sight
+line to the hero must be clear, and the shot should have something BEHIND the
+subject. That last rule replaced "prefer north" — true in a room, worth nothing
+in the overworld, which is the level a new player's title opens over, where it
+metered contrast 8 against a floor of 8.
+
+Three things the measuring turned up, each of which had been a plausible guess:
+
+- **The aim offset.** Two closed forms were wrong — one used world up at a
+  pitched camera, the other built the camera's own basis and was then undone by
+  `lookAt` re-deriving it, delivering a third of the vertical offset asked for.
+  It now solves numerically against the real projection, three bounded passes,
+  which is also what makes it correct at any aspect ratio.
+- **The hero's root is their CHEST, not their feet** (body y 1.00–2.93, root
+  1.95). The first draft framed a metre above their head.
+- **The subject was a white smear in the Bone Forest**, and it was neither a
+  room fixture nor the new key light. Toggling each in turn, bloom was the
+  answer: the game's bloom is tuned against a frame where the hero is 30 px,
+  and at 205 px it covers them. The title trims it while it is up and gives it
+  back on the way out.
+
+A title-only key light, swept over four levels and five intensities — and the
+first sweep picked the wrong number, because it optimised separation alone. A
+wide cone scored 14 everywhere by pooling on the FLOOR, lifting the hero and
+the ring around them together while the picture became a white blob. Adding
+*spill* — how far the surround rose above its unlit value — and tightening the
+cone found the real answer: 220 buys 15–21 points of separation for at most 3.2
+of spill.
+
+`tests/game/title-camera.spec.mjs` (52 assertions) frames a real
+`THREE.PerspectiveCamera` and projects the subject through it rather than
+checking constants against themselves. 26 counterfactuals across two sweeps;
+five stayed green on the first pass and each was a real hole — a determinism
+check that compared a function with itself, two source checks satisfied by
+`if (false)`, and an occlusion fixture that could not tell the lens test from
+the sight test because its pillar was also the backdrop.
+
+
 ### Something in a room finally moves without being pushed
 
 `docs/HOW-TO-CLOSE-THE-GAP.md` §3 item 3 had been diagnosed three times, each
