@@ -44,13 +44,30 @@ console.log('\n══ SOVEREIGN SCAR — CONTENT DENSITY ' + '═'.repeat(43));
 const enc = { rooms: 0, total: 0, hist: {}, perBeat: {} };
 const kinds = {};
 const pairs = {};   // "kind+ai" — the matrix trap 9 is about
-for (const f of beats) {
-    const src = fs.readFileSync(path.join(LEVELS, f), 'utf8');
-    const beat = f.slice(0, 7);
+
+// READ FROM THE REAL DEFINITIONS, NOT FROM THE SOURCE TEXT.
+//
+// This section used to grep the level files for an `enemies:` array whose
+// closing bracket was matched by a pattern ending in "newline, twelve spaces,
+// close-bracket" — which requires the closing bracket to sit at exactly twelve
+// spaces of indentation. Twenty-two of the campaign's arrays are written on one
+// line — `enemies: [{ x: 0, z: -3, kind: 'scarab', … }],` — and have no such
+// bracket, so they were not counted as rooms at all.
+//
+// The TOTALS still came out right (153 either way) because the entry regex ran
+// over whatever text the block match happened to swallow. The ROOM count did
+// not: it reported 47 encounter rooms against a real 65, and therefore a mean
+// encounter size of 3.26 against a real 2.35, and a histogram and a set of
+// per-beat peaks built on the same mistake. A design conversation about
+// encounter density was being had against numbers that were 28% out.
+//
+// `BEAT_LIST` is already imported for the puzzle census below. Nothing here
+// needed to be grepped.
+for (const def of BEAT_LIST) {
+    const beat = def.id.slice(0, 7);
     enc.perBeat[beat] = { rooms: 0, mobs: 0, max: 0 };
-    for (const m of src.matchAll(/enemies:\s*\[([\s\S]*?)\n\s{12}\]/g)) {
-        const body = m[1];
-        const entries = body.match(/\{[^}]*kind:[^}]*\}/g) || [];
+    for (const room of Object.values(def.rooms)) {
+        const entries = room.enemies || [];
         if (!entries.length) continue;
         enc.rooms++;
         enc.total += entries.length;
@@ -59,15 +76,15 @@ for (const f of beats) {
         enc.perBeat[beat].mobs += entries.length;
         enc.perBeat[beat].max = Math.max(enc.perBeat[beat].max, entries.length);
         for (const e of entries) {
-            const k = (e.match(/kind:\s*'([a-z]+)'/) || [])[1];
+            const k = e.kind;
             if (!k) continue;
-            const ai = (e.match(/ai:\s*'([a-z]+)'/) || [])[1] || '(default)';
+            const ai = e.ai || '(default)';
             kinds[k] = (kinds[k] || 0) + 1;
-            const key = `${k} + ${ai}`;
-            pairs[key] = (pairs[key] || 0) + 1;
+            pairs[`${k} + ${ai}`] = (pairs[`${k} + ${ai}`] || 0) + 1;
         }
     }
 }
+
 const sizes = Object.keys(enc.hist).map(Number).sort((a, b) => a - b);
 console.log(`\n▸ ENCOUNTERS   ${enc.total} enemies across ${enc.rooms} rooms `
     + `— mean ${(enc.total / enc.rooms).toFixed(2)}, largest ${Math.max(...sizes)}`);
@@ -78,6 +95,72 @@ console.log('\n    per beat:');
 for (const [b, v] of Object.entries(enc.perBeat)) {
     console.log(`      ${b}  ${String(v.mobs).padStart(3)} mobs / ${String(v.rooms).padStart(2)} rooms`
         + `   peak ${v.max}`);
+}
+
+// ---- 1b. What each room is FOR --------------------------------------------
+//
+// "56% of rooms do nothing" was the premise of a content ticket, and it came
+// out of the broken count above: 108 rooms minus 47 with encounters. It was
+// never true. This asks the question directly instead, and the answer is that
+// only fourteen rooms in the campaign offer the player nothing at all - and
+// every one of them is a dungeon's ENTRANCE, which is a deliberate pattern
+// rather than a gap. A quiet threshold before the dungeon starts is a room
+// doing its job.
+//
+// The thin rooms are somewhere else entirely, and the corrected histogram is
+// where to look: twenty-four rooms hold a single enemy. A room with one enemy
+// in it promises a fight and delivers a speed bump, which is closer to "does
+// nothing" than an empty room that never promised anything.
+{
+    const keysByRoom = {};
+    for (const def of BEAT_LIST) {
+        for (const k of def.keys || []) keysByRoom[`${def.id}/${k.room}`] = true;
+    }
+    const offers = { fight: 0, boss: 0, item: 0, key: 0, story: 0, blocker: 0, built: 0 };
+    const bare = [];
+    let solo = 0;
+    let roomCount = 0;
+    for (const def of BEAT_LIST) {
+        for (const [rid, room] of Object.entries(def.rooms)) {
+            roomCount++;
+            const n = (room.enemies || []).length;
+            const has = {
+                fight: n > 0,
+                boss: !!room.boss,
+                item: !!room.onBake,
+                key: !!keysByRoom[`${def.id}/${rid}`],
+                story: !!room.onEnter,
+                blocker: (room.blockers || []).length > 0,
+                // BOTH HOOKS. Asking only `build` reported beat 11's lichgate
+                // as the one room in the game with no authored geometry, and it
+                // was about to be "fixed". It builds its walkable islets
+                // through `platforms` instead — the platform map, which is
+                // meshed without XZ solids — because an islet you stand ON is
+                // not the same thing as a wall. Two hooks, one question.
+                built: !!room.build || !!room.platforms,
+            };
+            if (n === 1) solo++;
+            for (const [k, v] of Object.entries(has)) if (v) offers[k]++;
+            // `built` is geometry, not a reason to be there - a room can be
+            // beautifully shaped and still hand the player nothing to do.
+            const reason = has.fight || has.boss || has.item || has.key
+                || has.story || has.blocker;
+            if (!reason) {
+                bare.push(`${def.id.replace('beat-', '')}/${rid}`
+                    + (has.built ? '' : '  (NO AUTHORED GEOMETRY EITHER)'));
+            }
+        }
+    }
+    console.log(`\nROOM PURPOSE   ${roomCount} rooms`);
+    for (const [k, v] of Object.entries(offers)) {
+        console.log(`    ${k.padEnd(10)} ${bar(v, roomCount)} ${String(v).padStart(3)} rooms`);
+    }
+    console.log(`\n    offering NOTHING: ${bare.length} rooms`);
+    for (const b of bare) console.log(`      ${b}`);
+    console.log('\n    ...and they are one per dungeon: the entrance. That is a pattern,');
+    console.log('    not a gap - a quiet room before the dungeon starts.');
+    console.log(`\n    The thin ones are elsewhere: ${solo} rooms hold exactly one enemy,`);
+    console.log('    which promises a fight and delivers a speed bump.');
 }
 
 // ── 2. The kind × AI matrix ────────────────────────────────────────────────
