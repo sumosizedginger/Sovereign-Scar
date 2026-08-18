@@ -57,6 +57,7 @@ import { run as runWallProfile } from './game/wall-profile.spec.mjs';
 import { run as runDressing } from './game/dressing.spec.mjs';
 import { run as runTitleCamera } from './game/title-camera.spec.mjs';
 import { run as runQualityTiers } from './game/quality-tiers.spec.mjs';
+import { run as runArenaCamera } from './game/arena-camera.spec.mjs';
 import { run as runWallClimb } from './game/wall-climb.spec.mjs';
 import { run as runDashCommit } from './game/dash-commit.spec.mjs';
 import { run as runWedgeCrackProximity } from './game/wedge-crack-proximity.spec.mjs';
@@ -243,6 +244,7 @@ async function main() {
     runNamed('dressing', runDressing);
     runNamed('title-camera', runTitleCamera);
     runNamed('quality-tiers', runQualityTiers);
+    runNamed('arena-camera', runArenaCamera);
     runNamed('dash-commit', runDashCommit);
     runNamed('wedge-crack-proximity', runWedgeCrackProximity);
     runNamed('weak-points', runWeakPoints);
@@ -334,6 +336,7 @@ async function main() {
             ['door-refusal-e2e', './door-refusal-e2e.spec.mjs'],
             ['boss-reach-e2e', './boss-reach-e2e.spec.mjs'],
             ['seal-stalemate-e2e', './seal-stalemate-e2e.spec.mjs'],
+            ['arena-camera-e2e', './arena-camera-e2e.spec.mjs'],
             ['world-e2e', './world-e2e.spec.mjs'],
             ['locked-doors-e2e', './locked-doors-e2e.spec.mjs'],
             ['key-progression-e2e', './key-progression-e2e.spec.mjs'],

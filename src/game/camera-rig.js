@@ -4,6 +4,10 @@
 
 import { camera } from '../engine/renderer.js';
 import { juice } from './fx/juice.js';
+import {
+    ARENA_WIDEN_MAX, ARENA_WIDEN_FREE, ARENA_WIDEN_RATE, ARENA_WIDEN_LERP,
+    SECOND_WIDEN_MAX, SEAL_PUNCH_DURATION, SEAL_PUNCH_DEPTH,
+} from './camera-framing.js';
 
 export class CameraRig {
     /**
@@ -35,6 +39,42 @@ export class CameraRig {
         this._bounds = null; // W2: room-lock rect for the look-at target
         this._second = null; // Ticket D: live second subject (boss) for two-subject framing
         this._secondW = 0; // smoothed engagement weight so framing eases in/out
+        this._threats = null; // arena: live enemies of a sealed room, widen only
+        this._arenaW = 0;  // smoothed arena widen, so it eases in and out
+        this._punch = null; // { t, dur, depth } — the seal's door-slam flinch
+    }
+
+    /**
+     * The live threats of a **sealed** room, for the arena widen. Pass an empty
+     * array or null the instant the room is not holding the player.
+     *
+     * Deliberately NOT routed through `setSecondSubject`. That channel slides
+     * the look-at target toward its subject, which is right for one boss and
+     * wrong for six enemies: the centroid of a room full of chasing bodies is
+     * not a place the player is looking, and taking the camera off a 34-px hero
+     * to point at it would cost more than the framing buys. This channel only
+     * ever changes how much fits, never what is centred.
+     *
+     * Safe to call every frame with the same list; it is a state, not an event.
+     */
+    setArenaThreats(list) {
+        this._threats = (list && list.length) ? list : null;
+    }
+
+    /**
+     * The flinch when a room seals — a fast dip in, then home.
+     *
+     * A dip IN is right here even though the sustained arena response is a
+     * widen, because this is the door slamming, not the fight: it lasts half a
+     * second and fires before anything has spread out.
+     *
+     * Its own channel for the reason `kick()` has one. A seal and a killing
+     * blow land on the same frame constantly — clearing the last add of one
+     * wave as the next seals — and whichever wrote the shared slot last would
+     * have silently eaten the other.
+     */
+    sealPunch(duration = SEAL_PUNCH_DURATION, depth = SEAL_PUNCH_DEPTH) {
+        this._punch = { t: 0, dur: Math.max(0.05, duration), depth };
     }
 
     /**
@@ -175,6 +215,13 @@ export class CameraRig {
         this._focus = null;
         this._kick = null;
         this._hold = null;
+        // The arena widen too, and its SMOOTHED weight rather than just its
+        // input. Dropping the threat list alone would leave `_arenaW` at
+        // whatever the last fight had opened it to and ease it shut over the
+        // first second of the next level — a level that opens mid-exhale.
+        this._punch = null;
+        this._threats = null;
+        this._arenaW = 0;
     }
 
     /**
@@ -223,6 +270,17 @@ export class CameraRig {
             if (u >= 1) this._kick = null;
         }
 
+        // The seal's flinch. Same shape as `kick`, own slot — see `sealPunch`.
+        if (this._punch) {
+            const p = this._punch;
+            p.t += dt;
+            const u = Math.min(1, p.t / p.dur);
+            const dip = Math.sin(Math.PI * u);
+            effH -= p.depth * dip;
+            effB -= p.depth * 0.35 * dip;
+            if (u >= 1) this._punch = null;
+        }
+
         // A held shot (cutscene). Eases in and then STAYS at full weight — no
         // `u >= 1` teardown here on purpose, that is what `releaseHold` is for.
         if (this._hold) {
@@ -244,6 +302,7 @@ export class CameraRig {
         // Two-subject framing (Ticket D): weight eases toward 1 while a
         // second subject is set and inside engagement range, toward 0
         // otherwise, so the frame never snaps when a boss dies or leashes.
+        let widen = 0;
         const s2 = this._second;
         const engaged = s2 && Math.hypot(s2.x - x, s2.z - z) < 26 ? 1 : 0;
         this._secondW += (engaged - this._secondW) * Math.min(1, dt * 4);
@@ -254,7 +313,35 @@ export class CameraRig {
             z += (s2.z - z) * w;
             // Pull up/back proportionally to separation so both subjects
             // stay inside the safe frame (capped: never a map view).
-            const widen = Math.min(7, Math.max(0, d - 6) * 0.5) * this._secondW;
+            widen = Math.min(SECOND_WIDEN_MAX, Math.max(0, d - 6) * 0.5) * this._secondW;
+        }
+
+        // The arena widen. Measured from the look point AFTER the boss slide
+        // above, because that is where the frame is actually centred — asking
+        // how far the threats are from the player would answer about a picture
+        // nobody is being shown.
+        let arenaTarget = 0;
+        if (this._threats) {
+            let far = 0;
+            for (const p of this._threats) {
+                if (!p) continue;
+                const d = Math.hypot(p.x - x, p.z - z);
+                if (d > far) far = d;
+            }
+            arenaTarget = Math.min(
+                ARENA_WIDEN_MAX,
+                Math.max(0, far - ARENA_WIDEN_FREE) * ARENA_WIDEN_RATE,
+            );
+        }
+        this._arenaW += (arenaTarget - this._arenaW)
+            * (1 - Math.exp(-ARENA_WIDEN_LERP * dt));
+
+        // MAX, NEVER A SUM. A boss with adds sets both channels, and adding
+        // them would open the frame to +9 — a map view of a fight, and the
+        // 34-px hero rendered at 24. Each channel states how much has to fit;
+        // satisfying the larger claim satisfies the smaller one by definition.
+        widen = Math.max(widen, this._arenaW);
+        if (widen > 0) {
             effH += widen;
             effB += widen * 0.35;
         }

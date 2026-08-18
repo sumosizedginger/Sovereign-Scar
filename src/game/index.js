@@ -149,6 +149,22 @@ camera.updateProjectionMatrix();
 // walls visible, tight enough that the hero still reads at overworld scale.
 const CAM_HEIGHT = 17.5;
 const camRig = new CameraRig({ height: CAM_HEIGHT, back: CAM_HEIGHT * 0.35 });
+/**
+ * Which room was holding the player last frame, so the seal's camera flinch
+ * fires once on the transition rather than every frame it stays sealed.
+ *
+ * The room ID and not a boolean: walking straight from one sealed room into
+ * another is a state change the flinch has to see, and `sealed → sealed` would
+ * hide it from a boolean.
+ */
+let sealedRoomWas = null;
+// DECLARED HERE, NOT BESIDE THE OTHER FRAME-LOOP STATE FURTHER DOWN, and the
+// game would not boot otherwise. `loadLevel` resets this, and `loadLevel` runs
+// during module initialisation — so a `let` sitting next to `wasAtTitle` at the
+// bottom of the file is still in its temporal dead zone when the first level
+// loads, and the whole game dies on a ReferenceError. Nothing headless catches
+// it: the unit suite never executes module init, and lint and tsc both read a
+// declaration that is textually above nothing it can see being called.
 // Ticket D: fades registered foreground occluders (userData.occluder) that
 // stand between camera and the player/boss. No-op until a level tags props.
 const occlusion = new OcclusionController();
@@ -541,6 +557,10 @@ function loadLevel(id) {
     // view are centred by the room-lock clamp; wider screens scroll.
     camRig.clearFocus(); // a boss-intro push-in must not bleed into the next level
     camRig.setSecondSubject(null); // Ticket D framing resets with the level
+    // Room IDs are only unique WITHIN a level, so without this a new dungeon
+    // whose first arena happens to share a name with the last one's would be
+    // read as "still the same seal" and swallow its own flinch.
+    sealedRoomWas = null;
     camRig.height = CAM_HEIGHT;
     camRig.back = camRig.height * 0.35;
     camRig.snapTo(player.root.position);
@@ -1584,6 +1604,17 @@ function frame() {
             occlusion.setCamera(camera.position);
             occlusion.setSubjects([player.root.position, bRoot ? bRoot.position : null]);
             occlusion.update(sdt);
+        }
+        // The arena. A sealed room widens the frame while its fight is spread
+        // out and closes it again as the fight comes back to knife range — see
+        // the measured note above `ARENA_WIDEN_MAX` in camera-rig.js for why
+        // this opens rather than tightens.
+        {
+            const held = game.level?.sealState?.() || null;
+            camRig.setArenaThreats(held ? (game.level?.arenaThreats?.() || null) : null);
+            const nowRoom = held ? held.roomId : null;
+            if (nowRoom && nowRoom !== sealedRoomWas) camRig.sealPunch();
+            sealedRoomWas = nowRoom;
         }
         // Breathe the room's fixtures, then let the pool copy their intensities
         // onto the real lights. Order is the whole trick: the pool already does

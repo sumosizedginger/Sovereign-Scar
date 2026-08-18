@@ -1293,6 +1293,33 @@ export function createDungeon(ctx, def, opts = {}) {
     }
 
     /**
+     * Public: where the live threats of a HOLDING room are, for the camera's
+     * arena widen (`CameraRig.setArenaThreats`).
+     *
+     * Gated on `sealedBy` rather than on "are there enemies", so it answers the
+     * same question the door does. A room with enemies you are free to walk
+     * away from is not an arena, and framing it as one would open the camera in
+     * every corridor with a scarab in it.
+     *
+     * Returns the live `Object3D.position` objects themselves, not copies. The
+     * rig reads `.x`/`.z` once per frame and never holds them past the call, so
+     * a copy would be 6 allocations a frame to defend against nothing — and a
+     * stale copy is exactly the bug this would be defending against.
+     */
+    function arenaThreats() {
+        if (!sealedBy(currentRoomId)) return null;
+        const rec = baked.get(currentRoomId);
+        if (!rec) return null;
+        const out = [];
+        for (const e of rec.enemies) {
+            if (e.state?.current === 'DEAD' || e.defeated) continue;
+            const p = e.root?.position;
+            if (p) out.push(p);
+        }
+        return out.length ? out : null;
+    }
+
+    /**
      * Refuse a door: push the player off the trigger and hand control back.
      *
      * Every refusal used to do this inline, three times over:
@@ -1774,6 +1801,7 @@ export function createDungeon(ctx, def, opts = {}) {
         // Exposed so the HUD can say the room is holding you, and so specs can
         // assert the seal without driving a door collision.
         sealState,
+        arenaThreats,
         /**
          * World origin of the room the player is standing in.
          *
