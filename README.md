@@ -202,12 +202,13 @@ and why it is there).
 
 ## License
 
-MIT (inherits kit license). Game content © project authors.
+**MIT, including the game content.** The engine, the systems, the fourteen
+dungeons, the narrative, the boss designs and the score are all covered by the
+same grant: use it, modify it, fork it, ship it, sell it, provided the copyright
+notice travels with it. Copyright stays with the author — that is what MIT's
+first line means — but nothing is reserved beyond it.
 
-**That sentence and the `LICENSE` file do not currently agree**, and the
-disagreement is unresolved rather than settled: MIT grants rights to "the
-Software" with no carve-out, and naming the author of the content reserves
-nothing that MIT does not already leave with them. `package.json` says `MIT`
-flatly. [docs/LICENSING.md](docs/LICENSING.md) sets out exactly what the files
-communicate today and what each possible intention would require. Nothing about
-the licence was changed while writing it — that is the owner's decision.
+That is a deliberate choice rather than an oversight, and
+[docs/LICENSING.md](docs/LICENSING.md) records what was decided and what the
+alternatives were. Vendored dependencies keep their own terms: three.js is MIT
+and its licence ships alongside it in `lib/three/`.

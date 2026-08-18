@@ -52,7 +52,10 @@ import { startServer, findChromeVerbose, sleep, disableGamepads } from './harnes
 // `docs/media/certification/beat-01-crypt-entry.png`, not by the statistic.
 // A gate is a ratchet against regression; it is not evidence that the art is
 // good, and this file has now been wrong about that twice.
-const LUM_BANDS = {
+// Exported so `tests/qa/lum-probe.mjs` reads the band rather than keeping its
+// own copy. It kept one for months, the copy went stale against a re-derived
+// band, and the probe reported ten levels out of band on a green campaign.
+export const LUM_BANDS = {
     crust: [76, 130],
     abyss: [76, 130],
 };

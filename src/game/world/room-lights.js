@@ -26,6 +26,7 @@
 //    can never outlive the thing that appears to be emitting it.
 
 import * as THREE from 'three';
+import { wallProfile, wallTopAt } from './wall-profile.js';
 import { markShadowRoles } from '../render/shadow-roles.js';
 
 /**
@@ -179,7 +180,7 @@ export function buildRoomLights(kit, room, roomId, origin, scene, pool) {
     if (!motif || !scene) return null;
 
     const half = room.half || 8;
-    const wallH = room.wallH || 4;
+    const prof = wallProfile(room);
     const n = fixtureCount(half);
     const rand = rng(`${kit.name}:${roomId}`);
     const group = new THREE.Group();
@@ -205,12 +206,16 @@ export function buildRoomLights(kit, room, roomId, origin, scene, pool) {
             const inset = half - 0.7;
             x = Math.cos(a) * inset;
             z = Math.sin(a) * inset;
-            y = 1 + wallH * 0.55;
+            // The wall this sconce hangs on, not the room's nominal height. In
+            // a raked room the far wall is several cells taller than the near
+            // one, and a fixture placed at a single height would float off the
+            // south wall entirely while sitting halfway down the north.
+            y = 1 + wallTopAt(prof, z, half) * 0.55;
         } else if (motif.place === 'high') {
             const r = half * (0.45 + rand() * 0.4);
             x = Math.cos(a) * r;
             z = Math.sin(a) * r;
-            y = 1 + wallH * 0.92;
+            y = 1 + wallTopAt(prof, z, half) * 0.92;
         } else { // floor
             const r = half * (0.35 + rand() * 0.45);
             x = Math.cos(a) * r;

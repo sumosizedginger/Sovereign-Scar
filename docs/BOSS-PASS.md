@@ -717,10 +717,10 @@ valuable one and should not be allowed to crowd out the rest:
 | Boss silhouettes | **DONE** — 13 rebuilt, 1 (Mantis) needed nothing, Wyrm revisited 08-17 |
 | Occlusion | **DONE 2026-08-17** — combat line of sight (`src/combat/line-of-sight.js`); attacks, boss cones and bolts all stop at walls. Landed before the combo work as agreed |
 | Combo system | **DONE 2026-08-17** — three-step string (opener / backhand / finisher) derived per weapon; `src/game/combat/combo.js` |
-| 80% room variation (wall/ceiling height) | not started |
+| 80% room variation (wall/ceiling height) | **DONE 2026-08-17** — per-room far/near wall heights with the side walls ramping between (`src/game/world/wall-profile.js`); one authored `wallRise` per kit. Fell out of it: hero occlusion 7.93% → 0.83% of standable cells |
 | In-engine key art + composed title camera | not started |
 | Ambient sway (dressing mesh + vertex displacement) | not started |
-| Doc truth pass + licence line | camera correction done; licence line outstanding |
+| Doc truth pass + licence line | **DONE 2026-08-17** — MIT throughout, content included; `LICENSE`/`README`/`package.json` agree and `docs/LICENSING.md` is a decision record |
 | Tester round folded back in | waiting on distribution |
 
 **The campaign has been played start to finish, and everything that
@@ -729,10 +729,9 @@ that is in hand and is not a reason to hold up the roster. Do not keep
 re-proposing it.
 
 *Suggested interleave:* ~~the Witness~~ ~~Frost & Fuel~~ ~~Hydroid Cloud~~
-the boss pass is **finished**, and so are ~~occlusion~~ and the ~~combo
-system~~. What is left on the v1 list is presentation and release: 80% room
-variation, in-engine key art, ambient sway, the licence line, and getting Pages
-to actually serve.
+the boss pass is **finished**, and so are ~~occlusion~~, the ~~combo system~~,
+~~room variation~~ and the ~~licence line~~. What is left on the v1 list is
+in-engine key art, ambient sway, and getting Pages to actually serve.
 
 **Two arena findings fell out of the occlusion work**, and they are placement,
 not bodies, so they are recorded here rather than fixed unasked. Measured at

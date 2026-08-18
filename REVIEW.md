@@ -250,17 +250,17 @@ repository has no versioning policy: `package.json` says 0.3.0, nothing keeps it
 in step with the tag, and nothing says what a version number means here. That is
 an owner decision, not a workflow line.
 
-**4.9 The licence is ambiguous and this pass did not resolve it.** `LICENSE` is
-MIT with no carve-out, `package.json` says `MIT`, and `README.md` adds "Game
-content © project authors" — which reserves nothing, because MIT already leaves
-copyright with the author. A reader would reasonably conclude the narrative, the
-fourteen dungeons and the score are MIT too. If that is the intent, one sentence
-should change; if it is not, the split has to be defined in `LICENSE` by path
-and `package.json` has to stop claiming MIT. `docs/LICENSING.md` sets out both
-options and what each requires. **Nothing about the licence was changed** — it
-alters what people may do with the work, and that is the owner's call. It
-matters more now than it did last week, because the game is about to be
-published at a URL.
+**4.9 The licence was ambiguous; it was settled on 2026-08-17.** `LICENSE` was
+MIT with no carve-out, `package.json` said `MIT`, and `README.md` added "Game
+content © project authors" — which reserved nothing, because MIT already leaves
+copyright with the author, but which read as though it did. The owner chose
+**MIT throughout, content included**, and the three files now agree: `LICENSE`
+carries a preamble saying "the Software" means the levels, narrative, designs
+and score as well as the code, and the README says so plainly. What that gives
+away — that anyone may ship this game, under their own name, for money, so long
+as they carry the notice — is written down in `docs/LICENSING.md` alongside the
+alternatives that were not taken, because a licence is easy to loosen and hard
+to tighten and the reasoning should outlive the decision.
 
 **4.10 Presentation, not correctness, is the remaining gap.** Ranked with method
 and cost in `docs/ROAD-TO-AAA.md` and `docs/HOW-TO-CLOSE-THE-GAP.md`. The

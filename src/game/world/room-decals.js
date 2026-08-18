@@ -37,6 +37,8 @@
  *
  * Keyed by kit name so a kit and its weathering cannot drift apart silently.
  */
+import { wallProfile, wallTopAt } from './wall-profile.js';
+
 export const WEATHERING = {
     // Grave dust settling on a floor nobody has walked in a long time.
     Crypt: { color: 0x8a8270, coverage: 0.30, strength: 0.30, where: 'floor' },
@@ -125,7 +127,8 @@ export function applyRoomDecals(map, room, kit, roomId = 'room', opts = {}) {
     if (opts.enabled === false) return 0;
     const spec = WEATHERING[kit?.name];
     if (!spec || !map?.size) return 0;
-    const wallH = room?.wallH || 4;
+    const prof = wallProfile(room || {});
+    const half = room?.half || 8;
     const seed = seedOf(`${kit.name}:${roomId}`);
     // The cut-off that produces `coverage`: value noise is roughly uniform, so
     // taking the top `coverage` fraction of the field is just a threshold.
@@ -140,7 +143,7 @@ export function applyRoomDecals(map, room, kit, roomId = 'room', opts = {}) {
         // The wall cap is left alone: `applyKit` deliberately brightens it as a
         // lit inlay, and weathering over the top of that would undo the one
         // piece of shading the room already had.
-        const isWall = y >= 1 && y < wallH;
+        const isWall = y >= 1 && y < wallTopAt(prof, z, half);
         if (spec.where === 'floor' && !isFloor) continue;
         if (spec.where === 'wall' && !isWall) continue;
         if (spec.where === 'both' && !isFloor && !isWall) continue;

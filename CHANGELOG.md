@@ -5,6 +5,90 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Rooms have a front and a back now — and the hero stopped hiding behind them
+
+The camera has never rotated. `camera-rig.js` places the lens at
+`look + (0, 17.5, +6.125)` and looks straight back down at the target, so the
+SOUTH wall of every room in the game is permanently between the lens and the
+hero and the NORTH wall is permanently the one you look at. Every room built
+all four the same height.
+
+Measured, with a new probe (`tests/qa/hero-occlusion.mjs`) that walks the sight
+line from the lens to the hero's head at every cell a player can stand on:
+**1826 of 23015 cells in the campaign — 7.9% — had something in the way.** In
+beat 01's tomb it is not even the wall; it is a decorative merlon at y=7 grazing
+the line while the wall itself tops out at y=5. Nothing in 5600 assertions had
+ever rendered a room and asked what could be seen from where the player stands.
+
+`src/game/world/wall-profile.js` gives a room two numbers instead of one — a FAR
+height and a NEAR height — and ramps the side walls between them with a single
+formula that comes out flat along the north and south walls because `z` is
+constant there. Each of the fourteen kits authors one number, `wallRise`, saying
+how much its back wall climbs, with the reason written next to it: 6 for the
+Bone Forest because `rib_cathedral` means ribs go up, 2 for the Rot Mire because
+a mire has no architecture left above the waterline. A room's existing authored
+height is preserved as the near wall, so the per-room decisions already in the
+level files survive — they simply survive in the wall you can actually see.
+
+Trim fades out across the near half. It buys nothing there (at this pitch the
+south wall is off the bottom of the frame unless you are pressed against it) and
+it was the only structure tall enough to graze the sight line.
+
+**Occlusion went 7.93% → 0.83%.** Nine of fourteen dungeons are now at zero; the
+remainder is interior architecture — ice fins, rib vaults, buttresses — which is
+a different ticket. Every level got *brighter* on the certification gate, by 2.3
+to 11.1 points of centre-crop luminance, because the removed near wall was dark
+and the raked far wall catches key light; all sixteen stay in band, with beat 03
+(122.9) and beat 11 (121.4) now the two nearest the ceiling of 130 rather than
+the floor. Geometry cost is between −0.3% and +2.2% of vertices per dungeon.
+
+Six places each read `room.wallH || 4` for themselves — the perimeter, the kit's
+cap course, the weathering band, the trim, the sconce heights, the door plugs.
+That is one fact copied six times and six chances for a room to be half
+converted, so the rake is resolved once in `bakeRoom` and handed down.
+
+Proven a no-op before any room was converted: every mesh in all fourteen
+dungeons was hashed — positions and vertex colours — against the same tree
+before and after the refactor, and the two agreed exactly.
+
+`tests/game/wall-profile.spec.mjs` (121 assertions) reads the baked voxel field
+and the collision world rather than the data table, and holds the near wall
+solid to a 0.4 body, the far wall's broken top edge, and the campaign-wide sight
+line at a 2% ratchet. Seven counterfactuals; two of them found holes in the spec
+rather than in the game — one assertion compared `WALL_MIN` against itself, and
+nothing at all checked that trim survived.
+
+### `tests/qa/lum-probe.mjs` had been lying, in three ways at once
+
+It reported ten of sixteen levels out of the luminance band on a campaign whose
+real gate was green — and did the same on a clean checkout, which is how it was
+caught rather than believed. It started runs with `click, ArrowDown, Enter` (the
+fixture `visual-sanity.spec.mjs` documents abandoning, because one added menu row
+moves what ArrowDown selects); it averaged the WHOLE FRAME including the void
+beyond the room, where the gate reads the centre crop; and it carried its own
+copy of bands that had since been replaced by one shared band. It now takes the
+fixture, the sampler and the bands from the spec, and agrees with it to a point.
+
+### The licence says one thing now
+
+`LICENSE`, `package.json` and `README.md` had been describing two different
+grants. The first two said MIT with no carve-out; the README added "Game content
+© project authors", which reserves nothing MIT does not already leave with the
+author but reads to a stranger like a reservation — so a reader deciding whether
+they could fork the fourteen dungeons had to guess.
+
+The owner settled it: **MIT throughout, game content included.** `LICENSE` now
+opens with a preamble stating that "the Software" means the levels, the
+narrative, the character and boss designs and the score as well as the code, and
+that nothing is reserved. `README.md` says the same in prose. `package.json`
+needed no change — it was already the correct answer.
+
+`docs/LICENSING.md` was a list of open options; it is now a decision record. It
+keeps the analysis of the roads not taken (a code/content split needs a
+maintained path list, and `package.json` must stop claiming MIT for it to be
+honest), and adds what MIT costs: anyone may ship this game under their own name
+for money, copies already taken cannot be recalled, and future contributions
+arrive under the same terms unless an agreement says otherwise.
 ## [0.4.0] — 2026-08-16
 
 Everything below this heading and above `[0.3.0]` shipped between the two tags.

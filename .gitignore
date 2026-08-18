@@ -19,3 +19,8 @@ dist-pages/
 # convenience — 20 MB of them — and the certification set already covers
 # HUD-free frames. Regenerate with `node tests/qa/player-captures.mjs --set=…`.
 docs/media/player/*/*-clean.png
+
+# Working frames from `tests/qa/wall-height-probe.mjs`. The probe is a real,
+# named instrument and is committed; its output is five pictures of one room,
+# re-shot every time a wall height moves, and is a record of nothing.
+docs/media/wall-height/

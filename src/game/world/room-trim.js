@@ -32,6 +32,7 @@
 
 import { vkey } from '../../voxel/core.js';
 import { shadeHex } from '../../voxel/helpers.js';
+import { wallProfile, wallTopAt, trimBudgetAt } from './wall-profile.js';
 
 /**
  * Deterministic 0..1 hash. Integer mixing rather than a float trick so it is
@@ -75,7 +76,7 @@ export function applyRoomTrim(map, room, roomId = 'room', opts = {}) {
     if (opts.enabled === false) return 0;
     const half = room?.half;
     if (!Number.isFinite(half) || half < 2) return 0;
-    const wallH = room.wallH || 4;
+    const prof = wallProfile(room);
     const seed = seedOf(roomId);
     let added = 0;
 
@@ -96,8 +97,21 @@ export function applyRoomTrim(map, room, roomId = 'room', opts = {}) {
             const onEdge = Math.abs(x) === half || Math.abs(z) === half;
             if (!onEdge) continue;
 
+            const wallH = wallTopAt(prof, z, half);
             const capColor = map.get(vkey(x, wallH, z));
             if (capColor == null) continue; // doorway, carved gap, or no wall here
+
+            // How much trim this cell may carry. 1 everywhere in an unraked
+            // room — every certification capture in the repository shows a room
+            // built that way and none of them may move. In a raked room it
+            // fades to nothing across the near half, because trim is the ONLY
+            // structure tall enough to graze the sight line between the lens
+            // and a hero standing at the south wall, and measurably does:
+            // `tests/qa/wall-height-probe.mjs` catches a merlon at y=7 hiding
+            // the hero in beat 01's tomb today.
+            const budget = trimBudgetAt(prof, z, half);
+            if (budget <= 0) continue;
+            const allow = (want) => Math.max(0, Math.round(want * budget));
 
             const corner = Math.abs(x) === half && Math.abs(z) === half;
             // Position along the ring, so pilasters space evenly on all sides
@@ -125,18 +139,19 @@ export function applyRoomTrim(map, room, roomId = 'room', opts = {}) {
                 // Corner posts. A room's corners are the first thing the eye
                 // uses to read its shape, and four identical 90° verticals is
                 // exactly what makes a room read as a box.
-                const h = 2 + CORNER_EXTRA;
+                const h = allow(2 + CORNER_EXTRA);
                 for (let i = 1; i <= h; i++) {
                     put(x, wallH + i, z, shadeHex(capColor, i === h ? 1.18 : 1.09));
                 }
             } else if (pilaster) {
-                for (let i = 1; i <= 2; i++) {
+                const h = allow(2);
+                for (let i = 1; i <= h; i++) {
                     put(x, wallH + i, z, shadeHex(capColor, 1.12));
                 }
             } else if (hash01(x, z, seed) < MERLON_RATE) {
                 // Merlons: a broken top edge. Randomised height, because a
                 // regular crenellation is just a different ruler.
-                const h = hash01(x + 977, z, seed) < 0.3 ? 2 : 1;
+                const h = allow(hash01(x + 977, z, seed) < 0.3 ? 2 : 1);
                 for (let i = 1; i <= h; i++) {
                     put(x, wallH + i, z, shadeHex(capColor, i === 2 ? 1.14 : 1.07));
                 }

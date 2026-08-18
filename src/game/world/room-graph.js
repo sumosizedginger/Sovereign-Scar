@@ -15,6 +15,7 @@ import { KITS as DUNGEON_KITS, applyKit, markTraversal } from '../levels/dungeon
 import { buildRoomLights, disposeRoomLights } from './room-lights.js';
 import { coach } from '../ui/coach.js';
 import { fillBox } from '../../voxel/helpers.js';
+import { wallProfile, wallTopAt, rakeRoom } from './wall-profile.js';
 import { stampMap } from '../assets/props.js';
 import { CRUST_COLORS, ABYSS_COLORS, MOOD_PRESETS } from '../assets/palettes.js';
 import { Enemy, DummyTarget, attachSplit } from '../enemy.js';
@@ -228,17 +229,25 @@ export function walkableCells(room, origin, solidAt) {
     return seen;
 }
 
-/** Perimeter walls with gaps punched at each door. */
+/**
+ * Perimeter walls with gaps punched at each door.
+ *
+ * The height comes from `wallTopAt` rather than a single `room.wallH`, so a
+ * room that authored `{ far, near }` gets a wall that ramps from the back of
+ * the frame to the lip you look over. A room that authored a plain number gets
+ * `far === near` and therefore a constant course — the identical geometry it
+ * has always produced. See `wall-profile.js` for why the four sides differ.
+ */
 export function buildPerimeterWithDoors(map, room, color) {
     const half = room.half;
-    const wallH = room.wallH || 4;
+    const prof = wallProfile(room);
     const skip = new Set();
     for (const door of room.doors || []) {
         for (const c of doorCells(room, door)) skip.add(`${c.x},${c.z}`);
     }
     const put = (x, z) => {
         if (skip.has(`${x},${z}`)) return;
-        fillBox(map, x, x, 1, wallH, z, z, color);
+        fillBox(map, x, x, 1, wallTopAt(prof, z, half), z, z, color);
     };
     for (let x = -half; x <= half; x++) { put(x, -half); put(x, half); }
     for (let z = -half; z <= half; z++) { put(-half, z); put(half, z); }
@@ -412,8 +421,12 @@ export function createDungeon(ctx, def, opts = {}) {
         if (keyStore.isOpen(dk)) return null;
         const map = new Map();
         const color = (door.type === 'boss') ? CRUST_COLORS.bloodStain : CRUST_COLORS.goldLeaf;
+        // The plug has to be as tall as the wall it fills. Reading a single
+        // `room.wallH` would leave a raked room's far door plugged to the
+        // NEAR height — a locked door you can see straight over.
+        const prof = wallProfile(room);
         for (const c of doorCells(room, door)) {
-            fillBox(map, c.x, c.x, 1, room.wallH || 4, c.z, c.z, color);
+            fillBox(map, c.x, c.x, 1, wallTopAt(prof, c.z, room.half), c.z, c.z, color);
         }
         return meshAndCollide(map, scene, collisionWorld, {
             origin,
@@ -423,7 +436,13 @@ export function createDungeon(ctx, def, opts = {}) {
 
     function bakeRoom(roomId) {
         if (baked.has(roomId) || disposed) return;
-        const room = def.rooms[roomId];
+        // Resolve the dungeon's wall rake ONCE, here, so every consumer below —
+        // the perimeter, the kit's cap course, the weathering band, the trim,
+        // the sconce heights and the door plugs — is looking at the same room.
+        // Each of them used to read `room.wallH || 4` for itself, which is six
+        // copies of one fact and six chances for a raked room to be half
+        // converted. `rakeRoom` returns a copy; `def.rooms` is never written to.
+        const room = rakeRoom(def.rooms[roomId], DUNGEON_KITS[def.id]);
         const origin = roomOrigin(room);
         const map = new Map();
         buildRoomFloor(map, -room.half, room.half, -room.half, room.half, 0,
