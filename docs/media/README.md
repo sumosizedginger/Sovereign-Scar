@@ -68,6 +68,18 @@ and they are worth more together than apart.
 Cloning the whole history is a few hundred megabytes. If you only want to play
 or build the game, `git clone --depth 1` skips it.
 
+### `gear-skins/`
+
+Every piece of held gear, shipped and skinned, plus 4x nearest-neighbour crops —
+the hero is 34 px wide at 1280 and a full frame cannot settle a palette. Also
+the Appearance menu itself. Written by `tests/qa/gear-skin-shots.mjs`.
+
+These are the pictures that overruled two instruments. The first said the hero's
+own body skin was invisible; the third said the shield "barely moves" while the
+picture showed a flat slab becoming a plate with two bright bone rails. Both
+times the frame was right and the number was measuring the wrong thing —
+see `docs/WARDROBE.md`.
+
 ---
 
 ## If you are reading this to learn something

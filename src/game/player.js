@@ -2,6 +2,7 @@
 
 import { createActorRig, recolorActor } from './characters/actor-rig.js';
 import { heroSkinPalette, wornSkin, DEFAULT_SKIN } from './characters/hero-skins.js';
+import { outfitOf } from './kernel/wardrobe.js';
 import { createActorAnimator } from './characters/actor-animator.js';
 import { makeFacing } from '../combat/facing.js';
 import { ArcSmear } from './fx/arc-smear.js';
@@ -126,6 +127,13 @@ export class Player {
         // inventory exists — this pass only covers a Player constructed with
         // one already restored, which is not the common path but is a real one.
         this.skin = DEFAULT_SKIN;
+        // The two held slots. Kept on the player rather than read out of the
+        // inventory inside the update loop, because that loop runs every frame
+        // and the answer only moves when something unlocks or the wardrobe is
+        // used — and because a level load rebuilds the holders, which then need
+        // telling what they are wearing.
+        this.weaponSkin = DEFAULT_SKIN;
+        this.shieldSkin = DEFAULT_SKIN;
         this.actor = createActorRig(HERO_RIG);
         this.rig = this.actor.root;
         this._inner = this.actor.inner;
@@ -267,9 +275,34 @@ export class Player {
         return true;
     }
 
-    /** Put the hero in whatever the save says they own and chose. */
+    /**
+     * Dress the weapon and the shield. The holders rebuild on the next frame's
+     * `set`, which now keys on the skin as well as on what is equipped.
+     *
+     * @returns {boolean} `true` if either slot changed
+     */
+    setGearSkins(weaponId, shieldId) {
+        const w = weaponId || DEFAULT_SKIN;
+        const s = shieldId || DEFAULT_SKIN;
+        if (w === this.weaponSkin && s === this.shieldSkin) return false;
+        this.weaponSkin = w;
+        this.shieldSkin = s;
+        return true;
+    }
+
+    /**
+     * Put the hero in whatever the save says they own and chose — all three
+     * slots, not only the body.
+     *
+     * Returns whether ANYTHING changed. The body's repaint can legitimately
+     * refuse (see `setSkin`) while the gear still moves, so the two results
+     * are OR-ed rather than the body's being taken as the answer for all three.
+     */
     applySavedSkin() {
-        return this.setSkin(wornSkin(this.inventory));
+        const worn = outfitOf(this.inventory);
+        const body = this.setSkin(worn.hero);
+        const gear = this.setGearSkins(worn.weapon, worn.shield);
+        return body || gear;
     }
 
     setGetVoxelAt(fn) {
@@ -850,8 +883,8 @@ export class Player {
 
         // Keep the hands matched to the inventory. Cheap — both are a no-op
         // unless what the player owns actually changed.
-        this.heldWeapon.set(this.inventory.activeWeapon);
-        this.heldShield.set(this.guard.hasShield);
+        this.heldWeapon.set(this.inventory.activeWeapon, this.weaponSkin);
+        this.heldShield.set(this.guard.hasShield, this.shieldSkin);
 
         // Grapple override
         const g = this.grapple.update(dt, this.collisionWorld, 0.4);

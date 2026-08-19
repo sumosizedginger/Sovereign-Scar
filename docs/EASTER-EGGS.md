@@ -402,11 +402,17 @@ Worth writing down because it cost more time than any of the art:
   somewhere else, correctly rendered. The fixture now enters a screen the way
   the save does and reports its own drift.
 
+## What happened next
+
+The relics dressed the hero and nothing else. The held gear, the wardrobe that
+mixes the three slots, and the picker are in **[WARDROBE.md](WARDROBE.md)** —
+including the two measuring instruments that had to be thrown away before the
+third one could say whether any of it is visible, and the part where I was wrong
+about weapons being too thin to skin.
+
 ## Still open
 
 - **Seven relics.** The table in `relics.js` has eight rows and seven are `null`
   on purpose. The chain is proven; the rest is content.
-- **A skin picker.** The newest unlock is worn automatically. `nextSkin` exists
-  and nothing calls it.
 - **The Ashen skin has no source.** `CIVILIAN_PALETTE`-adjacent, and the idea
   was all three settlements — not wired.

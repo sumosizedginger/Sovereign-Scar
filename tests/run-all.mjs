@@ -62,6 +62,7 @@ import { run as runRoomFootprint } from './game/room-footprint.spec.mjs';
 import { run as runCommittedAttacks } from './game/committed-attacks.spec.mjs';
 import { run as runHeroSkins } from './game/hero-skins.spec.mjs';
 import { run as runRelics } from './game/relics.spec.mjs';
+import { run as runGearSkins } from './game/gear-skins.spec.mjs';
 import { run as runOverworldRelief } from './game/overworld-relief.spec.mjs';
 import { run as runThreatEdge } from './game/threat-edge.spec.mjs';
 import { run as runWallClimb } from './game/wall-climb.spec.mjs';
@@ -255,6 +256,7 @@ async function main() {
     runNamed('committed-attacks', runCommittedAttacks);
     runNamed('hero-skins', runHeroSkins);
     runNamed('relics', runRelics);
+    runNamed('gear-skins', runGearSkins);
     runNamed('overworld-relief', runOverworldRelief);
     runNamed('threat-edge', runThreatEdge);
     runNamed('dash-commit', runDashCommit);

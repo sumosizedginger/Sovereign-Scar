@@ -474,7 +474,7 @@ export function run(t) {
         t.ok('addMiner registers no system', !miner.includes('addSystem'));
         t.ok('addMiner has no interact', !miner.includes('consumeInteract'));
         t.ok('addMiner never speaks', !miner.includes('story') && !miner.includes('toast'));
-        t.ok('addMiner grants nothing', !miner.includes('grantSkin') && !miner.includes('setFlag'));
+        t.ok('addMiner grants nothing', !miner.includes('grant') && !miner.includes('setFlag'));
         t.ok('the miner is frozen — never ticked, so he never breathes',
             /frozen:\s*true/.test(miner));
 

@@ -157,6 +157,29 @@ anything enters the balance conversation. `INHERITED_CLOTHING` names the shirt
 and trousers the hero has always worn, which were never authored here at all:
 they fall out of defaults inside the frozen `src/characters/builders.js`.
 
+**Held gear skins and the wardrobe** (`src/game/assets/gear-skins.js`,
+`src/game/kernel/wardrobe.js`): the weapon and the shield are groups of boxes
+with a material each, so a gear skin is a lookup rather than a live repaint —
+both holders already rebuild the model whenever the equipped item changes. Every
+box declares a ROLE (`grip`, `guard`, `guardDark`, `blade`, `bladeDark`,
+`glow`, `accent`) and a skin supplies colours per role. **A skin may write
+`color`, `emissive`, `emissiveIntensity`, `metal` and `rough` — nothing
+else, enforced by `SKINNABLE` in `weapon-models.js`.** `weaponTipY` measures
+the built geometry and the swing the player watches is drawn from the boxes the
+hitbox is resolved against, so a skin that could reach a dimension would separate
+the two; restricting the override to colour keys makes "a cosmetic cannot change
+combat" true by construction. The refactor that introduced roles produced
+byte-identical output for every weapon and the shield. `wardrobe.js` is the only
+file that knows one unlock id spans three slots (`skin:worn`,
+`skin:worn:weapon`, `skin:worn:shield`): ownership is shared, wear is per slot,
+a slot is never offered an outfit with no art for it, and an edited save cannot
+wear something it never found. The Appearance screen is three `select` rows on
+the pause menu and needed no new widget code. Measured by
+`tests/qa/gear-skin-shots.mjs`, which hides and shows each piece to isolate its
+exact silhouette — a mean colour cannot see a shield whose face darkened by as
+much as its bands brightened, and reporting only a mean is how a working art
+change gets thrown away. Full account in `docs/WARDROBE.md`.
+
 **Region relics and easter eggs** (`src/game/world/relics.js`,
 `src/game/world/easter-eggs.js`): props at overworld screen centres that grant a
 skin and nothing else. The screen centre is the placement because

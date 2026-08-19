@@ -56,7 +56,8 @@
 
 import * as THREE from 'three';
 import { makeFigure } from './settlements.js';
-import { grantSkin, heroSkin } from '../characters/hero-skins.js';
+import { heroSkin } from '../characters/hero-skins.js';
+import { grantOutfit } from '../kernel/wardrobe.js';
 import { CRUST_COLORS } from '../assets/palettes.js';
 
 /** What one throw costs. */
@@ -316,7 +317,7 @@ export function addDryWell(level, ctx, origin) {
             inv.setFlag(WELL_THROWS_FLAG, n);
             let dressed = false;
             if (n >= WELL_PAYOUT_AT) {
-                dressed = grantSkin(inv, WELL_SKIN);
+                dressed = grantOutfit(inv, WELL_SKIN);
                 if (dressed) game.player.applySavedSkin?.();
             }
             game.persistInventory?.();

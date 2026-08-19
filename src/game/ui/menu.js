@@ -169,6 +169,39 @@ export function buildScreens() {
         return rows;
     };
 
+    /**
+     * One row per cosmetic slot.
+     *
+     * Rows carry NAMES, not ids — `wardrobeView` does that translation and
+     * `outfitIdFromName` undoes it on the way back, so neither this file nor
+     * the event handler holds a second copy of the table.
+     *
+     * A slot with one option is disabled rather than hidden. A player who has
+     * found the dragon should be able to see that a Shield row exists and is
+     * waiting on something, which is a different message from the row not being
+     * there at all.
+     */
+    const appearanceItems = (ctx) => {
+        const slots = ctx.wardrobe ? ctx.wardrobe() : [];
+        const rows = slots.map((s) => ({
+            type: 'select',
+            id: `skin:${s.slot}`,
+            label: s.label,
+            value: s.value,
+            options: s.options,
+            disabled: s.only,
+            note: s.only ? 'Nothing found yet' : s.from,
+        }));
+        if (!rows.length) rows.push({ type: 'text', label: 'Nothing to change yet.' });
+        // The change lands on the hero the instant it is made, and the hero is
+        // standing behind this panel. Saying so is cheaper than building a
+        // preview doll, and more honest than one — a doll under menu lighting
+        // is not what the character looks like in the room you are standing in.
+        rows.push({ type: 'text', label: 'Changes apply at once. Close the menu to look.' });
+        rows.push({ type: 'action', id: 'back', label: 'Back' });
+        return rows;
+    };
+
     return {
         title: (ctx) => {
             const prog = ctx.progress();
@@ -213,6 +246,15 @@ export function buildScreens() {
             items: [
                 { type: 'text', label: `Run mode: ${(RUN_MODES[ctx.progress().runMode]?.name || 'Medium').toUpperCase()}` },
                 { type: 'action', id: 'resume', label: 'Resume' },
+                // Pause only, never the title. There is no body to dress before
+                // a save is loaded, and a wardrobe on the title screen would be
+                // a menu that reads an inventory that does not exist yet.
+                {
+                    type: 'submenu', id: 'appearance', label: 'Appearance', screen: 'appearance',
+                    disabled: !!ctx.wardrobe && ctx.wardrobe().every((s) => s.only),
+                    note: (!!ctx.wardrobe && ctx.wardrobe().every((s) => s.only))
+                        ? 'Nothing found yet' : '',
+                },
                 { type: 'submenu', id: 'beats', label: 'Altar Travel', screen: 'beats', disabled: ctx.progress().runMode === 'survival' || (ctx.hasItem && !ctx.hasItem('resonance_fork')) },
                 { type: 'submenu', id: 'settings', label: 'Settings', screen: 'settings' },
                 { type: 'submenu', id: 'scores', label: 'Witness Scores', screen: 'scores' },
@@ -221,6 +263,7 @@ export function buildScreens() {
             ],
         }),
         settings: (ctx) => ({ title: 'SETTINGS', items: settingsItems(ctx) }),
+        appearance: (ctx) => ({ title: 'APPEARANCE', items: appearanceItems(ctx) }),
         beats: (ctx) => ({ title: 'BEAT SELECT', items: beatItems(ctx) }),
         controls: () => ({ title: 'CONTROLS', items: controlsItems() }),
         scores: (ctx) => ({ title: 'WITNESS SCORES', items: scoreItems(ctx) }),

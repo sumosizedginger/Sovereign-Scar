@@ -48,7 +48,8 @@
 // thing depends on it. After that the rest are content, not engineering.
 
 import * as THREE from 'three';
-import { grantSkin, heroSkin } from '../characters/hero-skins.js';
+import { heroSkin } from '../characters/hero-skins.js';
+import { grantOutfit } from '../kernel/wardrobe.js';
 
 /** Radius the player must be inside to read the prompt and press the key. */
 export const RELIC_REACH = 2.6;
@@ -460,7 +461,7 @@ export function addRelic(level, ctx, spec, origin) {
                 return;
             }
             inv.setFlag(spec.id);
-            const dressed = grantSkin(inv, spec.skin);
+            const dressed = grantOutfit(inv, spec.skin);
             game.persistInventory?.();
             if (dressed) game.player.applySavedSkin?.();
             game.hud?.story?.queue?.(spec.lines);

@@ -6,12 +6,16 @@
 // separately and matching it to the body by hand is how the two drift apart.
 
 import { buildShieldModel, SHIELD_OFFSET, SHIELD_TILT } from '../assets/weapon-models.js';
+import { gearRoleMap, DEFAULT_GEAR } from '../assets/gear-skins.js';
 
 export class HeldShield {
     /** @param {THREE.Object3D} rigRoot the actor's root group */
     constructor(rigRoot) {
         this.rigRoot = rigRoot;
         this.shown = false;
+        // Same reasoning as HeldWeapon: visibility alone is not enough to
+        // decide whether the prop in the hand is still the right prop.
+        this.skin = DEFAULT_GEAR;
         this.model = null;
         this.mount = null;
         this._findMount();
@@ -28,18 +32,24 @@ export class HeldShield {
         this.mount = handL || arm;
     }
 
-    /** Show or hide. Cheap to call every frame — a no-op unless it changed. */
-    set(visible) {
+    /** Show or hide, in `skinId`. A no-op unless one of the two changed. */
+    set(visible, skinId = DEFAULT_GEAR) {
         const want = !!visible;
-        if (want === this.shown) return;
+        if (want === this.shown && skinId === this.skin) return;
         this.shown = want;
+        this.skin = skinId;
         if (!want) {
             this.clear();
             return;
         }
         if (!this.mount) this._findMount();
         if (!this.mount) return;
-        const model = buildShieldModel();
+        // Rebuilt rather than repainted. The shield is torn down and remade
+        // every time it is raised anyway, so there is no live-recolour path to
+        // keep correct — unlike the hero, who is on screen continuously and had
+        // to grow one.
+        this.clear();
+        const model = buildShieldModel(gearRoleMap(skinId, 'shield'));
         model.position.set(SHIELD_OFFSET.x, SHIELD_OFFSET.y, SHIELD_OFFSET.z);
         model.rotation.set(SHIELD_TILT.x, 0, SHIELD_TILT.z);
         this.mount.add(model);

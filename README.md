@@ -175,7 +175,7 @@ is and is not under review, how to verify the claims here yourself, and an
 unflattering list of this project's known weaknesses written by the person who
 built it.
 
-Implementation log: [BUILD_LOG.md](BUILD_LOG.md) · Controls: [docs/CONTROLS.md](docs/CONTROLS.md) · Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Design audit: [ZeldaLevel.md](ZeldaLevel.md) · Rendering roadmap: [docs/VISUAL_PLAN.md](docs/VISUAL_PLAN.md) · Open questions: [docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md) · Easter eggs and skins: [docs/EASTER-EGGS.md](docs/EASTER-EGGS.md)
+Implementation log: [BUILD_LOG.md](BUILD_LOG.md) · Controls: [docs/CONTROLS.md](docs/CONTROLS.md) · Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Design audit: [ZeldaLevel.md](ZeldaLevel.md) · Rendering roadmap: [docs/VISUAL_PLAN.md](docs/VISUAL_PLAN.md) · Open questions: [docs/OPEN_QUESTIONS.md](docs/OPEN_QUESTIONS.md) · Easter eggs and skins: [docs/EASTER-EGGS.md](docs/EASTER-EGGS.md) · Wardrobe: [docs/WARDROBE.md](docs/WARDROBE.md)
 
 ## Project layout
 

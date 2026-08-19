@@ -24,6 +24,7 @@ import { LocalLightPool } from './fx/local-light-pool.js';
 import { prewarmLevel } from './render/prewarm.js';
 import { bossSubtitle } from './bosses/subtitles.js';
 import { Player } from './player.js';
+import { wardrobeView, wearIn, outfitIdFromName } from './kernel/wardrobe.js';
 import { HUD } from './ui/hud.js';
 import { coach, setCoachSink, setCoachStore, resetCoach } from './ui/coach.js';
 import { MoodController } from './fx/mood-controller.js';
@@ -760,6 +761,7 @@ const menu = new MenuOverlay({
         shards: () => loadSovereignProgress().bankedShards || 0,
         upgrades: () => loadSovereignProgress().upgrades || {},
         hasItem: (id) => player.inventory.hasItem(id),
+        wardrobe: () => wardrobeView(player.inventory),
         healthFull: () => player.health.hp >= player.health.max,
         hasVialSlot: () => {
             const slots = player.inventory.memoryVialSlots
@@ -799,6 +801,21 @@ const menu = new MenuOverlay({
     },
     onEvent: (ev) => {
         if (ev.type === 'set') {
+            // The three wardrobe rows share one handler rather than three
+            // cases, because the slot is already in the id and a switch would
+            // be the same four lines written three times.
+            if (typeof ev.id === 'string' && ev.id.startsWith('skin:')) {
+                const slot = ev.id.slice(5);
+                if (wearIn(player.inventory, slot, outfitIdFromName(ev.value))) {
+                    // Rebuild from the SAVE, not from `ev.value`. `wearIn`
+                    // refuses an outfit the player does not own, so reading the
+                    // flags back is what guarantees the body on screen and the
+                    // body in the file are the same body.
+                    player.applySavedSkin();
+                    game.persistInventory();
+                }
+                return;
+            }
             switch (ev.id) {
                 case 'masterVol':
                     volState.master = ev.value;
