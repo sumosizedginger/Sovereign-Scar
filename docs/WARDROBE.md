@@ -303,12 +303,13 @@ too weak rather than code that was wrong, which is the point of running them.
 Counted rather than remembered, because a number in a plan is a hypothesis:
 
     region relic slots    8   all eight filled
-    outfits in the table 11   Crustwalker plus ten
-    with held gear       10   nine full sets; Ashen is shield-only on purpose
+    outfits in the table 12   Crustwalker plus eleven
+    with held gear       11   nine full sets, two single-slot on purpose
     relic props built     8   one per region
-    outfits with a source 10  eight relics, the well, the three fires
+    outfits with a source 11  eight relics, the well, three fires, one clean fight
 
-The roadmap below is finished. What is left is on the last page.
+**The roadmap is finished.** Every numbered step and the one item that was
+listed beside it. What is left is on the last page, and none of it is content.
 
 ---
 
@@ -437,6 +438,55 @@ not, and that distinction is the whole of it.
 
 ---
 
+## The one you cannot walk to
+
+Every outfit above is somewhere. **Untouched** is something you did: beat a boss
+without being hit once.
+
+It costs no prop, which is why it was named from the start as the cheapest
+source on the list. It dresses the **weapon only** — behaviour unlocks are
+single-slot standouts, and it is the second gap in the table after the Ashen's
+missing weapon, which means the slot filter now has two genuine holes keeping it
+honest instead of one.
+
+The blade is the point. Every other weapon in this game is battered — bone off a
+corpse, bronze out of a well, iron off a mast that fell over, steel that went
+through a fire. This one is unmarked: polished cold white, no rust, no wear, no
+patina, in a set whose entire visual language is things that have been used hard.
+The single red line on the accent is the only warm mark, and it is the joke: the
+blood on it is not yours.
+
+### The bookkeeping is the whole difficulty
+
+`index.js` already carried `_bossPhaseDamaged`, cleared at every phase change so
+the witness score can award a flawless *phase*. Reusing it would have been one
+word of work and permanently wrong — a flag that resets three times during the
+thing it measures cannot answer a question about the whole of it.
+
+So `kernel/flawless.js` is thirty lines with no imports, and the case it exists
+for is the one that hands out the reward for free:
+
+> **Dying to a boss and retrying re-enters the same id**, and `enter` ignores
+> being handed the same id twice — it has to, or the flag would reset at 144 Hz
+> and every fight would be flawless. Without an explicit reset on death, a
+> player who died four times would be handed a reward for never being hit.
+
+`leave()` is called in three places: the boss dying, the level tearing down, and
+the player dying. The last is the one the class was written around. The spec
+drives the class directly, and *reads `index.js` as text* to check the calls are
+still there — a weak assertion, honest about being weak, and the only available
+alternative to none.
+
+### And one branch turned out to be dead
+
+`hit()` guarded on `bossId` so damage outside a fight would be ignored. A
+counterfactual removed the guard and **every assertion stayed green** — which is
+the signal that a branch is unreachable rather than untested, since `enter`
+already clears the flag whenever a fight begins. The guard is gone: one place
+owns the invariant, and two places both trying to own it is how they drift.
+
+---
+
 ## The eight regions
 
 Each region has a colour identity in `overworld/world7.js`, and every outfit is
@@ -506,10 +556,6 @@ already written and is the thing that makes it survivable.
 
 ## Still open
 
-- **The no-damage boss kill.** Named from the start as the cheapest source in
-  the plan — a flag the combat code could already set, needing no prop, able to
-  grant any outfit. It is the only item on the original roadmap not built, and
-  it is a source rather than a look.
 - **The Light Caster still cannot be skinned.** All ten outfits land within a
   few points of each other on it, because its silhouette is almost entirely the
   emissive lamp and its bloom, and this table leaves `glow` alone. The probe

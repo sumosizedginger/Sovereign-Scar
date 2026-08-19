@@ -568,15 +568,26 @@ export function run(t) {
                 typeof WORLD7.screens[sid]?.onBake === 'function');
         }
 
+        // SOURCES ARE NOT ALL RELICS, and the list of the ones that are not is
+        // written here rather than left as a growing pile of `continue`s.
+        //
+        // Three outfits are earned instead of found: the Drowned out of the dry
+        // well, the Ashen for speaking to all three settlements, and Untouched
+        // for a boss beaten without being hit. The first version of this loop
+        // skipped the Ashen with a bare id in a condition; the third one
+        // arriving is what made that unmaintainable, because a skip list that
+        // grows silently is how a skin with NO source eventually slips through
+        // wearing somebody else's exemption.
+        const EARNED = { ashen: 'the three settlements', untouched: 'a flawless boss' };
+        const grantors = [...placed.map((r) => r.skin), WELL_SKIN, ...Object.keys(EARNED)];
         // Each skin is granted by at most one thing, or two sources fight over
         // the same unlock and the second one silently does nothing.
-        const grantors = [...placed.map((r) => r.skin), WELL_SKIN];
         t.ok('no two sources grant the same skin',
             new Set(grantors).size === grantors.length, grantors.join(', '));
         // Every skin except the default has a source. An unlock nothing grants
         // is content the player can never see.
         for (const id of heroSkinIds()) {
-            if (id === 'crustwalker' || id === 'ashen') continue;
+            if (id === 'crustwalker') continue;
             t.ok(`skin '${id}' has something that grants it`, grantors.includes(id));
         }
     }

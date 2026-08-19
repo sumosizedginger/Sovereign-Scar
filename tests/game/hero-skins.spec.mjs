@@ -28,6 +28,7 @@ import {
 } from '../../src/characters/builders.js';
 import { buildVoxelGeo } from '../../src/voxel/core.js';
 import { HERO_PALETTE } from '../../src/game/assets/palettes.js';
+import { hasGearArt } from '../../src/game/assets/gear-skins.js';
 import {
     HERO_SKINS, DEFAULT_SKIN, INHERITED_CLOTHING, heroSkinIds, heroSkin,
     heroSkinPalette, isHeroSkin, unlockedSkins, wornSkin, grantSkin, wearSkin,
@@ -96,6 +97,24 @@ export function run(t) {
         const baseLeg = buildVoxelGeo(base.legR).attributes.color.array;
         for (const id of heroSkinIds()) {
             if (id === DEFAULT_SKIN) continue;
+            // A SINGLE-SLOT OUTFIT HAS NO BODY PALETTE, AND THAT IS ALLOWED.
+            //
+            // This table started as the hero's wardrobe and has become the
+            // outfit REGISTRY: it carries the name and the source line for
+            // every look in the game, including the ones that dress only a
+            // hand. `docs/WARDROBE.md` settles the rule those follow - relics
+            // are full sets because they are the payoff for exploring, and
+            // behaviour unlocks are single-slot standouts.
+            //
+            // So the question is no longer "does every skin repaint the body",
+            // it is "does every skin that CLAIMS a body palette repaint the
+            // body". An outfit with an empty palette is checked below instead:
+            // it has to dress something somewhere, or it is a name with no art.
+            if (Object.keys(HERO_SKINS[id].palette).length === 0) {
+                t.ok(`skin ${id} has no body palette and dresses gear instead`,
+                    hasGearArt(id, 'weapon') || hasGearArt(id, 'shield'));
+                continue;
+            }
             const parts = heroParts(heroSkinPalette(id, HERO_PALETTE));
             const torso = buildVoxelGeo(parts.torso).attributes.color.array;
             const leg = buildVoxelGeo(parts.legR).attributes.color.array;

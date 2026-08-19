@@ -44,6 +44,7 @@
 //      an unlock dresses every slot it can fill without resetting the ones it
 //      cannot.
 
+import fs from 'node:fs';
 import * as THREE from 'three';
 import {
     buildWeaponModel, buildShieldModel, weaponTipY, MODELLED_WEAPONS, GEAR_ROLES,
@@ -64,6 +65,7 @@ import {
 } from '../../src/game/world/settlements.js';
 import { HeldWeapon } from '../../src/game/fx/held-weapon.js';
 import { HeldShield } from '../../src/game/fx/held-shield.js';
+import { FlawlessWatch } from '../../src/game/kernel/flawless.js';
 
 /** Just enough Inventory to exercise the flag helpers. */
 function fakeInventory(flags = {}) {
@@ -504,6 +506,81 @@ export function run(t) {
         t.ok('speaking again does not re-announce', toasts.length === before);
 
         for (const sys of systems) sys.dispose();
+    }
+
+    // ── the one outfit you cannot walk to ───────────────────────────────────
+    //
+    // Every other unlock is somewhere in the world. This is a boss beaten
+    // without being hit, and the bookkeeping behind it is easy to get subtly
+    // wrong in ways that hand out the reward for free - which is why the watch
+    // is thirty lines in its own file instead of a flag in the render loop.
+    {
+        const w = new FlawlessWatch();
+        t.ok('nothing is flawless before a fight', w.flawless === false);
+        t.ok('a hit outside a fight leaves nothing flawless', (w.hit(), w.flawless === false));
+        // AND CANNOT CONTAMINATE THE NEXT FIGHT. That is the actual contract,
+        // and it is `enter` that keeps it - `hit` used to carry a guard for the
+        // same purpose and a counterfactual proved the guard unreachable.
+        t.ok('and cannot leak into the fight that follows',
+            (w.enter('early'), w.flawless === true));
+        w.leave();
+
+        t.ok('entering a fight starts a clean sheet', (w.enter('crypt'), w.flawless === true));
+        // CALLED EVERY FRAME. If re-entering the same id cleared the record,
+        // the flag would reset at 144 Hz and every fight would be flawless.
+        w.enter('crypt');
+        t.ok('re-entering the same fight keeps the sheet', w.flawless === true);
+        w.hit();
+        t.ok('a hit ends it', w.flawless === false);
+        w.enter('crypt');
+        t.ok('and re-entering does not launder it', w.flawless === false);
+
+        // THE CASE THE CLASS EXISTS FOR. Dying and retrying re-enters the same
+        // id, which `enter` ignores by design, so the reset has to be explicit
+        // or a player who died four times is rewarded for never being hit.
+        w.leave();
+        t.ok('leaving clears the fight', w.flawless === false);
+        w.enter('crypt');
+        t.ok('the retry starts clean', w.flawless === true);
+
+        // A different boss is a different sheet even without a leave.
+        w.hit();
+        w.enter('spindle');
+        t.ok('a new boss starts its own sheet', w.flawless === true);
+        t.ok('enter reports whether it started one', w.enter('spindle') === false);
+        t.ok('and reports true when it does', w.enter('sinklands') === true);
+
+        // The reward itself.
+        t.ok('Untouched is a real outfit', isHeroSkin('untouched'));
+        t.ok('Untouched dresses the weapon', hasGearArt('untouched', 'weapon'));
+        // SINGLE SLOT, like every behaviour unlock - see docs/WARDROBE.md.
+        t.ok('Untouched carries no shield', !hasGearArt('untouched', 'shield'));
+        // THE WIRING, BY INSPECTION, because the alternative is nothing.
+        //
+        // `FlawlessWatch` is fully tested above and completely useless if
+        // `index.js` stops calling it, and index.js is the whole game - it
+        // cannot be imported into a spec. So this reads the source, which is
+        // the same thing `relics.spec.mjs` does to prove the miner grants
+        // nothing. It is a weak assertion and it is honest about being one: it
+        // cannot tell whether the calls are in the RIGHT places, only that
+        // somebody has not quietly deleted them.
+        //
+        // The three `leave()` calls are the boss dying, the level tearing down,
+        // and the player dying. The last is the one the class exists for.
+        const idx = fs.readFileSync('src/game/kernel/../index.js', 'utf8');
+        t.ok('the game watches for a flawless fight', /new FlawlessWatch\(\)/.test(idx));
+        t.ok('it is told when the player is hit', idx.includes('flawless.hit()'));
+        t.ok('it is told which fight is happening', idx.includes('flawless.enter('));
+        t.ok('and it is cleared in three places', (idx.match(/flawless\.leave\(\)/g) || []).length >= 3,
+            `${(idx.match(/flawless\.leave\(\)/g) || []).length} calls`);
+        t.ok('the reward is granted from the defeat path',
+            /flawless\.flawless[\s\S]{0,120}grantOutfit\(player\.inventory, 'untouched'\)/.test(idx));
+
+        const inv = fakeInventory();
+        t.ok('it can be granted', grantOutfit(inv, 'untouched') === true);
+        t.ok('granting it twice reports nothing', grantOutfit(inv, 'untouched') === false);
+        t.ok('it dresses the weapon slot', wornIn(inv, 'weapon') === 'untouched');
+        t.ok('and leaves the shield alone', wornIn(inv, 'shield') === DEFAULT_GEAR);
     }
 
     // ── the table's own shape ───────────────────────────────────────────────

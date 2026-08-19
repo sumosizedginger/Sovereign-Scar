@@ -24,7 +24,9 @@ import { LocalLightPool } from './fx/local-light-pool.js';
 import { prewarmLevel } from './render/prewarm.js';
 import { bossSubtitle } from './bosses/subtitles.js';
 import { Player } from './player.js';
-import { wardrobeView, wearIn, outfitIdFromName } from './kernel/wardrobe.js';
+import { wardrobeView, wearIn, outfitIdFromName, grantOutfit } from './kernel/wardrobe.js';
+import { FlawlessWatch } from './kernel/flawless.js';
+import { heroSkin } from './characters/hero-skins.js';
 import { HUD } from './ui/hud.js';
 import { coach, setCoachSink, setCoachStore, resetCoach } from './ui/coach.js';
 import { MoodController } from './fx/mood-controller.js';
@@ -276,12 +278,23 @@ player.onShatter = (dest, _n) => {
 };
 
 // Juice feeds (A1–A3, A5)
+/**
+ * Tracks whether the CURRENT boss fight has been clean.
+ *
+ * `_bossPhaseDamaged` beside it answers a different question - it clears at
+ * every phase change so the witness score can award a flawless phase - and
+ * reusing it would have meant a whole-fight reward decided by the last third of
+ * the fight. See `kernel/flawless.js`.
+ */
+const flawless = new FlawlessWatch();
+
 player.health.onDamage = () => {
     juice.addTrauma(0.3);
     juice.hitstop(0.09);
     juice.spikeDamageVignette();
     witnessScore?.resetChain?.();
     if (game?.activeBoss) game._bossPhaseDamaged = true;
+    flawless.hit();
 };
 juice.onKill = (defender) => {
     const p = defender?.root?.position;
@@ -378,6 +391,15 @@ const game = {
     recordBoss(id) {
         const p = recordBossDefeat(id);
         witnessScore?.award?.('boss', id);
+        // THE ONE OUTFIT YOU CANNOT WALK TO. Read before anything else here
+        // touches the player: this is the last frame on which the fight is
+        // still the fight.
+        if (flawless.flawless && grantOutfit(player.inventory, 'untouched')) {
+            player.applySavedSkin?.();
+            game.persistInventory?.();
+            hud.toast(`Untouched \u2014 ${heroSkin('untouched').from}`, 4200);
+        }
+        flawless.leave();
         const beatNo = Number(String(game.levelId).match(/beat-(\d+)/)?.[1] || 0);
         if (beatNo >= 6 && beatNo <= 12) witnessScore?.award?.('engineer', game.levelId);
         sfx.fanfare?.();
@@ -479,6 +501,11 @@ function unloadLevel() {
         try { game.level.dispose(); } catch (e) { console.warn('level dispose', e); }
         game.level = null;
     }
+    // A FIGHT DOES NOT SURVIVE A LEVEL CHANGE. Walking out of an arena and
+    // back in is a new attempt, and `FlawlessWatch.enter` deliberately ignores
+    // being handed the same boss id twice - so without this, leaving after
+    // being hit and returning would resume the sheet mid-fight.
+    flawless.leave();
     heartDrops.clear(); // loose hearts must not survive into the next level
     contactShadows.clear(); // ditto — a disc outlives its actor by a frame otherwise
     collisionWorld.clear();
@@ -1610,6 +1637,9 @@ function frame() {
             }
             if (phase > 0 && !game._lastBossPhase) game._bossPhaseDamaged = false;
             game._lastBossPhase = phase;
+            // Safe every frame: `enter` only starts a new sheet on a CHANGE of
+            // id, so calling it at 144 Hz cannot clear the record it is keeping.
+            if (b && !b.defeated && b.bossId) flawless.enter(b.bossId);
         }
 
         if (particles.update) particles.update(sdt);
@@ -1777,6 +1807,11 @@ function frame() {
                     });
                 }
 
+                // AND A DEATH ENDS IT. This is the case the whole class is
+                // written around: dying to a boss and retrying re-enters the
+                // same id, which `enter` ignores, so a player who died four
+                // times would otherwise be handed a reward for never being hit.
+                flawless.leave();
                 deathShown = true;
                 juice.hitstop(0.3);
                 juice.addTrauma(0.8);

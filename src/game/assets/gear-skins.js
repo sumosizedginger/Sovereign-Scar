@@ -439,6 +439,31 @@ export const GEAR_SKINS = Object.freeze({
             grip: { color: 0x2c2a29, rough: 0.96, metal: 0.04 },
         }),
     }),
+
+    // BEATEN A BOSS WITHOUT BEING HIT. Weapon only, and the only outfit in the
+    // game earned by playing rather than by walking somewhere.
+    //
+    // Every other weapon here is battered: bone off a corpse, bronze out of a
+    // well, iron off a mast that fell over, a blade that went through a fire.
+    // This one is unmarked. Polished to a cold white with no rust, no wear and
+    // no patina, against a set where the whole visual language is things that
+    // have been used hard - which is why it needs no ornament to stand out.
+    //
+    // The single red line on the accent is the only warm mark, and it is the
+    // point of the joke: the blood on it is not yours.
+    untouched: Object.freeze({
+        id: 'untouched',
+        name: 'Untouched',
+        weapon: Object.freeze({
+            grip: { color: 0x2a2a2c, rough: 0.90, metal: 0.15 },
+            guard: { color: 0x9aa0a6, metal: 0.70, rough: 0.26 },
+            guardDark: { color: 0x63696e, metal: 0.62, rough: 0.34 },
+            blade: { color: 0xf0f4f8, metal: 0.88, rough: 0.12 },
+            bladeDark: { color: 0xc0c8d0, metal: 0.80, rough: 0.20 },
+            accent: { color: 0x8e0f24, metal: 0.40, rough: 0.36 },
+        }),
+        shield: null,
+    }),
 });
 
 /** `true` if `id` names a row here. */

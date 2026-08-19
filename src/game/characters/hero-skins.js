@@ -339,6 +339,26 @@ export const HERO_SKINS = Object.freeze({
             beardDark: 0x2c2a29,
         },
     },
+
+    // BEATEN A BOSS WITHOUT BEING HIT.
+    //
+    // The one thing in the wardrobe you cannot walk to. Every other outfit is
+    // somewhere in the world; this is something you did, and the only palette
+    // in the set that describes the PLAYER rather than a place.
+    //
+    // It dresses the weapon and nothing else - see the rule in
+    // `docs/WARDROBE.md`: relics are full sets because they are the payoff for
+    // exploring, and behaviour unlocks are single-slot standouts. The body
+    // entry exists so the name and the source line have somewhere to live and
+    // so the picker can say where it came from; there is no body palette to
+    // apply, which `hero-skins.spec.mjs` allows because an empty override is a
+    // merge that changes nothing.
+    untouched: {
+        id: 'untouched',
+        name: 'Untouched',
+        from: 'a boss that never landed one',
+        palette: {},
+    },
 });
 
 /** Ids in display order. */
