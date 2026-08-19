@@ -31,7 +31,18 @@ export function makeProtector(s, features, half) {
     const circles = [{ x: 0, z: 0, r: 6 }]; // spawn + screen centre
     for (const en of s.entrances || []) circles.push({ x: en.x, z: en.z, r: 5 });
     if (s.monolith) circles.push({ x: s.monolith.x, z: s.monolith.z, r: 4 });
-    for (const f of features || []) if (f) circles.push({ x: f.x, z: f.z, r: 4 });
+    // `f.r ?? 4` — and the `?? 4` is the old behaviour, not a new default.
+    //
+    // This read `r: 4` unconditionally, which silently discarded every radius a
+    // feature asked for. `world/settlements.js` has pushed `{ x: 0, z: 0, r: 8 }`
+    // since Phase E3 under a comment explaining exactly why a settlement needs a
+    // fat one — "boulders grown through somebody's chest is not the impression
+    // this is for" — and that 8 has never once been read. The settlements were
+    // saved only by the radius-6 circle above them, which is not the same shape
+    // and was not the reason anybody thought they were safe.
+    //
+    // A feature that does not ask keeps 4, so every other caller is unmoved.
+    for (const f of features || []) if (f) circles.push({ x: f.x, z: f.z, r: f.r ?? 4 });
     const rects = [];
     for (const b of s.blockers || []) {
         if (b.rect) rects.push({

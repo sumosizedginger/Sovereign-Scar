@@ -9,6 +9,10 @@ import { CRUST_REGION } from './screens.js';
 import { addForkDigSite, addWeatherRelay, addEngineerCamp } from '../narrative/item-chains.js';
 import { runGrammar } from './grammars.js';
 import { SETTLEMENTS } from '../world/settlements.js';
+import { relicOnScreen, addRelic } from '../world/relics.js';
+import {
+    addDryWell, addMiner, WELL_SCREEN, MINER_SCREEN, WELL_AT, MINER_AT,
+} from '../world/easter-eggs.js';
 
 // ── Seeded rand (mulberry32 over a string hash) ────────────────────────────
 function hash(str) {
@@ -176,6 +180,16 @@ function screenFeatures(sid) {
     // around it), so it declares a fat anchor at the screen centre: boulders
     // grown through somebody's chest is not the impression this is for.
     if (SETTLEMENTS[sid]) feats.push({ x: 0, z: 0, r: 8 });
+    // A relic is the biggest prop in the game and the reason the player came to
+    // the screen, so it declares 7 — enough to keep the ribcage and the arch
+    // the player walks under clear, and deliberately NOT enough to cover the
+    // skull and the tail. Those are meant to be half-buried: a dragon lying in
+    // clean ground looks mounted, and a dragon with rock over its jaw looks
+    // like it has been there a long time.
+    const relic = relicOnScreen(sid);
+    if (relic) feats.push({ x: relic.x, z: relic.z, r: 7 });
+    if (sid === WELL_SCREEN) feats.push({ ...WELL_AT, r: 4 });
+    if (sid === MINER_SCREEN) feats.push({ ...MINER_AT, r: 4 });
     return feats;
 }
 
@@ -220,6 +234,18 @@ export function buildWorld7() {
 
             const feats = screenFeatures(sid);
             const s = {
+                // PUBLISHED, not just handed to the grammar.
+                //
+                // These anchors used to exist only inside the grammar closure,
+                // which meant the terrain grammar respected them and every
+                // later pass did not. `terraceRoom` runs after the grammar and
+                // knew about doors, the spawn and enemies — so measured across
+                // the thirteen anchors this world already had, TWELVE had
+                // terrain raised inside them and three were sitting on top of
+                // a raised cell: a shard cache, the Fork's dig site and the
+                // weather relay, which between them are the Resonance Fork's
+                // whole acquisition chain.
+                features: feats,
                 grid: [8 + c, 8 + r],
                 floorColor: R.crustFloor,
                 edges: [],
@@ -261,9 +287,19 @@ export function buildWorld7() {
             const secret = SECRETS[sid];
             const suture = OVERWORLD_SUTURES[sid];
             const chainProp = CHAIN_PROPS[sid];
-            s.secret = !!secret;
-            if (secret || suture || chainProp) {
+            const relic = relicOnScreen(sid);
+            const egg = sid === WELL_SCREEN || sid === MINER_SCREEN;
+            // A relic marks the screen as a secret, so the Echo Lens points at
+            // it the same way it points at a shard cache. The two easter eggs
+            // deliberately do NOT: a joke you stumble on is worth more than a
+            // joke the map sent you to, and neither of them is a completion
+            // item that a player could be left hunting for.
+            s.secret = !!secret || !!relic;
+            if (secret || suture || chainProp || relic || egg) {
                 s.onBake = (level, origin, ctx) => {
+                    if (relic) addRelic(level, ctx, relic, origin);
+                    if (sid === WELL_SCREEN) addDryWell(level, ctx, origin);
+                    if (sid === MINER_SCREEN) addMiner(ctx, origin);
                     if (chainProp) {
                         const at = { x: origin.x + chainProp.x, z: origin.z + chainProp.z };
                         if (chainProp.kind === 'digsite') addForkDigSite(level, ctx, at);

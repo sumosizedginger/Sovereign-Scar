@@ -495,3 +495,84 @@ export function createActorRig(opts = {}) {
         },
     };
 }
+
+/**
+ * Repaint a built rig with a different palette, in place.
+ *
+ * WHY IN PLACE, RATHER THAN REBUILDING THE ACTOR
+ *
+ * By the time a skin is unlocked the hero's rig is load-bearing for six other
+ * systems: the animator holds every pivot, `HeldWeapon` and `HeldShield` have
+ * parented models to the `hand` and `handL` sockets, the physics body tracks
+ * `rig.position`, combat reads `radius`, and the contact shadow tracks the
+ * feet. Rebuilding means re-establishing all of that correctly at the exact
+ * moment the player is looking at the character, which is the worst possible
+ * time to discover one of them was missed.
+ *
+ * None of it is necessary. A palette carries COLOURS, and the part builders
+ * decide SHAPE from the profile and the clothing mode — both of which live in
+ * `opts`, not in the palette. Build any part twice under two palettes and you
+ * get the same cell keys and the same vertex count; only the colour buffer
+ * differs. So the whole skin change is one buffer per part.
+ *
+ * The vertex-count check below is not defensive padding. It is the assumption
+ * stated as a runtime assertion: if a future palette key ever does add or
+ * remove a voxel, this refuses the swap and leaves the hero correctly dressed
+ * in the old skin, rather than writing a mismatched colour buffer and
+ * scattering another part's colours across the body.
+ *
+ * @param {ReturnType<typeof createActorRig>} actor
+ * @param {object} opts     the SAME options the actor was built with — the
+ *   profile scales and clothing mode decide shape, so passing different ones
+ *   here would produce a buffer for a body this rig does not have.
+ * @param {object} palette  the new palette
+ * @returns {boolean} `true` if every part was repainted
+ */
+export function recolorActor(actor, opts, palette) {
+    if (!actor || !palette) return false;
+    const slim = scaleProfile(TORSO_PROFILE, opts?.torsoProfileScale ?? 0.65);
+    const slimHead = scaleProfile(HEAD_PROFILE, opts?.headProfileScale ?? 0.85);
+    const clothing = { clothingMode: opts?.clothingMode || 'casual' };
+
+    /** The part mesh inside a pivot group — found by the same marker the
+     *  outline pass uses, so it cannot be broken by the rig gaining children. */
+    const partOf = (node) => {
+        if (!node) return null;
+        if (node.isMesh && node.userData?.ssPart) return node;
+        let found = null;
+        node.traverse((o) => { if (!found && o.isMesh && o.userData?.ssPart) found = o; });
+        return found;
+    };
+
+    const parts = [
+        [actor.torsoMesh, () => buildTorso(palette, slim, clothing)],
+        [partOf(actor.head), () => buildHead(palette, slimHead, {})],
+        [partOf(actor.armR), () => buildArm(palette, 1)],
+        [partOf(actor.armL), () => buildArm(palette, -1)],
+        [partOf(actor.legR), () => buildLeg(palette, 1)],
+        [partOf(actor.legL), () => buildLeg(palette, -1)],
+    ];
+
+    // Built first, checked, THEN written. A half-repainted hero — bone torso on
+    // crustwalker legs — is worse than one that did not change, and it is
+    // exactly what a per-part loop with a bail-out in the middle produces.
+    const pending = [];
+    for (const [mesh, build] of parts) {
+        const live = mesh?.geometry?.attributes?.color;
+        if (!live) return false;
+        const geo = buildVoxelGeo(build());
+        const next = geo.attributes.color;
+        if (!next || next.count !== live.count) {
+            geo.dispose();
+            for (const p of pending) p.geo.dispose();
+            return false;
+        }
+        pending.push({ live, next, geo });
+    }
+    for (const p of pending) {
+        p.live.array.set(p.next.array);
+        p.live.needsUpdate = true;
+        p.geo.dispose();
+    }
+    return true;
+}

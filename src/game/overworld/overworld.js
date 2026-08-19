@@ -230,6 +230,11 @@ export function createOverworld(ctx, screensDef, opts = {}) {
             // material laid over it.
             treadColor: shadeOf(screenFloor, mood === 'abyss' ? 1.24 : 1.16),
             onBake: s.onBake,
+            // Forwarded so the terracing pass can refuse to raise ground
+            // through a cache, a suture, a chain prop, a settlement fire or a
+            // relic. See `world7.js` — the grammar has always honoured these
+            // and nothing downstream of it did.
+            features: s.features || [],
             doors: (s.edges || []).map((e) => ({
                 to: e.to,
                 side: e.side,

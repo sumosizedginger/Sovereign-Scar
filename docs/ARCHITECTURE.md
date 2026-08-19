@@ -142,6 +142,43 @@ a **sealed** room — widen only, never a look-target slide, capped at
 and a killing blow land on the same frame constantly and sharing `_kick` would
 let one eat the other. Measured with `tests/qa/arena-frame.mjs`.
 
+**Hero skins** (`src/game/characters/hero-skins.js`, DOM-free so specs can load
+it): a table of palette overrides merged over `HERO_PALETTE`, plus the ownership
+helpers. `recolorActor` in `actor-rig.js` applies one to a LIVE rig by writing
+the colour buffer of each of the six body parts and nothing else — proven safe
+rather than assumed, because a palette carries colours while the part builders
+take shape from the profile and clothing mode, so two palettes give identical
+cell keys and identical vertex counts. A build whose vertex count disagrees is
+refused whole rather than half-applied, so no socket moves and the weapon cannot
+come out of the hand. **A skin may never set `rimColor`, `rimStrength` or
+`eyeGlow`, and may never touch a number** — the rim is pinned to azure by
+`hero-readability.spec.mjs` for a recorded reason, and a cosmetic that grants
+anything enters the balance conversation. `INHERITED_CLOTHING` names the shirt
+and trousers the hero has always worn, which were never authored here at all:
+they fall out of defaults inside the frozen `src/characters/builders.js`.
+
+**Region relics and easter eggs** (`src/game/world/relics.js`,
+`src/game/world/easter-eggs.js`): props at overworld screen centres that grant a
+skin and nothing else. The screen centre is the placement because
+`makeProtector` keeps a radius-6 disc clear there, so it is the one spot
+guaranteed unoccluded at 70.7° of pitch. **Nothing here collides** — a relic is
+scenery you walk through, and the dragon's arch clears 2.10 against a hero of
+1.95, measured off the built meshes by `relics.spec.mjs`. `REGION_RELICS` has
+one row per region and seven are `null` on purpose: the chain is proven once
+before the rest is authored. Placement in the built world is measured by
+`tests/qa/easter-eggs.mjs`; how it all LOOKS is `tests/qa/easter-egg-shots.mjs`,
+which is not optional — every placement number was green while the skull was a
+pile of pale rectangles and the well could not be seen from inside its own
+interact radius.
+
+**Feature anchors are honoured by every pass, not just the grammar.** A screen
+publishes `features` (caches, sutures, chain props, settlements, relics) and
+both `makeProtector` and `terraceRoom` read them, each with the radius the
+anchor asks for. Before this, `makeProtector` discarded every requested radius
+and the terracing pass had never heard of anchors at all: 12 of 13 had terrain
+raised inside them and 3 sat on a raised cell, two of those being the Resonance
+Fork's acquisition chain.
+
 **Off-screen threat marks** (`src/game/fx/threat-edge.js`): a chevron at the
 frame edge for a committed attack whose attacker is outside it, for exactly the
 wind-up, in the telegraph ring's colour. Hooked at `Enemy._beginWindup`, the one

@@ -3,7 +3,8 @@
 Written 2026-08-18, from the owner: *"we have a lot of useless overworld where
 there is no reason to explore."*
 
-This is a design doc, not a build log. **Nothing in it has shipped yet.** The
+**Built 2026-08-18.** The design reasoning below is unchanged; what shipped and
+what looking at it changed is recorded in *What was built* at the bottom. The
 numbers are measured and the command that measures them is named, so the next
 reader can check rather than trust.
 
@@ -281,3 +282,131 @@ Eight region relics are the backbone. Other sources worth arguing about:
 4. **Eight relics or eight regions?** They are the same number today. If a
    region ever splits, the relic count should follow the *regions*, since the
    palette is the point.
+
+---
+
+# What was built
+
+Three props, four hero skins, and the map mark — plus two pre-existing bugs that
+only surfaced because something new was placed into that world.
+
+| thing | where | what it gives |
+|---|---|---|
+| the dragon skeleton | `r0c1`, tombfields | the **Bonewarden** skin |
+| the dry well | `r2c1`, one screen west of spawn | the **Drowned** skin, on the third throw |
+| the miner | `r6c6`, the far corner | nothing, on purpose |
+
+Code: `src/game/characters/hero-skins.js`, `src/game/world/relics.js`,
+`src/game/world/easter-eggs.js`, `recolorActor` in
+`src/game/characters/actor-rig.js`, wiring in `src/game/overworld/world7.js`.
+Held by `tests/game/hero-skins.spec.mjs` (246) and
+`tests/game/relics.spec.mjs` (117). Measured by `tests/qa/easter-eggs.mjs`
+(placement) and `tests/qa/easter-egg-shots.mjs` (pictures and skin contrast).
+
+## The skin swap is a colour buffer, nothing more
+
+Proven rather than assumed: build every part of the hero under two palettes and
+you get identical cell keys and identical vertex counts —
+
+```
+torso  cells 3903 3903 | same keys true | verts 11352 11352
+head   cells  993  993 | same keys true | verts  5268  5268
+armR   cells  819  819 | same keys true | verts  4404  4404
+legR   cells 1233 1233 | same keys true | verts  5736  5736
+```
+
+so `recolorActor` writes one buffer per part into the live rig and moves
+nothing. No socket shifts, the weapon stays in the hand, the hitbox radius and
+the standing height are byte-identical. A build that would change the vertex
+count is refused outright rather than half-applied.
+
+## Two bugs that were already there
+
+**`makeProtector` discarded every radius a feature asked for.** It pushed
+`{ x, z, r: 4 }` unconditionally. `world/settlements.js` has passed
+`{ x: 0, z: 0, r: 8 }` since Phase E3 under a comment explaining exactly why a
+settlement needs a fat one, and that 8 had never once been read.
+
+**The terracing pass had never heard of feature anchors.** The terrain grammar
+has always refused to build over one; `terraceRoom` runs afterwards, raises
+ground by up to two, and knew only about doors, the spawn and enemies. Measured
+across the thirteen anchors the overworld already had:
+
+```
+before   12 of 13 had terrain raised inside them
+          3 were sitting ON a raised cell — a shard cache, the Fork's
+            dig site, and the weather relay
+after     0 of 16 sit on a raised cell   (16 = 13 + the three new props)
+```
+
+Two of those three are the Resonance Fork's whole acquisition chain, which gates
+Altar Travel. Both fixes are one predicate each and both are held by the
+counterfactual sweep.
+
+## What looking at it changed
+
+Everything above is a measurement, and every one of them was green while the
+pictures were wrong. These came only from rendering the props at the real camera
+and looking:
+
+- **The skull was a pile of pale rectangles.** It was a perfectly reasonable
+  skull *seen from the side*, and nobody ever sees this animal from the side.
+  Rebuilt as a plan-view silhouette: a wedge that steps inward to the snout, two
+  large dark eye sockets in the top surface, a detached jaw lying beside it.
+- **The well could not be seen from inside its own interact radius.** Same value
+  as the ground, no depth, and its only vertical was the same grey as its rim.
+  Now: dark rim with a pale coping, a real hole with rubble in it, timber posts
+  and a winding barrel. Still no emissive, still no blue — visibly dry is a
+  promise the spec holds.
+- **The skull floated 0.39 above the ground and the tail 0.81.** Same defect as
+  each other, invisible in every number that placed them.
+- **The horns barred the arch.** They swept back at a constant height and put a
+  bone at 1.07 across the ribcage the player is invited to walk through. They
+  descend to the ground now, which is also what a fallen skull does.
+- **The wing was correct and off-screen.** North of the spine, in a frame only
+  6.8 units deep above the character. Moved to the near ground, where it fills
+  the empty foreground and the animal wraps around the player.
+
+## I was wrong about the Bonewarden
+
+The first look said the pale skin dissolved into the clay. The palette
+arithmetic said the opposite. Measured properly — an exact silhouette from a
+two-shot diff, on rendered frames, at play scale — the arithmetic was right:
+
+| skin | ΔL* vs floor | ΔRGB vs floor |
+|---|---|---|
+| crustwalker *(the shipped default)* | −2.0 | 34.9 |
+| **bonewarden** | **+4.8** | **44.0** |
+| drowned | −3.6 | 53.2 |
+| ashen | −1.7 | 34.1 |
+
+Every skin separates from the ground at least as well as the hero that ships
+today, and the Bonewarden separates best on luminance. Nothing was changed on
+the strength of a first impression that the instrument disagreed with.
+
+Two instruments had to be repaired before that table meant anything: a disc-and-
+annulus sampler whose "floor" ring was still inside a 34-pixel figure, and the
+palette-space version that measured a table instead of a frame.
+
+## And the fixture lied twice
+
+Worth writing down because it cost more time than any of the art:
+
+- The shot probe reported the dragon present on the well's screen and the
+  miner's. Every screen the player has visited stays in the scene graph, 64
+  units apart, so "is it in the scene" was never the question.
+- Two well shots came out with no well in them and I went looking for the bug in
+  the prop. `enterRoom` moves the room graph and nothing else — the overworld
+  keeps its own idea of which screen you are on and quietly walked the player 62
+  units back onto it, taking the camera along. Both photographs were of
+  somewhere else, correctly rendered. The fixture now enters a screen the way
+  the save does and reports its own drift.
+
+## Still open
+
+- **Seven relics.** The table in `relics.js` has eight rows and seven are `null`
+  on purpose. The chain is proven; the rest is content.
+- **A skin picker.** The newest unlock is worn automatically. `nextSkin` exists
+  and nothing calls it.
+- **The Ashen skin has no source.** `CIVILIAN_PALETTE`-adjacent, and the idea
+  was all three settlements — not wired.

@@ -1,6 +1,7 @@
 // Player construct — modular voxels, physics, combat.
 
-import { createActorRig } from './characters/actor-rig.js';
+import { createActorRig, recolorActor } from './characters/actor-rig.js';
+import { heroSkinPalette, wornSkin, DEFAULT_SKIN } from './characters/hero-skins.js';
 import { createActorAnimator } from './characters/actor-animator.js';
 import { makeFacing } from '../combat/facing.js';
 import { ArcSmear } from './fx/arc-smear.js';
@@ -119,6 +120,12 @@ export class Player {
         // Ticket F: named-pivot rig + procedural animator replace the old
         // single welded figure. Same frozen part builders, same grounding
         // (feet at the physics body's bottom face, rig.y - 0.95).
+        // Built in whatever skin the save says, so a returning player is
+        // dressed correctly on the first frame rather than being repainted a
+        // moment later. `wornSkin` is read again in `applySavedSkin` once the
+        // inventory exists — this pass only covers a Player constructed with
+        // one already restored, which is not the common path but is a real one.
+        this.skin = DEFAULT_SKIN;
         this.actor = createActorRig(HERO_RIG);
         this.rig = this.actor.root;
         this._inner = this.actor.inner;
@@ -235,6 +242,34 @@ export class Player {
         this.frictionName = 'default';
         this._stepAcc = 0;
         this.spawnPoint = { x: 0, y: 1.95, z: 0 };
+    }
+
+    /**
+     * Wear `id`, repainting the live rig.
+     *
+     * Cheap to call every frame — a no-op unless the skin actually changed —
+     * so the caller does not have to track what is already on. That matters
+     * because the two callers are a level load and an unlock, and neither of
+     * them knows what the other did.
+     *
+     * @returns {boolean} `true` if the hero's appearance changed
+     */
+    setSkin(id) {
+        const next = id || DEFAULT_SKIN;
+        if (next === this.skin) return false;
+        // The rig is repainted BEFORE `this.skin` is updated, so a refused
+        // swap — a palette that somehow changed the vertex count — leaves the
+        // player correctly describing the skin they are still wearing. A field
+        // that says `bonewarden` over a body that is still Crustwalker is the
+        // kind of disagreement that outlives the bug that caused it.
+        if (!recolorActor(this.actor, HERO_RIG, heroSkinPalette(next, HERO_PALETTE))) return false;
+        this.skin = next;
+        return true;
+    }
+
+    /** Put the hero in whatever the save says they own and chose. */
+    applySavedSkin() {
+        return this.setSkin(wornSkin(this.inventory));
     }
 
     setGetVoxelAt(fn) {

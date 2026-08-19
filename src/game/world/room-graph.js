@@ -584,6 +584,25 @@ export function createDungeon(ctx, def, opts = {}) {
                     for (const e of room.enemies || []) {
                         if (Math.hypot(x - e.x, z - e.z) < 2) return true;
                     }
+                    // …AND NEVER OVER A FEATURE ANCHOR.
+                    //
+                    // The overworld grammar has honoured these since it was
+                    // written — `makeProtector` refuses any box that touches
+                    // one — and this pass, which runs afterwards and raises
+                    // ground by up to two, had never heard of them. Measured
+                    // across the thirteen anchors the world already had: twelve
+                    // had terrain raised inside them, and three had been lifted
+                    // onto a raised cell outright, so the prop was standing
+                    // below the ground the player walks on. Two of those three
+                    // are the Fork dig site and the weather relay — the whole
+                    // acquisition chain for the item that unlocks Altar Travel.
+                    //
+                    // The anchor's own radius, not a constant: a settlement
+                    // asks for 8 because it is a fire with people round it, and
+                    // a shard cache asks for 4 because it is a box.
+                    for (const f of room.features || []) {
+                        if (f && Math.hypot(x - f.x, z - f.z) <= (f.r ?? 4)) return true;
+                    }
                     return false;
                 });
         }

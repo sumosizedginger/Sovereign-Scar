@@ -690,6 +690,11 @@ function startNewGame(mode = 'medium') {
     hud.story?.resetSeen?.();
     activateCampaignServices(fresh);
     player.inventory = new Inventory();
+    // A fresh run is dressed fresh. Without this the hero keeps whatever skin
+    // the PREVIOUS run unlocked, because the rig outlives the inventory that
+    // earned it — a cosmetic surviving a reset that wipes the shards is the
+    // wrong way round.
+    player.applySavedSkin();
     player.health.max = 6;
     player.health.fullRestore();
     game.playTime = 0;
@@ -1048,6 +1053,9 @@ if (progress.inventory) {
     }
     player.inventory = Inventory.fromJSON(progress.inventory);
 }
+// After the inventory exists, never before: what the hero is wearing is a fact
+// about the save, and the rig is built before the save is read.
+player.applySavedSkin();
 applyUpgradeStats();
 if (progress.maxHp) player.health.setMax(progress.maxHp);
 if (progress.hp) player.health.hp = Math.min(progress.hp, player.health.max);
