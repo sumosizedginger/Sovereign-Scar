@@ -2,8 +2,9 @@
 //
 //   node tests/qa/gear-skin-shots.mjs
 //
-// Writes PNGs to docs/media/gear-skins/ and prints, for each piece of gear, how
-// many screen pixels it owns and how far its colour moves when it is skinned.
+// Writes PNGs to docs/media/gear-skins/ and prints, for every outfit and every
+// piece of held gear, how many screen pixels the piece owns and what the skin
+// actually does to it.
 //
 // WHY THIS EXISTS AND WHY IT IS THE POINT
 //
@@ -29,38 +30,36 @@
 // pose and a dust position, and made the control a real teardown and rebuild
 // with identical colours. Better, and still wrong: the control moved 1521 px
 // with no art change at all, 4.75% of the window. Something in the render path
-// is not still even when the simulation is. Signal was above it — the shield
-// moved 2645, the whole outfit 3633 — but a metric whose floor is that close to
-// its ceiling cannot tell "faint" from "nothing", and those are the two answers
-// this file exists to distinguish.
+// is not still even when the simulation is. Signal was above it, but a metric
+// whose floor is that close to its ceiling cannot tell "faint" from "nothing",
+// and those are the two answers this file exists to distinguish.
 //
 // SO IT STOPPED COUNTING CHANGE AND STARTED MEASURING THE OBJECT.
 //
 // Each piece of gear is hidden and shown while everything else holds still. The
 // pixels that appear ARE the gear — its exact silhouette, at play scale, under
-// the real light. That gives the number the whole question turns on, which is
-// not "did the colour move" but HOW BIG IS THIS THING ON SCREEN. Then the mean
-// colour inside that silhouette is compared across skins.
+// the real light. Whatever the render noise is doing, the blade is still the
+// same number of pixels wide.
 //
-// A frame-differencing metric can be defeated by grain. Asking an object how
-// many pixels it occupies cannot: whatever the noise is doing, the blade is
-// still the same number of pixels wide.
+// AND THEN THAT WAS WRONG TOO, IN THE OLDEST WAY IN THIS REPO.
 //
-// AND THEN THE THIRD INSTRUMENT WAS WRONG TOO, IN THE OLDEST WAY IN THIS REPO.
+// It reported the shield's mean colour moving by dRGB 9 out of 255 and called
+// it "barely moves". The picture shows a flat grey slab becoming a dark plate
+// with two bright bone rails down its sides — one of the clearest changes in
+// the set. Both are correct: the face got DARKER and the bands got BRIGHTER,
+// and a mean cancels them against each other exactly. `docs/media/README.md`
+// carries the same lesson from the terraces, which scored 46/47/47 while the
+// pictures went from concrete slabs to correct.
 //
-// It reported the shield's colour moving by dRGB 9 out of 255 and called it
-// "barely moves". The picture shows the shield going from a flat grey slab to a
-// dark plate with two bright bone rails down its sides — one of the clearest
-// changes in the whole set. Both are correct: the face got DARKER and the bands
-// got BRIGHTER, and a mean cancels them against each other exactly.
+// So it reports three things about a piece and not one: how big it is, how many
+// of ITS OWN pixels moved, and how much contrast it carries inside its own
+// outline. A redistribution shows up in the second and third and is invisible
+// to the first, which is how a working art change gets thrown away.
 //
-// The mean was never the question. `docs/media/README.md` carries the same
-// lesson from the terraces, which scored 46/47/47 while the pictures went from
-// concrete slabs to correct. So this measures three things about a piece and
-// not one: how big it is, how many of ITS OWN pixels actually changed, and how
-// much contrast it carries inside its own outline. A redistribution shows up in
-// the second and third and is invisible to the first, which is why reporting
-// only a mean is how a working art change gets thrown away.
+// EVERY OUTFIT, NOT ONE. The baseline for a piece is the same picture whatever
+// is being worn, so it is shot once and every skin is compared against it. That
+// is what makes the table below a comparison between outfits rather than four
+// separate claims that each happen to sound fine on their own.
 
 import fs from 'node:fs';
 import { startServer, findChromeVerbose, sleep, disableGamepads } from '../harness.mjs';
@@ -75,12 +74,12 @@ fs.mkdirSync(OUT, { recursive: true });
 /** The window the hero occupies, in 1280x720 frame pixels. */
 const BOX = { x: 560, y: 250, w: 160, h: 200 };
 const SHIP = 'crustwalker';
-const SKIN = 'bonewarden';
+const WEAPONS = ['anchor_link', 'tectonic_wedge', 'heavy_mallet', 'light_caster'];
 
 // 8850 is outside the block every spec in tests/ reserves. This probe first
-// used 8795, which is `locked-doors-e2e`'s, and running the two together
-// failed that spec with EADDRINUSE — a suite that is only green when nothing
-// else is running is not green.
+// used 8795, which is `locked-doors-e2e`'s, and running the two together failed
+// that spec with EADDRINUSE — a suite that is only green when nothing else is
+// running is not green.
 const server = await startServer(8850);
 let browser;
 try {
@@ -107,9 +106,9 @@ try {
         s.menu.close();
         s.hud?.setHidden?.(true);
         // The shield is only mounted when the inventory says it is owned —
-        // `player.js` rewrites `guard.hasShield` from the inventory every
-        // frame, so setting that flag directly would be overwritten on the next
-        // tick and the shield row would have measured an empty hand.
+        // `player.js` rewrites `guard.hasShield` from the inventory every frame,
+        // so setting that flag directly would be overwritten on the next tick
+        // and the shield row would have measured an empty hand.
         s.player.inventory.grantItem('bulwark_shield');
         for (const w of ['tectonic_wedge', 'heavy_mallet', 'light_caster']) {
             s.player.inventory.grantItem(w);
@@ -118,13 +117,33 @@ try {
     await page.evaluate(() => window.__sovereignScar.loadLevel('overworld'));
     await sleep(900);
 
+    // Read the outfits out of the table rather than listing them here. A probe
+    // with its own copy of the roster silently stops covering the newest thing.
+    // PER SLOT, not one list for both. The Ashen has a shield and no weapon on
+    // purpose, so a single roster would have quietly skipped the one piece it
+    // does dress - a probe that takes the weapon list as the answer for the
+    // shield is a probe that stops covering the exact case the table was
+    // shaped to keep testable.
+    const ART = await page.evaluate(async () => {
+        const m = await import('/src/game/assets/gear-skins.js');
+        return { weapon: m.gearSkinIds('weapon'), shield: m.gearSkinIds('shield') };
+    });
+    const SKINS = {
+        weapon: ART.weapon.filter((id) => id !== SHIP),
+        shield: ART.shield.filter((id) => id !== SHIP),
+    };
+    // Everything with art anywhere, for the body readings and the stills.
+    const ALL = [...new Set([...SKINS.weapon, ...SKINS.shield])];
+    console.log(`weapon art: ${SKINS.weapon.join(', ')}`);
+    console.log(`shield art: ${SKINS.shield.join(', ')}`);
+
     /** Stand the hero on the flattest screen, dressed as asked, then stop the world. */
     async function pose({ body, weapon, weaponSkin, shield, shieldSkin }) {
         return page.evaluate(async (o) => {
             const s = window.__sovereignScar;
             s.game.paused = false;
             s.game.level.enterRoom('scarfield', s.game);
-            await new Promise((r) => setTimeout(r, 350));
+            await new Promise((r) => setTimeout(r, 320));
             const org = s.game.level.currentRoomOrigin();
             s.player.rig.position.set(org.x, s.game.level.groundY?.(org.x, org.z) ?? 1.95, org.z);
             s.player.rig.rotation.y = Math.PI;
@@ -135,14 +154,12 @@ try {
             s.player.shieldSkin = o.shieldSkin;
             s.player.guard.hasShield = !!o.shield;
             s.hud?.setHidden?.(true);
-            await new Promise((r) => setTimeout(r, 700));
+            await new Promise((r) => setTimeout(r, 650));
             s.game.paused = true;
-            await new Promise((r) => setTimeout(r, 200));
+            await new Promise((r) => setTimeout(r, 180));
             return {
                 holding: !!s.player.heldWeapon?.model,
                 shielded: !!s.player.heldShield?.model,
-                weaponSkin: s.player.heldWeapon?.skin || null,
-                shieldSkin: s.player.heldShield?.skin || null,
             };
         }, { body, weapon, weaponSkin, shield: shield || false, shieldSkin });
     }
@@ -154,69 +171,49 @@ try {
             const m = w === 'shield' ? s.player.heldShield?.model : s.player.heldWeapon?.model;
             if (m) m.visible = v;
         }, which, on);
-        await sleep(140);
+        await sleep(130);
     }
 
     /**
-     * The hero window, blown up 4x with smoothing OFF.
+     * Grab the hero window, and write a 4x nearest-neighbour crop of it.
      *
-     * The full frames are the honest picture and are kept, but the hero is 34
-     * px wide in them: judging a palette off one is judging it off a rumour.
-     * Nearest-neighbour, because this is voxel art and a bilinear upscale
-     * invents gradients the game does not have — which is precisely the kind of
-     * flattering lie that makes a still look better than the thing.
+     * Nearest-neighbour because this is voxel art and a bilinear upscale invents
+     * gradients the game does not have — exactly the flattering lie that makes a
+     * still look better than the thing. The full 1280x720 frame is written only
+     * where it is asked for: it is the honest picture, but at 34 px of hero it
+     * cannot settle a palette, and 40 of them is 40 MB.
      */
-    async function crop(file) {
+    async function grab(file, { full = false } = {}) {
+        if (full && file) await page.screenshot({ path: `${OUT}/${file}.png` });
         const b64 = await page.screenshot({
             clip: { x: BOX.x, y: BOX.y, width: BOX.w, height: BOX.h },
             encoding: 'base64',
         });
-        const url = await page.evaluate(async (b) => {
-            const img = new Image();
-            img.src = `data:image/png;base64,${b}`;
-            await img.decode();
-            const c = document.createElement('canvas');
-            c.width = img.width * 4; c.height = img.height * 4;
-            const g = c.getContext('2d');
-            g.imageSmoothingEnabled = false;
-            g.drawImage(img, 0, 0, c.width, c.height);
-            return c.toDataURL('image/png');
-        }, b64);
-        fs.writeFileSync(`${OUT}/${file}-zoom.png`, Buffer.from(url.split(',')[1], 'base64'));
+        if (file) {
+            const url = await page.evaluate(async (b) => {
+                const img = new Image();
+                img.src = `data:image/png;base64,${b}`;
+                await img.decode();
+                const c = document.createElement('canvas');
+                c.width = img.width * 4; c.height = img.height * 4;
+                const g = c.getContext('2d');
+                g.imageSmoothingEnabled = false;
+                g.drawImage(img, 0, 0, c.width, c.height);
+                return c.toDataURL('image/png');
+            }, b64);
+            fs.writeFileSync(`${OUT}/${file}-zoom.png`, Buffer.from(url.split(',')[1], 'base64'));
+        }
         return b64;
     }
 
-    async function grab(file) {
-        if (file) {
-            await page.screenshot({ path: `${OUT}/${file}.png` });
-            return crop(file);
-        }
-        return page.screenshot({
-            clip: { x: BOX.x, y: BOX.y, width: BOX.w, height: BOX.h },
-            encoding: 'base64',
-        });
-    }
-
     /**
-     * Everything worth knowing about one piece across two skins.
+     * Everything worth knowing about one piece, shipped versus skinned.
      *
-     * `hidden` and `shipped` come from the same pose with the piece toggled
-     * off and on, so the pixels that differ ARE the piece — its exact
-     * silhouette at play scale under the real light. `skinned` is the same
-     * pose again with the skin applied.
-     *
-     * The threshold is deliberately high. A held object against the ground or
-     * against the hero's own body is a large difference; the render noise this
-     * file's second instrument tripped over was a small one, and setting the
-     * bar where the two do not overlap is what makes the area trustworthy.
-     *
-     * THREE NUMBERS, BECAUSE ONE LIES. `area` is the ceiling on how much any
-     * repaint can matter. `changed` is how many of the piece's own pixels
-     * actually moved, which a mean cannot see when one part darkens by as much
-     * as another brightens — the exact case that made the shield look like a
-     * failure. `spread` is the standard deviation of L* inside the outline:
-     * a piece that gains internal contrast has become a shape with parts, and
-     * that is most of what makes a small object read from 17.5 units up.
+     * `hidden` and `shipped` come from the same pose with the piece toggled off
+     * and on, so the pixels that differ ARE the piece. The threshold is
+     * deliberately high: a held object against the ground or against the hero's
+     * own body is a large difference, and the render noise that defeated this
+     * file's second instrument was a small one.
      */
     async function compare(hidden, shipped, skinned) {
         return page.evaluate(async (b64h, b64a, b64b) => {
@@ -243,7 +240,10 @@ try {
             const n = mask.length || 1;
             const acc = (img) => {
                 let r = 0, g = 0, bl = 0; const ls = [];
-                for (const i of mask) { r += img[i]; g += img[i + 1]; bl += img[i + 2]; ls.push(lstar(img[i], img[i + 1], img[i + 2])); }
+                for (const i of mask) {
+                    r += img[i]; g += img[i + 1]; bl += img[i + 2];
+                    ls.push(lstar(img[i], img[i + 1], img[i + 2]));
+                }
                 const mL = ls.reduce((s, v) => s + v, 0) / n;
                 const sd = Math.sqrt(ls.reduce((s, v) => s + (v - mL) ** 2, 0) / n);
                 return { mean: [r / n, g / n, bl / n].map((v) => Math.round(v)), L: +mL.toFixed(1), spread: +sd.toFixed(1) };
@@ -258,58 +258,165 @@ try {
     }
 
     /**
-     * Pose twice — once shipped, once skinned — and hand back the three frames.
+     * Re-dress a held piece WITHOUT re-posing, while the world is stopped.
      *
-     * The hidden frame is taken in the SHIPPED pose only. It is a picture of the
-     * world without the piece in it, and the world is identical in both poses,
-     * so shooting it twice would measure the render noise and call it geometry.
+     * THIS IS THE CORRECTNESS ARGUMENT OF THE WHOLE FILE, and the fourth thing
+     * it got wrong before getting it right. The silhouette mask is a set of
+     * pixel indices cut from one frame; it only describes the gear in another
+     * frame if the gear occupies exactly the same pixels. The version before
+     * this one called `pose()` again for every skin, which re-entered the room
+     * and let the idle animation land somewhere slightly else.
+     *
+     * For the wide weapons that still mostly overlapped and the numbers looked
+     * plausible. For the Anchor Link, 0.10 units thick, it did not overlap at
+     * all: the mask sampled the GROUND beside the blade, and all three outfits
+     * reported a mean near 121,95,65 - which is dirt. Three completely
+     * different palettes agreeing to within dRGB 1 is not a palette result, and
+     * the pictures said so plainly, because the Drowned blade is green.
+     *
+     * The holders rebuild on demand and the update loop is not running while
+     * paused, so calling `set` directly is both correct and the real code path.
      */
-    async function measure(which, base, files) {
-        const p1 = await pose({ ...base, weaponSkin: SHIP, shieldSkin: SHIP });
-        const live = which === 'shield' ? p1.shielded : p1.holding;
-        if (!live) return { missing: true };
-        await setVisible(which, false);
-        const hidden = await grab(null);
-        await setVisible(which, true);
-        const shipped = await grab(files[0]);
-        const key = which === 'shield' ? 'shieldSkin' : 'weaponSkin';
-        await pose({ ...base, weaponSkin: SHIP, shieldSkin: SHIP, [key]: SKIN });
-        const skinned = await grab(files[1]);
-        return compare(hidden, shipped, skinned);
+    async function reskin(which, weapon, skin) {
+        await page.evaluate((w, wp, sk) => {
+            const s = window.__sovereignScar;
+            if (w === 'shield') s.player.heldShield.set(true, sk);
+            else s.player.heldWeapon.set(wp, sk);
+        }, which, weapon, skin);
+        await sleep(160);
+    }
+
+    /**
+     * The hero's own silhouette against the ground that was behind it.
+     *
+     * Returns the mean L* of both, so the separation is a perceptual number
+     * rather than a channel average, plus the spread inside the figure - a
+     * character with internal contrast survives a low-separation background
+     * better than a flat one does.
+     */
+    async function figureGround(ground, figure) {
+        return page.evaluate(async (b64g, b64f) => {
+            const load = async (b64) => {
+                const img = new Image();
+                img.src = `data:image/png;base64,${b64}`;
+                await img.decode();
+                const c = document.createElement('canvas');
+                c.width = img.width; c.height = img.height;
+                c.getContext('2d').drawImage(img, 0, 0);
+                return c.getContext('2d').getImageData(0, 0, img.width, img.height).data;
+            };
+            const [g, f] = await Promise.all([load(b64g), load(b64f)]);
+            const lin = (v) => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+            const lstar = (r, gg, b) => {
+                const Y = 0.2126 * lin(r) + 0.7152 * lin(gg) + 0.0722 * lin(b);
+                return Y > 0.008856 ? 116 * Math.cbrt(Y) - 16 : 903.3 * Y;
+            };
+            const mask = [];
+            for (let i = 0; i < g.length; i += 4) {
+                const d = Math.abs(g[i] - f[i]) + Math.abs(g[i + 1] - f[i + 1]) + Math.abs(g[i + 2] - f[i + 2]);
+                if (d > 45) mask.push(i);
+            }
+            const n = mask.length || 1;
+            const stat = (img) => {
+                const ls = []; let r = 0, gg = 0, b = 0;
+                for (const i of mask) { r += img[i]; gg += img[i + 1]; b += img[i + 2]; ls.push(lstar(img[i], img[i + 1], img[i + 2])); }
+                const mL = ls.reduce((s, v) => s + v, 0) / n;
+                const sd = Math.sqrt(ls.reduce((s, v) => s + (v - mL) ** 2, 0) / n);
+                return { mean: [r / n, gg / n, b / n].map((v) => Math.round(v)), L: +mL.toFixed(1), spread: +sd.toFixed(1) };
+            };
+            return { area: mask.length, ground: stat(g), figure: stat(f) };
+        }, ground, figure);
     }
 
     const rows = [];
+    const controls = [];
 
-    for (const w of ['anchor_link', 'tectonic_wedge', 'heavy_mallet', 'light_caster']) {
-        rows.push({
-            what: `weapon ${w}`,
-            ...(await measure('weapon', { body: SHIP, weapon: w, shield: false },
-                [`weapon-${w}-crustwalker`, `weapon-${w}-bonewarden`])),
+    for (const piece of [...WEAPONS, 'shield']) {
+        const which = piece === 'shield' ? 'shield' : 'weapon';
+        const weapon = piece === 'shield' ? 'anchor_link' : piece;
+
+        // ONE POSE FOR THE WHOLE PIECE. Everything below happens inside it, so
+        // every frame shares a body position, an animation phase and a dust
+        // field, and the mask keeps describing the object it was cut from.
+        const p = await pose({
+            body: SHIP, weapon, shield: which === 'shield',
+            weaponSkin: SHIP, shieldSkin: SHIP,
         });
-    }
-    rows.push({
-        what: 'shield',
-        ...(await measure('shield', { body: SHIP, weapon: 'anchor_link', shield: true },
-            ['shield-crustwalker', 'shield-bonewarden'])),
-    });
+        if (!(which === 'shield' ? p.shielded : p.holding)) {
+            rows.push({ piece, outfit: '-', missing: true });
+            continue;
+        }
+        await setVisible(which, false);
+        const hidden = await grab(null);
+        await setVisible(which, true);
+        const shipped = await grab(`${piece}-crustwalker`, { full: piece === 'shield' });
 
-    // Whole-outfit stills, for looking at rather than for measuring.
-    await pose({ body: SHIP, weapon: 'tectonic_wedge', weaponSkin: SHIP, shield: true, shieldSkin: SHIP });
-    await grab('outfit-crustwalker');
-    await pose({ body: SKIN, weapon: 'tectonic_wedge', weaponSkin: SKIN, shield: true, shieldSkin: SKIN });
-    await grab('outfit-bonewarden');
+        for (const skin of SKINS[which]) {
+            await reskin(which, weapon, skin);
+            const skinned = await grab(`${piece}-${skin}`);
+            // `outfit`, not `skin` - `compare` returns a `skin` accumulator and
+            // the spread below would overwrite the id with it. Two meanings for
+            // one short word inside one object is its own bug.
+            rows.push({ piece, outfit: skin, ...(await compare(hidden, shipped, skinned)) });
+        }
+
+        // THE CONTROL THAT WOULD HAVE CAUGHT THE DRIFT. Put the shipped gear
+        // back and measure it against its own baseline: if the mask still
+        // describes the object, almost nothing has changed. If the readings
+        // above were taken over a moved target this comes back large, and every
+        // number for this piece is void.
+        await reskin(which, weapon, SHIP);
+        const again = await grab(null);
+        const back = await compare(hidden, shipped, again);
+        controls.push({ piece, area: back.area, changed: back.changed });
+    }
+
+    // ── CAN YOU SEE THE HERO AT ALL? ───────────────────────────────────────
+    //
+    // Everything above measures gear. None of it can catch the failure that
+    // actually matters, which is an outfit whose BODY disappears into the
+    // ground it is standing on. `hero-skins.js` records at length why the
+    // separation rim is azure and why a skin may never touch it; that rim is
+    // the safety net, and a net is a thing you are supposed to test.
+    //
+    // This is the exact version of the figure/ground question. Hiding the rig
+    // and showing it gives the hero's true silhouette, and the SAME pixels in
+    // the hidden frame are the ground that was behind them. So the comparison
+    // is the character against the specific dirt it is standing on, not against
+    // an annulus that hopes to have found some.
+    //
+    // The Ashen is why this exists. It is dust-coloured on purpose - the whole
+    // idea is to look like the civilians - and the first picture of it showed a
+    // figure that had gone missing. Intent does not exempt an outfit from being
+    // visible; a player figure that cannot be found is one that stops answering
+    // the controller.
+    const bodyRows = [];
+    for (const skin of [SHIP, ...ALL]) {
+        await pose({
+            body: skin, weapon: 'tectonic_wedge', weaponSkin: skin,
+            shield: true, shieldSkin: skin,
+        });
+        await page.evaluate(() => { window.__sovereignScar.player.rig.visible = false; });
+        await sleep(150);
+        const ground = await grab(null);
+        await page.evaluate(() => { window.__sovereignScar.player.rig.visible = true; });
+        await sleep(150);
+        const figure = await grab(`outfit-${skin}`, { full: true });
+        bodyRows.push({ skin, ...(await figureGround(ground, figure)) });
+    }
 
     // ── the picker itself ───────────────────────────────────────────────────
     //
     // A wardrobe is a screen as much as it is a system, and it is the one part
-    // of this feature a player interacts with directly. Shot with the outfit
-    // actually unlocked, so the rows carry real options rather than the
-    // "Nothing found yet" state a fresh save shows.
+    // of this feature a player interacts with directly. Shot with everything
+    // unlocked, so the rows carry real options rather than the "Nothing found
+    // yet" state a fresh save shows.
     await page.evaluate(async () => {
         const s = window.__sovereignScar;
         s.game.paused = false;
         const w = await import('/src/game/kernel/wardrobe.js');
-        w.grantOutfit(s.player.inventory, 'bonewarden');
+        const g = await import('/src/game/assets/gear-skins.js');
+        for (const id of g.gearSkinIds('weapon')) w.grantOutfit(s.player.inventory, id);
         s.player.applySavedSkin();
         s.menu.mode = 'pause';
         s.menu.state.open('pause');
@@ -329,38 +436,107 @@ try {
     const px = BOX.w * BOX.h;
     console.log(`\nEach piece hidden and shown at play scale, 1280x720, world stopped.`);
     console.log(`Areas are screen pixels; the whole hero window is ${px} px.\n`);
-    console.log('piece                    area   changed  % of it   dRGB   dL*   contrast within');
-    console.log('-'.repeat(86));
+    console.log('piece             outfit        area  changed  % of it   dRGB   dL*   contrast within');
+    console.log('-'.repeat(88));
+    let lastPiece = null;
     for (const r of rows) {
-        if (r.missing) { console.log(`${r.what.padEnd(24)} NOT ON THE BODY`); continue; }
+        if (r.missing) { console.log(`${r.piece.padEnd(18)} NOT ON THE BODY`); continue; }
         r.dRGB = Math.round(Math.hypot(...r.ship.mean.map((v, i) => v - r.skin.mean[i])));
         r.dL = +(r.skin.L - r.ship.L).toFixed(1);
         r.pct = (r.changed / (r.area || 1)) * 100;
         console.log(
-            r.what.padEnd(24)
-            + String(r.area).padStart(6)
-            + String(r.changed).padStart(10)
+            (r.piece === lastPiece ? '' : r.piece).padEnd(18)
+            + r.outfit.padEnd(13)
+            + String(r.area).padStart(5)
+            + String(r.changed).padStart(9)
             + `${r.pct.toFixed(0).padStart(8)}%`
             + String(r.dRGB).padStart(7)
             + String(r.dL).padStart(6)
             + `   ${r.ship.spread} -> ${r.skin.spread}`,
         );
+        lastPiece = r.piece;
     }
-    console.log('-'.repeat(86));
+    console.log('-'.repeat(88));
+
     console.log('\nWHAT THIS SAYS');
+    // Area is the ceiling on how much any repaint can matter; `changed` is what
+    // it actually spent. A piece can move nearly every pixel it owns and still
+    // register almost no shift in mean colour — that is a redistribution, and it
+    // is not a failure.
     for (const r of rows) {
         if (r.missing) continue;
-        // Area is the ceiling on how much any repaint can matter; `changed` is
-        // what it actually spent. A piece can move nearly every pixel it owns
-        // and still register almost no shift in mean colour, which is what a
-        // redistribution looks like and is not a failure.
-        const size = r.area < 150 ? 'a sliver' : r.area < 400 ? 'small' : 'a real surface';
         const verdict = r.pct < 15 ? 'THE SKIN DOES NOT REACH IT'
             : r.pct < 50 ? 'partly repainted'
-                : r.dRGB < 20 ? 'repainted, but the mean holds — it redistributed'
+                : r.dRGB < 20 ? 'repainted; mean holds, so it redistributed'
                     : 'repainted outright';
-        console.log(`  ${r.what.padEnd(22)} ${String(r.area).padStart(5)} px (${size}) · ${r.pct.toFixed(0)}% of its own pixels moved · ${verdict}`);
+        console.log(`  ${r.piece.padEnd(15)} ${r.outfit.padEnd(12)} ${String(r.area).padStart(4)} px · ${r.pct.toFixed(0).padStart(3)}% moved · ${verdict}`);
     }
+    // The one number that is about the SET rather than any one outfit: two
+    // outfits that repaint a piece to the same place are one outfit with two
+    // names, and nothing else here would notice.
+    console.log('\nDO THE OUTFITS DIFFER FROM EACH OTHER?');
+    for (const piece of [...WEAPONS, 'shield']) {
+        const mine = rows.filter((r) => r.piece === piece && !r.missing);
+        if (mine.length < 2) continue;
+        let worst = Infinity, pair = '';
+        for (let i = 0; i < mine.length; i++) {
+            for (let j = i + 1; j < mine.length; j++) {
+                const d = Math.round(Math.hypot(...mine[i].skin.mean.map((v, k) => v - mine[j].skin.mean[k])));
+                if (d < worst) { worst = d; pair = `${mine[i].outfit} vs ${mine[j].outfit}`; }
+            }
+        }
+        const call = worst < 15 ? 'TOO CLOSE' : worst < 35 ? 'close' : 'distinct';
+        console.log(`  ${piece.padEnd(16)} closest pair: ${pair.padEnd(26)} dRGB ${String(worst).padStart(3)}  ${call}`);
+        // The means themselves, because a distance is a claim about two numbers
+        // and this file has already been wrong twice about numbers it did not
+        // print. `shipped` first, then each outfit.
+        console.log(`      shipped ${mine[0].ship.mean.join(',').padEnd(14)}` + mine.map((r) => `${r.outfit} ${r.skin.mean.join(',')}`).join('  '));
+    }
+    console.log('\nCAN YOU SEE THE HERO? figure against the ground actually behind it');
+    console.log('outfit         area   figure L*   ground L*    dL*   dRGB   contrast within');
+    console.log('-'.repeat(78));
+    for (const b of bodyRows) {
+        const dL = +(b.figure.L - b.ground.L).toFixed(1);
+        const dRGB = Math.round(Math.hypot(...b.figure.mean.map((v, i) => v - b.ground.mean[i])));
+        b.dL = dL; b.dRGB = dRGB;
+        console.log(
+            b.skin.padEnd(15)
+            + String(b.area).padStart(5)
+            + String(b.figure.L).padStart(12)
+            + String(b.ground.L).padStart(12)
+            + String(dL).padStart(7)
+            + String(dRGB).padStart(7)
+            + `   ${b.figure.spread}`,
+        );
+    }
+    const ship = bodyRows.find((b) => b.skin === SHIP);
+    console.log('-'.repeat(78));
+    // The shipped hero is the bar. Nothing here has to beat it; anything that
+    // falls well under it is harder to see than the character the game has
+    // always asked people to follow, and that is a gameplay claim, not a taste
+    // one.
+    for (const b of bodyRows) {
+        if (b.skin === SHIP) continue;
+        const rel = Math.abs(b.dL) - Math.abs(ship.dL);
+        const call = Math.abs(b.dL) < 4 && b.dRGB < 30 ? '*** DISAPPEARS ***'
+            : rel < -6 ? 'notably harder to see than the shipped hero'
+                : rel < 0 ? 'slightly harder to see' : 'as visible or better';
+        console.log(`  ${b.skin.padEnd(14)} |dL*| ${Math.abs(b.dL).toFixed(1).padStart(5)} vs shipped ${Math.abs(ship.dL).toFixed(1)}   dRGB ${String(b.dRGB).padStart(3)} vs ${ship.dRGB}   ${call}`);
+    }
+
+    console.log('\nCONTROL - shipped gear put back, measured against its own baseline');
+    let voided = 0;
+    for (const c of controls) {
+        const pct = (c.changed / (c.area || 1)) * 100;
+        // A correct control lands near zero. Anything that climbs means the
+        // object moved between readings and the mask stopped describing it,
+        // which is exactly how this file once reported the colour of dirt.
+        const ok = pct < 5;
+        if (!ok) voided++;
+        console.log(`  ${c.piece.padEnd(16)} ${String(c.changed).padStart(4)} / ${String(c.area).padStart(4)} px  ${pct.toFixed(1).padStart(5)}%  ${ok ? 'stable' : '*** READINGS FOR THIS PIECE ARE VOID ***'}`);
+    }
+    if (voided) console.log(`\n${voided} piece(s) moved between readings. Do not trust the table above.`);
+
     console.log(`\nPNGs in ${OUT}/ — the *-zoom.png files are 4x nearest-neighbour crops.`);
 } finally {
     await browser?.close();

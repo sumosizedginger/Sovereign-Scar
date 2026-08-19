@@ -57,8 +57,11 @@ import {
     grantOutfit, outfitOf, outfitName, outfitFrom, outfitIdFromName,
     wardrobeView,
 } from '../../src/game/kernel/wardrobe.js';
-import { HERO_SKINS, DEFAULT_SKIN, heroSkinIds, skinFlag } from '../../src/game/characters/hero-skins.js';
+import { HERO_SKINS, DEFAULT_SKIN, heroSkinIds, skinFlag, isHeroSkin } from '../../src/game/characters/hero-skins.js';
 import { ENEMY_PALETTES } from '../../src/game/assets/palettes.js';
+import {
+    SETTLEMENTS, ASHEN_SKIN, metFlag, settlementIds, allSettlementsMet, addSettlement,
+} from '../../src/game/world/settlements.js';
 import { HeldWeapon } from '../../src/game/fx/held-weapon.js';
 import { HeldShield } from '../../src/game/fx/held-shield.js';
 
@@ -349,14 +352,26 @@ export function run(t) {
         const both = fakeInventory();
         grantOutfit(both, 'bonewarden');
         both.setFlag(skinFlag('drowned'));
-        t.ok('the body offers an outfit with no gear', slotOptions(both, 'hero').includes('drowned'));
-        t.ok('the weapon slot does not', !slotOptions(both, 'weapon').includes('drowned'));
-        t.ok('the shield slot does not', !slotOptions(both, 'shield').includes('drowned'));
+        // The Ashen has a body and a shield and no weapon. That gap is the
+        // only thing in the table that can tell whether the filter works: if
+        // every row filled every slot, removing the filter would change
+        // nothing and this guard would quietly stop being a guard.
+        both.setFlag(skinFlag('ashen'));
+        t.ok('the body offers an outfit with no weapon', slotOptions(both, 'hero').includes('ashen'));
+        t.ok('the shield offers it too', slotOptions(both, 'shield').includes('ashen'));
+        t.ok('the weapon slot does not', !slotOptions(both, 'weapon').includes('ashen'));
+        // ...and the general form, which becomes load-bearing for whichever
+        // slot the next gap lands in.
+        for (const slot of ['weapon', 'shield']) {
+            t.ok(`${slot}: never offers an outfit with no art for it`,
+                slotOptions(both, slot).every((id) => id === DEFAULT_GEAR || hasGearArt(id, slot)));
+        }
         // ...and wearing it must not strip the gear the player chose.
-        const kept = wornIn(both, 'shield');
-        wearOutfit(both, 'drowned');
-        t.ok('an unlock with no gear leaves the gear alone', wornIn(both, 'shield') === kept);
-        t.ok('and it does dress the body', wornIn(both, 'hero') === 'drowned');
+        wearIn(both, 'weapon', 'bonewarden');
+        wearOutfit(both, 'ashen');
+        t.ok('an unlock with no weapon leaves the weapon alone', wornIn(both, 'weapon') === 'bonewarden');
+        t.ok('and it does dress the body', wornIn(both, 'hero') === 'ashen');
+        t.ok('and the slots it CAN fill', wornIn(both, 'shield') === 'ashen');
 
         // The picker's cycle belongs to `MenuState.adjust`, which walks
         // `options` — so what this file owes it is that `options` is always a
@@ -401,6 +416,96 @@ export function run(t) {
         t.ok('the rows carry the source line', view.every((r) => r.from.length > 3));
     }
 
+    // ── the Ashen's source: speak to all three ──────────────────────────────
+    //
+    // The only EARNED cosmetic in the game. Every other one is walked into.
+    {
+        const ids = settlementIds();
+        t.ok('there are three settlements', ids.length === 3);
+        t.ok('the ids are unique', new Set(ids).size === ids.length);
+        // Read from the table, never written down beside it. A hand-kept list
+        // is one edit away from a fourth settlement nobody has to visit, and
+        // the reward would keep paying out on the old three in silence.
+        t.ok('the ids come from the settlement table',
+            ids.every((id) => Object.values(SETTLEMENTS).some((d) => d.id === id)));
+        for (const id of ids) {
+            t.ok(`${id}: its flag is namespaced`, metFlag(id).startsWith('met:'));
+        }
+        t.ok('the flags are distinct', new Set(ids.map(metFlag)).size === ids.length);
+
+        const inv = fakeInventory();
+        t.ok('a fresh save has met nobody', allSettlementsMet(inv) === false);
+        // TWO IS NOT THREE. The interesting failure is an off-by-one that pays
+        // out early, and it cannot be seen by testing only the empty and full
+        // cases — which is what a spec that walks the loop to the end does.
+        for (const id of ids.slice(0, 2)) inv.setFlag(metFlag(id));
+        t.ok('two of three is not enough', allSettlementsMet(inv) === false);
+        t.ok('and it has granted nothing', !inv.getFlag(skinFlag(ASHEN_SKIN)));
+        inv.setFlag(metFlag(ids[2]));
+        t.ok('all three is enough', allSettlementsMet(inv) === true);
+        // Reaching the condition is not the same as being paid. `addSettlement`
+        // is what pays, so the rule and the grant are asserted separately.
+        t.ok('the condition alone still grants nothing', !inv.getFlag(skinFlag(ASHEN_SKIN)));
+        t.ok('Ashen is a real outfit', isHeroSkin(ASHEN_SKIN));
+        // Shield yes, weapon no - the civilians carry nothing, and the gap
+        // is what keeps the slot filter testable. See gear-skins.js.
+        t.ok('Ashen dresses the shield', hasGearArt(ASHEN_SKIN, 'shield'));
+        t.ok('Ashen carries no weapon', !hasGearArt(ASHEN_SKIN, 'weapon'));
+    }
+
+    // ── the settlement actually pays out ────────────────────────────────────
+    //
+    // Installs the REAL system rather than restating its rule. A spec that
+    // re-implements the thing under test passes whether or not the game does;
+    // this one drives `addSettlement` with a fake game and presses interact.
+    {
+        const inv = fakeInventory();
+        let persisted = 0;
+        let dressed = 0;
+        const toasts = [];
+        let interact = false;
+        const game = {
+            player: {
+                root: { position: { x: 0, y: 1, z: 0 } },
+                inventory: inv,
+                applySavedSkin() { dressed++; },
+            },
+            input: { consumeInteract: () => (interact ? ((interact = false), true) : false) },
+            hud: { toast: (txt) => toasts.push(txt), story: { queue() {} } },
+            persistInventory: () => { persisted++; },
+        };
+        const scene = { add() {}, remove() {} };
+        const systems = Object.entries(SETTLEMENTS).map(([, def]) => addSettlement(
+            { addSystem() {} }, { scene }, { x: 0, z: 0 }, def,
+        ));
+        t.ok('every settlement built a system', systems.every((sys) => typeof sys.update === 'function'));
+
+        const speak = (sys) => { interact = true; sys.update(0.1, game); };
+        speak(systems[0]);
+        t.ok('speaking records the meeting', inv.getFlag(metFlag(systems[0].id)) === true);
+        t.ok('speaking persists', persisted === 1);
+        t.ok('one settlement grants nothing', !inv.getFlag(skinFlag(ASHEN_SKIN)));
+        speak(systems[1]);
+        t.ok('two settlements grant nothing', !inv.getFlag(skinFlag(ASHEN_SKIN)));
+        speak(systems[2]);
+        t.ok('the third grants the Ashen', inv.getFlag(skinFlag(ASHEN_SKIN)) === true);
+        t.ok('and puts it on', wornIn(inv, 'hero') === ASHEN_SKIN);
+        // The shield, not the weapon: the Ashen has no weapon art, so that
+        // slot must be left exactly as the player had it.
+        t.ok('including the shield', wornIn(inv, 'shield') === ASHEN_SKIN);
+        t.ok('and not the weapon it has no art for', wornIn(inv, 'weapon') === DEFAULT_GEAR);
+        t.ok('the hero was repainted', dressed === 1);
+        t.ok('the player was told', toasts.some((x) => /Ashen/.test(x)));
+
+        // Speaking again must not repeat the toast. A reward that re-announces
+        // itself every time you walk past is a reward you start avoiding.
+        const before = toasts.length;
+        speak(systems[2]);
+        t.ok('speaking again does not re-announce', toasts.length === before);
+
+        for (const sys of systems) sys.dispose();
+    }
+
     // ── the table's own shape ───────────────────────────────────────────────
     {
         for (const id of Object.keys(GEAR_SKINS)) {
@@ -414,7 +519,15 @@ export function run(t) {
             gearSkinIds('shield').includes('bonewarden'));
         // The unauthored rows are absent on purpose, not by omission — the same
         // discipline the seven null region relics are held to.
-        t.ok('drowned has no held art yet', !hasGearArt('drowned', 'weapon') && !hasGearArt('drowned', 'shield'));
-        t.ok('ashen has no held art yet', !hasGearArt('ashen', 'weapon') && !hasGearArt('ashen', 'shield'));
+        t.ok('the Drowned is a full set', hasGearArt('drowned', 'weapon') && hasGearArt('drowned', 'shield'));
+        t.ok('the Ashen carries no weapon', !hasGearArt('ashen', 'weapon'));
+        t.ok('the Ashen does carry a shield', hasGearArt('ashen', 'shield'));
+        // At least one genuine gap must survive in the table, or the filter
+        // above is untestable. This is the assertion that says so out loud
+        // rather than leaving it to whoever authors the next outfit.
+        const gaps = Object.keys(GEAR_SKINS)
+            .filter((id) => id !== DEFAULT_GEAR)
+            .filter((id) => !hasGearArt(id, 'weapon') || !hasGearArt(id, 'shield'));
+        t.ok('some outfit still has a slot it does not fill', gaps.length >= 1);
     }
 }

@@ -33,6 +33,8 @@ import * as THREE from 'three';
 import { createActorRig } from '../characters/actor-rig.js';
 import { createActorAnimator } from '../characters/actor-animator.js';
 import { CRUST_COLORS } from '../assets/palettes.js';
+import { grantOutfit } from '../kernel/wardrobe.js';
+import { heroSkin } from '../characters/hero-skins.js';
 
 /** Weathered, dust-coloured, and deliberately unlike every enemy palette. */
 export const CIVILIAN_PALETTE = {
@@ -223,6 +225,47 @@ export const SETTLEMENTS = {
 export const TALK_RANGE = 3.2;
 
 /**
+ * THE ASHEN, AND WHERE IT COMES FROM.
+ *
+ * Every other cosmetic in this game is found. This one is EARNED, and the thing
+ * it asks for is the only one worth asking: go and speak to all three of them.
+ *
+ * `docs/EASTER-EGGS.md` argued that `CIVILIAN_PALETTE` is the only cosmetic in
+ * the list that means anything, because wearing it makes the hero look like the
+ * people they are failing to save. That argument only lands if you have met the
+ * people. A relic you walk into hands you a look; this hands you the same look
+ * after you have stood at all three fires and been told, three times, what is
+ * about to happen to everyone standing at them.
+ *
+ * SPEAKING, NOT ARRIVING. Walking across a screen is not meeting anybody, and
+ * a reward for proximity is a reward for pathfinding. The interact already
+ * exists, it is already the deliberate act, and it is already the thing that
+ * plays the lines.
+ */
+export const ASHEN_SKIN = 'ashen';
+
+/** The flag that records having spoken to one settlement. */
+export function metFlag(id) {
+    return `met:${id}`;
+}
+
+/**
+ * Every settlement id, read out of the table rather than written down.
+ *
+ * A hand-kept list of three strings beside a table of three rows is one edit
+ * away from a fourth settlement that nobody has to visit — the reward would
+ * quietly keep paying out on the old three and nothing would say so.
+ */
+export function settlementIds() {
+    return Object.values(SETTLEMENTS).map((s) => s.id);
+}
+
+/** `true` once the player has spoken to all of them. */
+export function allSettlementsMet(inventory) {
+    return settlementIds().every((id) => !!inventory?.getFlag?.(metFlag(id)));
+}
+
+/**
  * Build a settlement into a level, at a world origin.
  *
  * Returns a system (`{ update, dispose }`) — the level owns the lifetime, the
@@ -271,6 +314,23 @@ export function addSettlement(level, ctx, origin, def) {
                         text: line.text,
                         priority: 'flavor',
                     });
+                }
+                // `spoken` above is per-visit and dies with the screen. This is
+                // the part that survives, because the reward is about three
+                // screens the player will never have loaded at the same time.
+                const inv = game.player?.inventory;
+                if (inv?.setFlag) {
+                    inv.setFlag(metFlag(def.id));
+                    // Queued BEHIND the keeper's own lines, not in front of
+                    // them. A toast that lands on the first frame of a speech
+                    // turns the speech into the thing interrupting the reward.
+                    if (allSettlementsMet(inv) && grantOutfit(inv, ASHEN_SKIN)) {
+                        game.player.applySavedSkin?.();
+                        game.hud?.toast?.(
+                            `New look — ${heroSkin(ASHEN_SKIN).name}`, 3600,
+                        );
+                    }
+                    game.persistInventory?.();
                 }
                 return;
             }

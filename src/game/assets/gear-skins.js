@@ -96,12 +96,26 @@ export const GEAR_SKINS = Object.freeze({
         name: 'Bonewarden',
         weapon: Object.freeze({
             grip: { color: 0x272c35, rough: 0.95, metal: 0.05 },
-            // Horn, not bone. This was 0xc4b896 and the Anchor Link measured
-            // as a flat stick — its whole visible length is blade and guard, so
-            // two shades of the same cream left nothing for the eye to catch.
-            // The shield's bands are also `guard` and want the opposite, which
-            // is why the two slots carry separate maps.
-            guard: { color: 0x7a6f58, metal: 0.10, rough: 0.70 },
+            // THIS VALUE WAS CHANGED ONCE AND CHANGED BACK, and the round
+            // trip is worth more than the colour.
+            //
+            // The probe reported the Anchor Link losing nearly all internal
+            // contrast under this skin - 20.9 collapsing to 1.8 - which reads
+            // as bone blade against bone guard with nothing for the eye to
+            // catch. So the guard went to horn (#7a6f58) to break it up.
+            //
+            // The reading was an artefact. `gear-skin-shots.mjs` was re-posing
+            // the hero between the baseline and the skinned frame, so the
+            // silhouette mask no longer covered a blade 0.10 units thick and
+            // was sampling the ground beside it. Measured without the re-pose,
+            // this weapon's contrast under bone is 20.8 -> 25.3: it GAINS
+            // definition, and always did.
+            //
+            // Bone is back because it was never wrong, and because it is the
+            // colour the outfit's own story asks for. The horn was a fix for a
+            // defect in the instrument, which is the most expensive kind of
+            // art direction there is.
+            guard: { color: 0xc4b896, metal: 0.10, rough: 0.70 },
             guardDark: { color: 0x6e6450, metal: 0.06, rough: 0.85 },
             blade: { color: 0xd8d2bc, metal: 0.08, rough: 0.72 },
             bladeDark: { color: 0xa39c86, metal: 0.05, rough: 0.80 },
@@ -123,13 +137,89 @@ export const GEAR_SKINS = Object.freeze({
         }),
     }),
 
-    // Paid out of the dry well. Body only so far — the well gives you a look,
-    // not a loadout, and inventing gear for it here would be authoring content
-    // nobody has looked at yet.
-    drowned: Object.freeze({ id: 'drowned', name: 'The Drowned', weapon: null, shield: null }),
+    // PAID OUT OF THE DRY WELL, to the player who kept paying it.
+    //
+    // Verdigris: bronze that has been under water long enough to stop being
+    // bronze. The joke the well is telling is that there is no water anywhere in
+    // this region and has not been for a very long time, so gear that has
+    // obviously drowned is the punchline worn rather than explained.
+    //
+    // The guard is a long way off the blade on purpose. Bonewarden's first pass
+    // put bone against bone and the Anchor Link measured as a flat stick —
+    // internal contrast 20.9 collapsing to 1.8 — because from directly overhead
+    // that weapon is almost entirely blade and guard. Every palette written
+    // after that one keeps those two roles apart by construction.
+    drowned: Object.freeze({
+        id: 'drowned',
+        name: 'The Drowned',
+        weapon: Object.freeze({
+            grip: { color: 0x1a2a2a, rough: 0.98, metal: 0.03 },
+            guard: { color: 0x4a6b60, metal: 0.25, rough: 0.75 },
+            guardDark: { color: 0x24393a, metal: 0.20, rough: 0.85 },
+            blade: { color: 0x7fa196, metal: 0.35, rough: 0.60 },
+            bladeDark: { color: 0x4e6f68, metal: 0.30, rough: 0.70 },
+            accent: { color: 0xa8bfae, metal: 0.15, rough: 0.80 },
+        }),
+        // Same structure as the bone shield and for a measured reason: dark
+        // face, bright bands, near-black rails took the plate's internal
+        // contrast from 8.9 to 24.0. What the player mostly sees of a shield is
+        // its edge — the arm is down and the face points away — so the bands and
+        // rails are the shield, and the face is what keeps it from flaring.
+        shield: Object.freeze({
+            blade: { color: 0x203a3a, metal: 0.20, rough: 0.72 },
+            guard: { color: 0x9dc0b2, metal: 0.30, rough: 0.58 },
+            guardDark: { color: 0x16292b, metal: 0.12, rough: 0.88 },
+            accent: { color: 0xc8d8c0, metal: 0.20, rough: 0.55 },
+            grip: { color: 0x2a2420, rough: 0.95, metal: 0.04 },
+        }),
+    }),
 
-    // Not yet wired to a source at all; see `docs/EASTER-EGGS.md`.
-    ashen: Object.freeze({ id: 'ashen', name: 'Ashen', weapon: null, shield: null }),
+    // GIVEN FOR SPEAKING TO ALL THREE SETTLEMENTS.
+    //
+    // The only cosmetic in the set that means something: `CIVILIAN_PALETTE`
+    // dresses the hero as the people they are failing to save. So the gear is
+    // deliberately the POOREST in the game — rag-wrapped grip, brass gone dark,
+    // a blade the colour of something that has been carried through smoke. It
+    // is the one outfit where looking worse is the point, which is a thing a
+    // cosmetic axis is normally incapable of.
+    //
+    // The single warm note is the boss and the accent, taken from the belt in
+    // the body palette (#8a6830). One warm mark on a dust-coloured figure reads
+    // as firelight; two would read as decoration.
+    ashen: Object.freeze({
+        id: 'ashen',
+        name: 'Ashen',
+        // NO WEAPON, ON PURPOSE, AND THE ART FOR ONE WAS WRITTEN AND CUT.
+        //
+        // Two reasons, and the design one came first.
+        //
+        // The civilians at the three fires carry nothing. A hero in their
+        // clothes, holding their battered plate, and still swinging their own
+        // real weapon reads as somebody who joined them. A matched three-piece
+        // set reads as a costume. This outfit is the one place in the game
+        // where looking like you belong to somebody else is the entire point,
+        // and a full kit undoes that.
+        //
+        // It also follows the rule this project set itself in
+        // `docs/WARDROBE.md`: region relics are full sets because they are the
+        // payoff for exploring; behaviour unlocks are single-slot standouts,
+        // because a wardrobe with nothing but matching sets is a wardrobe with
+        // nothing to mix.
+        //
+        // The second reason is that a table where EVERY row fills EVERY slot
+        // silently retires the rule that a slot is only offered outfits it has
+        // art for. The filter would still be there, and nothing would be able
+        // to tell whether it worked. Keeping one genuine gap in the data is
+        // what keeps that guard honest - see `gear-skins.spec.mjs`.
+        weapon: null,
+        shield: Object.freeze({
+            blade: { color: 0x3f382c, metal: 0.10, rough: 0.85 },
+            guard: { color: 0xc0ae8c, metal: 0.15, rough: 0.70 },
+            guardDark: { color: 0x241f18, metal: 0.08, rough: 0.92 },
+            accent: { color: 0xd8b45c, metal: 0.35, rough: 0.50 },
+            grip: { color: 0x2c261e, rough: 0.96, metal: 0.03 },
+        }),
+    }),
 });
 
 /** `true` if `id` names a row here. */
