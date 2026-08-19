@@ -97,8 +97,21 @@ export function run(t) {
     }
 
     // ── Charger telegraphs before it commits to a lane ────────────────────
+    //
+    // FIXTURE MOVED FROM 6 TO 5, and the reason is a fix rather than a fudge.
+    // A charge now triggers only inside the distance it can actually cross —
+    // `dashReach(speed, 2.4, 0.55, 1.6)`, which is 5.30 for a scarab. At 6 the
+    // right behaviour is to walk closer first, so the old fixture was asking a
+    // charger to commit from a range where committing would have been a miss.
+    // That is exactly the bug that shipped: a bulwark's charge closed 3.81
+    // units while triggering at anything past 3.5, so from 6 it stopped 2.19
+    // short and hit nothing. See `tests/game/committed-attacks.spec.mjs`.
+    //
+    // 5 is inside the band and still well outside melee, so the assertion this
+    // block is actually about — a charger tells you before it commits — is
+    // unchanged.
     {
-        const p = fakePlayer(6, 0);
+        const p = fakePlayer(5, 0);
         const e = new Enemy(scene, null, { x: 0, y: 1, z: 0 }, { kind: 'scarab' });
         e.update(0.05, p);
         t.ok('charge winds up before launching', e._windupT > 0 && e._chargeT === 0,

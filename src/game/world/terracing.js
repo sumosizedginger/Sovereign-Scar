@@ -193,3 +193,105 @@ function hashOf(str) {
     }
     return h >>> 0;
 }
+
+/** How high a body climbs without jumping. `MAX_STEP_HEIGHT`, voxel-physics-body.js. */
+const WALK_STEP = 1;
+
+/**
+ * Put a step against anything the player can see the top of and cannot reach.
+ *
+ * THE REPORT THIS ANSWERS, from play: *"if these pieces of land are of equal
+ * height, shouldn't I be able to walk on them?"* Measured on the overworld's
+ * start screen: **2025 standable cells, 2006 reachable, 19 raised cells cut
+ * off** — two flat-topped plateaus at heights 3 and 4 sitting on a floor at 1.
+ *
+ * They are grammar masses (`g.box(x, x+2, 2, 3, ...)`), not terraces, and they
+ * predate this pass. But a two-cell mass with a flat top, in the same rock as
+ * the ground, at a height the eye reads as a step, is a thing the player walks
+ * up to and tries to stand on. Either it should look like a cliff or it should
+ * be climbable, and adding a step is far cheaper than re-authoring the eight
+ * grammars.
+ *
+ * SAFE BY THE SAME RULE AS EVERYTHING ELSE HERE: it only ever ADDS to the
+ * platform map, one cell at a time, obeying `isBlocked`. Platform voxels mesh
+ * without XZ solids, so nothing this places can block a route — it can only
+ * make more of the room reachable than before.
+ *
+ * @param {Map<string, number>} map        the room's own voxels
+ * @param {Map<string, number>} pmap       the platform map, written to
+ * @param {number} half                    room bounding half-extent
+ * @param {number} color                   step colour
+ * @param {(x: number, z: number) => boolean} [isBlocked]
+ * @returns {number} cells added
+ */
+export function rampIsolatedRises(map, pmap, half, color, isBlocked = () => false) {
+    const solid = (x, y, z) => map.has(`${x},${y},${z}`) || pmap.has(`${x},${y},${z}`);
+    /** Lowest surface with a body's worth of room above it — matches walkableCells. */
+    const surf = (x, z) => {
+        for (let y = 1; y <= 10; y++) {
+            if (!solid(x, y - 1, z)) continue;
+            if (solid(x, y, z) || solid(x, y + 1, z)) continue;
+            return y;
+        }
+        return null;
+    };
+    const H = half - 1;
+    const height = new Map();
+    for (let x = -H; x <= H; x++) {
+        for (let z = -H; z <= H; z++) {
+            const y = surf(x, z);
+            if (y != null) height.set(`${x},${z}`, y);
+        }
+    }
+    if (!height.has('0,0')) return 0;
+
+    // Flood from the centre with the body's real step limit.
+    const reach = () => {
+        const seen = new Set(['0,0']);
+        const q = ['0,0'];
+        while (q.length) {
+            const k = q.pop();
+            const p = k.split(',');
+            const x = +p[0], z = +p[1], y = height.get(k);
+            for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                const nk = `${x + d[0]},${z + d[1]}`;
+                if (seen.has(nk) || !height.has(nk)) continue;
+                if (Math.abs(height.get(nk) - y) > WALK_STEP) continue;
+                seen.add(nk);
+                q.push(nk);
+            }
+        }
+        return seen;
+    };
+
+    let added = 0;
+    // Iterate: one course of steps can expose the next one up a tall plateau.
+    for (let pass = 0; pass < 6; pass++) {
+        const seen = reach();
+        let placedThisPass = 0;
+        for (const [k, y] of height) {
+            if (seen.has(k)) continue;
+            const p = k.split(',');
+            const x = +p[0], z = +p[1];
+            for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                const nx = x + d[0], nz = z + d[1];
+                const nk = `${nx},${nz}`;
+                if (!seen.has(nk)) continue;
+                const ny = height.get(nk);
+                if (y - ny <= WALK_STEP) continue;
+                // Raise the REACHED neighbour by one, never the plateau: the
+                // step is built on the ground you are standing on, so the mass
+                // keeps the silhouette its grammar authored.
+                if (Math.abs(nx) > H || Math.abs(nz) > H) continue;
+                if (isBlocked(nx, nz)) continue;
+                fillBox(pmap, nx, nx, 1, ny, nz, nz, color);
+                height.set(nk, ny + 1);
+                added++;
+                placedThisPass++;
+                break;
+            }
+        }
+        if (!placedThisPass) break;
+    }
+    return added;
+}

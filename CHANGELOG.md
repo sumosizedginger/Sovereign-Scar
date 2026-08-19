@@ -3,6 +3,78 @@
 All notable changes to this project are documented here.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+
+## Reported from play — four findings, three of them real bugs
+
+### Two committed attacks could not damage the player at all
+
+*"Should charging enemies hit me when they reach the circle? Because they
+currently don't."* They could not, and neither could a lancer, with either of
+its attacks.
+
+A committed dash sets `attackCd` when its WIND-UP starts, and the IMPACT then
+asked `if (this.attackCd <= 0)`. It never is. Driven headlessly: 34 frames of
+charging with `attackCd` at 2.13 throughout and **0 impacts**; 16 lunges, 416
+frames of lunging, **0 damage events of any kind**. Every hit a bulwark landed
+came from its ordinary melee, which is exactly what the report described.
+
+Underneath that, geometry. Fixing the gate revealed a bulwark's 0.55 s charge
+closes 3.81 units while triggering at any range past 3.5 — from 6 it stopped
+2.19 short of a 1.6 impact radius. The charge got a derived TRIGGER; the lunge
+got a derived DURATION, because clamping ITS trigger to a fixed 0.42 s thrust
+made a lancer standing at 8 never lunge at all.
+
+And a third, found on the way: a ranged lancer backs off below 4, advances above
+8, and fires below `attackRange` = 7 — so anything sitting in 7..8 did nothing
+forever. Measured: 30 seconds at 8.00, **0 projectiles**. Its hold band now comes
+off `_pressureRange()`, which already knew a shooter wants to stand at 6.2.
+
+### The big yellow circle is not a bug — it was wearing the wrong clothes
+
+*"the enemy that puts a big yellow circle on the ground apparently doesn't hurt
+me either."* Correct, and by design: a Censer heals and shields its neighbours,
+a Weaver's strand slows. Neither damages.
+
+But both were drawn as a filled disc in the same visual language as an attack,
+under a coach line that promises *"that ring is where the blow will land"* — so
+the game taught its central rule with a counterexample. Support pulses are now a
+hollow annulus in a support colour and do not speak that line.
+
+### Raised overworld ground you could not stand on
+
+*"if these pieces of land are of equal height, shouldn't I be able to walk on
+them?"* Measured on the start screen: 2025 standable cells, 2006 reachable,
+**19 cut off** — two flat-topped grammar masses at heights 3 and 4 on a floor at
+1. Not terraces, and older than the relief pass, but a two-cell mass with a flat
+top in the same rock as the ground is a thing a player walks up to and tries to
+stand on.
+
+`rampIsolatedRises` puts a one-cell step against anything you can see the top of
+and cannot reach. Additive to the platform map, so like everything else in
+`terracing.js` it can only ever make more of a room reachable. Start screen is
+now 2025 of 2025.
+
+Found while wiring it: **the overworld def never sets `overworld: true`**, so
+three guards in `room-graph.js` that claim to skip the overworld have never
+fired — including the terrace skip, which is why the overworld has terraces at
+all. Left alone and written down rather than quietly "fixed", because setting
+the flag would silently delete the relief pass.
+
+### The map has a key
+
+*"Need to include some kind of key for the world map."* It drew six marks and
+four link colours and explained none of them — and a solid gold outline and a
+DASHED gold outline mean entirely different things. The key is built from what
+is actually on screen, so it never names a symbol the player cannot see.
+
+  tests/game/committed-attacks.spec.mjs   40 assertions, 15 counterfactuals
+  tests/qa/rise-reach.mjs                 raised ground you cannot reach
+  tests/qa/map-legend-shot.mjs            a picture of the key
+
+Two counterfactuals stay green and are documented as such rather than papered
+over: the `_chargeHit` latch is belt-and-braces (ending the dash is what stops
+a repeat), and correcting the charge's stale distance read was right but was not
+the cause — one frame of charge is 0.11 units against a 1.6 radius.
 ## [Unreleased]
 
 ### The frame breathes with the fight, and three probes were wrong

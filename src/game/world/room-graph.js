@@ -32,7 +32,7 @@ import { EncounterDirector, tokensForBeat } from './encounter-director.js';
 import { eliteSpawns } from './elites.js';
 import { puzzleFor } from './puzzles.js';
 import { SETTLEMENTS, addSettlement, addTownDead } from './settlements.js';
-import { terraceRoom } from './terracing.js';
+import { terraceRoom, rampIsolatedRises, LARGE_HALF } from './terracing.js';
 import { stampKitProps, shapeBossArena } from './kit-props.js';
 import { SignalBus } from './puzzle-kit.js';
 import { gsfx } from '../audio/sfx-bank.js';
@@ -583,6 +583,41 @@ export function createDungeon(ctx, def, opts = {}) {
                     if (map.has(`${x},1,${z}`)) return true;
                     for (const e of room.enemies || []) {
                         if (Math.hypot(x - e.x, z - e.z) < 2) return true;
+                    }
+                    return false;
+                });
+        }
+
+        // A STEP AGAINST ANYTHING YOU CAN SEE THE TOP OF AND CANNOT REACH.
+        //
+        // Reported from play on the overworld: raised land the player walked up
+        // to and could not stand on. Measured on the start screen — 2025
+        // standable cells, 2006 reachable, **19 raised cells cut off** — two
+        // flat-topped grammar masses at heights 3 and 4 on a floor at 1.
+        //
+        // Runs after terracing, because it has to see the finished heights, and
+        // only where a screen is big enough that the player meets these masses
+        // side-on rather than looking down on them. Additive to the platform
+        // map, so like everything else in that file it can only ever make more
+        // of the room reachable.
+        // GATED ON ROOM SIZE, NOT ON `def.overworld`, and that is not a style
+        // choice. **The overworld def never sets `overworld: true`** — grep it —
+        // so the three guards in this function that read `def.overworld` have
+        // never fired for the real overworld. One of them is the terrace skip,
+        // which is precisely why the overworld HAS terraces at all; setting the
+        // flag now to make this line work would silently delete the relief pass.
+        // Left alone and written down rather than quietly repaired.
+        //
+        // `LARGE_HALF` is the honest predicate anyway: this exists for rooms big
+        // enough that the player meets a mass side-on instead of looking down on
+        // it. That is the overworld's 23 and no dungeon (the largest is 12).
+        if (pmap && room.half >= LARGE_HALF) {
+            rampIsolatedRises(map, pmap, room.half, room.wallColor || wallColor,
+                (x, z) => {
+                    for (const door of room.doors || []) {
+                        for (const c of doorCells(room, door)) {
+                            if (Math.abs(x - c.x) <= 2 && Math.abs(z - c.z) <= 2) return true;
+                        }
                     }
                     return false;
                 });

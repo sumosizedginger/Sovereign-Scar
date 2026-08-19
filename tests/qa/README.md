@@ -43,6 +43,13 @@ one — which is the only reason a probe is worth writing:
   frame depth is constant at 1206 across every fov and distance. Pitch is the
   one lever that is not a straight trade and it is a cliff: occlusion is ~1%
   from 78° down to 66° and **8.29% at 60°**.
+- **`rise-reach`** — raised ground the player cannot get onto. Written after
+  the report *"if these pieces of land are of equal height, shouldn't I be able
+  to walk on them?"*; the overworld start screen measured 2025 standable cells,
+  2006 reachable, 19 cut off. Read the dungeon rows as context, not a bug list —
+  most of that height is props and pillars.
+- **`map-legend-shot`** — the Tab map with its key, overworld and dungeon, into
+  `docs/media/map/<label>/`. A legend is a thing that has to be looked at.
 - **`overworld-lum`** — the sixteen overworld certification samples (one screen
   per region × both mirror states) against `visual-sanity`'s own bands, in two
   minutes instead of a twenty-minute suite run. Written because the relief pass

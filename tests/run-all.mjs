@@ -59,6 +59,7 @@ import { run as runTitleCamera } from './game/title-camera.spec.mjs';
 import { run as runQualityTiers } from './game/quality-tiers.spec.mjs';
 import { run as runArenaCamera } from './game/arena-camera.spec.mjs';
 import { run as runRoomFootprint } from './game/room-footprint.spec.mjs';
+import { run as runCommittedAttacks } from './game/committed-attacks.spec.mjs';
 import { run as runOverworldRelief } from './game/overworld-relief.spec.mjs';
 import { run as runThreatEdge } from './game/threat-edge.spec.mjs';
 import { run as runWallClimb } from './game/wall-climb.spec.mjs';
@@ -249,6 +250,7 @@ async function main() {
     runNamed('quality-tiers', runQualityTiers);
     runNamed('arena-camera', runArenaCamera);
     runNamed('room-footprint', runRoomFootprint);
+    runNamed('committed-attacks', runCommittedAttacks);
     runNamed('overworld-relief', runOverworldRelief);
     runNamed('threat-edge', runThreatEdge);
     runNamed('dash-commit', runDashCommit);

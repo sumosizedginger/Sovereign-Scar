@@ -182,6 +182,62 @@ function telegraphCss(hex) {
     return `#${(n & 0xffffff).toString(16).padStart(6, '0')}`;
 }
 
+/**
+ * How close a committed dash has to get to connect, in world units.
+ *
+ * THESE ARE THE TELEGRAPH RADII, shared with the ring rather than restated
+ * beside it. Five attacks in this project have shipped drawn one size and
+ * resolving at another; one named constant used in both places is the cheapest
+ * way that cannot happen again.
+ */
+export const CHARGE_IMPACT_R = 1.6;
+export const LUNGE_IMPACT_R = 1.5;
+
+/** Seconds each committed dash runs for, and its speed multiplier. */
+export const CHARGE_TIME = 0.55;
+export const CHARGE_SPEED_MULT = 2.4;
+export const LUNGE_TIME = 0.42;
+export const LUNGE_SPEED_MULT = 4.2;
+/**
+ * How far either side of its preferred distance a shooter will drift before
+ * correcting. The FAR side must keep it inside `attackRange`, or the kind has
+ * a band where it neither advances nor fires — see `_aiRanged`.
+ */
+/**
+ * A support pulse is drawn as a hollow band, not a filled disc — see
+ * `telegraphAt`. 0.72 leaves a ring thick enough to read at a 34-px hero's
+ * scale while leaving the middle plainly open ground.
+ */
+export const SUPPORT_RING_INNER = 0.72;
+export const SUPPORT_RING_OPACITY = 0.42;
+
+export const RANGED_BAND_NEAR = 1.5;
+export const RANGED_BAND_FAR = 0.4;
+
+/** Bounds on the derived lunge travel time — see `_aiLunge`. */
+export const LUNGE_TIME_MIN = 0.20;
+export const LUNGE_TIME_MAX = 0.95;
+
+/**
+ * How far a committed dash can actually close, for a body of this speed.
+ *
+ * THE SECOND HALF OF WHY A CHARGE NEVER LANDED. The impact was gated on a
+ * cooldown it had just set itself, which alone made contact impossible — but
+ * fixing that revealed the geometry underneath: a bulwark charges for 0.55 s at
+ * 2.4x a speed of 2.8, which closes **3.81 units**, and it triggered at any
+ * range past 3.5. Started from 6 it ended 2.19 away against an impact radius of
+ * 1.6, and missed by 0.59.
+ *
+ * So the trigger is now derived from the reach instead of being a second
+ * hand-picked number that has to agree with it. Too far and the dash cannot
+ * arrive; the body walks in and tries again. The player can still step out of
+ * the lane, which is the counterplay the kind is built around — the dash is
+ * meant to be dodged, not to be undodgeable-by-arithmetic.
+ */
+export function dashReach(speed, mult, time, impactR) {
+    return speed * mult * time + impactR;
+}
+
 export class Enemy {
     /**
      * @param {string} kind sentinel | scarab | frost | bulwark | mote | lancer | brood
@@ -276,6 +332,7 @@ export class Enemy {
         this.knockbackVel = { x: 0, z: 0 };
         this._flash = 0;
         this._chargeT = 0;
+        this._chargeHit = true;   // no charge in flight
         this._chargeDir = null;
         // Attack telegraphs. Every hostile action winds up first: the enemy
         // freezes, a ring marks the ground it is about to strike, and only
@@ -354,6 +411,7 @@ export class Enemy {
         this.generation = opts.generation || 0;
         this._openT = 0;      // armour-down window bought by a parry
         this._lungeT = 0;
+        this._lungeHit = true;    // no lunge in flight
         this._lungeDir = null;
         // Phase D1 — the encounter director. Nullable, and a null director
         // grants every request, so the sandbox, the levels that predate this
@@ -482,24 +540,45 @@ export class Enemy {
      * Mark the ground the enemy is committing to strike. Mirrors the boss
      * telegraph (bosses/base.js) so both read the same to the player.
      */
-    telegraphAt(x, z, radius, life, color = 0xff5533) {
-        // The single most important rule in the game, said the first time the
-        // game asks the player to obey it. Every hostile action in Sovereign
-        // Scar winds up first and resolves against where you are THEN — which
-        // is a generous, readable design that the player has to notice before
-        // it helps them.
-        coach('telegraph-ring',
-            'That ring is where the blow will land, not where it started. '
-            + 'Walk out of it, or dash through — a dash has invulnerable frames.');
+    telegraphAt(x, z, radius, life, color = 0xff5533, opts = {}) {
+        // A SUPPORT PULSE IS NOT A TELEGRAPH, and drawing it as one taught the
+        // game's central rule with a counterexample.
+        //
+        // The coach line below promises "that ring is where the blow will
+        // land". The Censer's pulse is a big filled disc in exactly the same
+        // visual language and it NEVER lands a blow — it heals and shields its
+        // neighbours. The owner reported it as an enemy that does not hurt
+        // them, which is precisely right and precisely the problem: every other
+        // ring in this game is a threat, so this one reads as a broken threat
+        // rather than as something else entirely. The Weaver's strand is the
+        // same shape of thing (it slows, it does not damage).
+        //
+        // So a support pulse gets its own language: a HOLLOW annulus rather
+        // than a filled disc — nothing about it says "this ground is unsafe" —
+        // and it does not speak the telegraph rule.
+        const support = !!opts.support;
+        if (!support) {
+            // The single most important rule in the game, said the first time
+            // the game asks the player to obey it. Every hostile action in
+            // Sovereign Scar winds up first and resolves against where you are
+            // THEN — which is a generous, readable design that the player has
+            // to notice before it helps them.
+            coach('telegraph-ring',
+                'That ring is where the blow will land, not where it started. '
+                + 'Walk out of it, or dash through — a dash has invulnerable frames.');
+        }
         this.clearTelegraph();
         // Filled, for the same reason BossBase.telegraphAt is: the resolve
         // tests the whole disc, so drawing the middle half as clear floor
-        // painted safe ground that was not.
-        const geo = new THREE.RingGeometry(0.001, radius, 24);
+        // painted safe ground that was not. A support pulse has no resolve to
+        // be honest about, so it is the one case that may be hollow.
+        const geo = support
+            ? new THREE.RingGeometry(radius * SUPPORT_RING_INNER, radius, 32)
+            : new THREE.RingGeometry(0.001, radius, 24);
         const mat = new THREE.MeshBasicMaterial({
             color,
             transparent: true,
-            opacity: 0.7,
+            opacity: support ? SUPPORT_RING_OPACITY : 0.7,
             side: THREE.DoubleSide,
             depthWrite: false,
         });
@@ -620,7 +699,7 @@ export class Enemy {
         const markX = this.rig.position.x + fv.x * offset;
         const markZ = this.rig.position.z + fv.z * offset;
         this._strikeMark = { x: markX, z: markZ, r: radius };
-        this.telegraphAt(markX, markZ, radius, dur, opts.color);
+        this.telegraphAt(markX, markZ, radius, dur, opts.color, { support: !!opts.support });
         // Sync rule 1 (Ticket F): the body's windup pose shares the ring's
         // exact life, so the raise peaks as the ring peaks. Frost aims (point
         // profile), scarab compresses low, sentinel pulls a slash back.
@@ -945,10 +1024,18 @@ export class Enemy {
         if (this._lungeT > 0) {
             this._lungeT -= dt;
             this._move(this._lungeDir.x, this._lungeDir.z, 1, this.speed * 4.2 * dt);
-            if (this.attackCd <= 0) {
+            // Same fix as the charge, same reason — see `_aiCharge`. This one
+            // measured its distance correctly and still could not land, because
+            // the wind-up that launched the lunge had set `attackCd` to
+            // `2.0/actionFrequency + windup` and the impact then asked whether
+            // `attackCd <= 0`. Driven headlessly: 16 lunges, 416 frames of
+            // lunging, **0 damage events of any kind** — a lancer that never
+            // hurt anyone.
+            {
                 const px = player.root.position.x - this.rig.position.x;
                 const pz = player.root.position.z - this.rig.position.z;
-                if (Math.hypot(px, pz) < 1.5) {
+                if (!this._lungeHit && Math.hypot(px, pz) < LUNGE_IMPACT_R) {
+                    this._lungeHit = true;
                     this.attackCd = 0.8 / this.actionFrequency;
                     player.health.damage(this.damage + 1, 0.6, 'hostile', {
                         from: this.rig.position, attacker: this,
@@ -970,14 +1057,33 @@ export class Enemy {
             this.attackCd = (2.0 / this.actionFrequency) + this.windup;
             this._lungeChained = false;  // a fresh lunge may chain again
             const dir = { x: dx / dist, z: dz / dist };
+            // THE THRUST IS AS LONG AS THE GAP IT COMMITTED TO, and that is
+            // the difference between this kind and the bulwark.
+            //
+            // A charge is a heavy body closing a short distance, so it triggers
+            // only when a charge can reach — clamping its trigger is right for
+            // something that should not cross a room. A lunge's whole identity
+            // is "you cannot outrun it, you step out of the lane", and it holds
+            // station between 3 and 9 units. Clamping ITS trigger to what a
+            // fixed 0.42 s covers (5.03 at this speed) meant a lancer standing
+            // at 8 simply never lunged — measured, 0 lunges in 40 seconds.
+            //
+            // So the duration is derived from the distance at wind-up instead.
+            // The lane is already locked at wind-up time by design; the travel
+            // is now locked with it. Bounded at both ends so a point-blank
+            // lunge is still a lunge and a cross-room one is still dodgeable.
+            const travel = Math.max(0, dist - LUNGE_IMPACT_R * 0.5);
+            const lungeT = Math.min(LUNGE_TIME_MAX, Math.max(LUNGE_TIME_MIN,
+                travel / Math.max(0.001, this.speed * LUNGE_SPEED_MULT)));
             this._beginWindup(() => {
-                this._lungeT = 0.42;
+                this._lungeT = lungeT;
                 this._lungeDir = dir;
+                this._lungeHit = false;   // a fresh lunge may land once
                 sfx.whoosh();
             }, {
                 windup: 0.6 * getActiveRunMode().telegraphDuration,
                 // A long, narrow tell drawn down the lane it will travel.
-                offset: 4.5, radius: 1.5, color: 0xff5533,
+                offset: 4.5, radius: LUNGE_IMPACT_R, color: 0xff5533,
             });
         }
     }
@@ -1061,7 +1167,9 @@ export class Enemy {
             const dir = { x: -uz, z: ux };
             this._beginWindup(() => this._spawnWeb(dir.x, dir.z), {
                 windup: 0.7 * getActiveRunMode().telegraphDuration,
-                offset: 0, radius: 1.2, color: 0xcfe8ff,
+                // The strand slows; it does not damage. Same reasoning as the
+                // Censer's pulse — a filled disc promises a blow.
+                offset: 0, radius: 1.2, color: 0xcfe8ff, support: true,
             });
         }
     }
@@ -1140,7 +1248,10 @@ export class Enemy {
             this.attackCd = (3.2 / this.actionFrequency) + this.windup;
             this._beginWindup(() => this._cense(), {
                 windup: 0.8 * getActiveRunMode().telegraphDuration,
-                offset: 0, radius: CENSE_R, color: 0xffd880,
+                // SUPPORT, not a threat. Warm yellow in a filled disc is the
+                // hue and the shape this game uses for "this ground is about to
+                // hurt", and this pulse never hurts anyone — see `telegraphAt`.
+                offset: 0, radius: CENSE_R, color: 0x7fe6c0, support: true,
             });
         }
     }
@@ -1203,15 +1314,16 @@ export class Enemy {
         this.rig.rotation.y = Math.atan2(dir.x, dir.z);
         this.attackCd = 0;
         this._beginWindup(() => {
-            this._lungeT = 0.42;
+            this._lungeT = LUNGE_TIME;
             this._lungeDir = dir;
+            this._lungeHit = false;   // the follow-up thrust lands on its own
             sfx.whoosh();
         }, {
             // Shorter than the first: the second thrust is a follow-up, and a
             // full-length tell would give the player time to simply walk away
             // from a combination that is supposed to demand one more decision.
             windup: 0.42 * getActiveRunMode().telegraphDuration,
-            offset: 4.5, radius: 1.5, color: 0xff5533,
+            offset: 4.5, radius: LUNGE_IMPACT_R, color: 0xff5533,
         });
     }
 
@@ -1373,7 +1485,31 @@ export class Enemy {
             this._chargeT -= dt;
             const sp = this.speed * 2.4 * dt;
             this._move(this._chargeDir.x, this._chargeDir.z, 1, sp);
-            if (dist < 1.3 && this.attackCd <= 0) {
+            // MEASURED AFTER THE MOVE, and gated on the charge rather than on
+            // the cooldown. The second of those is what meant a charging
+            // bulwark could never hurt anybody.
+            //
+            // `dist` is the distance from the TOP of the frame, before the 2.4x
+            // charge step ran, so the impact was tested against where the body
+            // used to be. Corrected here for the sake of being right — but the
+            // counterfactual sweep put the stale read back and the spec stayed
+            // green, so it is NOT claimed as a cause: one frame of charge is
+            // 0.11 units against an impact radius of 1.6. The gate was the bug.
+            //
+            // That gate was `attackCd <= 0`, on an attack
+            // whose own wind-up had just set `attackCd` to `2.2/actionFrequency
+            // + windup`. Driven headlessly: 34 frames of charging, `attackCd`
+            // sitting at 2.13 throughout, **0 impacts**. Every hit the owner
+            // took from a bulwark came from its ordinary melee, which is
+            // exactly what they reported — it charges, connects, nothing.
+            //
+            // A committed attack has already paid for itself with a telegraph.
+            // It must not ask the shared cooldown for permission a second time;
+            // it needs its own once-per-charge latch.
+            const px = player.root.position.x - this.rig.position.x;
+            const pz = player.root.position.z - this.rig.position.z;
+            if (!this._chargeHit && Math.hypot(px, pz) < CHARGE_IMPACT_R) {
+                this._chargeHit = true;
                 this.attackCd = 0.7 / this.actionFrequency;
                 player.health.damage(this.damage + 0.5, 0.5, 'hostile', {
                     from: this.rig.position, attacker: this,
@@ -1383,17 +1519,24 @@ export class Enemy {
             }
             return;
         }
-        if (dist > 3.5 && this.attackCd <= 0) {
+        const chargeReach = dashReach(
+            this.speed, CHARGE_SPEED_MULT, CHARGE_TIME, CHARGE_IMPACT_R,
+        );
+        if (dist > 3.5 && dist < chargeReach && this.attackCd <= 0) {
             // Rear up before charging, marking the lane it will run down, so
             // the charge can be read and stepped out of instead of simply
             // arriving. The direction is locked at windup time.
             this.attackCd = (2.2 / this.actionFrequency) + this.windup;
             const dir = { x: dx / dist, z: dz / dist };
             this._beginWindup(() => {
-                this._chargeT = 0.55;
+                this._chargeT = CHARGE_TIME;
                 this._chargeDir = dir;
+                this._chargeHit = false;   // a fresh charge may land once
                 sfx.stomp();
-            }, { windup: 0.5 * getActiveRunMode().telegraphDuration, offset: 2.2, radius: 1.6, color: 0xffaa33 });
+            }, {
+                windup: 0.5 * getActiveRunMode().telegraphDuration,
+                offset: 2.2, radius: CHARGE_IMPACT_R, color: 0xffaa33,
+            });
         } else if (dist > this.attackRange) {
             this._move(dx, dz, dist, this.speed * 0.7 * dt);
         } else if (this.attackCd <= 0) {
@@ -1406,10 +1549,23 @@ export class Enemy {
     }
 
     _aiRanged(dt, player, dx, dz, dist) {
-        // Keep distance
-        if (dist < 4) {
+        // THE HOLD BAND IS DERIVED FROM THE FIRING RANGE, because when it was
+        // not, there was a band where the kind did nothing at all.
+        //
+        // It used to back off below 4 and approach above 8, and fire below
+        // `attackRange`, which is 7. So a lancer sitting anywhere in 7..8 was
+        // not far enough to advance and not near enough to shoot: measured,
+        // one held at 8.00 for thirty seconds and fired **0 projectiles**. The
+        // player only ever escaped it by moving.
+        //
+        // `_pressureRange()` already knows where a shooter wants to stand —
+        // `min(attackRange - 0.6, 6.2)`, deliberately inside its own reach — so
+        // the band comes off that instead of off two more hand-picked numbers
+        // that have to agree with a third.
+        const want = this._pressureRange();
+        if (dist < want - RANGED_BAND_NEAR) {
             this._move(-dx, -dz, dist, this.speed * 0.9 * dt);
-        } else if (dist > 8) {
+        } else if (dist > want + RANGED_BAND_FAR) {
             this._move(dx, dz, dist, this.speed * 0.7 * dt);
         }
         if (this.attackCd <= 0 && dist < this.attackRange) {

@@ -150,6 +150,25 @@ kinds act from beyond the frame (lancer 7, censer 9, weaver 11, against a
 shallow-axis reach of 6.18) and no camera setting fixes that — frame depth and
 hero size are the same knob (`tests/qa/hero-scale.mjs`).
 
+**Committed attacks** (`enemy.js`): a charge or a lunge sets `attackCd` when its
+WIND-UP begins, so its IMPACT must never be gated on that same cooldown — it
+never reaches zero in time. Both used to be, and neither could damage the player
+at all. The impact is gated on the dash being live plus a `_chargeHit` /
+`_lungeHit` latch, and ending the dash (`_chargeT = 0`) is what actually stops
+it repeating. Reach is derived, not hand-picked: a charge triggers only inside
+`dashReach(speed, mult, time, impactR)`, and a lunge's travel TIME is derived
+from the gap it committed to, because its identity is "you cannot outrun it".
+A shooter's hold band comes off `_pressureRange()` so it can never sit outside
+its own `attackRange` doing nothing. Held by
+`tests/game/committed-attacks.spec.mjs`, which drives the real `Enemy`.
+
+**Support pulses** (`telegraphAt(..., { support: true })`): the Censer heals and
+shields, the Weaver's strand slows — neither damages, and neither may wear the
+attack telegraph's filled disc. A support mark is a hollow annulus and does not
+speak the `telegraph-ring` coach line, which promises "that ring is where the
+blow will land". Drawing them the same way taught the game's central rule with a
+counterexample.
+
 ## Threat curve
 
 `world/threat-curve.js` is the single lever for campaign difficulty, applied in
