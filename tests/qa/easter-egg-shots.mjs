@@ -25,6 +25,7 @@
 
 import fs from 'node:fs';
 import { startServer, findChromeVerbose, sleep, disableGamepads } from '../harness.mjs';
+import { placedRelics } from '../../src/game/world/relics.js';
 
 const OUT = 'docs/media/easter-eggs';
 
@@ -33,13 +34,35 @@ if (!chrome.path) { console.error('no chrome'); process.exit(2); }
 const puppeteer = await import('puppeteer-core');
 fs.mkdirSync(OUT, { recursive: true });
 
-const SHOTS = [
+// Hand-written shots for the props that have a specific angle worth composing.
+const COMPOSED = [
     { file: 'dragon-tombfields', screen: 'r0c1', want: 'relic:tombfields', at: { x: 1.2, z: 4.5 }, note: 'the dragon, from the road' },
     { file: 'dragon-approach', screen: 'r0c1', want: 'relic:tombfields', at: { x: -7.0, z: 5.0 }, note: 'the skull end' },
     { file: 'dragon-under', screen: 'r0c1', want: 'relic:tombfields', at: { x: -2.0, z: -0.4 }, note: 'standing inside the ribcage' },
     { file: 'well-dry', screen: 'r2c1', want: 'egg:well', at: { x: -1.5, z: 3.4 }, note: 'the dry well' },
     { file: 'miner', screen: 'r6c6', want: 'egg:miner', at: { x: 2.0, z: 1.6 }, note: 'the man in the hole' },
 ];
+
+// PLUS ONE PER RELIC, GENERATED FROM THE TABLE.
+//
+// The hand-written list above covered exactly the props that existed the day it
+// was written, which means the next relic ships unphotographed and nobody finds
+// out until somebody wonders why the folder looks thin. `gear-skin-shots.mjs`
+// learned the same thing about its roster of outfits. Two standard angles: from
+// the south at the distance the interact prompt appears, and from directly
+// beside it, which is where the fixed 70.7-degree camera is least forgiving.
+const relicShots = placedRelics().flatMap((r) => ([
+    {
+        file: `relic-${r.region}-approach`, screen: r.screen, want: r.id,
+        at: { x: r.x, z: r.z + 4.6 }, note: `${r.label}, walking up to it`,
+    },
+    {
+        file: `relic-${r.region}-beside`, screen: r.screen, want: r.id,
+        at: { x: r.x + 3.4, z: r.z + 0.8 }, note: `${r.label}, from beside`,
+    },
+]));
+
+const SHOTS = [...COMPOSED, ...relicShots];
 
 const server = await startServer(8794);
 let browser;

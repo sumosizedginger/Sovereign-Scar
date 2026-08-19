@@ -369,9 +369,214 @@ export function buildDragonSkeleton() {
     return g;
 }
 
+/**
+ * THE COLD SIGNAL FIRE — the pyre region's relic.
+ *
+ * A stone ring, a bed of dead ash, four charred beams fallen inward, one
+ * standing pole still leaning, and the iron basket that used to hang off it
+ * lying on its side where it landed.
+ *
+ * WHY IT IS OUT, IN THE ONE REGION THAT GLOWS
+ *
+ * `overworld/world7.js` gives the pyre `ABYSS_COLORS.magma` as its accent; it
+ * is the ascent to the peak and the only region in the world whose ground is
+ * lit from underneath. So the loudest thing a prop can do here is *not* glow.
+ * Nothing in this function sets an emissive. That is the whole idea: a beacon
+ * at the top of the world, gone out, in a place where everything else is still
+ * burning.
+ *
+ * WHY IT IS COLLAPSED RATHER THAN STANDING
+ *
+ * A tripod holding a basket puts iron at roughly 1.9, and the hero stands 1.95.
+ * Relics do not collide, so it would not have stopped anybody — it would have
+ * been worse than that: the player would walk straight through a hanging
+ * brazier, which teaches them that nothing here is real. The dragon learned the
+ * same lesson from the other side, where the horns barred its arch at 1.07.
+ *
+ * Collapsed also says more. Somebody lit this, and then nobody came back to it.
+ *
+ * WHY IT READS IN PLAN VIEW
+ *
+ * The camera is fixed at 70.7 degrees of pitch, so a prop is seen from very
+ * nearly above. The dragon's first skull was a good side view and a pile of
+ * pale rectangles from up here. This is built the other way round: a RING with
+ * SPOKES is one of the few shapes that is unmistakable from directly overhead,
+ * and the fallen pole crossing it is the diagonal that stops it reading as a
+ * decoration rather than a wreck.
+ */
+export function buildColdSignalFire() {
+    const g = new THREE.Group();
+
+    // VALUE FIRST, HUE SECOND. The first build gave the ring stones #6a625c
+    // against char at #241f1d, and from 70.7 degrees up the whole prop read as
+    // one dark pile - the ring was not legible AS a ring, which is the only
+    // shape that makes this thing a fire pit instead of rubble. Unburnt stone
+    // is now clearly lighter than everything that burned, and that single
+    // separation is what does the work.
+    const STONE = 0x968d85;
+    const STONE_DARK = 0x746b64;
+    const CHAR = 0x241f1d;
+    const CHAR_LIGHT = 0x3a322e;
+    // Warmed off neutral grey. The first pass read as paper or snow against
+    // clay ground, which is a material this world does not have.
+    const ASH = 0x8f857a;
+    const ASH_PALE = 0xa79b8d;
+    const IRON = 0x4a3b34;
+    const IRON_RUST = 0x6e4028;
+
+    // ── the ring ────────────────────────────────────────────────────────────
+    // Twelve stones, deliberately uneven: three are knocked flat and one is
+    // missing entirely, because a perfect circle of identical blocks reads as
+    // a texture rather than as something people built.
+    const RING_R = 2.15;
+    const MISSING = 7;
+    for (let i = 0; i < 12; i++) {
+        if (i === MISSING) continue;
+        const a = (i / 12) * Math.PI * 2;
+        const toppled = i === 2 || i === 5 || i === 9;
+        const h = toppled ? 0.26 : 0.44 + (i % 3) * 0.08;
+        const tilt = toppled ? 0.22 : 0;
+        // A TILTED BOX DIGS ITS CORNER IN. Centring a stone at h/2 puts it flat
+        // on the floor only while it is level; tilt it by `rz` and the low
+        // corner drops by half its width times sin(tilt), which for these was
+        // 6.8 cm underground. Sub-pixel at the scale this game is played, and
+        // still wrong - and `relics.spec.mjs` checks it, so the alternative was
+        // widening a threshold to admit the thing it exists to measure.
+        box(g, {
+            w: 0.62, h, d: 0.52,
+            x: Math.cos(a) * RING_R,
+            y: h / 2 + Math.abs(Math.sin(tilt)) * 0.31,
+            z: Math.sin(a) * RING_R,
+            ry: a + (toppled ? 0.35 : 0),
+            rz: tilt,
+            color: i % 2 ? STONE : STONE_DARK,
+            rough: 0.95,
+        });
+    }
+
+    // ── the ash bed ─────────────────────────────────────────────────────────
+    // Low and wide, so from overhead the ring is filled rather than hollow.
+    // Two tones: the pale centre is where it burned hottest and longest.
+    for (const [r, n, col, y] of [[1.55, 9, ASH, 0.07], [0.85, 5, ASH_PALE, 0.10]]) {
+        for (let i = 0; i < n; i++) {
+            const a = (i / n) * Math.PI * 2 + r;
+            box(g, {
+                w: 0.78, h: 0.12, d: 0.78,
+                x: Math.cos(a) * r * 0.62,
+                y,
+                z: Math.sin(a) * r * 0.62,
+                ry: a * 0.5,
+                color: col,
+                rough: 1.0,
+            });
+        }
+    }
+
+    // ── the beams ───────────────────────────────────────────────────────────
+    // Fallen inward, which is what a fire does when it finishes: the spokes
+    // are what make the ring read as a FIRE from above rather than as a well.
+    const BEAMS = [0.4, 1.9, 3.1, 4.6, 5.6];
+    for (const [i, a] of BEAMS.entries()) {
+        const len = 2.5 + (i % 3) * 0.45;
+        const tilt = -0.10 - (i % 2) * 0.06;
+        // Same correction as the ring stones, and it matters more here because
+        // a beam is long: half of 3.4 metres times sin(0.16) is 27 cm of dip.
+        box(g, {
+            w: len, h: 0.26, d: 0.26,
+            x: Math.cos(a) * (len * 0.36),
+            y: 0.24 + (i % 2) * 0.16 + Math.abs(Math.sin(tilt)) * (len / 2),
+            z: Math.sin(a) * (len * 0.36),
+            ry: a,
+            rz: tilt,
+            color: i % 2 ? CHAR : CHAR_LIGHT,
+            rough: 1.0,
+        });
+    }
+
+    // ── the mast: a stump, and the rest of it on the ground ─────────────────
+    //
+    // The first version was one tall pole leaning 25 degrees off vertical. From
+    // this camera a near-vertical object projects to almost nothing: it was
+    // three metres of geometry and perhaps eight pixels, and in the photograph
+    // it simply was not there.
+    //
+    // A stump plus a long fallen mast says the same thing and says it in plan
+    // view, where this game is actually seen. The mast is the diagonal that
+    // stops the pit reading as a decorative circle, and the two together read
+    // as something that broke rather than something that was arranged.
+    box(g, {
+        w: 0.26, h: 0.85, d: 0.26,
+        x: -1.55, y: 0.42, z: 1.35, ry: 0.4, rz: 0.07,
+        color: CHAR_LIGHT, rough: 0.95,
+    });
+
+    const mast = new THREE.Group();
+    mast.position.set(-1.55, 0.20, 1.35);
+    mast.rotation.set(0, 2.42, 0);
+    // Lying along its own +X, so the group's yaw is the whole story.
+    box(mast, { w: 4.4, h: 0.24, d: 0.24, x: 2.3, color: CHAR_LIGHT, rough: 0.95 });
+    // The arm it hung from, snapped and still attached near the far end.
+    box(mast, { w: 0.22, h: 0.18, d: 1.05, x: 3.9, z: 0.3, ry: 0.22, color: CHAR, rough: 0.95 });
+    // A stub of chain, holding nothing.
+    box(mast, { w: 0.44, h: 0.12, d: 0.12, x: 4.05, y: 0.02, z: 0.78, color: IRON, metal: 0.55, rough: 0.5 });
+    g.add(mast);
+
+    // ── the basket, where the mast dropped it ───────────────────────────────
+    //
+    // TWO THINGS WERE WRONG WITH THE FIRST PLACEMENT AND ONLY THE PICTURE SAID
+    // SO.
+    //
+    // It sat at (2.6, -2.2), on the opposite side of the pit from the mast, and
+    // it read as an unrelated crate somebody had left there. A brazier and the
+    // pole it hung from are one object in two pieces; putting them on opposite
+    // sides of the wreck breaks the only sentence the prop is trying to say.
+    //
+    // And it was tipped 1.45 radians - 83 degrees, nearly flat on its side - so
+    // from overhead its staves stuck up like legs and its floor plate became a
+    // tabletop. It read as a small pergola. A round vessel reads as a round
+    // vessel from this camera when it is closer to UPRIGHT, because that is the
+    // pose whose silhouette is a circle.
+    //
+    // Now: at the mast's broken end, leaning 0.55 - clearly fallen, still
+    // obviously a bucket.
+    const basket = new THREE.Group();
+    // The Y is SWEPT, not reasoned about. Three stacked rotations do not compose
+    // in anybody's head - the first two guesses at this were 33 cm and 6 cm
+    // underground - so the build is run at a range of heights and the one whose
+    // lowest iron lands at +0.008 is the one that ships.
+    basket.position.set(-3.95, 0.82, -1.95);
+    basket.rotation.set(0.55, 0.9, 0.12);
+    for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        box(basket, {
+            w: 0.16, h: 0.62, d: 0.16,
+            x: Math.cos(a) * 0.52, z: Math.sin(a) * 0.52,
+            ry: a,
+            color: i % 2 ? IRON : IRON_RUST,
+            metal: 0.5, rough: 0.55,
+        });
+    }
+    box(basket, { w: 1.24, h: 0.14, d: 1.24, y: -0.30, color: IRON, metal: 0.5, rough: 0.6 });
+    g.add(basket);
+
+    // The coal it spilled, in the direction it tipped. Dead black, no glow -
+    // this is the one thing in the region that is not still burning.
+    for (const [x, z, w] of [[-3.0, -1.2, 0.34], [-3.4, -0.8, 0.26], [-2.6, -1.7, 0.3], [-3.9, -0.9, 0.22]]) {
+        box(g, { w, h: 0.2, d: w, x, y: 0.1, z, ry: x, color: CHAR, rough: 1.0 });
+    }
+
+    // The stones are broad and flat-topped, so a shadow across them resolves
+    // into shade rather than into edge flicker. Same call the shield makes in
+    // `assets/weapon-models.js`.
+    g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
+
+    return g;
+}
+
 /** id → builder. A relic's `kind` chooses its mesh. */
 export const RELIC_BUILDERS = {
     dragon: buildDragonSkeleton,
+    signal_fire: buildColdSignalFire,
 };
 
 /**
@@ -400,7 +605,29 @@ export const REGION_RELICS = {
     quarry: null,
     bonetown: null,
     cryomire: null,
-    pyre: null,
+
+    // THE SECOND PROP, AND DELIBERATELY A SMALL ONE.
+    //
+    // `docs/WARDROBE.md` argues that the prop is the cost and the palette is
+    // not, and that whether the dragon was expensive or the PIPELINE is
+    // expensive was a hypothesis until a second one existed. A ring of stones
+    // and a fallen pole is the cheapest honest way to find out.
+    //
+    // r0c6 is the far north-east: the top of the pyre ascent, and the opposite
+    // corner of the map from the miner in the south-east. Nothing else is on
+    // it - r1c6 already carries a secret and is left alone.
+    pyre: {
+        id: 'relic:pyre',
+        kind: 'signal_fire',
+        screen: 'r0c6',
+        x: -0.8, z: 0.6,
+        skin: 'unanswered',
+        label: 'the fire that went out',
+        lines: [
+            { speaker: 'PREDECESSOR', text: 'This is the high one. You light it and everything west of here can see it.' },
+            { speaker: 'PREDECESSOR', text: 'Somebody did. Then they sat down next to it and waited, and it burned all the way down, and here it still is.' },
+        ],
+    },
 };
 
 /** Every authored relic, in region order. */

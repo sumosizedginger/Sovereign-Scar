@@ -27,7 +27,7 @@ import * as THREE from 'three';
 import {
     REGION_RELICS, placedRelics, relicOnScreen, buildDragonSkeleton,
     RELIC_MAX_OFFSET, RELIC_REACH, RIBCAGE_X, DRAGON_RIBS, spineY,
-    SPINE_TOP, SPINE_N, SPINE_X0, SPINE_DX,
+    SPINE_TOP, SPINE_N, SPINE_X0, SPINE_DX, RELIC_BUILDERS, buildColdSignalFire,
 } from '../../src/game/world/relics.js';
 import {
     WELL_COST, WELL_PAYOUT_AT, WELL_SKIN, WELL_LINES, WELL_BROKE,
@@ -219,13 +219,136 @@ export function run(t) {
             t.ok(`the relic table has a row for '${r}'`, r in REGION_RELICS);
         }
 
+        // ── 1b. THE COLD SIGNAL FIRE ───────────────────────────────────────
+        //
+        // Three of these assertions exist because the thing they check was
+        // WRONG in the first build and only the pictures said so. That is the
+        // whole reason they are here in this shape.
+        {
+            const fire = buildColdSignalFire();
+            const bb = bounds(fire);
+
+            // NOTHING IS BURIED. The iron basket was authored at y 0.34 with a
+            // 1.32 tip, and its staves swing half a metre below their own
+            // origin: the lower half of it was under the floor and it read from
+            // above as a half-disc. A prop that sinks is the dragon skull's
+            // float in the other direction, and neither is visible in a number
+            // unless somebody asks for one.
+            // THE THRESHOLD IS -0.03 AND THAT IS DELIBERATE. At -0.06 the beam
+            // tilt correction was not load-bearing: removing it left the lowest
+            // point at -0.059 and this stayed green, which means the fix was
+            // shipped untested. The prop now rests at -0.013 with every
+            // correction in, so the bar sits where it can actually feel one
+            // going missing.
+            t.ok('nothing on the cold fire is buried',
+                bb.min.y >= -0.03, `lowest point ${bb.min.y.toFixed(3)}`);
+
+            // AND NOTHING FLOATS. Something has to be touching the ground or
+            // the whole prop is hovering.
+            t.ok('the cold fire rests on the ground',
+                bb.min.y <= 0.06, `lowest point ${bb.min.y.toFixed(3)}`);
+
+            // IT IS OUT. This is the entire idea: the pyre is the one region in
+            // the world whose ground is lit from underneath, and the relic
+            // found there is the thing that stopped burning. A single emissive
+            // anywhere in this prop makes it a campfire and deletes the point.
+            let lit = 0;
+            fire.traverse((o) => {
+                if (!o.isMesh) return;
+                const e = o.material?.emissive;
+                if (e && e.getHex() !== 0x000000 && (o.material.emissiveIntensity ?? 0) > 0) lit++;
+            });
+            t.ok('the cold fire does not glow', lit === 0, `${lit} emissive parts`);
+
+            // IT READS AS A RING FROM DIRECTLY ABOVE. The camera is fixed at
+            // 70.7 degrees, so plan view is the only view. A ring is one of the
+            // few shapes unmistakable from up there, and it is what makes this
+            // a fire pit rather than a pile.
+            let ringStones = 0;
+            const b = new THREE.Box3();
+            fire.updateMatrixWorld(true);
+            fire.traverse((o) => {
+                if (!o.isMesh) return;
+                b.setFromObject(o);
+                const cx = (b.min.x + b.max.x) / 2;
+                const cz = (b.min.z + b.max.z) / 2;
+                const r = Math.hypot(cx, cz);
+                if (r > 1.75 && r < 2.6 && b.max.y < 0.75) ringStones++;
+            });
+            t.ok('the pit is ringed by stones', ringStones >= 8, `${ringStones} on the ring`);
+
+            // THE MAST IS A DIAGONAL, NOT A POST. The first version was a pole
+            // 25 degrees off vertical: three metres of geometry that projected
+            // to almost nothing from overhead and was simply absent from the
+            // photograph. Its footprint has to be LONG on the ground.
+            //
+            // THE FIRST VERSION OF THIS ASSERTION DID NOT TEST THAT. It took
+            // the longest ground span of any mesh, and the charred beams are
+            // 3.4 long — so standing the mast back up left it green. A test
+            // whose subject can be removed without it noticing is measuring
+            // something else. It now demands that the LONGEST piece is also a
+            // FLAT one, which a pole cannot be.
+            let longest = 0;
+            let longestHeight = 0;
+            fire.traverse((o) => {
+                if (!o.isMesh) return;
+                b.setFromObject(o);
+                const span = Math.hypot(b.max.x - b.min.x, b.max.z - b.min.z);
+                if (span > longest) {
+                    longest = span;
+                    longestHeight = b.max.y - b.min.y;
+                }
+            });
+            t.ok('something long lies across the ground',
+                longest >= 4.0, `longest ground span ${longest.toFixed(2)}`);
+            t.ok('and the longest thing is lying down, not standing up',
+                longestHeight <= 0.7, `its height is ${longestHeight.toFixed(2)}`);
+
+            // And the whole prop stays inside the protected disc, which is
+            // radius 6 — outside it the grammar was free to build.
+            const reach = Math.max(
+                Math.abs(bb.min.x), Math.abs(bb.max.x),
+                Math.abs(bb.min.z), Math.abs(bb.max.z),
+            );
+            t.ok('the cold fire fits inside the protected disc',
+                reach <= 5.6, `reaches ${reach.toFixed(2)}`);
+
+            fire.traverse((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
+        }
+
         const placed = placedRelics();
         t.ok('at least one relic is placed', placed.length >= 1);
-        // THE PLAN IS ONE, THEN SEVEN. If this ever fails it should be because
-        // somebody deliberately authored more, and they should come here and
-        // say so rather than discovering it in a diff.
-        t.ok('exactly one relic is placed so far', placed.length === 1,
-            `${placed.length} placed — see docs/EASTER-EGGS.md before raising this`);
+        // THE COUNT IS A TRIPWIRE, AND IT HAS FIRED ONCE.
+        //
+        // It read `=== 1` while only the dragon existed, with a note saying
+        // that whoever raised it should come here and say so rather than let a
+        // diff discover it. That worked: the pyre's cold signal fire tripped it
+        // on the day it was authored.
+        //
+        // TWO now, and the reason is written down. The dragon proved the chain
+        // end to end - prop, interact, story, unlock, save, map mark, visible
+        // hero - and the signal fire is deliberately the SECOND and deliberately
+        // small, because whether the cost was that particular dragon or the
+        // pipeline itself was a hypothesis until a second prop existed. See the
+        // sequence in `docs/WARDROBE.md`.
+        //
+        // Keep it exact. A `>=` here would be a tripwire that never fires again.
+        t.ok('the authored relic count is deliberate', placed.length === 2,
+            `${placed.length} placed — see docs/WARDROBE.md before raising this`);
+
+        // Each placed relic must name a builder that exists. `addRelic` returns
+        // null for a `kind` with no builder and swallows it silently, so a typo
+        // in the table ships a screen the player was sent to with nothing on it.
+        for (const r of placed) {
+            t.ok(`${r.id}: names a real builder ('${r.kind}')`,
+                typeof RELIC_BUILDERS[r.kind] === 'function');
+        }
+        // And every builder must be reachable from the table, or it is art
+        // nobody can see.
+        for (const kind of Object.keys(RELIC_BUILDERS)) {
+            t.ok(`builder '${kind}' is used by a placed relic`,
+                placed.some((r) => r.kind === kind));
+        }
 
         const seen = new Set();
         for (const r of placed) {

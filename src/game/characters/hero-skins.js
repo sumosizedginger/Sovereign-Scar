@@ -168,6 +168,40 @@ export const HERO_SKINS = Object.freeze({
             beltDark: 0x54401c,
         },
     },
+
+    // THE FIRE THAT WENT OUT, at the top of the pyre ascent.
+    //
+    // Charcoal and one ember. `world7.js` gives the pyre region magma as its
+    // accent - it is the only ground in the world lit from underneath - so the
+    // loudest thing an outfit found there can do is not glow either. Everything
+    // here is burnt: the clothes are cold charcoal, the hair is soot, and the
+    // single warm mark is the belt.
+    //
+    // ONE ember, not two. A dark figure with a single hot line on it reads as
+    // somebody who came out of a fire. Two reads as a costume with trim, which
+    // is the mistake the Ashen was shaped to avoid one region over.
+    //
+    // The skin tone is left at the hero's own. Smoke-darkening it as well would
+    // have taken away the only light value on the character, and the face and
+    // hands are what a 34-pixel figure is read by.
+    unanswered: {
+        id: 'unanswered',
+        name: 'The Unanswered',
+        from: 'the signal fire nobody came to',
+        palette: {
+            shirt: 0x3a3436,
+            shirtDark: 0x232022,
+            jeans: 0x2b2528,
+            jeansDark: 0x181416,
+            belt: 0xb44a24,
+            beltDark: 0x6e2a12,
+            hair: 0x2a2422,
+            hairDark: 0x161210,
+            hairLight: 0x3e3632,
+            beard: 0x2a2422,
+            beardDark: 0x161210,
+        },
+    },
 });
 
 /** Ids in display order. */

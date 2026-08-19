@@ -267,7 +267,8 @@ you get the actor outline back.
 
 ## Held here
 
-`tests/game/gear-skins.spec.mjs` — 211 assertions.
+`tests/game/gear-skins.spec.mjs` — 236 assertions, plus 143 in
+`tests/game/relics.spec.mjs` covering the two props.
 
 1. A skin cannot change shape. Every piece built under every skin, compared box
    for box, plus the blade tip measured off the built object.
@@ -291,8 +292,9 @@ Writes `docs/media/gear-skins/`, including 4x nearest-neighbour crops, because
 the hero is 34 px wide at 1280 and judging a palette off a full frame is judging
 it off a rumour.
 
-**24 counterfactuals. 0 stayed green, 0 vacuous, every file restored byte for
-byte.**
+**35 counterfactuals across the two sweeps. 0 stayed green, 0 vacuous, every
+file restored byte for byte** — and three of them found assertions that were
+too weak rather than code that was wrong, which is the point of running them.
 
 ---
 
@@ -300,22 +302,65 @@ byte.**
 
 Counted rather than remembered, because a number in a plan is a hypothesis:
 
-    region relic slots     8   tombfields filled, seven null
-    outfits in the table   4   Crustwalker, Bonewarden, Drowned, Ashen
-    with held gear         3   Bonewarden, Drowned (full), Ashen (shield only)
-    relic props built      1   the dragon
-    outfits with a source  3   Bonewarden (dragon), Drowned (well), Ashen (three fires)
+    region relic slots     8   tombfields and pyre filled, six null
+    outfits in the table   5   Crustwalker, Bonewarden, Drowned, Ashen, The Unanswered
+    with held gear         4   three full sets; Ashen is shield-only on purpose
+    relic props built      2   the dragon, the cold signal fire
+    outfits with a source  4   dragon, well, three fires, signal fire
     outfits with none      0   Crustwalker is the default and needs none
 
-**The prop is the cost, not the palette.** The Bonewarden palette took an
-afternoon. The dragon took five separate fixes that no probe found and only
-pictures did — the skull was a fine side view and a pile of rectangles at 70.7
-degrees, the well could not be seen from inside its own interact radius, the
-horns barred the arch at 1.07 against a hero of 1.95. Any plan that treats a new
-region as "write six hex values" is a plan that has not read
-`docs/EASTER-EGGS.md`.
+---
 
-The two palette-only steps are done. Everything below costs a prop.
+## The question the second prop was built to answer
+
+`docs/WARDROBE.md` said the prop is the cost and the palette is not — and that
+whether *the dragon* was expensive or *the pipeline* was expensive stayed a
+hypothesis until a second prop existed. The pyre's cold signal fire was chosen
+to be the cheapest honest test of it: a ring of stones and a fallen pole against
+22 spine segments and a ribcage.
+
+**It is the pipeline.** The small prop hit the same class of problems the big one
+did, at the same rate:
+
+| the dragon | the cold signal fire |
+|---|---|
+| skull was a fine side view, a pile of rectangles from above | ring stones were the same value as the char; the whole prop read as rubble |
+| skull floated 0.39, tail floated 0.81 | basket was 33 cm underground, then 6 cm; toppled stones dug their corners in |
+| horns barred the arch at 1.07 | the standing mast projected to almost nothing from overhead and was *absent from the photograph* |
+| the wing was correct and off the top of the frame | the basket sat on the opposite side of the pit from the mast and read as an unrelated crate |
+
+Six fixes on the second prop against five on the first. Nothing about the dragon
+was special; **building anything for a fixed 70.7-degree camera is the cost.**
+
+What changed is what caught them. The dragon's were all found by looking. Three
+of the fire's were found by looking, and **three were found by assertions that
+did not exist when the dragon was built** — nothing buried, nothing floating,
+the longest piece must be lying down. The specs written after the first prop
+paid for themselves on the second, which is the actual return on the sequence.
+
+### And two of those assertions were themselves too weak
+
+The counterfactual sweep is what said so, not a hunch.
+
+- *"something long lies across the ground"* took the longest ground span of any
+  mesh. The charred beams are 3.4 long, so **standing the mast back up left it
+  green** — the assertion could not feel its own subject being removed. It now
+  demands that the longest piece is also a flat one, which a pole cannot be.
+- The burial threshold was −0.06, and removing the beams' tilt correction left
+  the prop at −0.059. The fix was shipped untested. The bar is −0.03 now, which
+  is where a prop resting at −0.013 can actually feel a correction go missing.
+
+### A tilted box digs its corner in
+
+Worth writing down because it is arithmetic, not art. Centring a box at `h/2`
+rests it on the floor only while it is level; give it `rz` and the low corner
+drops by half its width times `sin(rz)`. The toppled ring stones were 6.8 cm
+under, and a 3.4-metre beam at 0.16 rad would be 27 cm under. Both now lift by
+exactly that term.
+
+The basket needed three attempts and was settled by **sweeping the build at a
+range of heights** rather than by reasoning: three stacked rotations do not
+compose in anybody's head, and two careful guesses landed 33 cm and 6 cm wrong.
 
 ---
 
@@ -360,7 +405,7 @@ invented beside it.
 | quarry | dark slate, basalt | a half-carved figure somebody abandoned | basalt and stone dust |
 | bonetown | limestone + moss | a house in the ruined town, still furnished | moss over limestone |
 | cryomire | ice + sludge | something frozen mid-stride | sludge green — **not ice** |
-| pyre | rust + magma | a signal fire that went out | soot and ember |
+| pyre | rust + magma | **the cold signal fire** — built | soot and one ember |
 
 **Cryomire is the constrained one and that is the good news.** Its enemies are
 the frost faction, and `gear-skins.spec.mjs` fails any outfit whose emissive
@@ -389,7 +434,7 @@ failing to save.
 Those two take the table from one geared outfit to three and cost no new art
 pipeline at all. Everything after them costs a prop.
 
-**3 — Pyre: the dead signal fire.** Deliberately the SECOND prop and
+**3 — Pyre: the dead signal fire. DONE.** Deliberately the SECOND prop and
 deliberately a small one. The dragon is 22 spine segments and a ribcage; a
 burnt-out fire is a handful of boxes. The question this answers is whether the
 prop cost was the dragon or the pipeline, and it is much cheaper to find that
@@ -453,8 +498,8 @@ already written and is the thing that makes it survivable.
 - **The guard pose.** Every shield number here was taken with the arm down,
   which is where the shield spends most of its time. Raised, it presents its
   face at the camera and is a much larger surface — unmeasured.
-- **A second prop has never been built.** Everything above about "the pipeline"
-  is a hypothesis until step 3.
+- ~~**A second prop has never been built.**~~ Answered: see above. It is the
+  pipeline, not the dragon.
 - **The no-damage boss kill.** Named as the cheapest remaining source — a flag
   the combat code could already set — and still not wired. It needs no prop and
   can grant any outfit, so it is the obvious companion to the next relic rather

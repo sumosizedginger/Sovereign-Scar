@@ -220,6 +220,42 @@ export const GEAR_SKINS = Object.freeze({
             grip: { color: 0x2c261e, rough: 0.96, metal: 0.03 },
         }),
     }),
+
+    // THE FIRE THAT WENT OUT. A region relic, so a full set - see the rule in
+    // `docs/WARDROBE.md`: relics are the payoff for exploring and dress you
+    // head to foot; behaviour unlocks are single-slot standouts.
+    //
+    // Cold iron with an ember trim, and no emissive anywhere. The prop this
+    // comes off makes the same refusal for the same reason: in the one region
+    // whose ground glows, the thing worth looking at is the thing that stopped.
+    //
+    // Blade and guard are far apart in value on purpose. That is the rule every
+    // palette after Bonewarden's first pass follows - from directly overhead
+    // the Anchor Link is almost entirely those two roles, so two neighbours of
+    // the same shade leave nothing for the eye to catch.
+    unanswered: Object.freeze({
+        id: 'unanswered',
+        name: 'The Unanswered',
+        weapon: Object.freeze({
+            grip: { color: 0x1c1618, rough: 0.98, metal: 0.03 },
+            guard: { color: 0x6b4030, metal: 0.30, rough: 0.68 },
+            guardDark: { color: 0x33201a, metal: 0.22, rough: 0.82 },
+            blade: { color: 0x8c827c, metal: 0.50, rough: 0.50 },
+            bladeDark: { color: 0x4a433f, metal: 0.42, rough: 0.62 },
+            accent: { color: 0xc0522a, metal: 0.35, rough: 0.55 },
+        }),
+        // Black plate, hot bands. The same structure the bone and verdigris
+        // shields use, because it is the one that measured: dark face, bright
+        // bands, near-black rails took the plate's internal contrast from 9.1
+        // to 24.3. What a player mostly sees of a shield is its edge.
+        shield: Object.freeze({
+            blade: { color: 0x2e2825, metal: 0.18, rough: 0.78 },
+            guard: { color: 0x9a5a34, metal: 0.35, rough: 0.55 },
+            guardDark: { color: 0x1a1614, metal: 0.12, rough: 0.90 },
+            accent: { color: 0xd06a30, metal: 0.40, rough: 0.48 },
+            grip: { color: 0x1c1618, rough: 0.96, metal: 0.03 },
+        }),
+    }),
 });
 
 /** `true` if `id` names a row here. */
