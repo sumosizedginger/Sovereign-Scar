@@ -413,6 +413,9 @@ about weapons being too thin to skin.
 ## Still open
 
 - **Seven relics.** The table in `relics.js` has eight rows and seven are `null`
-  on purpose. The chain is proven; the rest is content.
+  on purpose. The chain is proven; the rest is content. What each region gets
+  and in what order is in [WARDROBE.md](WARDROBE.md) — and the honest note there
+  is that the prop is the cost, not the palette, which is a lesson this document
+  paid for.
 - **The Ashen skin has no source.** `CIVILIAN_PALETTE`-adjacent, and the idea
   was all three settlements — not wired.

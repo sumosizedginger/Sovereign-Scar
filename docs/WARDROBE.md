@@ -227,14 +227,136 @@ byte.**
 
 ---
 
+## What actually exists
+
+Counted rather than remembered, because a number in a plan is a hypothesis:
+
+    region relic slots     8   tombfields filled, seven null
+    outfits in the table   4   Crustwalker, Bonewarden, Drowned, Ashen
+    with held gear         1   Bonewarden
+    relic props built      1   the dragon
+    outfits with a source  2   Bonewarden (dragon), Drowned (well)
+    outfits with none      1   Ashen — Crustwalker is the default and needs none
+
+**The prop is the cost, not the palette.** The Bonewarden palette took an
+afternoon. The dragon took five separate fixes that no probe found and only
+pictures did — the skull was a fine side view and a pile of rectangles at 70.7
+degrees, the well could not be seen from inside its own interact radius, the
+horns barred the arch at 1.07 against a hero of 1.95. Any plan that treats a new
+region as "write six hex values" is a plan that has not read
+`docs/EASTER-EGGS.md`.
+
+So the seven remaining regions are not seven equal units of work. They are two
+palette-only jobs, then a prop each.
+
+---
+
+## The eight regions
+
+Each region already has a colour identity in `overworld/world7.js`, so an
+outfit found there can be made of the ground it was found on rather than
+invented beside it.
+
+| region | ground | the thing you find | the look |
+|---|---|---|---|
+| tombfields | slate + bone | **the dragon** — built | bone over slate |
+| spindle | iron + slate, violet | a toppled survey mast, still pointing | iron and violet |
+| sinklands | clay + rust | a shipwreck, where there has been no water in a very long time | bleached canvas and tar |
+| citadel | gold-veined slate | a throne with nobody in it | gold leaf and deep violet |
+| quarry | dark slate, basalt | a half-carved figure somebody abandoned | basalt and stone dust |
+| bonetown | limestone + moss | a house in the ruined town, still furnished | moss over limestone |
+| cryomire | ice + sludge | something frozen mid-stride | sludge green — **not ice** |
+| pyre | rust + magma | a signal fire that went out | soot and ember |
+
+**Cryomire is the constrained one and that is the good news.** Its enemies are
+the frost faction, and `gear-skins.spec.mjs` fails any outfit whose emissive
+matches an enemy accent — so the ice region is the one place an ice-coloured
+outfit is forbidden. Sludge against ice is a better idea than ice against ice
+anyway, and the rule is what forced it.
+
+---
+
+## Order of work
+
+Sequenced by what each step *proves*, not by which region is nicest.
+
+**1 — Finish the Drowned.** It has a working source already (the well pays out
+on the third throw) and it is body-only. Weapon and shield art for it is pure
+palette: no prop, no placement, no new interact. It also doubles every row of
+the picker from two options to three, which is the first point at which mixing
+is worth opening a menu for.
+
+**2 — Wire the Ashen.** Needs a trigger — all three settlement fires still
+burning — and full art. Still no prop. It is the only cosmetic in the whole set
+that *means* something: `CIVILIAN_PALETTE` dresses you as the people you are
+failing to save.
+
+Those two take the table from one geared outfit to three and cost no new art
+pipeline at all. Everything after them costs a prop.
+
+**3 — Pyre: the dead signal fire.** Deliberately the SECOND prop and
+deliberately a small one. The dragon is 22 spine segments and a ribcage; a
+burnt-out fire is a handful of boxes. The question this answers is whether the
+prop cost was the dragon or the pipeline, and it is much cheaper to find that
+out on something small.
+
+**4 — Spindle: the toppled mast.** The other cheap silhouette — one long
+diagonal, vertical where the dragon was horizontal. Two small props in a row
+before committing to a big one.
+
+**5 — Sinklands: the shipwreck.** The best idea in `EASTER-EGGS.md` and the
+first real set piece. A hull is a large horizontal mass on a screen whose
+density is the lowest in the world (0.35), so there is room for it, and the joke
+carries itself without a line of dialogue.
+
+**6 — Citadel: the empty throne.** The centre screen — the highest-traffic
+square on the map, so the most value per unit of work — and the most ornate
+outfit, so the most art risk. Worth doing once five palettes' worth of evidence
+exists about what actually reads at 34 px.
+
+**7 — Cryomire: the frozen figure.** Held late on purpose. Its palette is the
+hardest in the set because the obvious answer is banned, and it should be
+attempted with the most evidence in hand, not the least.
+
+**8 — Bonetown: the furnished house.** Density 0.9, the highest in the world.
+Placement risk is at its worst here, and the feature-anchor system should have
+the most mileage under it before it is asked to keep a house clear.
+
+**9 — Quarry: the half-carved figure.** Last because it is the one whose idea is
+weakest, and by then there will be seven better ones to steal from.
+
+### Not on this list, and cheap
+
+**A source that costs no prop at all.** Beating a boss without taking damage is
+a flag the combat code could already set, and it can grant any outfit above
+rather than needing its own. Same for finding all three settlements, which is
+Ashen. Sources and outfits are separate axes and do not have to be built
+together.
+
+---
+
+## Two decisions worth making before more art
+
+**Does every outfit need all three slots?** Two of four are body-only today.
+Recommendation: **region relics are full sets** — they are the backbone and the
+payoff for exploring — and **behaviour unlocks are single-slot standouts.** A
+weapon-only reward for a no-damage boss kill is a change of pace, is cheaper,
+and gives the wardrobe something to mix that is not a matching set.
+
+**Should `glow` ever be skinnable?** It is the only reason the Light Caster
+cannot be re-dressed, and the ten enemy accents leave a narrow safe band. If it
+is ever opened, the spec that holds every skin against every enemy accent is
+already written and is the thing that makes it survivable.
+
+---
+
 ## Still open
 
-- **Seven outfits.** `GEAR_SKINS` has four rows and two of them are body-only on
-  purpose. The engine is proven; the rest is authoring.
-- **The Light Caster.** Unskinnable under the current rule. Changing that means
-  picking an emissive no faction owns, and the safe part of the spectrum is
-  narrow.
+- **The Light Caster.** Unskinnable under the current rule; 8–13% of its pixels
+  move because its silhouette is almost all bloom. Recorded rather than worked
+  around.
 - **The guard pose.** Every shield number here was taken with the arm down,
   which is where the shield spends most of its time. Raised, it presents its
   face at the camera and is a much larger surface — unmeasured.
-- **The Ashen outfit still has no source.**
+- **A second prop has never been built.** Everything above about "the pipeline"
+  is a hypothesis until step 3.
