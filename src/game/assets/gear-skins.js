@@ -256,6 +256,189 @@ export const GEAR_SKINS = Object.freeze({
             grip: { color: 0x1c1618, rough: 0.96, metal: 0.03 },
         }),
     }),
+
+    // ── the six remaining region relics ─────────────────────────────────────
+    //
+    // All full sets. Region relics are the payoff for exploring and dress you
+    // head to foot; behaviour unlocks are the single-slot standouts. The Ashen
+    // is the only one of those so far, and its missing weapon is what keeps the
+    // slot filter testable - see its entry above.
+    //
+    // Each takes its colours from its own body palette, key for key, so the
+    // three slots read as one find rather than three items that happen to be
+    // the same temperature. And in every one of them `blade` and `guard` sit a
+    // long way apart in value: from directly overhead the Anchor Link is almost
+    // entirely those two roles, and two neighbours of the same shade leave
+    // nothing for the eye to catch.
+
+    // Iron and violet, off the fallen survey mast.
+    surveyor: Object.freeze({
+        id: 'surveyor',
+        name: 'The Surveyor',
+        weapon: Object.freeze({
+            grip: { color: 0x1b2028, rough: 0.95, metal: 0.10 },
+            guard: { color: 0x54606e, metal: 0.45, rough: 0.55 },
+            guardDark: { color: 0x353e49, metal: 0.38, rough: 0.68 },
+            blade: { color: 0x9aa6b2, metal: 0.62, rough: 0.38 },
+            bladeDark: { color: 0x66717d, metal: 0.55, rough: 0.50 },
+            accent: { color: 0x6a4d8c, metal: 0.35, rough: 0.42 },
+        }),
+        shield: Object.freeze({
+            blade: { color: 0x2e3440, metal: 0.35, rough: 0.60 },
+            guard: { color: 0x8b98a6, metal: 0.50, rough: 0.45 },
+            guardDark: { color: 0x1b2028, metal: 0.30, rough: 0.75 },
+            accent: { color: 0x7d5aa4, metal: 0.40, rough: 0.38 },
+            grip: { color: 0x22262a, rough: 0.95, metal: 0.06 },
+        }),
+    }),
+
+    // Bleached canvas, tar and rope, off the ship in the dust.
+    landlocked: Object.freeze({
+        id: 'landlocked',
+        name: 'The Landlocked',
+        weapon: Object.freeze({
+            grip: { color: 0x171412, rough: 0.98, metal: 0.03 },
+            guard: { color: 0x8a6a3c, metal: 0.12, rough: 0.85 },
+            guardDark: { color: 0x54401f, metal: 0.10, rough: 0.90 },
+            blade: { color: 0xc4bcac, metal: 0.22, rough: 0.62 },
+            bladeDark: { color: 0x8a8171, metal: 0.18, rough: 0.72 },
+            accent: { color: 0x7a4a2c, metal: 0.30, rough: 0.60 },
+        }),
+        shield: Object.freeze({
+            blade: { color: 0x2a2622, metal: 0.10, rough: 0.88 },
+            guard: { color: 0xc4bcac, metal: 0.18, rough: 0.66 },
+            guardDark: { color: 0x171412, metal: 0.08, rough: 0.92 },
+            accent: { color: 0xa8763c, metal: 0.35, rough: 0.52 },
+            grip: { color: 0x3d382f, rough: 0.96, metal: 0.04 },
+        }),
+    }),
+
+    // Gilt and deep violet, from beside the empty chair. The only ornate set in
+    // the game, and the only one whose brightest note is on the WEAPON rather
+    // than the shield - a courtier's blade is meant to be looked at.
+    attendant: Object.freeze({
+        id: 'attendant',
+        name: 'The Attendant',
+        weapon: Object.freeze({
+            grip: { color: 0x140d1b, rough: 0.92, metal: 0.10 },
+            guard: { color: 0x8c6f18, metal: 0.68, rough: 0.38 },
+            guardDark: { color: 0x54410c, metal: 0.60, rough: 0.50 },
+            blade: { color: 0xd8be5e, metal: 0.78, rough: 0.28 },
+            bladeDark: { color: 0x9c8430, metal: 0.70, rough: 0.40 },
+            accent: { color: 0x6a3f84, metal: 0.42, rough: 0.40 },
+        }),
+        shield: Object.freeze({
+            // LIGHTER THAN IT WAS. At #2e1a39 this plate measured dRGB 6 from
+            // the Unanswered's charcoal — two near-black shields, and the one
+            // that is supposed to be the ornate outfit in the game was reading
+            // as the austere one. Violet has to be legible AS violet.
+            blade: { color: 0x4a3a58, metal: 0.34, rough: 0.52 },
+            guard: { color: 0xc9a227, metal: 0.72, rough: 0.34 },
+            guardDark: { color: 0x251733, metal: 0.25, rough: 0.78 },
+            accent: { color: 0xf0dc94, metal: 0.65, rough: 0.30 },
+            grip: { color: 0x241830, rough: 0.94, metal: 0.06 },
+        }),
+    }),
+
+    // Pale cold and sludge, off the figure in the mire ice. NOT ice blue: the
+    // frost faction owns #60e0ff and the hero's rim is azure, so a blue outfit
+    // in a blue region would be three shades of the same idea and one of them
+    // belongs to the enemy.
+    thaw: Object.freeze({
+        id: 'thaw',
+        name: 'The Thaw',
+        weapon: Object.freeze({
+            grip: { color: 0x232b28, rough: 0.95, metal: 0.06 },
+            guard: { color: 0x6a7040, metal: 0.20, rough: 0.78 },
+            guardDark: { color: 0x424626, metal: 0.15, rough: 0.86 },
+            blade: { color: 0xbccacc, metal: 0.40, rough: 0.34 },
+            bladeDark: { color: 0x7f8e90, metal: 0.32, rough: 0.48 },
+            accent: { color: 0x8a9a5a, metal: 0.22, rough: 0.66 },
+        }),
+        shield: Object.freeze({
+            blade: { color: 0x3d4a44, metal: 0.22, rough: 0.66 },
+            guard: { color: 0xbccacc, metal: 0.38, rough: 0.36 },
+            guardDark: { color: 0x1c2320, metal: 0.14, rough: 0.88 },
+            accent: { color: 0x9fb0b4, metal: 0.30, rough: 0.44 },
+            grip: { color: 0x2b3032, rough: 0.95, metal: 0.05 },
+        }),
+    }),
+
+    // Moss, limestone and worked wood, out of the furnished house. The one set
+    // in the game whose colours came off furniture rather than off stone, bone
+    // or iron.
+    tenant: Object.freeze({
+        id: 'tenant',
+        name: 'The Tenant',
+        // LED BY MOSS AND BRASS, NOT BY LIMESTONE, and the change came out of a
+        // measurement rather than a preference.
+        //
+        // With ten outfits in the table the probe started reporting closest
+        // pairs instead of comfortable gaps, and this one was in three of them:
+        // dRGB 5 from the Landlocked on the Wedge, 5 from the Unfinished on the
+        // Mallet, 6 from the Ashen on the shield. Its blade was #b0a894, which
+        // sits between the Landlocked's bleached canvas and the Unfinished's
+        // stone dust - three pale putty blades that were one blade at 34 px.
+        //
+        // A wardrobe of ten is a different problem from a wardrobe of three: it
+        // is not enough for each outfit to differ from what SHIPPED, they have
+        // to differ from each other, and nothing but measuring every pair says
+        // whether they do.
+        weapon: Object.freeze({
+            grip: { color: 0x40311f, rough: 0.96, metal: 0.03 },
+            guard: { color: 0x5e6b42, metal: 0.16, rough: 0.80 },
+            guardDark: { color: 0x3a4328, metal: 0.12, rough: 0.88 },
+            // MOSS-STAINED BRONZE, and this value has moved twice.
+            //
+            // It started as limestone (#b0a894) and collided with the
+            // Landlocked and the Unfinished. Moved to brass (#a8874a) it
+            // stopped colliding with those and immediately collided with the
+            // Attendant's gilt instead — dRGB 8 on the Anchor Link, which is
+            // one outfit with two names. Stepping out of a crowd into the only
+            // other warm neighbourhood in the table is not a fix.
+            //
+            // Green is the direction nothing else in the wardrobe occupies. The
+            // Drowned is verdigris and reads blue-green; this is yellow-green,
+            // and the pair are further apart than either is from anything else.
+            blade: { color: 0x7d8a4e, metal: 0.40, rough: 0.55 },
+            bladeDark: { color: 0x525c31, metal: 0.32, rough: 0.66 },
+            accent: { color: 0xb0a894, metal: 0.22, rough: 0.66 },
+        }),
+        shield: Object.freeze({
+            blade: { color: 0x3a4328, metal: 0.12, rough: 0.82 },
+            guard: { color: 0x93a06a, metal: 0.20, rough: 0.64 },
+            guardDark: { color: 0x241f18, metal: 0.10, rough: 0.90 },
+            accent: { color: 0xc0a860, metal: 0.45, rough: 0.48 },
+            grip: { color: 0x40311f, rough: 0.96, metal: 0.03 },
+        }),
+    }),
+
+    // Stone dust over basalt, off the carving nobody finished. Greyscale, which
+    // nothing else in the wardrobe is - the cheapest way to be unmistakable
+    // among bone, verdigris, dust, charcoal, canvas and gilt. The one warm note
+    // is the mallet handle left on the block.
+    unfinished: Object.freeze({
+        id: 'unfinished',
+        name: 'The Unfinished',
+        weapon: Object.freeze({
+            grip: { color: 0x1d1b1a, rough: 0.96, metal: 0.05 },
+            guard: { color: 0x585450, metal: 0.30, rough: 0.72 },
+            guardDark: { color: 0x35322f, metal: 0.22, rough: 0.84 },
+            // Colder and a step darker than it started. At #b6b0a6 this blade
+            // measured dRGB 9 from the Thaw's, which is two pale greys sharing
+            // one silhouette.
+            blade: { color: 0x9a9690, metal: 0.30, rough: 0.60 },
+            bladeDark: { color: 0x656260, metal: 0.24, rough: 0.70 },
+            accent: { color: 0x9c6a3c, metal: 0.20, rough: 0.72 },
+        }),
+        shield: Object.freeze({
+            blade: { color: 0x33302e, metal: 0.20, rough: 0.80 },
+            guard: { color: 0x968f86, metal: 0.28, rough: 0.58 },
+            guardDark: { color: 0x1d1b1a, metal: 0.14, rough: 0.90 },
+            accent: { color: 0xc8c0b4, metal: 0.30, rough: 0.52 },
+            grip: { color: 0x2c2a29, rough: 0.96, metal: 0.04 },
+        }),
+    }),
 });
 
 /** `true` if `id` names a row here. */

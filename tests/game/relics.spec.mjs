@@ -37,6 +37,7 @@ import {
 import { addRelic } from '../../src/game/world/relics.js';
 import { REGIONS, regionOf, WORLD7 } from '../../src/game/overworld/world7.js';
 import { isHeroSkin, heroSkinIds } from '../../src/game/characters/hero-skins.js';
+import { ENEMY_PALETTES } from '../../src/game/assets/palettes.js';
 import { CollisionWorld } from '../../src/engine/collision.js';
 import { LEVELS } from '../../src/game/levels/registry.js';
 import { patchOverworld } from '../../src/game/world/keys.js';
@@ -219,6 +220,168 @@ export function run(t) {
             t.ok(`the relic table has a row for '${r}'`, r in REGION_RELICS);
         }
 
+        // ── 1c. THE ANCHOR ASKS FOR TWO MORE THAN IT NEEDS ──────────────────
+        //
+        // `world7.js` publishes a feature anchor per relic and both the grammar
+        // and the terracing pass refuse to build inside one. They honour it —
+        // and terracing raises ground by up to two, and its SKIRT steps down
+        // OUTSIDE the cell it was refused at. So an anchor of r delivers a
+        // clearing of about r - 2, and the relic's radius-7 clearing was a five.
+        //
+        // Swept with `tests/qa/easter-eggs.mjs` counting raised cells inside the
+        // anchor across all eight relics:
+        //
+        //     r=7   6 relics affected, 19 cells      r=10  0, 0
+        //     r=8   1 relic affected,   3 cells      r=11  0, 0
+        //     r=9   0 relics affected,  0 cells      r=12  0, 0
+        //
+        // Nine is pinned here because the number was measured, not chosen, and
+        // a measured number with no test is a number that drifts back.
+        {
+            const MIN_ANCHOR = 9;
+            // Its own call rather than the outer `placed`: this block sits
+            // above where that is defined, and reaching forward to a const is a
+            // temporal-dead-zone error that only shows up when the file runs.
+            for (const r of placedRelics()) {
+                const screen = WORLD7.screens[r.screen];
+                const mine = (screen?.features || []).filter(
+                    (f) => Math.hypot((f.x ?? 0) - r.x, (f.z ?? 0) - r.z) < 0.001,
+                );
+                t.ok(`${r.id}: publishes a feature anchor`, mine.length === 1);
+                t.ok(`${r.id}: its anchor is at least ${MIN_ANCHOR}`,
+                    (mine[0]?.r ?? 0) >= MIN_ANCHOR, `r=${mine[0]?.r}`);
+            }
+        }
+
+        // ── 1d. THE ICE HAS NO LID ─────────────────────────────────────────
+        //
+        // The cryomire relic is a figure caught in ice, and the first build put
+        // a slab across the top of it. The camera is 17.5 units up at 70.7
+        // degrees, so the TOP is the face the player sees: the prop came back
+        // from the photographer as a white box with nothing in it. "Open toward
+        // the camera" had been reasoned about as if this game had a side view.
+        //
+        // The rule, stated so it cannot come back: nothing may sit above the
+        // figure's shoulders directly over the middle of the prop.
+        {
+            const g = RELIC_BUILDERS.frozen_stride();
+            g.updateMatrixWorld(true);
+            const b = new THREE.Box3();
+            let covering = 0;
+            // ICE ONLY, AND FROM CHEST HEIGHT UP. The first version of this
+            // asked for anything over the centre above 1.6 and a counterfactual
+            // walked straight past it: a lid whose underside sits at 1.5 still
+            // hides the head, which reaches 1.97. Lowering the bar to chest
+            // height would have caught the figure's own torso instead, so the
+            // question has to name the material — nothing frozen may be over
+            // the thing that froze.
+            const ICE_HEX = new Set([0xa8c4cc, 0x6e8890]);
+            g.traverse((o) => {
+                if (!o.isMesh) return;
+                b.setFromObject(o);
+                if (!ICE_HEX.has(o.material.color.getHex())) return;
+                if (b.min.x <= 0.2 && b.max.x >= -0.2 && b.min.z <= 0.2 && b.max.z >= -0.2
+                    && b.min.y > 1.2) covering++;
+            });
+            t.ok('nothing roofs the figure in the ice', covering === 0, `${covering} pieces overhead`);
+            // And the figure has to reach above the ice, or it is a well with
+            // something at the bottom of it.
+            let iceTop = 0;
+            let figureTop = 0;
+            g.traverse((o) => {
+                if (!o.isMesh) return;
+                b.setFromObject(o);
+                const hex = o.material.color.getHex();
+                if (hex === 0xa8c4cc || hex === 0x6e8890) iceTop = Math.max(iceTop, b.max.y);
+                if (hex === 0x2a2e2c) figureTop = Math.max(figureTop, b.max.y);
+            });
+            t.ok('the figure stands proud of the ice around it',
+                figureTop > iceTop, `figure ${figureTop.toFixed(2)} vs ice ${iceTop.toFixed(2)}`);
+            g.traverse((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
+        }
+
+        // ── 1a. EVERY PROP, STRUCTURALLY ───────────────────────────────────
+        //
+        // These ran as bespoke assertions for the cold signal fire and caught
+        // three real bugs in it. Written per-prop they would have to be written
+        // eight times and would be written well maybe twice, so they run over
+        // whatever `RELIC_BUILDERS` holds — a new prop inherits the whole set
+        // the moment it is registered, which is the only version of this that
+        // survives the seventh one.
+        {
+            const b = new THREE.Box3();
+            const accents = new Set();
+            for (const pal of Object.values(ENEMY_PALETTES)) {
+                if (typeof pal?.eyeGlow === 'number') accents.add(pal.eyeGlow);
+            }
+            // THE DRAGON'S FLOOR IS PINNED, NOT EXEMPTED. It was built before
+            // `grounded()` existed and its skull end sits 0.253 under — twenty
+            // meshes are below the floor. That is pre-existing, a quarter of a
+            // metre on a prop 4.7 tall, and it looks right, so it has not been
+            // re-tuned: `docs/media` records what happens when art is changed
+            // to move a number. Pinning the value means it cannot get WORSE
+            // without this saying so, which is the part that matters.
+            const FLOOR = { dragon: -0.26 };
+            for (const [kind, build] of Object.entries(RELIC_BUILDERS)) {
+                const g = build();
+                g.updateMatrixWorld(true);
+                const bb = new THREE.Box3().setFromObject(g);
+
+                let meshes = 0, inside = 0, lit = 0, longest = 0;
+                g.traverse((o) => {
+                    if (!o.isMesh) return;
+                    meshes++;
+                    b.setFromObject(o);
+                    const cx = (b.min.x + b.max.x) / 2;
+                    const cz = (b.min.z + b.max.z) / 2;
+                    if (Math.hypot(cx, cz) <= 6) inside++;
+                    longest = Math.max(longest, Math.hypot(b.max.x - b.min.x, b.max.z - b.min.z));
+                    const e = o.material?.emissive;
+                    if (e && e.getHex() !== 0x000000 && (o.material.emissiveIntensity ?? 0) > 0
+                        && accents.has(e.getHex())) lit++;
+                });
+
+                // RESTS ON THE FLOOR. Both directions: a prop that floats reads
+                // as pasted on, and one that sinks loses whatever went under.
+                const floor = FLOOR[kind] ?? -0.03;
+                t.ok(`${kind}: nothing is buried`, bb.min.y >= floor,
+                    `lowest ${bb.min.y.toFixed(3)} against ${floor}`);
+                t.ok(`${kind}: something touches the ground`, bb.min.y <= 0.06,
+                    `lowest ${bb.min.y.toFixed(3)}`);
+
+                // MASS INSIDE THE PROTECTED DISC. `makeProtector` keeps radius
+                // 6 clear at the screen centre; past it the grammar was free to
+                // build, and the set piece the player travelled for starts
+                // competing with boulders. The dragon deliberately trails a
+                // tail and a wing past the line, so the rule is about where the
+                // BULK is rather than where the last vertex is.
+                const pct = Math.round((inside / meshes) * 100);
+                t.ok(`${kind}: most of it is inside the protected disc`, pct >= 85, `${pct}%`);
+                const reach = Math.max(
+                    Math.abs(bb.min.x), Math.abs(bb.max.x),
+                    Math.abs(bb.min.z), Math.abs(bb.max.z),
+                );
+                t.ok(`${kind}: does not run off the screen`, reach <= 11, `reaches ${reach.toFixed(2)}`);
+
+                // IT IS A SET PIECE. A relic is the reason somebody walked
+                // across a region; four boxes in a heap is a placeholder that
+                // shipped.
+                t.ok(`${kind}: is actually built`, meshes >= 12, `${meshes} meshes`);
+                t.ok(`${kind}: reads at a distance`, longest >= 1.2 || bb.max.y >= 1.2,
+                    `longest span ${longest.toFixed(2)}, height ${bb.max.y.toFixed(2)}`);
+                t.ok(`${kind}: is not taller than the world`, bb.max.y <= 6,
+                    `${bb.max.y.toFixed(2)}`);
+
+                // NO PROP WEARS AN ENEMY'S ACCENT. Same rule the outfits are
+                // held to in `gear-skins.spec.mjs`, and it matters more here:
+                // a set piece glowing in the local faction's colour is a
+                // permanent false telegraph on a screen the player came to.
+                t.ok(`${kind}: does not glow in an enemy's colour`, lit === 0, `${lit} parts`);
+
+                g.traverse((o) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
+            }
+        }
+
         // ── 1b. THE COLD SIGNAL FIRE ───────────────────────────────────────
         //
         // Three of these assertions exist because the thing they check was
@@ -318,23 +481,26 @@ export function run(t) {
 
         const placed = placedRelics();
         t.ok('at least one relic is placed', placed.length >= 1);
-        // THE COUNT IS A TRIPWIRE, AND IT HAS FIRED ONCE.
+        // THE COUNT WAS A TRIPWIRE AND IT HAS FIRED TWICE. It read `=== 1`
+        // while only the dragon existed, `=== 2` after the pyre's cold signal
+        // fire, and each time whoever raised it came here and said why rather
+        // than letting a diff discover it.
         //
-        // It read `=== 1` while only the dragon existed, with a note saying
-        // that whoever raised it should come here and say so rather than let a
-        // diff discover it. That worked: the pyre's cold signal fire tripped it
-        // on the day it was authored.
-        //
-        // TWO now, and the reason is written down. The dragon proved the chain
-        // end to end - prop, interact, story, unlock, save, map mark, visible
-        // hero - and the signal fire is deliberately the SECOND and deliberately
-        // small, because whether the cost was that particular dragon or the
-        // pipeline itself was a hypothesis until a second prop existed. See the
-        // sequence in `docs/WARDROBE.md`.
-        //
-        // Keep it exact. A `>=` here would be a tripwire that never fires again.
-        t.ok('the authored relic count is deliberate', placed.length === 2,
-            `${placed.length} placed — see docs/WARDROBE.md before raising this`);
+        // EIGHT now, which is all of them, so it stops being a tripwire and
+        // becomes a completeness check: every region in the world has something
+        // in it, and a ninth region added later arrives with an empty row that
+        // this refuses. That is a better question than the count ever was.
+        t.ok('every region has a relic', placed.length === regions.length,
+            `${placed.length} placed, ${regions.length} regions`);
+        for (const r of regions) {
+            t.ok(`region '${r}' has a relic authored`, !!REGION_RELICS[r]);
+        }
+        // Every relic is somewhere different. Two on one screen would put two
+        // set pieces inside the same protected disc.
+        t.ok('no two relics share a screen',
+            new Set(placed.map((r) => r.screen)).size === placed.length);
+        t.ok('every relic grants a different outfit',
+            new Set(placed.map((r) => r.skin)).size === placed.length);
 
         // Each placed relic must name a builder that exists. `addRelic` returns
         // null for a `kind` with no builder and swallows it silently, so a typo

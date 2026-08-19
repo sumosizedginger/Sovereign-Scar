@@ -127,8 +127,8 @@ lighting is not what the character looks like in the room you are standing in.
 
 ## What looking at it changed
 
-Everything above can be true of something invisible. **Four instruments were
-built to answer *can you actually see this*, and the first three were wrong.**
+Everything above can be true of something invisible. **Five instruments were
+built to answer *can you actually see this*, and the first four were wrong** — three of them by reaching for a mean.
 
 **The first** counted pixels that changed between a before and an after frame,
 and took its noise floor from two shots 700 ms apart with the world running —
@@ -302,176 +302,190 @@ too weak rather than code that was wrong, which is the point of running them.
 
 Counted rather than remembered, because a number in a plan is a hypothesis:
 
-    region relic slots     8   tombfields and pyre filled, six null
-    outfits in the table   5   Crustwalker, Bonewarden, Drowned, Ashen, The Unanswered
-    with held gear         4   three full sets; Ashen is shield-only on purpose
-    relic props built      2   the dragon, the cold signal fire
-    outfits with a source  4   dragon, well, three fires, signal fire
-    outfits with none      0   Crustwalker is the default and needs none
+    region relic slots    8   all eight filled
+    outfits in the table 11   Crustwalker plus ten
+    with held gear       10   nine full sets; Ashen is shield-only on purpose
+    relic props built     8   one per region
+    outfits with a source 10  eight relics, the well, the three fires
+
+The roadmap below is finished. What is left is on the last page.
 
 ---
 
-## The question the second prop was built to answer
+## What eight props cost, and what caught it
 
-`docs/WARDROBE.md` said the prop is the cost and the palette is not — and that
-whether *the dragon* was expensive or *the pipeline* was expensive stayed a
-hypothesis until a second prop existed. The pyre's cold signal fire was chosen
-to be the cheapest honest test of it: a ring of stones and a fallen pole against
-22 spine segments and a ribcage.
+The plan asked whether *the dragon* was expensive or the *pipeline* was. Two
+props answered it and eight confirmed it: **it is the pipeline.** Building
+anything for a camera fixed at 70.7 degrees is the cost, and the failure is
+almost always the same one — a shape that is perfectly good from the side and
+means nothing from above.
 
-**It is the pipeline.** The small prop hit the same class of problems the big one
-did, at the same rate:
+Every prop after the first inherited a shared `grounded()` helper, so the one
+piece of arithmetic that had already gone wrong twice was written once:
 
-| the dragon | the cold signal fire |
-|---|---|
-| skull was a fine side view, a pile of rectangles from above | ring stones were the same value as the char; the whole prop read as rubble |
-| skull floated 0.39, tail floated 0.81 | basket was 33 cm underground, then 6 cm; toppled stones dug their corners in |
-| horns barred the arch at 1.07 | the standing mast projected to almost nothing from overhead and was *absent from the photograph* |
-| the wing was correct and off the top of the frame | the basket sat on the opposite side of the pit from the mast and read as an unrelated crate |
+> A box centred at `h / 2` rests on the floor only while it is level. Give it a
+> tilt and the low corner drops by half the span times the sine of the angle.
+> The cold fire's toppled stones went 6.8 cm under; a 3.4-metre beam at 0.16 rad
+> would go 27 cm under.
 
-Six fixes on the second prop against five on the first. Nothing about the dragon
-was special; **building anything for a fixed 70.7-degree camera is the cost.**
+Every one of the six new props came out resting at **exactly 0.000**. That
+particular bug is now structurally impossible, which is the return on writing a
+helper instead of six careful copies.
 
-What changed is what caught them. The dragon's were all found by looking. Three
-of the fire's were found by looking, and **three were found by assertions that
-did not exist when the dragon was built** — nothing buried, nothing floating,
-the longest piece must be lying down. The specs written after the first prop
-paid for themselves on the second, which is the actual return on the sequence.
+### What the photographs changed
 
-### And two of those assertions were themselves too weak
+Four of the six needed real work after they were built, and **not one of those
+four was visible in any number.**
 
-The counterfactual sweep is what said so, not a hunch.
+| prop | what the numbers said | what the picture said |
+|---|---|---|
+| **survey mast** | fine | fine — the only one that landed first time |
+| **empty throne** | fine | fine |
+| **shipwreck** | fine | a herringbone with a black stripe through it. Separated planks left no closed shape, and the tar keel was the darkest thing in frame — the one element meant to be hidden under the hull was the one that read. Rebuilt as a continuous elliptical outline with a pinched bow and a decked front. |
+| **furnished house** | fine | two of the four walls were **0.115 thick instead of 0.44**. The wall helper divided `w` by the block count for every wall, which is right when the run is along X and chops up the *thickness* when it runs along Z. A stick is still a wall as far as a bounding box is concerned. |
+| **frozen figure** | fine | a white box with nothing in it. The ice had a lid. "Open toward the camera" had been reasoned about as if this game has a side view; the camera is 17.5 units up, so the TOP is the face the player sees. Even after the lid came off, the walls stood taller than the figure and it read as a well with something at the bottom. |
+| **half-carved figure** | fine | a small ziggurat. A standing figure seen from directly above is a head with a ring of shoulder round it. Laid down as a **recumbent effigy** it became unmistakable in one glance — and it is the better idea, since a tomb figure is what a quarry in this region would be cutting. |
 
-- *"something long lies across the ground"* took the longest ground span of any
-  mesh. The charred beams are 3.4 long, so **standing the mast back up left it
-  green** — the assertion could not feel its own subject being removed. It now
-  demands that the longest piece is also a flat one, which a pole cannot be.
-- The burial threshold was −0.06, and removing the beams' tilt correction left
-  the prop at −0.059. The fix was shipped untested. The bar is −0.03 now, which
-  is where a prop resting at −0.013 can actually feel a correction go missing.
-
-### A tilted box digs its corner in
-
-Worth writing down because it is arithmetic, not art. Centring a box at `h/2`
-rests it on the floor only while it is level; give it `rz` and the low corner
-drops by half its width times `sin(rz)`. The toppled ring stones were 6.8 cm
-under, and a 3.4-metre beam at 0.16 rad would be 27 cm under. Both now lift by
-exactly that term.
-
-The basket needed three attempts and was settled by **sweeping the build at a
-range of heights** rather than by reasoning: three stacked rotations do not
-compose in anybody's head, and two careful guesses landed 33 cm and 6 cm wrong.
+Two of those are now assertions, because they can be: *nothing roofs the figure
+in the ice*, and *the figure stands proud of the ice around it*. The wall
+thickness is not, and that is recorded rather than papered over — it was caught
+by looking, which is the method, and inventing a fragile assertion to re-catch a
+bug already fixed is how a suite fills up with things nobody trusts.
 
 ---
 
-## Not every outfit fills every slot
+## The anchor was delivering two less than it asked for
 
-The Ashen has a body and a shield and **no weapon**, and that is a decision
-rather than an omission.
+Placing six new relics surfaced a bug that had been in the world since the first
+one.
 
-The civilians at the three fires carry nothing. A hero in their clothes, holding
-their battered plate, still swinging their own real weapon reads as somebody who
-*joined* them; a matched three-piece set reads as a costume. This is the one
-outfit in the game whose whole point is looking like you belong to somebody
-else, and a full kit undoes it.
+`world7.js` publishes a feature anchor per relic and both the grammar and the
+terracing pass refuse to build inside one. They honour it. But terracing raises
+ground by up to two, and its **skirt steps down outside the cell it was refused
+at** — so an anchor of `r` delivers a clearing of about `r − 2`, and the relic's
+radius-7 clearing was really a five.
 
-It is also the only thing keeping one of the wardrobe's rules honest. `slotOptions`
-filters an outfit out of a slot it has no art for — and if every row filled every
-slot, deleting that filter would change nothing and no test could tell. One
-genuine gap in the data is what makes the guard testable, and `gear-skins.spec.mjs`
-asserts that **at least one gap always survives** rather than leaving it to
-whoever authors the next outfit.
+Measured across all eight relics, counting raised cells inside the anchor:
 
-The general rule this settles, and the one the remaining seven should follow:
+    r=7   6 relics affected, 19 cells      r=10   0 relics, 0 cells
+    r=8   1 relic affected,   3 cells      r=11   0 relics, 0 cells
+    r=9   0 relics affected,  0 cells      r=12   0 relics, 0 cells
 
-> **Region relics are full sets** — they are the payoff for exploring.
-> **Behaviour unlocks are single-slot standouts** — cheaper, and they give the
-> wardrobe something to mix that is not a matching set.
+Nine is the first value that delivers the seven it asks for. **The dragon was
+affected too** — it has been standing in a slightly terraced clearing since the
+day it was placed, and nobody could see it because the prop itself was never
+buried. `mass` inside the prop's own footprint was zero the whole time; the
+question that found this was a different and stricter one.
+
+The probe now measures both, and the spec pins the radius at 9, because a
+measured number with no test is a number that drifts back.
+
+---
+
+## Ten outfits is a different problem from three
+
+With three outfits it is enough for each to differ from what shipped. With ten
+they have to differ **from each other**, and the probe started reporting closest
+pairs instead of comfortable gaps:
+
+    thaw vs unfinished    dRGB 9   on the Anchor Link
+    landlocked vs tenant  dRGB 5   on the Wedge
+    tenant vs unfinished  dRGB 5   on the Mallet
+    ashen vs tenant       dRGB 6   on the shield
+
+The Tenant was in three of the four. Its blade sat at `#b0a894`, between the
+Landlocked's bleached canvas and the Unfinished's stone dust — three pale putty
+blades that were one blade at 34 pixels.
+
+Moving it to brass fixed those three and **immediately created a fourth**: brass
+landed on the Attendant's gilt at dRGB 8. Stepping out of a crowd into the only
+other warm neighbourhood in the table is not a fix. It is moss-stained bronze
+now — green is the direction nothing else occupies, and the Drowned's verdigris
+reads blue-green while this reads yellow-green, so the pair sit further apart
+than either does from anything else.
+
+### And then the mean lied for a third time
+
+Asked the obvious next question — *are the whole outfits tellable apart?* — the
+probe averaged each figure's colour and reported the **shipped hero six points
+from a figure dressed entirely in grey.** The shipped hero wears a red shirt and
+blue trousers. Red and blue average to something close to grey.
+
+That is the same failure as the bone shield, whose face darkened by exactly as
+much as its bands brightened, and it is the third time in this document a mean
+has been the thing that was wrong. The lesson is not "be careful with means", it
+is that **a mean answers "what colour is this on average" and is never the
+answer to "can you tell these apart".**
+
+The figures share a rig and a pose, so their silhouettes almost coincide and the
+pixels can simply be compared. What comes back is the fraction of the character
+that actually looks different, which nothing can hide inside:
+
+    55 pairs. Closest: surveyor vs unfinished    27%
+                       unfinished vs ashen       28%
+                       unanswered vs attendant   28%
+                       bonewarden vs thaw        28%
+              widest:  crustwalker vs drowned    43%
+
+**Every pair differs across at least a quarter of the character.** The palettes
+were fine; the question had been asked with the wrong instrument.
+
+The per-piece numbers above were *not* the same mistake, and the palette moves
+they prompted stand: a blade is close to one colour, so a mean over its
+silhouette is a fair summary of it. A whole character wearing four garments is
+not, and that distinction is the whole of it.
 
 ---
 
 ## The eight regions
 
-Each region already has a colour identity in `overworld/world7.js`, so an
-outfit found there can be made of the ground it was found on rather than
-invented beside it.
+Each region has a colour identity in `overworld/world7.js`, and every outfit is
+made of the ground it was found on rather than invented beside it.
 
-| region | ground | the thing you find | the look |
-|---|---|---|---|
-| tombfields | slate + bone | **the dragon** — built | bone over slate |
-| spindle | iron + slate, violet | a toppled survey mast, still pointing | iron and violet |
-| sinklands | clay + rust | a shipwreck, where there has been no water in a very long time | bleached canvas and tar |
-| citadel | gold-veined slate | a throne with nobody in it | gold leaf and deep violet |
-| quarry | dark slate, basalt | a half-carved figure somebody abandoned | basalt and stone dust |
-| bonetown | limestone + moss | a house in the ruined town, still furnished | moss over limestone |
-| cryomire | ice + sludge | something frozen mid-stride | sludge green — **not ice** |
-| pyre | rust + magma | **the cold signal fire** — built | soot and one ember |
+| region | the thing you find | the outfit |
+|---|---|---|
+| tombfields | the dragon skeleton | **Bonewarden** — bone over slate |
+| spindle | a toppled survey mast, dish still on the end | **The Surveyor** — iron and violet |
+| sinklands | a shipwreck, where there has been no water in a very long time | **The Landlocked** — bleached canvas over tar |
+| citadel | a throne with nobody in it | **The Attendant** — gilt and deep violet |
+| quarry | a recumbent figure somebody stopped carving | **The Unfinished** — stone dust over basalt |
+| bonetown | a house in the ruined town, table still laid | **The Tenant** — moss, brass and limestone |
+| cryomire | somebody caught mid-stride in the ice | **The Thaw** — pale cold and sludge |
+| pyre | a signal fire that went out | **The Unanswered** — charcoal and one ember |
 
-**Cryomire is the constrained one and that is the good news.** Its enemies are
-the frost faction, and `gear-skins.spec.mjs` fails any outfit whose emissive
-matches an enemy accent — so the ice region is the one place an ice-coloured
-outfit is forbidden. Sludge against ice is a better idea than ice against ice
-anyway, and the rule is what forced it.
+Two more come from elsewhere: **The Drowned** out of the dry well on the third
+throw, and **The Ashen** for speaking to all three settlements.
+
+**Cryomire was the constrained one and the constraint made it better.** Its
+enemies are the frost faction, and `gear-skins.spec.mjs` fails any outfit whose
+emissive matches an enemy accent — so the ice region is the one place an
+ice-coloured outfit is forbidden. Sludge against ice is a better idea than ice
+against ice, and the rule is what forced it. Nothing in the prop glows either:
+the pyre and the cryomire are the two regions whose ground is lit, and both of
+their relics are things that stopped.
 
 ---
 
-## Order of work
+## Order of work — finished
 
-Sequenced by what each step *proves*, not by which region is nicest.
+Sequenced by what each step *proved*, not by which region was nicest. All nine
+are done; what each one actually taught is above.
 
-**1 — Finish the Drowned. DONE.** It has a working source already (the well pays out
-on the third throw) and it is body-only. Weapon and shield art for it is pure
-palette: no prop, no placement, no new interact. It also doubles every row of
-the picker from two options to three, which is the first point at which mixing
-is worth opening a menu for.
+| | | what it was for |
+|---|---|---|
+| 1 | **Finish the Drowned** | no prop at all — pure palette on a source that already worked |
+| 2 | **Wire the Ashen** | no prop — the first *earned* outfit, and the first single-slot one |
+| 3 | **Pyre: the cold signal fire** | the second prop, deliberately small: was it the dragon or the pipeline? |
+| 4 | **Spindle: the toppled mast** | a second cheap silhouette before committing to a big one |
+| 5 | **Sinklands: the shipwreck** | the first real set piece — and the one that had to be rebuilt |
+| 6 | **Citadel: the empty throne** | the highest-traffic square on the map |
+| 7 | **Cryomire: the frozen figure** | held late: its palette was the hardest, because the obvious answer is banned |
+| 8 | **Bonetown: the furnished house** | held late: density 0.9, the worst placement risk in the world |
+| 9 | **Quarry: the half-carved figure** | last, and the weakest idea until it was laid down |
 
-**2 — Wire the Ashen. DONE** — speak to all three keepers; the flags survive
-because the reward spans three screens that are never loaded at once. Needs a trigger — all three settlement fires still
-burning — and full art. Still no prop. It is the only cosmetic in the whole set
-that *means* something: `CIVILIAN_PALETTE` dresses you as the people you are
-failing to save.
-
-Those two take the table from one geared outfit to three and cost no new art
-pipeline at all. Everything after them costs a prop.
-
-**3 — Pyre: the dead signal fire. DONE.** Deliberately the SECOND prop and
-deliberately a small one. The dragon is 22 spine segments and a ribcage; a
-burnt-out fire is a handful of boxes. The question this answers is whether the
-prop cost was the dragon or the pipeline, and it is much cheaper to find that
-out on something small.
-
-**4 — Spindle: the toppled mast.** The other cheap silhouette — one long
-diagonal, vertical where the dragon was horizontal. Two small props in a row
-before committing to a big one.
-
-**5 — Sinklands: the shipwreck.** The best idea in `EASTER-EGGS.md` and the
-first real set piece. A hull is a large horizontal mass on a screen whose
-density is the lowest in the world (0.35), so there is room for it, and the joke
-carries itself without a line of dialogue.
-
-**6 — Citadel: the empty throne.** The centre screen — the highest-traffic
-square on the map, so the most value per unit of work — and the most ornate
-outfit, so the most art risk. Worth doing once five palettes' worth of evidence
-exists about what actually reads at 34 px.
-
-**7 — Cryomire: the frozen figure.** Held late on purpose. Its palette is the
-hardest in the set because the obvious answer is banned, and it should be
-attempted with the most evidence in hand, not the least.
-
-**8 — Bonetown: the furnished house.** Density 0.9, the highest in the world.
-Placement risk is at its worst here, and the feature-anchor system should have
-the most mileage under it before it is asked to keep a house clear.
-
-**9 — Quarry: the half-carved figure.** Last because it is the one whose idea is
-weakest, and by then there will be seven better ones to steal from.
-
-### Not on this list, and cheap
-
-**A source that costs no prop at all.** Beating a boss without taking damage is
-a flag the combat code could already set, and it can grant any outfit above
-rather than needing its own. Same for finding all three settlements, which is
-Ashen. Sources and outfits are separate axes and do not have to be built
-together.
+Steps 3 and 4 answered their question — the small props hit the same problems
+the big one did — so 5 through 9 were built knowing the visual pass was the
+cost, and were budgeted for it.
 
 ---
 
@@ -492,15 +506,17 @@ already written and is the thing that makes it survivable.
 
 ## Still open
 
-- **The Light Caster.** Unskinnable under the current rule; 8–13% of its pixels
-  move because its silhouette is almost all bloom. Recorded rather than worked
-  around.
+- **The no-damage boss kill.** Named from the start as the cheapest source in
+  the plan — a flag the combat code could already set, needing no prop, able to
+  grant any outfit. It is the only item on the original roadmap not built, and
+  it is a source rather than a look.
+- **The Light Caster still cannot be skinned.** All ten outfits land within a
+  few points of each other on it, because its silhouette is almost entirely the
+  emissive lamp and its bloom, and this table leaves `glow` alone. The probe
+  labels it rather than flagging it every run.
 - **The guard pose.** Every shield number here was taken with the arm down,
   which is where the shield spends most of its time. Raised, it presents its
-  face at the camera and is a much larger surface — unmeasured.
-- ~~**A second prop has never been built.**~~ Answered: see above. It is the
-  pipeline, not the dragon.
-- **The no-damage boss kill.** Named as the cheapest remaining source — a flag
-  the combat code could already set — and still not wired. It needs no prop and
-  can grant any outfit, so it is the obvious companion to the next relic rather
-  than a job of its own.
+  face at the camera and is a much larger surface — still unmeasured.
+- **The house's wall thickness has no test.** It was caught by looking, which
+  is the method; an assertion invented afterwards to re-catch a bug already
+  fixed is how a suite fills up with things nobody trusts.

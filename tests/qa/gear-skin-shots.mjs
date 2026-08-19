@@ -287,6 +287,42 @@ try {
     }
 
     /**
+     * Two dressed figures, compared pixel for pixel.
+     *
+     * A MEAN CANNOT ANSWER THIS AND HAS NOW FOOLED THIS FILE THREE TIMES. It
+     * said the bone shield "barely moves" while its face darkened by as much as
+     * its bands brightened; and asked whether ten outfits are tellable apart it
+     * reported the shipped hero — red shirt, blue trousers — sitting 6 points
+     * from a figure dressed entirely in grey, because red and blue average to
+     * something close to grey.
+     *
+     * The figures share a rig and a pose, so their silhouettes very nearly
+     * coincide and the pixels can be compared directly. What comes back is the
+     * fraction of the character that actually looks different, which is the
+     * question, and no arrangement of colours can hide inside it.
+     */
+    async function figureDiff(fa, fb) {
+        return page.evaluate(async (b64a, b64b) => {
+            const load = async (b64) => {
+                const img = new Image();
+                await new Promise((r) => { img.onload = r; img.src = 'data:image/png;base64,' + b64; });
+                const c = document.createElement('canvas');
+                c.width = img.width; c.height = img.height;
+                const ctx = c.getContext('2d', { willReadFrequently: true });
+                ctx.drawImage(img, 0, 0);
+                return ctx.getImageData(0, 0, img.width, img.height).data;
+            };
+            const [a, b] = await Promise.all([load(b64a), load(b64b)]);
+            let same = 0, diff = 0;
+            for (let i = 0; i < a.length; i += 4) {
+                const d = Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]);
+                if (d > 45) diff++; else same++;
+            }
+            return { diff, same };
+        }, fa, fb);
+    }
+
+    /**
      * The hero's own silhouette against the ground that was behind it.
      *
      * Returns the mean L* of both, so the separation is a perceptual number
@@ -402,7 +438,7 @@ try {
         await page.evaluate(() => { window.__sovereignScar.player.rig.visible = true; });
         await sleep(150);
         const figure = await grab(`outfit-${skin}`, { full: true });
-        bodyRows.push({ skin, ...(await figureGround(ground, figure)) });
+        bodyRows.push({ skin, frame: figure, ...(await figureGround(ground, figure)) });
     }
 
     // ── the picker itself ───────────────────────────────────────────────────
@@ -485,7 +521,14 @@ try {
                 if (d < worst) { worst = d; pair = `${mine[i].outfit} vs ${mine[j].outfit}`; }
             }
         }
-        const call = worst < 15 ? 'TOO CLOSE' : worst < 35 ? 'close' : 'distinct';
+        // The Light Caster is exempt and the exemption is recorded rather than
+        // hidden: its silhouette is almost entirely the emissive lamp and its
+        // bloom, this table leaves `glow` alone on purpose, and so every outfit
+        // lands within a few points of every other one. Flagging that every run
+        // is how a probe teaches people to stop reading it.
+        const known = piece === 'light_caster';
+        const call = known ? 'all alike - the Caster is its glow, see gear-skins.js'
+            : worst < 15 ? 'TOO CLOSE' : worst < 35 ? 'close' : 'distinct';
         console.log(`  ${piece.padEnd(16)} closest pair: ${pair.padEnd(26)} dRGB ${String(worst).padStart(3)}  ${call}`);
         // The means themselves, because a distance is a claim about two numbers
         // and this file has already been wrong twice about numbers it did not
@@ -522,6 +565,46 @@ try {
             : rel < -6 ? 'notably harder to see than the shipped hero'
                 : rel < 0 ? 'slightly harder to see' : 'as visible or better';
         console.log(`  ${b.skin.padEnd(14)} |dL*| ${Math.abs(b.dL).toFixed(1).padStart(5)} vs shipped ${Math.abs(ship.dL).toFixed(1)}   dRGB ${String(b.dRGB).padStart(3)} vs ${ship.dRGB}   ${call}`);
+    }
+
+    // ── AND THE QUESTION THAT ACTUALLY MATTERS ──────────────────────────────
+    //
+    // Everything above compares one PIECE across outfits, which is the right
+    // way to tell whether a skin reached a blade and the wrong way to tell
+    // whether two outfits are the same outfit. A player never sees a weapon
+    // alone: they see a figure, and the figure is mostly body, with a shield
+    // beside it and a blade off one arm.
+    //
+    // With ten outfits some pairs of one piece will always be close - there
+    // are only so many places to stand in a palette this narrow, and chasing
+    // every pair on every piece is how a set gets flattened into a gradient
+    // by somebody optimising a table. This is the number to hold: the whole
+    // silhouette, outfit against outfit.
+    console.log('\nARE THE OUTFITS TELLABLE APART? whole figure, pixel for pixel');
+    {
+        const pairs = [];
+        for (let a = 0; a < bodyRows.length; a++) {
+            for (let b = a + 1; b < bodyRows.length; b++) {
+                const r = await figureDiff(bodyRows[a].frame, bodyRows[b].frame);
+                // As a share of the FIGURE, not of the window: the window is
+                // mostly ground and would dilute every reading toward zero.
+                const area = (bodyRows[a].area + bodyRows[b].area) / 2;
+                pairs.push({ a: bodyRows[a].skin, b: bodyRows[b].skin, pct: (r.diff / area) * 100 });
+            }
+        }
+        pairs.sort((x, y) => x.pct - y.pct);
+        console.log(`  ${pairs.length} pairs, as a percentage of the figure that differs.`);
+        console.log('  Closest six:');
+        for (const w of pairs.slice(0, 6)) {
+            const call = w.pct < 20 ? 'TOO CLOSE' : w.pct < 45 ? 'close' : 'distinct';
+            console.log(`    ${w.a.padEnd(13)} vs ${w.b.padEnd(13)} ${w.pct.toFixed(0).padStart(3)}%  ${call}`);
+        }
+        const w = pairs[pairs.length - 1];
+        console.log(`  widest: ${w.a} vs ${w.b} at ${w.pct.toFixed(0)}%`);
+        const bad = pairs.filter((x) => x.pct < 20).length;
+        console.log(bad
+            ? `  ${bad} pair(s) under 20% — those two outfits are close to being one outfit.`
+            : '  Every pair differs across at least a fifth of the character.');
     }
 
     console.log('\nCONTROL - shipped gear put back, measured against its own baseline');

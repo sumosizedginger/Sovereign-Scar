@@ -189,20 +189,42 @@ function headroomUnder(group, span = RIBCAGE_X) {
 const rows = [];
 const notes = [];
 
+/**
+ * The radius `world7.js` publishes as the relic's feature anchor.
+ *
+ * `mass` inside RELIC_MAX_OFFSET asks whether the PROP is buried. This asks the
+ * different and stricter question the anchor exists to answer: is the ground
+ * the player walks up to the thing across actually clear? Terracing and the
+ * grammar are both supposed to refuse inside it.
+ */
+const ANCHOR_R = 7;
+
 for (const relic of placedRelics()) {
     const { level, scene, origin } = bakeScreen(relic.screen);
     const group = scene.getObjectByName(relic.id);
     const half = level.halfSize || 23;
     const mass = massWithin(level, origin, relic.x, relic.z, RELIC_MAX_OFFSET);
+    const anchorMass = massWithin(level, origin, relic.x, relic.z, ANCHOR_R);
     const reach = reachable(level, origin, half, relic.x, relic.z, RELIC_REACH);
-    const head = headroomUnder(group);
+    // ONLY PROPS THAT CLAIM AN ARCH GET MEASURED FOR ONE.
+    //
+    // `headroomUnder` was written for the dragon and defaults to the dragon's
+    // own ribcage span. Run over every relic it dutifully reported that a
+    // throne, a house and a block of ice all "fail" to clear a standing hero,
+    // which is true and meaningless: nobody is meant to walk under a chair.
+    // A claim nobody made cannot be broken, and a probe that invents claims
+    // teaches people to ignore it.
+    const head = relic.walkUnder ? headroomUnder(group, relic.walkUnder) : null;
     rows.push({
         what: `relic ${relic.region}`, screen: relic.screen, built: !!group,
-        offset: Math.hypot(relic.x, relic.z), mass, reach, head,
+        offset: Math.hypot(relic.x, relic.z), mass, anchorMass, reach, head,
     });
     if (!group) notes.push(`relic ${relic.id}: NOT IN THE SCENE`);
     if (head != null && head < HERO_HEIGHT) {
         notes.push(`relic ${relic.id}: arch clears ${head.toFixed(2)} — the hero is ${HERO_HEIGHT}`);
+    }
+    if (anchorMass > 0) {
+        notes.push(`relic ${relic.id}: ${anchorMass} raised cell(s) inside the radius-${ANCHOR_R} anchor`);
     }
 }
 
@@ -218,14 +240,15 @@ for (const [what, screen, at, reachR] of [
         what, screen, built: !!group,
         offset: Math.hypot(at.x, at.z),
         mass: massWithin(level, origin, at.x, at.z, 2.5),
+        anchorMass: null,
         reach: reachable(level, origin, half, at.x, at.z, reachR),
         head: null,
     });
     if (!group) notes.push(`${what}: NOT IN THE SCENE`);
 }
 
-console.log('what                screen   built  offset   mass  nearest-walkable  headroom');
-console.log('-'.repeat(80));
+console.log('what                screen   built  offset   mass  anchor  nearest-walkable  headroom');
+console.log('-'.repeat(88));
 for (const r of rows) {
     console.log(
         r.what.padEnd(19)
@@ -233,11 +256,12 @@ for (const r of rows) {
         + ` ${(r.built ? 'yes' : 'NO ').padEnd(6)}`
         + ` ${r.offset.toFixed(2).padStart(6)}`
         + ` ${String(r.mass).padStart(6)}`
+        + ` ${(r.anchorMass == null ? '—' : String(r.anchorMass)).padStart(6)}`
         + ` ${(r.reach.ok ? r.reach.nearest.toFixed(2) : `${r.reach.nearest.toFixed(2)} CUT OFF`).padStart(17)}`
         + ` ${(r.head == null ? '—' : r.head.toFixed(2)).padStart(9)}`,
     );
 }
-console.log('-'.repeat(80));
+console.log('-'.repeat(88));
 for (const r of rows) {
     if (!r.reach.ok) notes.push(`${r.what}: nearest walkable cell is ${r.reach.nearest.toFixed(2)} away`);
     if (r.offset > RELIC_MAX_OFFSET) notes.push(`${r.what}: sits ${r.offset.toFixed(2)} from centre, past ${RELIC_MAX_OFFSET}`);

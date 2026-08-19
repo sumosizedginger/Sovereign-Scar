@@ -91,6 +91,25 @@ function box(g, { w, h, d, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, color, .
     g.add(m);
     return m;
 }
+/**
+ * A box that RESTS on the floor, given its own tilt.
+ *
+ * Centring a box at `h / 2` puts it flat on the ground only while it is level.
+ * Give it `rz` or `rx` and the low corner drops by half the relevant span times
+ * the sine of the tilt: the cold fire's toppled ring stones went 6.8 cm under,
+ * and a 3.4-metre beam at 0.16 rad would go 27 cm under. Sub-pixel at the scale
+ * this game is played and still wrong, and `relics.spec.mjs` checks for it.
+ *
+ * Written once here because it was got wrong twice by hand. Pass the same spec
+ * `box` takes; `y` is measured from the floor to the box's UNDERSIDE rather
+ * than to its centre, which is how anybody actually thinks about placing one.
+ */
+function grounded(g, spec) {
+    const { w = 0, h = 0, d = 0, rx = 0, rz = 0, y = 0 } = spec;
+    const lift = Math.abs(Math.sin(rz)) * (w / 2) + Math.abs(Math.sin(rx)) * (d / 2);
+    return box(g, { ...spec, y: y + h / 2 + lift });
+}
+
 
 /**
  * One rib: boxes stepping along a quarter ellipse, each rotated to its tangent.
@@ -573,10 +592,536 @@ export function buildColdSignalFire() {
     return g;
 }
 
+/**
+ * SPINDLE — the toppled survey mast.
+ *
+ * The region is computing-vault heights in iron and slate, so what fell over
+ * here is instrumentation: a lattice tower that used to hold a dish, lying flat
+ * with its concrete footing snapped off at the base.
+ *
+ * PLAN VIEW FIRST. A lattice is rails plus rungs, which from directly above is
+ * a LADDER — one of the few silhouettes as unambiguous as a ring — and the dish
+ * at the far end turns it into a ladder with a circle on it. Neither shape is
+ * used by any other relic, which matters more than it sounds: eight set pieces
+ * seen from the same fixed 70.7 degrees have to be told apart at a glance.
+ */
+export function buildSurveyMast() {
+    const g = new THREE.Group();
+    const IRON = 0x7d8189;
+    const IRON_DARK = 0x565b62;
+    const CONCRETE = 0xa8a49c;
+    const CONCRETE_DARK = 0x7b776f;
+    const VIOLET = 0x6a4d8c;
+
+    // The footing: a broken slab with the stumps of its bolts still in it.
+    grounded(g, { w: 2.0, h: 0.42, d: 2.0, x: 2.6, z: 1.4, ry: 0.24, color: CONCRETE, rough: 0.95 });
+    for (const [bx, bz] of [[-0.6, -0.6], [0.6, -0.6], [-0.6, 0.6], [0.6, 0.6]]) {
+        grounded(g, {
+            w: 0.16, h: 0.5, d: 0.16, x: 2.6 + bx, y: 0.42, z: 1.4 + bz,
+            color: IRON_DARK, metal: 0.5, rough: 0.6,
+        });
+    }
+    // A chunk of it that came away with the tower.
+    grounded(g, { w: 0.9, h: 0.34, d: 0.8, x: 1.5, z: 0.2, ry: 0.9, rz: 0.14, color: CONCRETE_DARK, rough: 1.0 });
+
+    // The tower, lying down. Two rails and the rungs between them.
+    const mast = new THREE.Group();
+    // THE YAW WAS 180 DEGREES OUT AND THE PROP REACHED 6.87 BECAUSE OF IT.
+    // The rails run along the group's LOCAL -X, so a yaw of 2.34 threw the far
+    // end away from the dish instead of toward it: the tower pointed one way,
+    // the thing that fell off the end of it lay the other, and the pair pushed
+    // the footprint past the radius-6 protected disc where the grammar is free
+    // to build boulders. Pointing it at its own dish fixed the story and the
+    // footprint in one number.
+    mast.position.set(2.1, 0.0, 0.9);
+    mast.rotation.set(0, 5.48, 0);
+    const LEN = 5.2;
+    for (const side of [-0.36, 0.36]) {
+        grounded(mast, { w: LEN, h: 0.18, d: 0.18, x: -LEN / 2, z: side, color: IRON, metal: 0.45, rough: 0.55 });
+    }
+    for (let i = 0; i < 11; i++) {
+        const t = -0.35 - (i / 10) * (LEN - 0.7);
+        grounded(mast, {
+            w: 0.14, h: 0.12, d: 0.78, x: t, y: 0.02,
+            color: i % 2 ? IRON : IRON_DARK, metal: 0.4, rough: 0.6,
+        });
+    }
+    // Two diagonal braces, because a real lattice is triangulated and the
+    // diagonals are what stop the ladder reading as a fence.
+    for (const [bx, br] of [[-1.9, 0.62], [-4.4, -0.62]]) {
+        grounded(mast, { w: 1.9, h: 0.12, d: 0.12, x: bx, y: 0.04, ry: br, color: IRON_DARK, metal: 0.4, rough: 0.6 });
+    }
+    g.add(mast);
+
+    // The dish, face down at the far end, with its hub and lens.
+    const dish = new THREE.Group();
+    dish.position.set(-1.6, 0, -2.9);
+    dish.rotation.set(0, 0.5, 0);
+    for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * Math.PI * 2;
+        grounded(dish, {
+            w: 0.52, h: 0.2, d: 0.42,
+            x: Math.cos(a) * 1.05, z: Math.sin(a) * 1.05, ry: a,
+            color: i % 2 ? IRON : IRON_DARK, metal: 0.45, rough: 0.55,
+        });
+    }
+    grounded(dish, { w: 1.5, h: 0.16, d: 1.5, color: IRON_DARK, metal: 0.4, rough: 0.65 });
+    // The one coloured thing on it. Diffuse violet, no emissive - the region's
+    // accent worn as a material rather than as a light, which is the rule the
+    // whole cosmetic axis follows.
+    grounded(dish, { w: 0.6, h: 0.3, d: 0.6, y: 0.16, color: VIOLET, metal: 0.3, rough: 0.35 });
+    g.add(dish);
+
+    g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
+    return g;
+}
+
+/**
+ * SINKLANDS — the shipwreck, where there has been no water for a very long time.
+ *
+ * The joke carries itself and needs no line of dialogue, which is why this is
+ * the one set piece `docs/EASTER-EGGS.md` named before any of the others.
+ *
+ * BUILT AS A HULL, NOT AS A SKELETON. The obvious way to draw a wrecked boat is
+ * a keel with ribs coming off it, and from above that is the dragon again -
+ * eight relics have to be distinguishable at a glance and two of them being a
+ * spine with ribs is a waste of one. So the bow half keeps its planking and
+ * reads SOLID, the stern half is open ribs, and the break between them is the
+ * thing that says wreck.
+ */
+export function buildShipwreck() {
+    const g = new THREE.Group();
+    const HULL = 0x6e6250;
+    const HULL_DARK = 0x4a4132;
+    const DECK = 0xa89a80;
+    const TAR = 0x2a2622;
+    const RUST = 0x7a4a2c;
+
+    // THE FIRST BUILD OF THIS WAS A PILE OF PLANKS AND A BLACK BAR.
+    //
+    // It drew the hull as separated angled boards either side of a heavy tar
+    // keel, which from 70.7 degrees read as a herringbone with a black stripe
+    // through it - a fern, or the dragon again, but not a boat. Two faults:
+    // the boards had GAPS, so there was no closed shape for the eye to fill,
+    // and the keel was the darkest thing in the frame, so the one element that
+    // should have been hidden under the hull was the one element that read.
+    //
+    // Rebuilt as a continuous OUTLINE. The perimeter is a closed ellipse of
+    // overlapping boxes with a pointed bow, which is a boat from directly above
+    // and nothing else - and the bow third is decked over so the front is a
+    // solid mass and the open stern is obviously open by comparison.
+    const A = 4.2;
+    const B = 1.32;
+    const N = 26;
+    for (let i = 0; i < N; i++) {
+        const th = (i / N) * Math.PI * 2;
+        // Pinch the bow: the ellipse's half-width falls away toward -X so the
+        // outline comes to a point instead of staying round at both ends.
+        const ct = Math.cos(th);
+        const pinch = ct < 0 ? (1 + ct * 0.72) : 1;
+        const x = ct * A;
+        const z = Math.sin(th) * B * pinch;
+        // Taller toward the bow, which is what makes the front read as solid
+        // body and the back as ribs.
+        const h = 0.62 + Math.max(0, -ct) * 0.85;
+        grounded(g, {
+            w: 0.78, h, d: 0.42,
+            x, z, ry: th + Math.PI / 2,
+            color: i % 2 ? HULL : HULL_DARK, rough: 0.93,
+        });
+    }
+    // The decking over the bow third. Overlapping, so it is a surface rather
+    // than a set of boards with the ground showing between them.
+    for (let i = 0; i < 6; i++) {
+        const t = i / 5;
+        const x = -3.7 + i * 0.72;
+        const half = B * (0.30 + t * 0.72);
+        grounded(g, {
+            w: 0.82, h: 0.34, d: half * 2, y: 0.30,
+            x, color: i % 2 ? DECK : HULL, rough: 0.9,
+        });
+    }
+    // The stem post: the tallest thing on the wreck and the front of it.
+    grounded(g, { w: 0.40, h: 1.7, d: 0.5, x: -4.35, rz: 0.18, color: HULL_DARK, rough: 0.9 });
+
+    // The stern ribs, standing above the outline so the back reads as opened up.
+    for (let i = 0; i < 5; i++) {
+        const th = 0.42 + i * 0.28;
+        for (const side of [-1, 1]) {
+            grounded(g, {
+                w: 0.24, h: 1.25 - (i % 2) * 0.4, d: 0.24,
+                x: Math.cos(th) * A * 0.86, z: side * Math.sin(th) * B * 1.02,
+                rz: side * 0.14,
+                color: i % 2 ? HULL : HULL_DARK, rough: 0.95,
+            });
+        }
+    }
+
+    // The keel, showing only where the hull has gone: a short dark line at the
+    // open stern instead of a bar running the whole length.
+    grounded(g, { w: 2.6, h: 0.24, d: 0.34, x: 2.4, color: TAR, rough: 0.95 });
+
+    // The rudder, off its pintles.
+    grounded(g, { w: 1.5, h: 0.22, d: 0.66, x: 4.0, z: -1.0, ry: 0.7, color: HULL_DARK, rough: 0.95 });
+    for (const [rx0, rz0] of [[3.5, -0.5], [4.5, -1.4]]) {
+        grounded(g, { w: 0.3, h: 0.16, d: 0.3, x: rx0, z: rz0, color: RUST, metal: 0.45, rough: 0.6 });
+    }
+
+    // The mast, down across the open stern - the diagonal that keeps a
+    // symmetrical hull from reading as an ornament.
+    const mast = new THREE.Group();
+    mast.position.set(-0.6, 0.30, 0.1);
+    mast.rotation.set(0, 1.05, 0);
+    grounded(mast, { w: 4.6, h: 0.26, d: 0.26, x: 2.1, color: DECK, rough: 0.9 });
+    grounded(mast, { w: 0.22, h: 0.2, d: 1.4, x: 3.7, color: HULL_DARK, rough: 0.9 });
+    g.add(mast);
+    grounded(g, { w: 0.44, h: 0.6, d: 0.44, x: -0.6, z: 0.1, color: HULL_DARK, rough: 0.9 });
+
+    // Loose planking thrown clear, pale so it reads against the clay.
+    for (const [px, pz, pr] of [[-2.8, 2.5, 0.6], [1.4, -2.6, -0.9], [3.0, 2.3, 2.1], [-1.2, -2.9, 1.4]]) {
+        grounded(g, { w: 1.5, h: 0.16, d: 0.34, x: px, z: pz, ry: pr, color: DECK, rough: 0.95 });
+    }
+
+    g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
+    return g;
+}
+
+/**
+ * CITADEL — the throne with nobody in it.
+ *
+ * The centre of the map and the highest-traffic square in the overworld, so it
+ * gets the most deliberate composition of the eight.
+ *
+ * PLAN VIEW FIRST, AGAIN: concentric squares are as unmistakable from directly
+ * above as a ring is, and a dais is concentric squares. The seat is the block
+ * in the middle that stops it being a platform, and the two fallen banner poles
+ * are the diagonals that stop it being architecture.
+ */
+export function buildEmptyThrone() {
+    const g = new THREE.Group();
+    const SLATE = 0x6c6a66;
+    const SLATE_DARK = 0x494743;
+    const GOLD = 0xc9a227;
+    const GOLD_DARK = 0x8c6f18;
+    const CLOTH = 0x4a2a5c;
+
+    // Three steps. Each is drawn as a frame rather than a solid slab so the
+    // step edges read as edges from overhead instead of as one grey lump.
+    const STEPS = [[3.7, 0.0, 0.30, SLATE_DARK], [2.9, 0.30, 0.26, SLATE], [2.2, 0.56, 0.24, SLATE_DARK]];
+    for (const [half, y, h, col] of STEPS) {
+        for (const [sx, sz, w, d] of [
+            [0, -half, half * 2, 0.5], [0, half, half * 2, 0.5],
+            [-half, 0, 0.5, half * 2], [half, 0, 0.5, half * 2],
+        ]) {
+            grounded(g, { w, h, d, x: sx, y, z: sz, color: col, rough: 0.9 });
+        }
+    }
+    // The floor of the top step, so the throne is not standing on a hole.
+    grounded(g, { w: 4.0, h: 0.24, d: 4.0, y: 0.56, color: SLATE, rough: 0.92 });
+
+    // The throne. Seat, back, two arms, and a gold band across the back which
+    // is the only bright thing in the prop.
+    grounded(g, { w: 1.5, h: 0.34, d: 1.2, y: 0.80, color: SLATE_DARK, rough: 0.85 });
+    grounded(g, { w: 1.5, h: 1.8, d: 0.30, y: 0.80, z: -0.75, color: SLATE_DARK, rough: 0.85 });
+    grounded(g, { w: 0.24, h: 1.05, d: 0.24, y: 2.10, z: -0.75, x: -0.55, color: GOLD_DARK, metal: 0.6, rough: 0.4 });
+    grounded(g, { w: 0.24, h: 1.05, d: 0.24, y: 2.10, z: -0.75, x: 0.55, color: GOLD_DARK, metal: 0.6, rough: 0.4 });
+    grounded(g, { w: 1.5, h: 0.26, d: 0.34, y: 2.30, z: -0.75, color: GOLD, metal: 0.7, rough: 0.35 });
+    for (const ax of [-0.86, 0.86]) {
+        grounded(g, { w: 0.26, h: 0.5, d: 1.2, x: ax, y: 1.14, color: SLATE_DARK, rough: 0.85 });
+    }
+
+    // Two banner poles, down. Cloth still on one of them.
+    for (const [px, pz, pr, len] of [[-3.4, 1.6, 0.5, 4.2], [3.2, -1.9, 2.3, 3.6]]) {
+        const pole = new THREE.Group();
+        pole.position.set(px, 0, pz);
+        pole.rotation.set(0, pr, 0);
+        grounded(pole, { w: len, h: 0.18, d: 0.18, x: len / 2, color: GOLD_DARK, metal: 0.5, rough: 0.6 });
+        for (let i = 0; i < 4; i++) {
+            grounded(pole, {
+                w: 0.7, h: 0.1, d: 0.9, x: len * 0.35 + i * 0.72, z: 0.3 + (i % 2) * 0.2,
+                ry: 0.2 * i, color: CLOTH, rough: 1.0,
+            });
+        }
+        g.add(pole);
+    }
+
+    g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
+    return g;
+}
+
+/**
+ * CRYOMIRE — something frozen mid-stride.
+ *
+ * THE PALETTE HERE IS CONSTRAINED AND THE CONSTRAINT MADE IT BETTER. The region
+ * runs frost enemies, `assets/palettes.js` gives them #60e0ff, and
+ * `gear-skins.spec.mjs` fails any outfit whose emissive matches an enemy
+ * accent. So the ice region is the one place an ice-blue glow is forbidden -
+ * and sludge against ice is a stronger idea than ice against ice was ever going
+ * to be. Nothing here is emissive at all.
+ *
+ * The ice is a SHELL, not a block: opaque voxels cannot be seen through, so the
+ * figure inside is enclosed on three sides and left open toward the camera.
+ * A solid cube with a secret in it is a solid cube.
+ */
+export function buildFrozenStride() {
+    const g = new THREE.Group();
+    const ICE = 0xa8c4cc;
+    const ICE_DARK = 0x6e8890;
+    const SLUDGE = 0x4a5238;
+    const SLUDGE_DARK = 0x2f3626;
+    const BODY = 0x2a2e2c;
+
+    // The sludge it froze into, spreading out from the base.
+    for (let i = 0; i < 11; i++) {
+        const a = (i / 11) * Math.PI * 2;
+        const r = 1.5 + (i % 3) * 0.55;
+        grounded(g, {
+            w: 1.1 + (i % 2) * 0.4, h: 0.14, d: 1.1,
+            x: Math.cos(a) * r, z: Math.sin(a) * r, ry: a,
+            color: i % 2 ? SLUDGE : SLUDGE_DARK, rough: 1.0,
+        });
+    }
+
+    // The figure: a stride caught. Deliberately crude - it is a shape in ice,
+    // not a character, and detail here would read as a second hero.
+    grounded(g, { w: 0.62, h: 1.05, d: 0.42, y: 0.5, color: BODY, rough: 0.9 });
+    grounded(g, { w: 0.42, h: 0.42, d: 0.4, y: 1.55, z: -0.06, color: BODY, rough: 0.9 });
+    grounded(g, { w: 0.26, h: 0.9, d: 0.26, x: -0.22, z: 0.42, rx: 0.5, color: BODY, rough: 0.9 });
+    grounded(g, { w: 0.26, h: 0.9, d: 0.26, x: 0.24, z: -0.36, rx: -0.35, color: BODY, rough: 0.9 });
+    grounded(g, { w: 0.9, h: 0.22, d: 0.22, x: 0.5, y: 1.15, rz: -0.4, color: BODY, rough: 0.9 });
+
+    // The ice around it: back and both sides, open toward -Z where the camera
+    // is, so the figure is legible instead of entombed.
+    // THE ICE COMES UP TO THE CHEST, NOT OVER THE HEAD.
+    //
+    // Removing the lid was necessary and not sufficient. At 2.3 the walls still
+    // stood taller than the figure inside them, so from directly above the prop
+    // read as a white well with something dark at the bottom of it - you could
+    // see that there WAS something and not what.
+    //
+    // At 1.45 the head and shoulders stand clear. A head and shoulders coming
+    // out of ice is legible in one glance at any size, and the part still
+    // buried does the rest of the work: what you cannot see is the half that
+    // was walking.
+    grounded(g, { w: 1.9, h: 1.45, d: 0.5, z: -0.95, color: ICE, metal: 0.1, rough: 0.28 });
+    grounded(g, { w: 0.5, h: 1.35, d: 1.5, x: -1.05, z: -0.15, color: ICE_DARK, metal: 0.1, rough: 0.3 });
+    grounded(g, { w: 0.5, h: 1.35, d: 1.5, x: 1.05, z: -0.15, color: ICE_DARK, metal: 0.1, rough: 0.3 });
+    // NO LID. The first build capped this at y 2.1 and the photograph came back
+    // as a white box with nothing in it: the camera is 17.5 units up at 70.7
+    // degrees, so the TOP is the face the player sees, and putting ice across
+    // it hid the only thing the prop is about. "Open toward -Z" was reasoning
+    // about a side view of a game that does not have one.
+    //
+    // A rim instead - four short blocks around the mouth, so the ice still
+    // encloses and the figure is still visible down inside it.
+    for (const [rx, rz, rw, rd] of [
+        [0, -0.95, 1.9, 0.34], [-0.95, -0.15, 0.34, 1.5], [0.95, -0.15, 0.34, 1.5],
+    ]) {
+        grounded(g, { w: rw, h: 0.26, d: rd, x: rx, y: 1.45, z: rz, color: ICE, metal: 0.1, rough: 0.28 });
+    }
+
+    // One slab split off and leaning, so the ice is a broken thing rather than
+    // a container somebody set the figure down in.
+    grounded(g, { w: 0.42, h: 1.7, d: 1.1, x: -1.5, z: 0.55, rz: 0.38, ry: 0.4, color: ICE, metal: 0.1, rough: 0.28 });
+
+    // Spikes radiating out along the ground - the shape that says this froze
+    // outward from a point rather than being carved.
+    for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * Math.PI * 2 + 0.3;
+        const len = 1.2 + (i % 3) * 0.5;
+        grounded(g, {
+            w: len, h: 0.26, d: 0.26,
+            x: Math.cos(a) * (1.6 + len * 0.4), z: Math.sin(a) * (1.6 + len * 0.4),
+            ry: a, rz: 0.12,
+            color: i % 2 ? ICE : ICE_DARK, metal: 0.08, rough: 0.32,
+        });
+    }
+
+    g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
+    return g;
+}
+
+/**
+ * BONETOWN — a house in the ruined town, still furnished.
+ *
+ * Beat 09's dead are frozen mid-task and `world/settlements.js` argues at
+ * length that they must never turn around. This is the same idea with nobody in
+ * it, which is worse: the table is laid, the bed is made, and the walls come up
+ * to a standing hero's chest.
+ *
+ * THE WALLS ARE LOW ON PURPOSE. At 1.1 against a hero of 1.95 you look INTO the
+ * house rather than at it, which is the only way a roofless interior reads from
+ * 70.7 degrees. It also keeps the prop honest: relics do not collide, and a
+ * full-height wall the player walks through teaches them nothing here is real.
+ * A knee-to-chest ruin is a footprint, and walking over a footprint is fine.
+ */
+export function buildFurnishedHouse() {
+    const g = new THREE.Group();
+    const LIME = 0xb0a894;
+    const LIME_DARK = 0x7e7768;
+    const MOSS = 0x5e7048;
+    const WOOD = 0x6a5236;
+    const WOOD_DARK = 0x453520;
+    const CLOTH = 0x9a8f7c;
+
+    const HW = 2.7;
+    const HD = 2.3;
+    const WALL_H = 1.1;
+
+    // Four walls with a gap for the door, drawn in blocks so the courses read.
+    // THE FIRST VERSION DIVIDED THE WRONG AXIS AND THE SIDE WALLS CAME OUT
+    // 0.115 THICK INSTEAD OF 0.44.
+    //
+    // It wrote `w: w / n` for every wall. For the back and front, where the run
+    // is along X, that is right. For the left and right, where the run is along
+    // Z, it chopped up the THICKNESS and left the length whole - so two of the
+    // four walls rendered as rows of thin sticks. Visible instantly in the
+    // photograph and invisible in every number, because a stick is still a
+    // wall as far as a bounding box is concerned.
+    //
+    // Now the long axis is chosen first and only that one is divided.
+    const wall = (x, z, w, d, n) => {
+        const along = w > d;
+        for (let i = 0; i < n; i++) {
+            const t = (i / (n - 1)) - 0.5;
+            const h = WALL_H - (i % 3) * 0.16;
+            grounded(g, {
+                w: along ? w / n + 0.06 : w,
+                h,
+                d: along ? d : d / n + 0.06,
+                x: x + (along ? t * w : 0),
+                z: z + (along ? 0 : t * d),
+                color: i % 2 ? LIME : LIME_DARK, rough: 0.95,
+            });
+        }
+    };
+    wall(0, -HD, HW * 2, 0.44, 9);            // back
+    wall(-HW, 0, 0.44, HD * 2, 8);            // left
+    wall(HW, 0, 0.44, HD * 2, 8);             // right
+    // Front, with a doorway: two stubs instead of a run.
+    wall(-1.75, HD, 1.9, 0.44, 3);
+    wall(1.75, HD, 1.9, 0.44, 3);
+
+    // Moss, on the north wall only - the side that never sees the sun.
+    for (const mx of [-1.9, -0.4, 1.2, 2.2]) {
+        grounded(g, { w: 0.8, h: 0.3, d: 0.5, x: mx, y: WALL_H - 0.34, z: -HD, color: MOSS, rough: 1.0 });
+    }
+
+    // The table, still laid.
+    grounded(g, { w: 1.7, h: 0.14, d: 1.0, y: 0.68, x: -0.5, z: 0.3, color: WOOD, rough: 0.9 });
+    for (const [lx, lz] of [[-1.1, -0.05], [0.1, -0.05], [-1.1, 0.65], [0.1, 0.65]]) {
+        grounded(g, { w: 0.14, h: 0.68, d: 0.14, x: lx, z: lz, color: WOOD_DARK, rough: 0.92 });
+    }
+    for (const [bx, bz] of [[-0.9, 0.15], [-0.15, 0.45]]) {
+        grounded(g, { w: 0.34, h: 0.12, d: 0.34, x: bx, y: 0.82, z: bz, color: CLOTH, rough: 0.95 });
+    }
+    // Two stools, one knocked over.
+    grounded(g, { w: 0.5, h: 0.44, d: 0.5, x: -1.7, z: 0.3, color: WOOD_DARK, rough: 0.92 });
+    grounded(g, { w: 0.5, h: 0.44, d: 0.5, x: 0.75, z: 0.35, rz: 1.3, color: WOOD_DARK, rough: 0.92 });
+
+    // The bed, made.
+    grounded(g, { w: 1.15, h: 0.34, d: 2.0, x: 1.75, z: -0.9, color: WOOD_DARK, rough: 0.92 });
+    grounded(g, { w: 1.05, h: 0.2, d: 1.5, x: 1.75, y: 0.34, z: -0.7, color: CLOTH, rough: 1.0 });
+    grounded(g, { w: 0.95, h: 0.22, d: 0.45, x: 1.75, y: 0.34, z: -1.6, color: LIME, rough: 1.0 });
+
+    // A roof beam, down across the corner. The one diagonal in a prop that is
+    // otherwise all right angles, and the thing that says ruin rather than home.
+    const beam = new THREE.Group();
+    beam.position.set(-2.4, 0.1, -1.9);
+    beam.rotation.set(0, -0.72, 0);
+    grounded(beam, { w: 5.2, h: 0.28, d: 0.28, x: 2.6, rz: 0.1, color: WOOD_DARK, rough: 0.95 });
+    g.add(beam);
+
+    g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
+    return g;
+}
+
+/**
+ * QUARRY — the figure somebody stopped carving.
+ *
+ * A block of basalt with a head and shoulders coming out of the top of it and
+ * the rest still stone, the chisel chips still lying where they fell, and the
+ * scaffold plank down.
+ *
+ * From overhead the read is a hard rectangle with one ROUNDED, PALE end - the
+ * carved part is dressed lighter than the raw block on purpose, because value
+ * is what separates shapes at this camera and two greys would be one grey. The
+ * cold fire taught that the expensive way.
+ */
+export function buildUnfinishedCarving() {
+    const g = new THREE.Group();
+    const BASALT = 0x4e4a48;
+    const BASALT_DARK = 0x33302e;
+    const DRESSED = 0x8e8880;
+    const PALE = 0xaaa49a;
+    const WOOD = 0x6a5236;
+    const IRON = 0x585450;
+
+    // IT LIES DOWN, AND THE FIRST VERSION DID NOT.
+    //
+    // Built standing, this was a head on shoulders on a block - and a standing
+    // figure seen from directly above is a head with a ring of shoulder around
+    // it, which reads as a stack of boxes and nothing else. The photograph came
+    // back looking like a small ziggurat.
+    //
+    // A RECUMBENT EFFIGY solves it completely: lying on its back, the figure's
+    // whole outline faces the camera, and a human outline is one of the few
+    // shapes a person recognises instantly at any size. It is also the better
+    // idea - a tomb effigy is what a quarry in a region full of the dead would
+    // actually be cutting, and half-finished it says the carver did not get to
+    // the legs.
+    //
+    // The plinth is deliberately DARK and the carved figure PALE. Value is what
+    // separates shapes at this camera; two greys would have been one grey.
+    grounded(g, { w: 4.4, h: 0.62, d: 2.1, color: BASALT_DARK, rough: 0.98 });
+    // The block the legs are still inside, left square at the foot end.
+    grounded(g, { w: 1.7, h: 0.95, d: 1.75, x: 1.3, color: BASALT, rough: 0.98 });
+    for (let i = 0; i < 3; i++) {
+        grounded(g, { w: 0.1, h: 0.85, d: 1.8, x: 0.75 + i * 0.55, y: 0.62, color: BASALT_DARK, rough: 1.0 });
+    }
+
+    // The figure, from the head down, stopping where the work stopped.
+    grounded(g, { w: 0.72, h: 0.5, d: 0.72, x: -1.85, y: 0.62, color: PALE, rough: 0.72 });
+    grounded(g, { w: 0.42, h: 0.34, d: 0.34, x: -1.42, y: 0.62, color: DRESSED, rough: 0.75 });
+    grounded(g, { w: 1.5, h: 0.46, d: 1.25, x: -0.6, y: 0.62, color: DRESSED, rough: 0.78 });
+    grounded(g, { w: 0.9, h: 0.4, d: 0.95, x: 0.35, y: 0.62, color: DRESSED, rough: 0.8 });
+    // One arm laid across the chest and finished; the other still in the stone.
+    grounded(g, { w: 1.05, h: 0.26, d: 0.3, x: -0.75, y: 1.08, z: 0.18, ry: 0.42, color: PALE, rough: 0.74 });
+    grounded(g, { w: 0.85, h: 0.3, d: 0.32, x: -0.6, y: 0.62, z: -0.78, color: BASALT, rough: 0.98 });
+
+    // Chips, denser on the side the carver stood.
+    for (const [cx, cz, cw] of [
+        [-2.6, 1.7, 0.3], [-1.9, 2.1, 0.22], [-3.0, 0.9, 0.26], [-2.2, -1.6, 0.2],
+        [0.6, 1.9, 0.24], [2.4, 1.3, 0.18], [1.4, -1.8, 0.22], [-0.4, 2.3, 0.26],
+    ]) {
+        grounded(g, { w: cw, h: 0.16, d: cw, x: cx, z: cz, ry: cx, color: BASALT_DARK, rough: 1.0 });
+    }
+
+    // The scaffold, down, and the mallet put down beside the head.
+    const plank = new THREE.Group();
+    plank.position.set(-2.2, 0.06, 2.6);
+    plank.rotation.set(0, 0.42, 0);
+    grounded(plank, { w: 3.6, h: 0.14, d: 0.55, x: 0.4, color: WOOD, rough: 0.95 });
+    grounded(plank, { w: 3.2, h: 0.14, d: 0.5, x: 0.6, z: 0.68, ry: 0.1, color: WOOD, rough: 0.95 });
+    g.add(plank);
+    grounded(g, { w: 0.7, h: 0.55, d: 0.7, x: -3.4, z: 2.2, rz: 0.9, color: WOOD, rough: 0.95 });
+    grounded(g, { w: 0.7, h: 0.16, d: 0.16, x: -2.9, z: -1.1, ry: 1.1, color: WOOD, rough: 0.95 });
+    grounded(g, { w: 0.3, h: 0.26, d: 0.3, x: -2.6, z: -1.4, color: IRON, metal: 0.5, rough: 0.6 });
+
+    g.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
+    return g;
+}
+
 /** id → builder. A relic's `kind` chooses its mesh. */
 export const RELIC_BUILDERS = {
     dragon: buildDragonSkeleton,
     signal_fire: buildColdSignalFire,
+    survey_mast: buildSurveyMast,
+    shipwreck: buildShipwreck,
+    empty_throne: buildEmptyThrone,
+    frozen_stride: buildFrozenStride,
+    furnished_house: buildFurnishedHouse,
+    unfinished_carving: buildUnfinishedCarving,
 };
 
 /**
@@ -593,18 +1138,92 @@ export const REGION_RELICS = {
         screen: 'r0c1',
         x: 1.2, z: -0.5,
         skin: 'bonewarden',
+        // THE ONLY RELIC THAT CLAIMS AN ARCH. The dragon's ribs are an
+        // invitation to walk through the animal, so their clearance is a
+        // promise and `tests/qa/easter-eggs.mjs` measures it. Nothing else here
+        // makes that promise - a throne, a house and a block of ice all have
+        // geometry over head height and none of them are asking anybody to walk
+        // under it. A probe that invents claims on a prop's behalf reports
+        // failures nobody can act on, and gets ignored.
+        walkUnder: RIBCAGE_X,
         label: 'the long dead thing',
         lines: [
             { speaker: 'PREDECESSOR', text: 'It came down here on its own, a long way before us. Nobody killed it. It just stopped.' },
             { speaker: 'PREDECESSOR', text: 'Take something off it. It has no use for the colour any more, and the road ahead has plenty of ways to go unnoticed.' },
         ],
     },
-    spindle: null,
-    sinklands: null,
-    citadel: null,
-    quarry: null,
-    bonetown: null,
-    cryomire: null,
+    spindle: {
+        id: 'relic:spindle',
+        kind: 'survey_mast',
+        screen: 'r1c3',
+        x: 0.6, z: -0.4,
+        skin: 'surveyor',
+        label: 'the mast that fell',
+        lines: [
+            { speaker: 'PREDECESSOR', text: 'They put these up to listen. Not to us — to the thing under the vaults, so somebody would know when it woke.' },
+            { speaker: 'PREDECESSOR', text: 'This one is face down in the dirt, and it has been for years. So we did know. We just were not listening back.' },
+        ],
+    },
+    sinklands: {
+        id: 'relic:sinklands',
+        kind: 'shipwreck',
+        screen: 'r4c3',
+        x: -0.5, z: 0.8,
+        skin: 'landlocked',
+        label: 'a ship, a long way from any water',
+        lines: [
+            { speaker: 'PREDECESSOR', text: 'There was water here. Not a river — the whole of it, deep enough for this.' },
+            { speaker: 'PREDECESSOR', text: 'Nobody alive has seen it. The hull is the only argument left that it was ever true, and the hull is going too.' },
+        ],
+    },
+    citadel: {
+        id: 'relic:citadel',
+        kind: 'empty_throne',
+        screen: 'r3c4',
+        x: 0.0, z: -1.2,
+        skin: 'attendant',
+        label: 'the seat nobody took',
+        lines: [
+            { speaker: 'PREDECESSOR', text: 'Everyone who came through here wanted to sit in it. I did. I stood in front of it for an hour.' },
+            { speaker: 'PREDECESSOR', text: 'It is a chair. That is the joke and it is not funny: they built the approach, and the steps, and the banners, and then a chair.' },
+        ],
+    },
+    quarry: {
+        id: 'relic:quarry',
+        kind: 'unfinished_carving',
+        screen: 'r5c0',
+        x: 1.0, z: 0.4,
+        skin: 'unfinished',
+        label: 'the one they stopped carving',
+        lines: [
+            { speaker: 'PREDECESSOR', text: 'Head and shoulders, and then nothing. The chips are still where they fell — they did not pack up, they just left.' },
+            { speaker: 'PREDECESSOR', text: 'I have thought about that more than I want to. Whatever came, it came fast enough that putting the mallet down was the last thing anybody here decided.' },
+        ],
+    },
+    bonetown: {
+        id: 'relic:bonetown',
+        kind: 'furnished_house',
+        screen: 'r6c3',
+        x: -0.4, z: 0.6,
+        skin: 'tenant',
+        label: 'the house with the table still laid',
+        lines: [
+            { speaker: 'PREDECESSOR', text: 'The roof went, so you can see straight in. Table set for two, bed made, stool knocked over on the way out.' },
+            { speaker: 'PREDECESSOR', text: 'Take something. They are not using it, and you will not be either, in the end — but you will be carrying it, and that is not nothing.' },
+        ],
+    },
+    cryomire: {
+        id: 'relic:cryomire',
+        kind: 'frozen_stride',
+        screen: 'r4c6',
+        x: 0.8, z: 0.2,
+        skin: 'thaw',
+        label: 'the one who stopped walking',
+        lines: [
+            { speaker: 'PREDECESSOR', text: 'Mid-step. Not curled up, not hiding — walking, and then not.' },
+            { speaker: 'PREDECESSOR', text: 'The mire took them and the cold kept them, and between the two of them they made the only honest monument in this region.' },
+        ],
+    },
 
     // THE SECOND PROP, AND DELIBERATELY A SMALL ONE.
     //

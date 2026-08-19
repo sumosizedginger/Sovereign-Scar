@@ -202,6 +202,143 @@ export const HERO_SKINS = Object.freeze({
             beardDark: 0x161210,
         },
     },
+
+    // THE MAST THAT FELL, in the spindle heights. Iron and slate with the
+    // region's violet worn as a material rather than as a light - the survey
+    // dish carries the same colour in the same way, so the outfit and the prop
+    // are visibly the same find.
+    surveyor: {
+        id: 'surveyor',
+        name: 'The Surveyor',
+        from: 'the mast that stopped listening',
+        palette: {
+            shirt: 0x54606e,
+            shirtDark: 0x353e49,
+            jeans: 0x2e3440,
+            jeansDark: 0x1b2028,
+            belt: 0x6a4d8c,
+            beltDark: 0x412f57,
+            hair: 0x3a3f45,
+            hairDark: 0x22262a,
+            hairLight: 0x525960,
+            beard: 0x3a3f45,
+            beardDark: 0x22262a,
+        },
+    },
+
+    // THE SHIP, in a region that has had no water in living memory. Sun-bleached
+    // canvas over tar, with rope at the belt. The canvas is deliberately greyer
+    // and darker than the Bonewarden's bone: two pale outfits are one pale
+    // outfit if they land within a few points of each other.
+    landlocked: {
+        id: 'landlocked',
+        name: 'The Landlocked',
+        from: 'the wreck in the dust',
+        palette: {
+            shirt: 0xb8b0a0,
+            shirtDark: 0x88816f,
+            jeans: 0x2a2622,
+            jeansDark: 0x171412,
+            belt: 0x8a6a3c,
+            beltDark: 0x54401f,
+            hair: 0x6a6255,
+            hairDark: 0x3d382f,
+            hairLight: 0x8a8071,
+            beard: 0x6a6255,
+            beardDark: 0x3d382f,
+        },
+    },
+
+    // THE SEAT NOBODY TOOK. The most ornate palette in the set, because the
+    // citadel is the only place in the world that was ever decorated - and
+    // because the joke of the throne is that all of it led to a chair.
+    attendant: {
+        id: 'attendant',
+        name: 'The Attendant',
+        from: 'standing beside an empty chair',
+        palette: {
+            shirt: 0x4a2a5c,
+            shirtDark: 0x2e1a39,
+            jeans: 0x241830,
+            jeansDark: 0x140d1b,
+            belt: 0xc9a227,
+            beltDark: 0x8c6f18,
+            hair: 0x2a2230,
+            hairDark: 0x161119,
+            hairLight: 0x3e3446,
+            beard: 0x2a2230,
+            beardDark: 0x161119,
+        },
+    },
+
+    // THE ONE WHO STOPPED WALKING. Pale cold grey with sludge at the belt.
+    //
+    // NOT ICE BLUE, and the rule that forbids it made it better. The frost
+    // faction's accent is #60e0ff and the hero's rim is azure; an ice-coloured
+    // hero in an ice region wearing a blue rim would have been three shades of
+    // the same idea, one of which belongs to the things trying to kill them.
+    thaw: {
+        id: 'thaw',
+        name: 'The Thaw',
+        from: 'the figure in the mire ice',
+        palette: {
+            shirt: 0x9fb0b4,
+            shirtDark: 0x6f7e82,
+            jeans: 0x3d4a44,
+            jeansDark: 0x232b28,
+            belt: 0x6a7040,
+            beltDark: 0x424626,
+            hair: 0x4a5254,
+            hairDark: 0x2b3032,
+            hairLight: 0x646d70,
+            beard: 0x4a5254,
+            beardDark: 0x2b3032,
+        },
+    },
+
+    // THE HOUSE WITH THE TABLE STILL LAID. Warm moss over limestone: the only
+    // outfit in the game whose colours came off furniture rather than off
+    // stone, bone or iron, which is most of why it feels different to wear.
+    tenant: {
+        id: 'tenant',
+        name: 'The Tenant',
+        from: 'a house whose people did not come back',
+        palette: {
+            shirt: 0x5e6b42,
+            shirtDark: 0x3a4328,
+            jeans: 0x9a9282,
+            jeansDark: 0x6c665a,
+            belt: 0x6a5236,
+            beltDark: 0x40311f,
+            hair: 0x4a4232,
+            hairDark: 0x2a251b,
+            hairLight: 0x655a45,
+            beard: 0x4a4232,
+            beardDark: 0x2a251b,
+        },
+    },
+
+    // THE ONE THEY STOPPED CARVING. Stone dust over basalt - greyscale, which
+    // nothing else in the set is, and the cheapest way to be unmistakable in a
+    // wardrobe that already holds bone, verdigris, dust, charcoal and canvas.
+    unfinished: {
+        id: 'unfinished',
+        name: 'The Unfinished',
+        from: 'the carving nobody came back to',
+        palette: {
+            shirt: 0x8e8880,
+            shirtDark: 0x605b55,
+            jeans: 0x33302e,
+            jeansDark: 0x1d1b1a,
+            belt: 0x585450,
+            beltDark: 0x35322f,
+            hair: 0x4e4a48,
+            hairDark: 0x2c2a29,
+            hairLight: 0x6b6663,
+            beard: 0x4e4a48,
+            beardDark: 0x2c2a29,
+        },
+    },
 });
 
 /** Ids in display order. */

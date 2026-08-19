@@ -187,7 +187,25 @@ function screenFeatures(sid) {
     // clean ground looks mounted, and a dragon with rock over its jaw looks
     // like it has been there a long time.
     const relic = relicOnScreen(sid);
-    if (relic) feats.push({ x: relic.x, z: relic.z, r: 7 });
+    // NINE, NOT SEVEN, AND THE TWO ARE MEASURED.
+    //
+    // The anchor is honoured — `makeProtector` refuses a box that touches one
+    // and `terraceRoom` refuses to raise a cell inside one — but terracing
+    // raises ground by up to two and its SKIRT steps down outside the cell it
+    // was refused at. So an anchor of r keeps the ground clear to about r - 2,
+    // and the relic's radius-7 clearing was really a five.
+    //
+    // Swept rather than guessed, with `tests/qa/easter-eggs.mjs` counting
+    // raised cells inside the anchor across all eight relics:
+    //
+    //     r=7   6 relics affected, 19 cells      r=10  0, 0
+    //     r=8   1 relic affected,   3 cells      r=11  0, 0
+    //     r=9   0 relics affected,  0 cells      r=12  0, 0
+    //
+    // Nine is the first value that actually delivers the seven it asks for. It
+    // affected the dragon too, which has been standing in a slightly terraced
+    // clearing since the day it was placed.
+    if (relic) feats.push({ x: relic.x, z: relic.z, r: 9 });
     if (sid === WELL_SCREEN) feats.push({ ...WELL_AT, r: 4 });
     if (sid === MINER_SCREEN) feats.push({ ...MINER_AT, r: 4 });
     return feats;
