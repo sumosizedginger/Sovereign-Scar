@@ -209,21 +209,32 @@ try {
 
     // ── does each skin READ? ────────────────────────────────────────────────
     //
-    // The pictures said the Bonewarden vanished into the clay. The palette
-    // arithmetic said the opposite — it has the largest luminance separation of
-    // the four (ΔL* 25.4 against the nearest floor colour). One of them is
-    // wrong, and it is the arithmetic: a palette constant is not what gets
-    // rendered. Lighting, the weathering decals and the separation rim all sit
-    // between the table and the frame.
+    // THIS BLOCK WAS WRONG FOR ITS WHOLE LIFE AND SAID SO OUT LOUD EVERY RUN.
     //
-    // So this measures the FRAME, with the method `silhouette-contrast.mjs`
-    // settled on: mean CIE-L* over a disc on the body against an annulus of
-    // floor just outside it. The hero is PROJECTED rather than assumed to be at
-    // frame centre — a probe in this repository once sampled the middle of the
-    // screen while the character rendered 35 px lower, and every number it ever
-    // published was diluted with floor.
+    // It sampled a disc of radius 9 on the projected chest against an annulus
+    // of "floor" 15 to 28 pixels out, and reported that the CRUSTWALKER - the
+    // hero this game has shipped with since launch - DISSOLVES against quarry
+    // slate. It also gave three completely different skins body values of 42.5,
+    // 42.8 and 42.8 on the same ground, which is the signature of a sampler
+    // that is not looking at the thing it names: three palettes that far apart
+    // cannot agree to a tenth of a point.
+    //
+    // The annulus is the fault. At 15 to 28 px from a 34-px hero it contains
+    // the contact shadow, the held weapon, the shield and whatever prop is
+    // nearby - so "floor" was a blend of the character's own furniture, and the
+    // disc caught the rim light and the head as much as the shirt.
+    //
+    // The method now is the one `gear-skin-shots.mjs` settled on: HIDE THE RIG
+    // AND SHOW IT. The pixels that differ are the hero's exact silhouette, and
+    // the SAME pixels in the hidden frame are the ground that was actually
+    // behind them. No disc, no annulus, no guess about where the figure is -
+    // the figure is defined by its own absence.
+    //
+    // Two grounds, because separation is a property of a PAIR. A palette that
+    // reads on clay can vanish on slate, and the wardrobe lets a player wear
+    // any of them anywhere.
     console.log('-'.repeat(84));
-    console.log('skin            screen     body L*   floor L*    dL*   verdict');
+    console.log('skin            screen            px   body L*   floor L*    dL*   dRGB   verdict');
     const FLOORS = [
         ['scarfield', 'tombfields clay'],
         ['r4c0', 'quarry slate'],
@@ -253,59 +264,85 @@ try {
                 };
             }, id, sid);
 
-            const b64 = await page.screenshot({ encoding: 'base64' });
-            const res = await page.evaluate(async (dataB64, cx, cy) => {
-                const img = new Image();
-                await new Promise((r) => { img.onload = r; img.src = 'data:image/png;base64,' + dataB64; });
-                const cv = document.createElement('canvas');
-                cv.width = img.width; cv.height = img.height;
-                const ctx = cv.getContext('2d', { willReadFrequently: true });
-                ctx.drawImage(img, 0, 0);
-                const d = ctx.getImageData(0, 0, img.width, img.height).data;
-                const srgb = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
-                const lum = (r, g, b) => 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
-                const Lstar = (Y) => (Y <= 0.008856 ? 903.3 * Y : 116 * Math.cbrt(Y) - 16);
-                // The hero is ~30 px tall at 720p. Same proportions as
-                // silhouette-contrast: a tight disc on the body, a ring of
-                // floor outside it with a gap so the rim light is in neither.
-                const R_BODY = 9, R_IN = 15, R_OUT = 28;
-                const body = [], floor = [];
-                for (let y = Math.floor(cy - R_OUT); y <= cy + R_OUT; y++) {
-                    for (let x = Math.floor(cx - R_OUT); x <= cx + R_OUT; x++) {
-                        if (x < 0 || y < 0 || x >= img.width || y >= img.height) continue;
-                        const dist = Math.hypot(x - cx, y - cy);
-                        const i = (y * img.width + x) * 4;
-                        const p = [d[i], d[i + 1], d[i + 2]];
-                        if (dist <= R_BODY) body.push(p);
-                        else if (dist >= R_IN && dist <= R_OUT) floor.push(p);
-                    }
-                }
-                const avg = (a) => a.reduce((acc, p) => [
-                    acc[0] + p[0] / a.length, acc[1] + p[1] / a.length, acc[2] + p[2] / a.length,
-                ], [0, 0, 0]);
-                const bA = avg(body), fA = avg(floor);
-                return {
-                    body: +Lstar(lum(...bA)).toFixed(1),
-                    floor: +Lstar(lum(...fA)).toFixed(1),
+            // The world is stopped for the pair, so both frames share a body
+            // pose and a dust position and the mask keeps describing the hero.
+            await page.evaluate(() => {
+                const s = window.__sovereignScar;
+                s.game.paused = true;
+                s.player.rig.visible = false;
+            });
+            await sleep(220);
+            const bare = await page.screenshot({ encoding: 'base64' });
+            await page.evaluate(() => { window.__sovereignScar.player.rig.visible = true; });
+            await sleep(220);
+            const shown = await page.screenshot({ encoding: 'base64' });
+            await page.evaluate(() => { window.__sovereignScar.game.paused = false; });
+
+            const res = await page.evaluate(async (b64g, b64f) => {
+                const load = async (b64) => {
+                    const img = new Image();
+                    await new Promise((r) => { img.onload = r; img.src = 'data:image/png;base64,' + b64; });
+                    const cv = document.createElement('canvas');
+                    cv.width = img.width; cv.height = img.height;
+                    const ctx = cv.getContext('2d', { willReadFrequently: true });
+                    ctx.drawImage(img, 0, 0);
+                    return ctx.getImageData(0, 0, img.width, img.height).data;
                 };
-            }, b64, m.cx, m.cy);
+                const [g, f] = await Promise.all([load(b64g), load(b64f)]);
+                const srgb = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+                const lum = (r, gg, b) => 0.2126 * srgb(r) + 0.7152 * srgb(gg) + 0.0722 * srgb(b);
+                const Lstar = (Y) => (Y <= 0.008856 ? 903.3 * Y : 116 * Math.cbrt(Y) - 16);
+                let n = 0, bodyY = 0, floorY = 0;
+                const bm = [0, 0, 0], fm = [0, 0, 0];
+                for (let i = 0; i < g.length; i += 4) {
+                    const d = Math.abs(g[i] - f[i]) + Math.abs(g[i + 1] - f[i + 1]) + Math.abs(g[i + 2] - f[i + 2]);
+                    if (d <= 45) continue;
+                    n++;
+                    bodyY += lum(f[i], f[i + 1], f[i + 2]);
+                    floorY += lum(g[i], g[i + 1], g[i + 2]);
+                    for (let k = 0; k < 3; k++) { bm[k] += f[i + k]; fm[k] += g[i + k]; }
+                }
+                if (!n) return { body: 0, floor: 0, px: 0, dRGB: 0 };
+                // LUMINANCE IS NOT THE WHOLE ANSWER, and taking it as the whole
+                // answer is what made the first verdict here wrong twice over.
+                // The hero's shirt is #b03030 and quarry slate is grey: a red
+                // figure on grey ground separates by HUE and barely at all by
+                // value, so a dL*-only rule calls the character this game ships
+                // with invisible. Both are reported and the verdict needs both
+                // to be small before it says anything alarming.
+                return {
+                    body: +Lstar(bodyY / n).toFixed(1),
+                    floor: +Lstar(floorY / n).toFixed(1),
+                    px: n,
+                    dRGB: Math.round(Math.hypot(...bm.map((v, k) => (v - fm[k]) / n))),
+                };
+            }, bare, shown);
 
             const dL = +(res.body - res.floor).toFixed(1);
             readings.push({ id, label, ...res, dL });
-            const verdict = Math.abs(dL) >= 8 ? 'reads'
-                : Math.abs(dL) >= 4 ? 'weak' : 'DISSOLVES';
+            const verdict = (Math.abs(dL) >= 8 || res.dRGB >= 45) ? 'reads'
+                : (Math.abs(dL) >= 4 || res.dRGB >= 25) ? 'weak'
+                    : 'DISSOLVES';
             console.log(
-                `${id.padEnd(15)} ${label.padEnd(16)} ${String(res.body).padStart(6)}`
-                + `${String(res.floor).padStart(10)} ${String(dL).padStart(7)}   ${verdict}`,
+                `${id.padEnd(15)} ${label.padEnd(16)} ${String(res.px).padStart(5)}`
+                + `${String(res.body).padStart(10)}${String(res.floor).padStart(11)}`
+                + ` ${String(dL).padStart(6)} ${String(res.dRGB).padStart(6)}   ${verdict}`,
             );
         }
     }
-    const worst = readings.slice().sort((a, b) => Math.abs(a.dL) - Math.abs(b.dL))[0];
+    // Ranked the way the verdict is decided, or the summary line contradicts
+    // the table it summarises. A figure that separates by colour and not by
+    // value is not the worst thing here just because one of its two numbers is
+    // small.
+    const score = (r) => Math.max(Math.abs(r.dL) / 8, (r.dRGB || 0) / 45);
+    const worst = readings.slice().sort((a, b) => score(a) - score(b))[0];
     console.log('-'.repeat(84));
-    console.log(`worst: ${worst.id} on ${worst.label} at dL* ${worst.dL}`);
+    console.log(`worst: ${worst.id} on ${worst.label} - dL* ${worst.dL}, dRGB ${worst.dRGB}`);
     console.log('A skin is a cosmetic, and a cosmetic that makes the player harder');
-    console.log('to find is not a cosmetic. |dL*| under 4 means the figure is the');
-    console.log('same value as the ground it stands on.');
+    console.log('to find is not a cosmetic. DISSOLVES means the figure separates');
+    console.log('from its ground neither by value nor by colour - both have to be');
+    console.log('small, because a red hero on grey slate is perfectly visible at');
+    console.log('a dL* of one.');
 
     console.log('-'.repeat(84));
     console.log(`PNGs in ${OUT}/`);
